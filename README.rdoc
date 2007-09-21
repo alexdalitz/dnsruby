@@ -1,0 +1,2 @@
+# Dnsruby is a pure Ruby DNS implementation which implements 
+# all DNS related RFCs.

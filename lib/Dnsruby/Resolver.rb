@@ -173,9 +173,9 @@ module Dnsruby
     #   res = Dnsruby::Resolver.new
     #   query_id = 10 # can be any object you like
     #   query_queue = Queue.new
-    #   response = res.send_async(Message.new("example.com", Types.MX), query_id,  query_queue)
+    #   res.send_async(Message.new("example.com", Types.MX), query_id,  query_queue)
     #   query_id += 1
-    #   response = res.send_async(Message.new("example.com", Types.A), query_id,  query_queue)
+    #   res.send_async(Message.new("example.com", Types.A), query_id,  query_queue)
     #   # ...do a load of other stuff here...
     #   2.times do 
     #     response_id, response, exception = query_queue.pop
