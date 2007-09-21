@@ -32,7 +32,7 @@ begin
 #  require "test/tc_recurse.rb"
   require "test/tc_tcp.rb"
 #  require "test/tc_soak.rb"
-  require "test/tc_axfr.rb"
+#  require "test/tc_axfr.rb" #@TODO@
 rescue Exception
   puts "Cannot bind to socket:\n\t"+$!+"\n"
   puts "This is an indication you have network problems\n"
