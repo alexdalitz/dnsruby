@@ -1,5 +1,34 @@
 Dnsruby
 =======
 
+Dnsruby is a pure Ruby DNS implementation. It aims to comply
+with all DNS RFCs, including DNSSEC NSEC3 support.
 
-#@todo@ Create README file!!!
+Dnsruby presents a new API for DNS. It is based on Ruby's core
+resolv.rb Resolv API, but has been much extended to provide a
+complete DNS implementation.
+
+Dnsruby runs a single I/O thread to handle all concurrent
+queries, and is therefore suitable for high volume DNS 
+applications.
+
+The following is a (non-exhaustive) list of features :
+
+o Implemented RRs :  A, AAAA, AFSDB, ANY, CERT, CNAME, DNAME,
+     HINFO, ISDN, LOC, MB, MG, MINFO, MR, MX, NAPTR, NS, NSAP,
+     OPT, PTR, PX, RP, RT, SOA, SPF, SRV, TKEY, TKEY, TSIG,
+     TSIG,TXT, WKS, X25
+
+o Generic RR types supported (RFC3597)
+
+o Zone transfer (AXFR and IXFR) supported
+
+o Dyamic updates supported
+
+o DNSSEC support in progress
+
+
+Contact
+=======
+
+Use dnsruby rubyforge forums

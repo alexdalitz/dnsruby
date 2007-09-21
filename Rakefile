@@ -2,9 +2,8 @@ require 'rake/testtask'
 require 'rake/rdoctask'
 
 Rake::RDocTask.new do |rd|
-  rd.main = "README.rdoc"
-  rd.rdoc_files.include("README.rdoc", "lib/**/*.rb")
-  rd.options << "--ri"
+  rd.rdoc_files.include("lib/**/*.rb")
+#  rd.options << "--ri"
 end
   
 task :test => :install do 
