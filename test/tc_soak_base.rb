@@ -1,0 +1,138 @@
+require 'rubygems'
+require 'test/unit'
+require 'eventmachine'
+require 'Dnsruby'
+
+class TestSoakBase < Test::Unit::TestCase
+  include Dnsruby
+  Rrs = [
+  {
+    :type   		=> Types.A,
+    :name   		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
+    :address 	=> '10.0.1.128'
+  },
+  {
+    :type		=> Types::MX,
+    :name		=> 'mx.t.dnsruby.validation-test-servers.nominet.org.uk',
+    :exchange	=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
+    :preference 	=> 10
+  },
+  {
+    :type		=> 'CNAME',
+    :name		=> 'cname.t.dnsruby.validation-test-servers.nominet.org.uk',
+    :domainname		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk'
+  },
+  {
+    :type		=> Types.TXT,
+    :name		=> 'txt.t.dnsruby.validation-test-servers.nominet.org.uk',
+    :strings		=> ['Net-DNS']
+  }		
+  ]		
+
+  def test_continuous_queries_asynch_single_res
+    # Have two threads looping, with one sending, and one receiving queries.
+    # Never exceed more than 250 concurrent queries, but make sure they're always running.
+    num_loops = 2000
+    num_sent = 0
+    q = Queue.new
+    timed_out = 0
+    mutex = Mutex.new
+    start = Time.now
+    num_in_progress = 0
+    sender = Thread.new{
+      res = SingleResolver.new
+      res.packet_timeout=5
+      # On windows, MAX_FILES is 256. This means that we have to limit
+      # this test while we're not using single sockets.
+      # We run four queries per iteration, so we're limited to 64 runs.
+      num_loops.times do |i|
+        rr_count = 0
+        Rrs.each do |data|
+          rr_count+=1
+          while (mutex.synchronize{num_in_progress> 250}) do
+            sleep(0.01)
+          end
+          res.send_async(Message.new(data[:name], data[:type]), [i,rr_count], q)
+          num_sent+=1
+          mutex.synchronize {
+            num_in_progress+=1
+          }
+        end
+      end
+      
+    }
+    receiver = Thread.new{
+     (num_loops*4).times do |i|
+        id,ret, error = q.pop
+        mutex.synchronize {
+          num_in_progress-=1
+        }
+        if (error.class == ResolvTimeout)
+          timed_out+=1
+          #        p "Number #{i} timed out!"
+        elsif (ret.class != Message)
+          TheLog.debug("tc_single_resolver : Query #{i} ERROR RETURNED : #{error.class}, #{error}")
+        end
+      end
+    }
+    sender.join
+    receiver.join
+    assert(num_in_progress==0)
+    stop=Time.now
+    time_taken=stop-start
+    p "Query count : #{num_sent}, #{timed_out} timed out. #{time_taken} time taken"
+    assert(timed_out < num_sent * 0.1, "#{timed_out} of #{num_sent} timed out!")
+  end
+  
+  def test_continuous_queries_asynch_resolver
+    # Have two threads looping, with one sending, and one receiving queries.
+    # Never exceed more than 250 concurrent queries, but make sure they're always running.
+    num_loops = 1000
+    num_sent = 0
+    q = Queue.new
+    timed_out = 0
+    mutex = Mutex.new
+    start = Time.now
+    num_in_progress = 0
+    sender = Thread.new{
+      res = Resolver.new
+      # On windows, MAX_FILES is 256. This means that we have to limit
+      # this test while we're not using single sockets.
+      # We run four queries per iteration, so we're limited to 64 runs.
+      num_loops.times do |i|
+        while (mutex.synchronize{num_in_progress> 50}) do # One query has several sockets in Resolver
+          sleep(0.01)
+        end
+        res.send_async(Message.new("example.com", Types.A), [i,1], q)
+        num_sent+=1
+        mutex.synchronize {
+          num_in_progress+=1
+        }
+      end
+    }
+    error_count=0
+    receiver = Thread.new{
+     (num_loops).times do |i|
+        id,ret, error = q.pop
+        mutex.synchronize {
+          num_in_progress-=1
+        }
+        if (error.class == ResolvTimeout)
+          timed_out+=1
+          #        p "Number #{i} timed out!"
+        elsif (ret.class != Message)
+          error_count+=1
+          TheLog.error("tc_single_resolver : Query #{i} ERROR RETURNED : #{error.class}, #{error}")
+        end
+      end
+    }
+    sender.join
+    receiver.join
+    assert(num_in_progress==0)
+    stop=Time.now
+    time_taken=stop-start
+    p "Query count : #{num_sent}, #{timed_out} timed out, #{error_count} other errors. #{time_taken} time taken"
+    assert(timed_out < num_sent * 0.1, "#{timed_out} of #{num_sent} timed out!")
+    assert(error_count == 0)
+  end
+end

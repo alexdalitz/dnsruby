@@ -14,6 +14,7 @@
 #limitations under the License.
 #++
 require 'Dnsruby/select_thread'
+require 'Dnsruby/event_machine_interface'
 module Dnsruby
   #== Dnsruby::SingleResolver
   #
@@ -191,7 +192,6 @@ module Dnsruby
     # * client_queue - a Queue to push the response to, when it arrives
     # * use_tcp - whether to use TCP (defaults to SingleResolver.use_tcp)
     def send_async(msg, client_query_id, client_queue, use_tcp=@use_tcp)
-      st = SelectThread.instance
       if (msg.kind_of?String)
         msg = Message.new(msg)
       end
@@ -199,9 +199,24 @@ module Dnsruby
       if (udp_packet_size < query_packet.length)
         use_tcp = true
       end
+      #@TODO@ Are we using EventMachine or native Dnsruby?
+      if (Resolver.eventmachine?)
+        send_eventmachine(query_packet, msg.header.id, client_query_id, client_queue, use_tcp)
+      else
+        send_dnsruby(query_packet, msg.header.id, client_query_id, client_queue, use_tcp)
+      end
+    end
+      
+    def send_eventmachine(msg, header_id, client_query_id, client_queue, use_tcp) #:nodoc: all
+        em = EventMachineInterface.instance
+        em.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
+    end
+
+    def send_dnsruby(query_packet, header_id, client_query_id, client_queue, use_tcp) #:nodoc: all
+      endtime = Time.now + @packet_timeout
       # First send the query (synchronously)
       # @TODO@ persisent sockets
-      endtime = Time.now + @packet_timeout
+      st = SelectThread.instance
       socket = nil
       begin
         #@TODO@ Different OSes have different interpretations of "random port" here.
@@ -248,7 +263,7 @@ module Dnsruby
       end
       
       # Then listen for the response
-      query_settings = SelectThread::QuerySettings.new(query_packet, msg.header.id, @tsig_key, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime)
+      query_settings = SelectThread::QuerySettings.new(query_packet, header_id, @tsig_key, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime)
       # The select thread will now wait for the response and send that or a timeout
       # back to the client_queue
       st.add_to_select(query_settings)

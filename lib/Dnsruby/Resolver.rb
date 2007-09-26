@@ -100,6 +100,8 @@ module Dnsruby
     # being targetted, and a new nameserver will be queried with the resultant delay.
     attr_accessor :retry_times, :retry_delay
     
+    @@use_eventmachine=false
+    
     #--
     #@TODO@ add load_balance? i.e. Target nameservers in a random, rather than pre-determined, order?
     #++
@@ -349,6 +351,10 @@ module Dnsruby
       # just ignore it. It may be for a query we've already completed.
       # 
       # So, get the next response from the queue (presuming there is one!)
+      #
+      # @TODO@ Tick could poll the queue and then call this method if needed - no need for observer interface.
+      # @TODO@ Currently, tick and handle_queue_event called from select_thread - could have thread chuck events in to tick_queue. But then, clients would have to call in on other thread!
+      #
       if (queue.empty?)
         TheLog.fatal("Queue empty in handle_queue_event!")
         raise RuntimeError.new("Severe internal error - Queue empty in handle_queue_event")
@@ -613,6 +619,16 @@ module Dnsruby
     def udp_size=(s)
       @udp_size = s
       update
+    end
+    def Resolver.use_eventmachine(on=true)
+      @@use_eventmachine = on
+    end
+    def Resolver.eventmachine?
+      if (@@use_eventmachine)
+        return @@use_eventmachine
+      else
+        return false
+      end
     end
   end
 end

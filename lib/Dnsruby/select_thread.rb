@@ -206,7 +206,7 @@ module Dnsruby
         #          next
         #        end
         #        socket = ready.pop
-        packet_size = 512 # @todo@ Sort out per-query packet sizes
+        packet_size = 512 # @TODO@ Sort out per-query packet sizes!!!
         #        @@mutex.synchronize{
         msg = get_incoming_data(socket, packet_size)
         if (msg!=nil)

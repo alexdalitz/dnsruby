@@ -20,7 +20,7 @@ include Dnsruby
 class TestSingleResolver < Test::Unit::TestCase
   # @todo@ Test udppacketsize
   Thread::abort_on_exception = true
-  
+
   def setup
     Dnsruby::Config.reset
   end
@@ -70,9 +70,9 @@ class TestSingleResolver < Test::Unit::TestCase
     res.packet_timeout=1
     q = Queue.new
     msg = Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk")
-    m = res.send_async(msg, msg, q)
+    res.send_async(msg, msg, q)
     id,ret, error = q.pop
-    assert(id=msg)
+    assert(id==msg)
     assert(ret==nil)
     assert(error.class == ResolvTimeout)
   end

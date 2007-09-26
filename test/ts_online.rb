@@ -21,18 +21,24 @@ require 'socket'
 sock = UDPSocket.new()
 begin
   sock.connect('193.0.14.129', # k.root-servers.net.
-          25)
+    25)
   # OK - online and ready to go
   require "test/tc_res_config.rb"
   require "test/tc_single_resolver.rb"
   require "test/tc_resolver.rb"
   require "test/tc_dns.rb"
   require "test/tc_dnsruby.rb"
-#  require "test/tc_inet6.rb"
-#  require "test/tc_recurse.rb"
+  #  require "test/tc_inet6.rb"
+  #  require "test/tc_recurse.rb"
   require "test/tc_tcp.rb"
-#  require "test/tc_soak.rb"
-#  require "test/tc_axfr.rb" #@TODO@
+  #  require "test/tc_soak.rb"
+  #  require "test/tc_axfr.rb" #@TODO@
+  begin
+    require 'eventmachine'
+    require 'test/tc_event_machine.rb'
+  rescue LoadError => e
+    puts "EventMachine not installed - skipping test"
+  end
 rescue Exception
   puts "Cannot bind to socket:\n\t"+$!+"\n"
   puts "This is an indication you have network problems\n"
