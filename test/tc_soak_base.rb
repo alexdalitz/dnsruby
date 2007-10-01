@@ -3,7 +3,7 @@ require 'test/unit'
 require 'eventmachine'
 require 'Dnsruby'
 
-class TestSoakBase < Test::Unit::TestCase
+class TestSoakBase # < Test::Unit::TestCase
   include Dnsruby
   Rrs = [
   {
@@ -29,9 +29,10 @@ class TestSoakBase < Test::Unit::TestCase
   }		
   ]		
 
-  def test_continuous_queries_asynch_single_res
+  def TestSoakBase.test_continuous_queries_asynch_single_res
     # Have two threads looping, with one sending, and one receiving queries.
-    # Never exceed more than 250 concurrent queries, but make sure they're always running.
+    # Never exceed more than 200 concurrent queries, but make sure they're always running.
+    outstanding_limit = 1
     num_loops = 2000
     num_sent = 0
     q = Queue.new
@@ -42,17 +43,15 @@ class TestSoakBase < Test::Unit::TestCase
     sender = Thread.new{
       res = SingleResolver.new
       res.packet_timeout=5
-      # On windows, MAX_FILES is 256. This means that we have to limit
-      # this test while we're not using single sockets.
-      # We run four queries per iteration, so we're limited to 64 runs.
       num_loops.times do |i|
         rr_count = 0
         Rrs.each do |data|
           rr_count+=1
-          while (mutex.synchronize{num_in_progress> 250}) do
+          while (mutex.synchronize{num_in_progress> outstanding_limit}) do
             sleep(0.01)
           end
           res.send_async(Message.new(data[:name], data[:type]), [i,rr_count], q)
+          puts num_sent
           num_sent+=1
           mutex.synchronize {
             num_in_progress+=1
@@ -84,7 +83,7 @@ class TestSoakBase < Test::Unit::TestCase
     assert(timed_out < num_sent * 0.1, "#{timed_out} of #{num_sent} timed out!")
   end
   
-  def test_continuous_queries_asynch_resolver
+  def TestSoakBase.test_continuous_queries_asynch_resolver
     # Have two threads looping, with one sending, and one receiving queries.
     # Never exceed more than 250 concurrent queries, but make sure they're always running.
     num_loops = 1000

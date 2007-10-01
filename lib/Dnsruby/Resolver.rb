@@ -101,6 +101,7 @@ module Dnsruby
     attr_accessor :retry_times, :retry_delay
     
     @@use_eventmachine=false
+    @@start_eventmachine_loop=true
     
     #--
     #@TODO@ add load_balance? i.e. Target nameservers in a random, rather than pre-determined, order?
@@ -624,11 +625,13 @@ module Dnsruby
       @@use_eventmachine = on
     end
     def Resolver.eventmachine?
-      if (@@use_eventmachine)
-        return @@use_eventmachine
-      else
-        return false
-      end
+      return @@use_eventmachine
+    end
+    def Resolver.start_eventmachine_loop(on=true)
+      @@start_eventmachine_loop=on
+    end
+    def Resolver.start_eventmachine_loop?
+      return @@start_eventmachine_loop
     end
   end
 end
