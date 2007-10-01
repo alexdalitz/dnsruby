@@ -44,6 +44,14 @@ module Dnsruby
   #
   
   class Resolver
+    @@event_machine_available=false
+    begin
+      require 'Dnsruby/event_machine_interface'
+      @@event_machine_available=true
+      TheLog.debug("EventMachine loaded")
+    rescue LoadError
+      TheLog.error("EventMachine not found")
+    end
     DefaultQueryTimeout = 0 
     DefaultPacketTimeout = 10
     DefaultRetryTimes = 4
@@ -622,6 +630,9 @@ module Dnsruby
       update
     end
     def Resolver.use_eventmachine(on=true)
+      if (!@@event_machine_available)
+        raise RuntimeError.new("EventMachine is not available in this environment!")
+      end
       @@use_eventmachine = on
     end
     def Resolver.eventmachine?

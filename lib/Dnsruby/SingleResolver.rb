@@ -14,7 +14,6 @@
 #limitations under the License.
 #++
 require 'Dnsruby/select_thread'
-require 'Dnsruby/event_machine_interface'
 module Dnsruby
   #== Dnsruby::SingleResolver
   #
