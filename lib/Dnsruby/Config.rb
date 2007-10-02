@@ -267,7 +267,11 @@ module Dnsruby
     def to_s
       ret = "Config - nameservers : "
       @nameserver.each {|n| ret += n.to_s + ", "}
-      ret += " domain : #{domain}, search : "
+      domain_string="empty"
+      if (@domain!=nil)
+        domain_string=@domain.to_s
+      end
+      ret += " domain : #{domain_string}, search : "
       search.each {|s| ret += s + ", " }
       ret += " ndots : #{@ndots}"
       return ret
@@ -310,6 +314,9 @@ module Dnsruby
     
     # Return the default domain
     def domain
+      if (@domain==nil)
+        return nil
+      end
       return Name.create(@domain).to_s
     end
     

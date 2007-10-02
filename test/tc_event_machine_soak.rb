@@ -56,20 +56,23 @@ class TestEventMachineSoak < Test::Unit::TestCase
     #    return dfs, num_sent  
   end
   
-    def test_sequential
-      #Dnsruby::TheLog.level=Logger::DEBUG
-      Dnsruby::Resolver.use_eventmachine(true)
-      Dnsruby::Resolver.start_eventmachine_loop(true)
-      res = Dnsruby::SingleResolver.new
-      res.packet_timeout = 2
-      q = Queue.new
-      240.times do |i|
-        puts i
-            res.send_async(Dnsruby::Message.new("example#{i}.com"), i, q)      
-      end
-      240.times do |i|
-        puts "Receiving #{i}"
-        q.pop
+  def test_sequential
+    #Dnsruby::TheLog.level=Logger::DEBUG
+    Dnsruby::Resolver.use_eventmachine(true)
+    Dnsruby::Resolver.start_eventmachine_loop(true)
+    res = Dnsruby::SingleResolver.new
+    res.packet_timeout = 2
+    q = Queue.new
+    240.times do |i|
+      puts i
+      res.send_async(Dnsruby::Message.new("example#{i}.com"), i, q)      
+    end
+    240.times do |i|
+      puts "Receiving #{i}"
+      id, msg, error = q.pop
+      if (error != nil)
+        puts ("Error : #{error}")
       end
     end
+  end
 end

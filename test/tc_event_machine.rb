@@ -17,7 +17,6 @@ class EventMachineTest < Test::Unit::TestCase
     Dnsruby::Resolver.start_eventmachine_loop(true)
   end
   def test_udp
-    Dnsruby::TheLog.level=Logger::DEBUG
     res = Dnsruby::SingleResolver.new
     Dnsruby::Resolver.use_eventmachine(true)
     Dnsruby::Resolver.start_eventmachine_loop(true)
@@ -28,6 +27,7 @@ class EventMachineTest < Test::Unit::TestCase
     res.send_async(Dnsruby::Message.new("example.com"), id, q)
     id.times do |i|
       item = q.pop
+      assert(item[1].class==Dnsruby::Message)
       assert(item[0] <= id)
       assert(item[0] >= 0)
     end
