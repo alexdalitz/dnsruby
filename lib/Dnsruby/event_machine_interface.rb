@@ -151,9 +151,9 @@ module Dnsruby
         end
         #  We call set_defered_status when done
         if (err != nil)
-          set_deferred_status :failed, id, msg, err
+          set_deferred_status :failed, msg, err
         else
-          set_deferred_status :succeeded, id, msg
+          set_deferred_status :succeeded, msg
         end
       end
     

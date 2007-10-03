@@ -43,16 +43,17 @@ class TestEventMachineSoak < Test::Unit::TestCase
       EM.stop
       return
     end
-    @@dfs[@@num_sent] = res.send_async(Dnsruby::Message.new("example.com"))
-    @@dfs[@@num_sent].callback {|msg| puts "callback: #{@@num_sent}" # , #{msg}"
-      send_next_deferrable(res) # (dfs, num_sent)
-    }
-    @@dfs[@@num_sent].errback {|msg, err| 
-      puts "errback: #{@@num_sent}, #{err}" #, #{msg}"
-      send_next_deferrable(res) # (dfs, num_sent)
-    }
+    id = @@num_sent
     puts @@num_sent
     @@num_sent+=1
+    @@dfs[id] = res.send_async(Dnsruby::Message.new("example.com"))
+    @@dfs[id].callback {|msg| puts "callback: #{id}" # , #{msg}"
+      send_next_deferrable(res) # (dfs, num_sent)
+    }
+    @@dfs[id].errback {|msg, err| 
+      puts "errback: #{id}, #{err}" #, #{msg}"
+      send_next_deferrable(res) # (dfs, num_sent)
+    }
     #    return dfs, num_sent  
   end
   

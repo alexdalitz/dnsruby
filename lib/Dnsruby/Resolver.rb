@@ -189,17 +189,17 @@ module Dnsruby
     #   end
     def send_async(*args) # msg, client_queue, client_query_id)
       # @TODO@ Sort out arguments to send_async!
-#      if (Resolver.eventmachine?)
-#        if (!@resolver_em)
-#          @resolver_em = ResolverEM.new(self)
-#        end
-#        @resolver_em.send_async(*args)
-#      else
-        if (!@resolver_ruby) # @TODO@ Synchronize this?
-          @resolver_ruby = ResolverRuby.new(self)
-        end
-        @resolver_ruby.send_async(*args)
-#      end
+      #      if (Resolver.eventmachine?)
+      #        if (!@resolver_em)
+      #          @resolver_em = ResolverEM.new(self)
+      #        end
+      #        @resolver_em.send_async(*args)
+      #      else
+      if (!@resolver_ruby) # @TODO@ Synchronize this?
+        @resolver_ruby = ResolverRuby.new(self)
+      end
+      @resolver_ruby.send_async(*args)
+      #      end
     end
     
     # Close the Resolver. Unfinished queries are terminated with OtherResolError.
@@ -434,25 +434,6 @@ module Dnsruby
       # @TODO@ ?
     end    
     def send_async(msg, client_queue, client_query_id)
-      # @TODO@ Provide a more EM-like signature
-      
-      # @TODO@ Implement send_async for EventMachine!
-      # Probably want a load of deferrables, one for each packet we send.
-      # Need to have ability to cancel all other packets for both query and server
-      
-      # Need to have at least two timers going - 
-      #   packet timeout handled by SingleResolver - use a deferrable to handle result
-      #   retry timer for that resolver - do we use add_timer or can we use deferrable?
-      #   "next query to fire" timer if still in the first round of queries
-      #
-      # But we want to use EventMachineInterface to do all this - calling us back
-      # So we need to make sure that there is always a query outstanding whenever we make
-      # an EventMachine call, or else the loop may not be running...
-      #
-      # Do we still need the same lists as ResolverRuby? 
-      # Still need a list of the oustanding client level queries, 
-      # and presumably a list for 
-      
       # We want to send the query to the first resolver.
       # We then want to set up all the timers for all of the events which might happen
       #   (first round timers, retry timers, etc.)
@@ -461,16 +442,32 @@ module Dnsruby
       
       # So, send the first query. This will ensure that EventMachine is up and running.
       # We can then just call EventMachine#add_timer to add all the rest of the callbacks.
+      outstanding = []
       timeouts=@parent.generate_timeouts
       timeouts.each do |timeout, value|
         single_resolver, retry_count = value
         if (timeout == 0) 
-          # @TODO@ Send immediately
-          single_resolver.send_async() # @TODO@ !!!
+          send_new_em_query
+          # Send immediately
+          send_new_em_query(single_resolver, msg, client_queue, client_query_id, retry_count, outstanding)
         else
-          # @TODO@ add_timer with the send code here
+          # Send later
+          EventMachine::add_timer(timeout) {
+            send_new_em_query(single_resolver, msg, client_queue, client_query_id, retry_count, outstanding)
+          }
         end
       end
+    end
+    
+    def send_new_em_query(single_resolver, msg, client_queue, client_query_id, retry_count, outstanding)
+      df = single_resolver.send_async(msg, client_queue, client_query_id)
+      id = [single_resolver, msg, df, retry_count]
+      outstanding.push(id)
+      # @TODO@ Callbacks should cancel all other packets for this query, and send result to client.
+      # Can we set flag to let other deferrables no they've been cancelled? Then they will just die...
+      # Would need to store reference to it in each deferrable
+      df.callback = {}  # @TODO@ !!!
+      df.errback = {}  # @TODO@ !!!      
     end
   end
 
