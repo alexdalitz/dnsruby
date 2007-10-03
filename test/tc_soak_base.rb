@@ -50,7 +50,7 @@ class TestSoakBase # < Test::Unit::TestCase
           while (mutex.synchronize{num_in_progress> outstanding_limit}) do
             sleep(0.01)
           end
-          res.send_async(Message.new(data[:name], data[:type]), [i,rr_count], q)
+          res.send_async(Message.new(data[:name], data[:type]), q, [i,rr_count])
           puts num_sent
           num_sent+=1
           mutex.synchronize {
@@ -102,7 +102,7 @@ class TestSoakBase # < Test::Unit::TestCase
         while (mutex.synchronize{num_in_progress> 50}) do # One query has several sockets in Resolver
           sleep(0.01)
         end
-        res.send_async(Message.new("example.com", Types.A), [i,1], q)
+        res.send_async(Message.new("example.com", Types.A), q, [i,1])
         num_sent+=1
         mutex.synchronize {
           num_in_progress+=1

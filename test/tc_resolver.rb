@@ -101,7 +101,7 @@ class TestResolver < Test::Unit::TestCase
   def test_nxdomain
     res=Resolver.new
     q = Queue.new
-    res.send_async(Message.new("dklfjhdFHFHDVVUIEWRFDSAJKVCNASDLFJHN.com", Types.A), 1, q)
+    res.send_async(Message.new("dklfjhdFHFHDVVUIEWRFDSAJKVCNASDLFJHN.com", Types.A), q, 1)
     id, m, err = q.pop
     assert(id==1)
     assert(m.header.rcode == RCode.NXDOMAIN)

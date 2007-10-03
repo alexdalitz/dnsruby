@@ -198,9 +198,16 @@ module Dnsruby
     # If the native Dsnruby networking layer is being used, then this method returns the client_query_id
     # @TODO@ Need to turn round the queue and id here, so that nil ID can be passed in.
     #    deferrable = res.send_async(msg)
+    #    deferrable = res.send_async(msg, true)
     #    id = res.send_async(msg, queue)
-    #    res.send(msg, queue, id, true)
-    def send_async(msg, client_query_id, client_queue, use_tcp=@use_tcp)
+    #    NOT SUPPORTED : id = res.send_async(msg, queue, true)
+    #    res.send_async(msg, queue, id)
+    #    res.send_async(msg, queue, id, true)
+    def send_async(*args) # msg, client_queue, client_query_id, use_tcp=@use_tcp)
+      msg = args[0]
+      client_query_id = nil
+      client_queue = nil
+      use_tcp = @use_tcp
       if (msg.kind_of?String)
         msg = Message.new(msg)
       end
@@ -208,18 +215,38 @@ module Dnsruby
       if (udp_packet_size < query_packet.length)
         use_tcp = true
       end
-      #@TODO@ Are we using EventMachine or native Dnsruby?
+      if (args.length > 1)
+        if (args[1].class==Queue)
+          client_queue = args[1]
+        elsif (args.length == 2)
+          use_tcp = args[1]
+        end
+        if (args.length > 2)
+          client_query_id = args[2]
+          if (args.length > 3)
+            use_tcp = args[3]
+          end
+        end
+      end
+      #Are we using EventMachine or native Dnsruby?
       if (Resolver.eventmachine?)
+        if (args.length == 2)
+          use_tcp = args[1]
+        end
         return send_eventmachine(query_packet, msg.header.id, client_query_id, client_queue, use_tcp)
       else
+        if (!client_query_id)
+          client_query_id = msg
+        end
         send_dnsruby(query_packet, msg.header.id, client_query_id, client_queue, use_tcp)
+        return client_query_id
       end
     end
       
     def send_eventmachine(msg, header_id, client_query_id, client_queue, use_tcp) #:nodoc: all
-#        em = EventMachineInterface.instance
-#        return em.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
-        return EventMachineInterface.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
+      #        em = EventMachineInterface.instance
+      #        return em.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
+      return EventMachineInterface.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
     end
 
     def send_dnsruby(query_packet, header_id, client_query_id, client_queue, use_tcp) #:nodoc: all

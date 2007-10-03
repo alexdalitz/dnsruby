@@ -43,12 +43,12 @@ class TestEventMachineSoak < Test::Unit::TestCase
       EM.stop
       return
     end
-    @@dfs[@@num_sent] = res.send_async(Dnsruby::Message.new("example.com"), @@num_sent, Queue.new) #@TODO@ Shouldn't need ID and queue
-    @@dfs[@@num_sent].callback {|id, msg| puts "callback: #{id}" # , #{msg}"
+    @@dfs[@@num_sent] = res.send_async(Dnsruby::Message.new("example.com"))
+    @@dfs[@@num_sent].callback {|msg| puts "callback: #{@@num_sent}" # , #{msg}"
       send_next_deferrable(res) # (dfs, num_sent)
     }
-    @@dfs[@@num_sent].errback {|id, msg, err| 
-      puts "errback: #{id}, #{err}" #, #{msg}"
+    @@dfs[@@num_sent].errback {|msg, err| 
+      puts "errback: #{@@num_sent}, #{err}" #, #{msg}"
       send_next_deferrable(res) # (dfs, num_sent)
     }
     puts @@num_sent
@@ -65,7 +65,7 @@ class TestEventMachineSoak < Test::Unit::TestCase
     q = Queue.new
     240.times do |i|
       puts i
-      res.send_async(Dnsruby::Message.new("example#{i}.com"), i, q)      
+      res.send_async(Dnsruby::Message.new("example#{i}.com"), q, i)      
     end
     240.times do |i|
       puts "Receiving #{i}"

@@ -40,7 +40,7 @@ module Dnsruby
   #=== Asynchronous
   #These methods use a response queue to return the response and the error
   #
-  #*  Dnsruby::Resolver#send_async(msg, query_id, response_queue)
+  #*  Dnsruby::Resolver#send_async(msg, response_queue, query_id)
   #
   
   class Resolver
@@ -174,9 +174,9 @@ module Dnsruby
     #   res = Dnsruby::Resolver.new
     #   query_id = 10 # can be any object you like
     #   query_queue = Queue.new
-    #   res.send_async(Message.new("example.com", Types.MX), query_id,  query_queue)
+    #   res.send_async(Message.new("example.com", Types.MX),  query_queue, query_id)
     #   query_id += 1
-    #   res.send_async(Message.new("example.com", Types.A), query_id,  query_queue)
+    #   res.send_async(Message.new("example.com", Types.A), query_queue, query_id)
     #   # ...do a load of other stuff here...
     #   2.times do 
     #     response_id, response, exception = query_queue.pop
@@ -187,18 +187,19 @@ module Dnsruby
     #         # deal with problem
     #     end
     #   end
-    def send_async(*args) # msg, client_query_id, client_queue)
-      if (Resolver.eventmachine?)
-        if (!@resolver_em)
-          @resolver_em = ResolverEM.new(self)
-        end
-        @resolver_em.send_async(*args)
-      else
+    def send_async(*args) # msg, client_queue, client_query_id)
+      # @TODO@ Sort out arguments to send_async!
+#      if (Resolver.eventmachine?)
+#        if (!@resolver_em)
+#          @resolver_em = ResolverEM.new(self)
+#        end
+#        @resolver_em.send_async(*args)
+#      else
         if (!@resolver_ruby) # @TODO@ Synchronize this?
           @resolver_ruby = ResolverRuby.new(self)
         end
         @resolver_ruby.send_async(*args)
-      end
+#      end
     end
     
     # Close the Resolver. Unfinished queries are terminated with OtherResolError.
@@ -275,12 +276,12 @@ module Dnsruby
     end    
     
     def reset_attributes #:nodoc: all
-     if (@resolver_em)
-       @resolver_em.reset_attributes
-     end
-     if (@resolver_ruby)
-       @resolver_ruby.reset_attributes
-     end
+      if (@resolver_em)
+        @resolver_em.reset_attributes
+      end
+      if (@resolver_ruby)
+        @resolver_ruby.reset_attributes
+      end
      
       # Attributes
       @query_timeout = DefaultQueryTimeout
@@ -394,6 +395,33 @@ module Dnsruby
     def Resolver.start_eventmachine_loop?
       return @@start_eventmachine_loop
     end
+    def generate_timeouts(base=0)
+      #These should be be pegged to the single_resolver they are targetting :
+      #  e.g. timeouts[timeout1]=nameserver
+      timeouts = {}
+      retry_delay = @retry_delay
+      @retry_times.times do |retry_count|
+        if (retry_count>0)
+          retry_delay *= 2
+        end
+        servers=[]
+        @single_resolvers.each do |r| servers.push(r.server) end
+        @single_resolvers.each_index do |i|
+          res= @single_resolvers[i]
+          offset = (i*@retry_delay.to_f/@single_resolvers.length)
+          if (retry_count==0)
+            timeouts[base+offset]=[res, retry_count]
+          else
+            if (timeouts.has_key?(base+retry_delay+offset))
+              TheLog.error("Duplicate timeout key!")
+              raise RuntimeError.new("Duplicate timeout key!")
+            end
+            timeouts[base+retry_delay+offset]=[res, retry_count]
+          end
+        end
+      end
+      return timeouts      
+    end
   end
   
   # This class implements the I/O using EventMachine.
@@ -405,6 +433,45 @@ module Dnsruby
     def reset_attributes #:nodoc: all
       # @TODO@ ?
     end    
+    def send_async(msg, client_queue, client_query_id)
+      # @TODO@ Provide a more EM-like signature
+      
+      # @TODO@ Implement send_async for EventMachine!
+      # Probably want a load of deferrables, one for each packet we send.
+      # Need to have ability to cancel all other packets for both query and server
+      
+      # Need to have at least two timers going - 
+      #   packet timeout handled by SingleResolver - use a deferrable to handle result
+      #   retry timer for that resolver - do we use add_timer or can we use deferrable?
+      #   "next query to fire" timer if still in the first round of queries
+      #
+      # But we want to use EventMachineInterface to do all this - calling us back
+      # So we need to make sure that there is always a query outstanding whenever we make
+      # an EventMachine call, or else the loop may not be running...
+      #
+      # Do we still need the same lists as ResolverRuby? 
+      # Still need a list of the oustanding client level queries, 
+      # and presumably a list for 
+      
+      # We want to send the query to the first resolver.
+      # We then want to set up all the timers for all of the events which might happen
+      #   (first round timers, retry timers, etc.)
+      # The callbacks for these should be able to cancel any of the rest (including any for broken resolvers)
+      # We can then forget about the query, as all the callbacks will be lodged with EventMachine.
+      
+      # So, send the first query. This will ensure that EventMachine is up and running.
+      # We can then just call EventMachine#add_timer to add all the rest of the callbacks.
+      timeouts=@parent.generate_timeouts
+      timeouts.each do |timeout, value|
+        single_resolver, retry_count = value
+        if (timeout == 0) 
+          # @TODO@ Send immediately
+          single_resolver.send_async() # @TODO@ !!!
+        else
+          # @TODO@ add_timer with the send code here
+        end
+      end
+    end
   end
 
   # This class implements the I/O using pure Ruby, with no dependencies.
@@ -419,7 +486,9 @@ module Dnsruby
       @query_list = {}
       @timeouts = {}
     end
-    def send_async(msg, client_query_id, client_queue)
+    def send_async(msg, client_queue, client_query_id)
+      # @TODO@ send_async arguments!
+      
       # This is the whole point of the Resolver class.
       # We want to use multiple SingleResolvers to run a query.
       # So we kick off a system with select_thread where we send
@@ -476,31 +545,8 @@ module Dnsruby
       # These should be absolute, rather than relative
       # The first value should be Time.now
       time_now = Time.now
-      timeouts={}
-      #These should be be pegged to the single_resolver they are targetting :
-      #  e.g. timeouts[timeout1]=nameserver
-      retry_delay = @parent.retry_delay
-      @parent.retry_times.times do |retry_count|
-        if (retry_count>0)
-          retry_delay *= 2
-        end
-        servers=[]
-        @parent.single_resolvers.each do |r| servers.push(r.server) end
-        @parent.single_resolvers.each_index do |i|
-          res= @parent.single_resolvers[i]
-          offset = (i*@parent.retry_delay.to_f/@parent.single_resolvers.length)
-          if (retry_count==0)
-            timeouts[time_now+offset]=[res, retry_count]
-          else
-            if (timeouts.has_key?(time_now+retry_delay+offset))
-              TheLog.error("Duplicate timeout key!")
-              raise RuntimeError.new("Duplicate timeout key!")
-            end
-            timeouts[time_now+retry_delay+offset]=[res, retry_count]
-          end
-        end
-      end
-      return timeouts      
+      timeouts=@parent.generate_timeouts(time_now)
+      return timeouts
     end
     
     # Close the Resolver. Unfinished queries are terminated with OtherResolError.
@@ -559,7 +605,7 @@ module Dnsruby
               outstanding.push(id)
               timeouts_done.push(timeout)
               timeouts.delete(timeout)
-              res.send_async(msg, id, select_queue)
+              res.send_async(msg, select_queue, id)
             else
               break
             end

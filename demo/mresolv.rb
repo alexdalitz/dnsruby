@@ -50,7 +50,7 @@ while (!eof)
       break
     end
     name.chomp!
-    res.send_async(Dnsruby::Message.new(name), name, q)
+    res.send_async(Dnsruby::Message.new(name), q, name)
     in_progress += 1
     print("name = #{name}, outstanding = #{in_progress}\n")   if debug
   end

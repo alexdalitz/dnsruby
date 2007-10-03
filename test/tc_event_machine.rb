@@ -22,9 +22,9 @@ class EventMachineTest < Test::Unit::TestCase
     Dnsruby::Resolver.start_eventmachine_loop(true)
     q = Queue.new
     id = 1
-    res.send_async(Dnsruby::Message.new("nominet.org.uk"), id, q)
+    res.send_async(Dnsruby::Message.new("nominet.org.uk"), q, id)
     id+=1
-    res.send_async(Dnsruby::Message.new("example.com"), id, q)
+    res.send_async(Dnsruby::Message.new("example.com"), q, id)
     id.times do |i|
       item = q.pop
       assert(item[1].class==Dnsruby::Message)
@@ -41,9 +41,9 @@ class EventMachineTest < Test::Unit::TestCase
     Dnsruby::Resolver.use_eventmachine
     q = Queue.new
     id = 1
-    res.send_async(Dnsruby::Message.new("nominet.org.uk"), id, q)
+    res.send_async(Dnsruby::Message.new("nominet.org.uk"), q, id)
     id+=1
-    res.send_async(Dnsruby::Message.new("example.com"), id, q)
+    res.send_async(Dnsruby::Message.new("example.com"), q, id)
     id.times do |i|
       itemid = q.pop[0]
       assert(itemid <= id)
@@ -57,7 +57,7 @@ class EventMachineTest < Test::Unit::TestCase
     res.packet_timeout=2
     q = Queue.new
     msg = Dnsruby::Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk")
-    res.send_async(msg, 1, q)
+    res.send_async(msg, q, 1)
     id,ret,error = q.pop
     assert(id==1)
     assert(ret==nil)
@@ -73,10 +73,10 @@ class EventMachineTest < Test::Unit::TestCase
     id = 1
     done = false
     EM.run {
-      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"), id, q) #@TODO@ Shouldn't need ID and queue
-      df.callback {|id, msg| puts "callback: #{id}, #{msg}"; done = true; EM.stop}
-      df.errback {|id, msg, err| 
-        puts "errback: #{id}, #{msg}, #{err}"
+      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
+      df.callback {|msg| puts "callback: #{msg}"; done = true; EM.stop}
+      df.errback {|msg, err| 
+        puts "errback: #{msg}, #{err}"
         done = true
         EM.stop 
         assert(false)}
@@ -93,9 +93,9 @@ class EventMachineTest < Test::Unit::TestCase
     id = 1
     done = false
     EM.run {
-      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"), id, q) #@TODO@ Shouldn't need ID and queue
-      df.callback {|id, msg| puts "callback: #{id}, #{msg}"; done = true; EM.stop; assert(false)}
-      df.errback {|id, msg, err| 
+      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
+      df.callback {|msg| puts "callback: #{msg}"; done = true; EM.stop; assert(false)}
+      df.errback {|msg, err| 
         puts "errback: #{id}, #{msg}, #{err}"
         done = true
         EM.stop 

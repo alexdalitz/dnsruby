@@ -70,7 +70,7 @@ class TestSingleResolverSoak < Test::Unit::TestCase
         if (res_pos >= num_resolvers)
           res_pos = 0
         end
-        res.send_async(Message.new(data[:name], data[:type]), [i,rr_count], q)
+        res.send_async(Message.new(data[:name], data[:type]), q, [i,rr_count])
         #        p "Sent #{i}, #{rr_count}, Queue #{q}"
         query_count+=1
       end
@@ -177,7 +177,7 @@ class TestSingleResolverSoak < Test::Unit::TestCase
               query_count+=1
             end
             q = Queue.new
-            res.send_async(Message.new(data[:name], data[:type]), [i,j], q)
+            res.send_async(Message.new(data[:name], data[:type]), q, [i,j])
             id, packet, error = q.pop
             if (error.class == ResolvTimeout)
               #              p "TIMEOUT for Thread #{i}, reply #{j}, type #{data[:type]}"

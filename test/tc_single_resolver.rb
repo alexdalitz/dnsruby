@@ -71,7 +71,7 @@ class TestSingleResolver < Test::Unit::TestCase
     res.packet_timeout=1
     q = Queue.new
     msg = Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk")
-    res.send_async(msg, msg, q)
+    res.send_async(msg, q, msg)
     id,ret, error = q.pop
     assert(id==msg)
     assert(ret==nil)

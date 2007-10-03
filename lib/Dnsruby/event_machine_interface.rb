@@ -146,7 +146,9 @@ module Dnsruby
         send_to_client(@args[:client_queue], @args[:client_query_id], nil, ResolvTimeout.new("Query timed out"))
       end
       def send_to_client(q, id, msg, err)
-        q.push([id, msg, err])
+        if (q)
+          q.push([id, msg, err])
+        end
         #  We call set_defered_status when done
         if (err != nil)
           set_deferred_status :failed, id, msg, err
