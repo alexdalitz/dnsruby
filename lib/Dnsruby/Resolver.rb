@@ -158,16 +158,6 @@ module Dnsruby
       else
         return result
       end
-      #      case result
-      #      when Exception
-      #        # Pass them on
-      #        raise result
-      #      when Message
-      #        return result
-      #      else
-      #        TheLog.error("Unknown result returned : #{result}")
-      #        raise ResolvError.new("Unknown error, return : #{result}")
-      #      end 
     end
     
     
@@ -197,6 +187,238 @@ module Dnsruby
     #         # deal with problem
     #     end
     #   end
+    def send_async(*args) # msg, client_query_id, client_queue)
+      if (Resolver.eventmachine?)
+        if (!@resolver_em)
+          @resolver_em = ResolverEM.new(self)
+        end
+        @resolver_em.send_async(*args)
+      else
+        if (!@resolver_ruby) # @TODO@ Synchronize this?
+          @resolver_ruby = ResolverRuby.new(self)
+        end
+        @resolver_ruby.send_async(*args)
+      end
+    end
+    
+    # Close the Resolver. Unfinished queries are terminated with OtherResolError.
+    def close
+      [@resolver_em, @resolver_ruby].each do |r| r.close if r end
+    end
+
+    # Create a new Resolver object. If no parameters are passed in, then the default 
+    # system configuration will be used. Otherwise, a Hash may be passed in with the 
+    # following optional elements : 
+    # 
+    # 
+    # * :port
+    # * :use_tcp
+    # * :tsig_key
+    # * :ignore_truncation
+    # * :src_address
+    # * :src_port
+    # * :persistent_tcp
+    # * :persistent_udp
+    # * :recurse
+    # * :udp_size
+    # * :config_info - see Config
+    # * :nameserver - can be either a String or an array of Strings
+    # * :packet_timeout
+    # * :query_timeout
+    # * :retry_times
+    # * :retry_delay
+    def initialize(*args)
+      reset_attributes
+      
+      # Process args
+      if (args.length==1)
+        if (args[0].class == Hash)
+          args[0].keys.each do |key|
+            begin
+              if (key == :config_info)
+                @config.set_config_info(args[0][:config_info])
+              elsif (key==:nameserver)
+                set_config_nameserver(args[0][:nameserver])
+              else
+                send(key.to_s+"=", args[0][key])
+              end
+            rescue Exception
+              TheLog.error("Argument #{key} not valid\n")
+            end
+          end
+        elsif (args[0].class == Config)
+          # also accepts a Config object from Dnsruby::Resolv
+          @config = args[0]
+        end
+      else
+        #@TODO@ ?
+      end
+      if (@single_resolvers==[])
+        add_config_nameservers
+      end
+      update
+    end
+    
+    def add_config_nameservers
+      # Add the Config nameservers
+      @config.nameserver.each do |ns|
+        @single_resolvers.push(SingleResolver.new({:server=>ns}))
+      end
+    end
+    
+    def set_config_nameserver(n)
+      if (n).kind_of?String
+        @config.nameserver=[n]
+      else
+        @config.nameserver=n
+      end
+    end    
+    
+    def reset_attributes #:nodoc: all
+     if (@resolver_em)
+       @resolver_em.reset_attributes
+     end
+     if (@resolver_ruby)
+       @resolver_ruby.reset_attributes
+     end
+     
+      # Attributes
+      @query_timeout = DefaultQueryTimeout
+      @retry_delay = DefaultRetryDelay
+      @retry_times = DefaultRetryTimes
+      @packet_timeout = DefaultPacketTimeout
+      @port = DefaultPort
+      @udp_size = DefaultUDPSize
+      @use_tcp = false
+      @tsig_key = nil
+      @ignore_truncation = false
+      @config = Config.new()
+      @src_addr        = '0.0.0.0'
+      @src_port        = 0
+      @recurse = true
+      @persistent_udp = false
+      @persistent_tcp = false
+      @single_resolvers=[]
+    end
+    
+    def update #:nodoc: all
+      #Update any resolvers we have with the latest config
+      @single_resolvers.each do |res|
+        [:port, :use_tcp, :tsig_key, :ignore_truncation, :packet_timeout, 
+          :src_address, :src_port, :persistent_tcp, :persistent_udp, :recurse, 
+          :udp_size].each do |param|
+          
+          res.send(param.to_s+"=", instance_variable_get("@"+param.to_s))
+        end
+      end
+    end
+    
+    # Add a new SingleResolver to the list of resolvers this Resolver object will 
+    # query.
+    def add_resolver(single)
+      @single_resolvers.push(single)
+    end
+    
+    def nameserver=(n)
+      @single_resolvers=[]
+      set_config_nameserver(n)
+      add_config_nameservers
+    end
+    
+    def packet_timeout=(t)
+      @packet_timeout = t
+      update
+    end
+    
+    def port=(p)
+      @port = p
+      update
+    end
+    
+    def use_tcp=(on)
+      @use_tcp = on
+      update
+    end
+    
+    def tsig_key=(t)
+      @tsig_key = t
+      update
+    end
+    
+    def ignore_truncation=(on)
+      @ignore_truncation = on
+      update
+    end
+    
+    def src_address=(a)
+      @src_address = a
+      update
+    end
+    
+    def src_port=(a)
+      @src_port = a
+      update
+    end
+    
+    def persistent_tcp=(on)
+      @persistent_tcp = on
+      update
+    end
+    
+    def persistent_udp=(on)
+      @persistent_udp = on
+      update
+    end
+    
+    def recurse=(a)
+      @recurse = a
+      update
+    end
+    
+    def udp_size=(s)
+      @udp_size = s
+      update
+    end
+    def Resolver.use_eventmachine(on=true)
+      if (!@@event_machine_available)
+        raise RuntimeError.new("EventMachine is not available in this environment!")
+      end
+      @@use_eventmachine = on
+    end
+    def Resolver.eventmachine?
+      return @@use_eventmachine
+    end
+    def Resolver.start_eventmachine_loop(on=true)
+      @@start_eventmachine_loop=on
+    end
+    def Resolver.start_eventmachine_loop?
+      return @@start_eventmachine_loop
+    end
+  end
+  
+  # This class implements the I/O using EventMachine.
+  # NOTE - EM does not work properly on Windows with version 0.8.1 - do not use!
+  class ResolverEM
+    def initialize(parent)
+      @parent=parent
+    end
+    def reset_attributes #:nodoc: all
+      # @TODO@ ?
+    end    
+  end
+
+  # This class implements the I/O using pure Ruby, with no dependencies.
+  class ResolverRuby #:nodoc: all
+    def initialize(parent)
+      reset_attributes
+      @parent=parent
+    end
+    def reset_attributes #:nodoc: all
+      # data structures
+      @mutex=Mutex.new
+      @query_list = {}
+      @timeouts = {}
+    end
     def send_async(msg, client_query_id, client_queue)
       # This is the whole point of the Resolver class.
       # We want to use multiple SingleResolvers to run a query.
@@ -233,8 +455,8 @@ module Dnsruby
         outstanding = []
         @query_list[client_query_id]=[msg, client_queue, q, outstanding]
         
-        query_timeout = Time.now+@query_timeout
-        if (@query_timeout == 0)
+        query_timeout = Time.now+@parent.query_timeout
+        if (@parent.query_timeout == 0)
           query_timeout = Time.now+31536000 # a year from now
         end
         @timeouts[client_query_id]=[query_timeout, generate_timeouts()]
@@ -257,16 +479,16 @@ module Dnsruby
       timeouts={}
       #These should be be pegged to the single_resolver they are targetting :
       #  e.g. timeouts[timeout1]=nameserver
-      retry_delay = @retry_delay
-      @retry_times.times do |retry_count|
+      retry_delay = @parent.retry_delay
+      @parent.retry_times.times do |retry_count|
         if (retry_count>0)
           retry_delay *= 2
         end
         servers=[]
-        @single_resolvers.each do |r| servers.push(r.server) end
-        @single_resolvers.each_index do |i|
-          res= @single_resolvers[i]
-          offset = (i*@retry_delay.to_f/@single_resolvers.length)
+        @parent.single_resolvers.each do |r| servers.push(r.server) end
+        @parent.single_resolvers.each_index do |i|
+          res= @parent.single_resolvers[i]
+          offset = (i*@parent.retry_delay.to_f/@parent.single_resolvers.length)
           if (retry_count==0)
             timeouts[time_now+offset]=[res, retry_count]
           else
@@ -457,192 +679,5 @@ module Dnsruby
         send_result_and_close(client_queue, client_query_id, select_queue, response, nil)
       }
     end
-    
-    # Create a new Resolver object. If no parameters are passed in, then the default 
-    # system configuration will be used. Otherwise, a Hash may be passed in with the 
-    # following optional elements : 
-    # 
-    # 
-    # * :port
-    # * :use_tcp
-    # * :tsig_key
-    # * :ignore_truncation
-    # * :src_address
-    # * :src_port
-    # * :persistent_tcp
-    # * :persistent_udp
-    # * :recurse
-    # * :udp_size
-    # * :config_info - see Config
-    # * :nameserver - can be either a String or an array of Strings
-    # * :packet_timeout
-    # * :query_timeout
-    # * :retry_times
-    # * :retry_delay
-    def initialize(*args)
-      reset_attributes
-      
-      # Process args
-      if (args.length==1)
-        if (args[0].class == Hash)
-          args[0].keys.each do |key|
-            begin
-              if (key == :config_info)
-                @config.set_config_info(args[0][:config_info])
-              elsif (key==:nameserver)
-                set_config_nameserver(args[0][:nameserver])
-              else
-                send(key.to_s+"=", args[0][key])
-              end
-            rescue Exception
-              TheLog.error("Argument #{key} not valid\n")
-            end
-          end
-        elsif (args[0].class == Config)
-          # also accepts a Config object from Dnsruby::Resolv
-          @config = args[0]
-        end
-      else
-        #@TODO@ ?
-      end
-      if (@single_resolvers==[])
-        add_config_nameservers
-      end
-      update
-    end
-    
-    def add_config_nameservers
-      # Add the Config nameservers
-      @config.nameserver.each do |ns|
-        @single_resolvers.push(SingleResolver.new({:server=>ns}))
-      end
-    end
-    
-    def set_config_nameserver(n)
-      if (n).kind_of?String
-        @config.nameserver=[n]
-      else
-        @config.nameserver=n
-      end
-    end    
-    
-    def reset_attributes #:nodoc: all
-      # data structures
-      @mutex=Mutex.new
-      @query_list = {}
-      
-      # Attributes
-      @timeouts = {}
-      @query_timeout = DefaultQueryTimeout
-      @retry_delay = DefaultRetryDelay
-      @retry_times = DefaultRetryTimes
-      @packet_timeout = DefaultPacketTimeout
-      @port = DefaultPort
-      @udp_size = DefaultUDPSize
-      @use_tcp = false
-      @tsig_key = nil
-      @ignore_truncation = false
-      @config = Config.new()
-      @src_addr        = '0.0.0.0'
-      @src_port        = 0
-      @recurse = true
-      @persistent_udp = false
-      @persistent_tcp = false
-      @single_resolvers=[]
-    end
-    
-    def update #:nodoc: all
-      #Update any resolvers we have with the latest config
-      @single_resolvers.each do |res|
-        [:port, :use_tcp, :tsig_key, :ignore_truncation, :packet_timeout, 
-          :src_address, :src_port, :persistent_tcp, :persistent_udp, :recurse, 
-          :udp_size].each do |param|
-          
-          res.send(param.to_s+"=", instance_variable_get("@"+param.to_s))
-        end
-      end
-    end
-    
-    # Add a new SingleResolver to the list of resolvers this Resolver object will 
-    # query.
-    def add_resolver(single)
-      @single_resolvers.push(single)
-    end
-    
-    def nameserver=(n)
-      @single_resolvers=[]
-      set_config_nameserver(n)
-      add_config_nameservers
-    end
-    
-    def packet_timeout=(t)
-      @packet_timeout = t
-      update
-    end
-    
-    def port=(p)
-      @port = p
-      update
-    end
-    
-    def use_tcp=(on)
-      @use_tcp = on
-      update
-    end
-    
-    def tsig_key=(t)
-      @tsig_key = t
-      update
-    end
-    
-    def ignore_truncation=(on)
-      @ignore_truncation = on
-      update
-    end
-    
-    def src_address=(a)
-      @src_address = a
-      update
-    end
-    
-    def src_port=(a)
-      @src_port = a
-      update
-    end
-    
-    def persistent_tcp=(on)
-      @persistent_tcp = on
-      update
-    end
-    
-    def persistent_udp=(on)
-      @persistent_udp = on
-      update
-    end
-    
-    def recurse=(a)
-      @recurse = a
-      update
-    end
-    
-    def udp_size=(s)
-      @udp_size = s
-      update
-    end
-    def Resolver.use_eventmachine(on=true)
-      if (!@@event_machine_available)
-        raise RuntimeError.new("EventMachine is not available in this environment!")
-      end
-      @@use_eventmachine = on
-    end
-    def Resolver.eventmachine?
-      return @@use_eventmachine
-    end
-    def Resolver.start_eventmachine_loop(on=true)
-      @@start_eventmachine_loop=on
-    end
-    def Resolver.start_eventmachine_loop?
-      return @@start_eventmachine_loop
-    end
-  end
+  end   
 end
