@@ -187,22 +187,22 @@ module Dnsruby
     #         # deal with problem
     #     end
     #   end
+    # @TODO@ Sort out RDoc arguments to send_async!
     def send_async(*args) # msg, client_queue, client_query_id)
-      # @TODO@ Sort out arguments to send_async!
-      #      if (Resolver.eventmachine?)
-      #        if (!@resolver_em)
-      #          @resolver_em = ResolverEM.new(self)
-      #        end
-      #        @resolver_em.send_async(*args)
-      #      else
-      if (!@resolver_ruby) # @TODO@ Synchronize this?
-        @resolver_ruby = ResolverRuby.new(self)
+      if (Resolver.eventmachine?)
+        if (!@resolver_em)
+          @resolver_em = ResolverEM.new(self)
+        end
+        return @resolver_em.send_async(*args)
+      else
+        if (!@resolver_ruby) # @TODO@ Synchronize this?
+          @resolver_ruby = ResolverRuby.new(self)
+        end
+        return @resolver_ruby.send_async(*args)
       end
-      @resolver_ruby.send_async(*args)
-      #      end
     end
     
-    # Close the Resolver. Unfinished queries are terminated with OtherResolError.
+    # Close the Resolver. Unfinished queries are terminated with OtherResolvError.
     def close
       [@resolver_em, @resolver_ruby].each do |r| r.close if r end
     end
@@ -247,6 +247,8 @@ module Dnsruby
               TheLog.error("Argument #{key} not valid\n")
             end
           end
+        elsif (args[0].class == String)
+          set_config_nameserver(args[0])          
         elsif (args[0].class == Config)
           # also accepts a Config object from Dnsruby::Resolv
           @config = args[0]
@@ -385,12 +387,22 @@ module Dnsruby
         raise RuntimeError.new("EventMachine is not available in this environment!")
       end
       @@use_eventmachine = on
+      if (on)
+        TheLog.info("EventMachine will be used for IO")
+      else
+        TheLog.info("EventMachine will not be used for IO")
+      end
     end
     def Resolver.eventmachine?
       return @@use_eventmachine
     end
     def Resolver.start_eventmachine_loop(on=true)
       @@start_eventmachine_loop=on
+      if (on)
+        TheLog.info("EventMachine loop will be started by Dnsruby")
+      else
+        TheLog.info("EventMachine loop will not be started by Dnsruby")
+      end
     end
     def Resolver.start_eventmachine_loop?
       return @@start_eventmachine_loop
@@ -431,43 +443,135 @@ module Dnsruby
       @parent=parent
     end
     def reset_attributes #:nodoc: all
-      # @TODO@ ?
-    end    
-    def send_async(msg, client_queue, client_query_id)
+    end
+    class PersistentData
+      attr_accessor :outstanding, :deferrable, :to_send, :timers
+    end
+    def send_async(msg, client_queue=nil, client_query_id=nil)
       # We want to send the query to the first resolver.
       # We then want to set up all the timers for all of the events which might happen
       #   (first round timers, retry timers, etc.)
       # The callbacks for these should be able to cancel any of the rest (including any for broken resolvers)
       # We can then forget about the query, as all the callbacks will be lodged with EventMachine.
       
-      # So, send the first query. This will ensure that EventMachine is up and running.
-      # We can then just call EventMachine#add_timer to add all the rest of the callbacks.
-      outstanding = []
+      EventMachineInterface::start_em_for_resolver(self)
+      persistent_data = PersistentData.new
+      persistent_data.deferrable = EM::DefaultDeferrable.new
+      persistent_data.outstanding = []
+      persistent_data.timers = []
+      persistent_data.to_send = 0
       timeouts=@parent.generate_timeouts
-      timeouts.each do |timeout, value|
+      timeouts.keys.sort.each do |timeout|
+        value = timeouts[timeout]
+        timeout = timeout.round
         single_resolver, retry_count = value
+        persistent_data.to_send+=1
+        df = nil
         if (timeout == 0) 
-          send_new_em_query
           # Send immediately
-          send_new_em_query(single_resolver, msg, client_queue, client_query_id, retry_count, outstanding)
+          TheLog.debug("Sending first EM query")
+          df = send_new_em_query(single_resolver, msg, client_queue, client_query_id, persistent_data)
+          persistent_data.outstanding.push(df)
         else
           # Send later
-          EventMachine::add_timer(timeout) {
-            send_new_em_query(single_resolver, msg, client_queue, client_query_id, retry_count, outstanding)
+          #          timer = EventMachine::add_timer(timeout) {
+          timer = EventMachine::Timer.new(timeout) {
+            TheLog.debug("Sending #{timeout} delayed EM query")
+            df = send_new_em_query(single_resolver, msg, client_queue, client_query_id, persistent_data)
+            persistent_data.outstanding.push(df)
           }
+          persistent_data.timers.push(timer)
         end
+      end
+      query_timeout = @parent.query_timeout
+      if (query_timeout > 0)
+        EventMachine::add_timer(query_timeout.round) {
+          cancel_queries(persistent_data)
+          return_to_client(persistent_data.deferrable, client_queue, client_query_id, nil, ResolvTimeout.new("Query timed out after query_timeout=#{query_timeout.round} seconds"))
+        }
+      end
+      return persistent_data.deferrable
+    end
+    
+    def send_new_em_query(single_resolver, msg, client_queue, client_query_id, persistent_data)
+      df = single_resolver.send_async(msg) # client_queue, client_query_id)
+      persistent_data.to_send-=1
+      df.callback { |answer|
+        TheLog.debug("Response returned, answer=#{answer}")
+        persistent_data.outstanding.delete(df)
+        cancel_queries(persistent_data)
+        return_to_client(persistent_data.deferrable, client_queue, client_query_id, answer, nil)
+      }  
+      df.errback { |response, error|
+        TheLog.debug("Error #{error} returned, response=#{response}")
+        persistent_data.outstanding.delete(df)
+        if (response!="cancelling")
+
+          if (error.kind_of?(ResolvTimeout))
+            #   - if it was a timeout, then check which number it was, and how many retries are expected on that server
+            #       - if it was the last retry, on the last server, then return a timeout to the client (and clean up)
+            #       - otherwise, continue
+            # Do we have any more packets to send to this resolver?
+            if (persistent_data.outstanding.empty? && persistent_data.to_send==0)
+              TheLog.debug("Sending timeout to client")
+              return_to_client(persistent_data.deferrable, client_queue, client_query_id, response, error)
+            end
+          elsif (error.kind_of?NXDomain)
+            #   - if it was an NXDomain, then return that to the client, and stop all new queries (and clean up)
+            TheLog.debug("NXDomain - returning to client")
+            cancel_queries(persistent_data)
+            return_to_client(persistent_data.deferrable, client_queue, client_query_id, response, error)
+          else
+            # @TODO@ How do we remove a single server from all the deferrables?
+            #   - if it was any other error, then remove that server from the list for that query
+            #   If a Too Many Open Files error, then don't remove, but let retry work.
+            if (!(error.to_s=~/Errno::EMFILE/))
+              # @TODO@ Remove server from list!
+              p "@TODO@ !!! Remove server from list due to error #{error}"
+              #              TheLog.debug("Removing #{resolver.server} from resolver list for this query")
+              #              timeouts[1].each do |key, value|
+              #                res = value[0]
+              #                if (res == resolver)
+              #                  timeouts[1].delete(key)
+              #                end
+              #              end
+            else
+              TheLog.debug("NOT Removing #{resolver.server} due to Errno::EMFILE")          
+            end
+            #        - if it was the last server, then return an error to the client (and clean up)
+            if (persistent_data.outstanding.empty? && persistent_data.to_send==0)
+              #          if (outstanding.empty?)
+              TheLog.debug("Sending error to client")
+              return_to_client(persistent_data.deferrable, client_queue, client_query_id, response, error)
+            end
+          end
+        end
+      }  
+      return df
+    end
+    
+    def cancel_queries(persistent_data)
+      TheLog.debug("Cancelling EM queries")
+      persistent_data.outstanding.each do |df|
+        df.set_deferred_status :failed, "cancelling", "cancelling"
+      end
+      persistent_data.timers.each do |timer|
+        timer.cancel
       end
     end
     
-    def send_new_em_query(single_resolver, msg, client_queue, client_query_id, retry_count, outstanding)
-      df = single_resolver.send_async(msg, client_queue, client_query_id)
-      id = [single_resolver, msg, df, retry_count]
-      outstanding.push(id)
-      # @TODO@ Callbacks should cancel all other packets for this query, and send result to client.
-      # Can we set flag to let other deferrables no they've been cancelled? Then they will just die...
-      # Would need to store reference to it in each deferrable
-      df.callback = {}  # @TODO@ !!!
-      df.errback = {}  # @TODO@ !!!      
+    def return_to_client(deferrable, client_queue, client_query_id, answer, error)
+      TheLog.debug("Returning answer=#{answer}, error=#{error} to client")
+      if (client_queue)
+        client_queue.push([client_query_id, answer, error])
+      end
+      #  We call set_defered_status when done
+      if (error != nil)
+        deferrable.set_deferred_status :failed, answer, error
+      else
+        deferrable.set_deferred_status :succeeded, answer
+      end
+      EventMachineInterface::stop_em_for_resolver(self)
     end
   end
 
@@ -546,7 +650,7 @@ module Dnsruby
       return timeouts
     end
     
-    # Close the Resolver. Unfinished queries are terminated with OtherResolError.
+    # Close the Resolver. Unfinished queries are terminated with OtherResolvError.
     def close
       @mutex.synchronize {
         @query_list.each do |client_query_id, values|

@@ -187,8 +187,8 @@ module Dnsruby
     # Takes :
     # 
     # * msg - the message to send
-    # * client_query_id - an ID to identify the query to the client
     # * client_queue - a Queue to push the response to, when it arrives
+    # * client_query_id - an ID to identify the query to the client
     # * use_tcp - whether to use TCP (defaults to SingleResolver.use_tcp)
     #
     #
@@ -196,9 +196,9 @@ module Dnsruby
     # an EM::Deferrable object
     #
     # If the native Dsnruby networking layer is being used, then this method returns the client_query_id
-    # @TODO@ Need to turn round the queue and id here, so that nil ID can be passed in.
     #    deferrable = res.send_async(msg)
     #    deferrable = res.send_async(msg, true)
+    #    deferrable = res.send_async(msg, q, id, true)
     #    id = res.send_async(msg, queue)
     #    NOT SUPPORTED : id = res.send_async(msg, queue, true)
     #    res.send_async(msg, queue, id)
@@ -230,9 +230,6 @@ module Dnsruby
       end
       #Are we using EventMachine or native Dnsruby?
       if (Resolver.eventmachine?)
-        if (args.length == 2)
-          use_tcp = args[1]
-        end
         return send_eventmachine(query_packet, msg.header.id, client_query_id, client_queue, use_tcp)
       else
         if (!client_query_id)
@@ -243,10 +240,37 @@ module Dnsruby
       end
     end
       
-    def send_eventmachine(msg, header_id, client_query_id, client_queue, use_tcp) #:nodoc: all
+    def send_eventmachine(msg, header_id, client_query_id, client_queue, use_tcp, client_deferrable=nil) #:nodoc: all
       #        em = EventMachineInterface.instance
       #        return em.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
-      return EventMachineInterface.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
+      if (!client_deferrable)
+        client_deferrable = EventMachine::DefaultDeferrable.new
+      end
+      #      packet_deferrable = EventMachineInterface.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
+      packet_deferrable = EventMachineInterface.send(:msg=>msg, :header_id=>header_id, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
+      packet_deferrable.callback { |response|
+        TheLog.debug("EM callback #{response}")
+        # @TODO@ Check TSIG!
+        ret = true
+        if (response.header.tc && !use_tcp)
+          # Try to resend over tcp
+          TheLog.debug("Truncated - resending over TCP")
+          send_eventmachine(msg, header_id, client_query_id, client_queue, true, client_deferrable)
+        else
+          client_deferrable.set_deferred_status :succeeded, response
+          if (client_queue)
+            client_queue.push([client_query_id, response, nil])
+          end
+        end
+      }
+      packet_deferrable.errback { |response, error|
+        TheLog.debug("EM errback #{error}, #{response}")
+        client_deferrable.set_deferred_status :failed, response, error
+        if (client_queue)
+          client_queue.push([client_query_id, response, error])
+        end
+      }
+      return client_deferrable
     end
 
     def send_dnsruby(query_packet, header_id, client_query_id, client_queue, use_tcp) #:nodoc: all
@@ -262,7 +286,6 @@ module Dnsruby
         #We need to determine an actual (random) number here, then ask the OS for it, and
         #continue until we get one.
         if (use_tcp) 
-          print "Setting src_port to #{@src_port}"
           socket = TCPSocket.new(@server, @port, @src_addr, @src_port)
         else
           socket = UDPSocket.new()
@@ -275,13 +298,13 @@ module Dnsruby
         end
         err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
         TheLog.error("#{err}")
-        st.push_exception_to_select(client_query_id, client_queue, err, nil)
+        st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
         return
       end
       if (socket==nil)
         err=IOError.new("dnsruby can't connect to #{@server}:#{port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}")
         TheLog.error("#{err}")
-        st.push_exception_to_select(client_query_id, client_queue, err, nil)
+        st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
         return
       end
       TheLog.debug("Sending packet to #{@server}:#{@port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}")
@@ -300,10 +323,22 @@ module Dnsruby
       end
       
       # Then listen for the response
-      query_settings = SelectThread::QuerySettings.new(query_packet, header_id, @tsig_key, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime)
+      query_settings = SelectThread::QuerySettings.new(query_packet, header_id, @tsig_key, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, self)
       # The select thread will now wait for the response and send that or a timeout
-      # back to the client_queue
+      # back to the client_queue.
       st.add_to_select(query_settings)
+    end
+    
+    def check_response(response, query, client_queue, client_query_id, tcp)
+      # @TODO@ Check TSIG!
+      ret = true
+      if (response.header.tc && !tcp)
+        # Try to resend over tcp
+        TheLog.debug("Truncated - resending over TCP")
+        send_async(Message.decode(query), client_queue, client_query_id, true)
+        ret=false
+      end
+      return ret
     end
     
     # Prepare the packet for sending

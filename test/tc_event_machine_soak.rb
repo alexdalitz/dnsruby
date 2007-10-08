@@ -76,4 +76,9 @@ class TestEventMachineSoak < Test::Unit::TestCase
       end
     end
   end
+  
+  # @TODO@ Need to test Resolver EM implementation here!
+  def test_resolver_em
+    
+  end
 end

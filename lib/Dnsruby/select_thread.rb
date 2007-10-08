@@ -76,9 +76,9 @@ module Dnsruby
     
     class QuerySettings
       attr_accessor :query, :query_header_id, :tsig, :ignore_truncation, :client_queue, 
-      :client_query_id, :socket, :dest_server, :dest_port, :endtime
+        :client_query_id, :socket, :dest_server, :dest_port, :endtime, :single_resolver
       # new(query, query_header_id, tsig, ignore_truncation, client_queue, client_query_id,
-      #     socket, dest_server, dest_port, endtime)
+      #     socket, dest_server, dest_port, endtime, single_resolver)
       def initialize(*args)
         @query = args[0]
         @query_header_id = args[1]
@@ -89,7 +89,8 @@ module Dnsruby
         @socket = args[6]
         @dest_server = args[7]
         @dest_port=args[8]
-        @endtime = args[9]        
+        @endtime = args[9]  
+        @single_resolver = args[10]        
       end
     end
     
@@ -233,14 +234,25 @@ module Dnsruby
         if (query_header_id == msg.header.id)
           # process the response
           client_queue = nil
+          res = nil
+          query=nil
           @@mutex.synchronize{
             client_queue = @@query_hash[id].client_queue
+            res = @@query_hash[id].single_resolver
+            query = @@query_hash[id].query
           }
-          remove_id(id)
-          exception = msg.header.getException
-          TheLog.debug("Pushing response to client queue")
-          client_queue.push([id, msg, exception])
-          notify_queue_observers(client_queue, id)
+          # @TODO@ At this point, we should call SingleResolver::process_response
+          # to check if the response is OK
+          tcp = (socket.class == TCPSocket)
+          if (res.check_response(msg, query, client_queue, id, tcp))
+            remove_id(id)
+            exception = msg.header.getException
+            TheLog.debug("Pushing response to client queue")
+            client_queue.push([id, msg, exception])
+            notify_queue_observers(client_queue, id)
+          else
+            # Sending query again - don't return response
+          end
           return
         end
       end

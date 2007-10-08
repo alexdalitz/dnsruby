@@ -32,10 +32,11 @@ begin
   #  require "test/tc_recurse.rb"
   require "test/tc_tcp.rb"
   #  require "test/tc_soak.rb"
-  #  require "test/tc_axfr.rb" #@TODO@
+  require "test/tc_axfr.rb" #@TODO@
   begin
     require 'eventmachine'
-    require 'test/tc_event_machine.rb'
+    require 'test/tc_event_machine_single_res.rb'
+    require 'test/tc_event_machine_res.rb'
   rescue LoadError => e
     puts "EventMachine not installed - skipping test"
   end

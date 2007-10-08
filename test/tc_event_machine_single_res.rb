@@ -5,10 +5,10 @@ require 'test/unit'
 require 'eventmachine'
 require 'Dnsruby'
 
-class EventMachineTest < Test::Unit::TestCase
+class EventMachineTestSingleResolver < Test::Unit::TestCase
   Dnsruby::Resolver.use_eventmachine(true)
   def setup
-#    Dnsruby::TheLog.level=Logger::DEBUG
+    Dnsruby::TheLog.level=Logger::DEBUG
     Dnsruby::Resolver.use_eventmachine(true)
     Dnsruby::Resolver.start_eventmachine_loop(true)
   end
@@ -35,7 +35,6 @@ class EventMachineTest < Test::Unit::TestCase
   end
   
   def test_tcp
-    flunk ("IMPLEMENT TCP!!")
     res = Dnsruby::SingleResolver.new
     res.use_tcp = true
     Dnsruby::Resolver.use_eventmachine
@@ -45,10 +44,33 @@ class EventMachineTest < Test::Unit::TestCase
     id+=1
     res.send_async(Dnsruby::Message.new("example.com"), q, id)
     id.times do |i|
-      itemid = q.pop[0]
+      itemid, response, error = q.pop
       assert(itemid <= id)
       assert(itemid >= 0)
+      assert(error==nil)
     end
+    #@TODO@ How do we check that TCP was actually used? Do we need a test server for this?
+    #Or will the truncated test catch this? (Query retried over TCP to fetch all records)
+  end
+  
+  def test_tcp_queue_timeout
+    res = Dnsruby::SingleResolver.new("10.0.1.128")
+    Dnsruby::Resolver.use_eventmachine(true)
+    res.packet_timeout=2
+    res.use_tcp=true
+    q = Queue.new
+    start=Time.now
+    msg = Dnsruby::Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk")
+    res.send_async(msg, q, 1)
+    id,ret,error = q.pop
+    end_time = Time.now
+    print id, ret, error
+    assert(id==1)
+    assert(ret==nil)
+    puts "Timeout returns " + error.class.to_s
+    assert(error.class == Dnsruby::ResolvTimeout)
+    assert(end_time - start >= 1.5)
+    assert(end_time - start <= 2.5)
   end
   
   def test_udp_queue_timeout
@@ -56,21 +78,23 @@ class EventMachineTest < Test::Unit::TestCase
     Dnsruby::Resolver.use_eventmachine(true)
     res.packet_timeout=2
     q = Queue.new
+    start=Time.now
     msg = Dnsruby::Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk")
     res.send_async(msg, q, 1)
     id,ret,error = q.pop
+    end_time = Time.now
     assert(id==1)
     assert(ret==nil)
     puts "Timeout returns " + error.class.to_s
     assert(error.class == Dnsruby::ResolvTimeout)
+    assert(end_time - start >= 1.5)
+    assert(end_time - start <= 2.5)
   end
   
   def test_deferrable_success
     res = Dnsruby::SingleResolver.new
     Dnsruby::Resolver.use_eventmachine
     Dnsruby::Resolver.start_eventmachine_loop(false)
-    q = Queue.new
-    id = 1
     done = false
     EM.run {
       df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
@@ -89,18 +113,25 @@ class EventMachineTest < Test::Unit::TestCase
     Dnsruby::Resolver.use_eventmachine
     res.packet_timeout=2
     Dnsruby::Resolver.start_eventmachine_loop(false)
-    q = Queue.new
-    id = 1
     done = false
     EM.run {
       df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
       df.callback {|msg| puts "callback: #{msg}"; done = true; EM.stop; assert(false)}
       df.errback {|msg, err| 
-        puts "errback: #{id}, #{msg}, #{err}"
+        puts "errback: #{msg}, #{err}"
         done = true
         EM.stop 
         }
     }
     Dnsruby::Resolver.start_eventmachine_loop(true)
+  end
+
+  def test_truncated_response
+    res = Dnsruby::SingleResolver.new
+    res.packet_timeout = 10
+    res.server=('ns0.validation-test-servers.nominet.org.uk')
+    m = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", 'txt')
+    assert(m.header.ancount == 61, "61 answer records expected, got #{m.header.ancount}")
+    assert(!m.header.tc, "Message was truncated!")
   end
 end

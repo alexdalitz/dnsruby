@@ -20,34 +20,34 @@ include Dnsruby
 class TestSingleResolver < Test::Unit::TestCase
   # @todo@ Test udppacketsize
   Thread::abort_on_exception = true
-#  Dnsruby::TheLog.level=Logger::DEBUG
+  #  Dnsruby::TheLog.level=Logger::DEBUG
 
   def setup
     Dnsruby::Config.reset
   end
   
   Rrs = [
-  {
-    :type   		=> Types.A,
-    :name   		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
-    :address 	=> '10.0.1.128'
-  },
-  {
-    :type		=> Types::MX,
-    :name		=> 'mx.t.dnsruby.validation-test-servers.nominet.org.uk',
-    :exchange	=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
-    :preference 	=> 10
-  },
-  {
-    :type		=> 'CNAME',
-    :name		=> 'cname.t.dnsruby.validation-test-servers.nominet.org.uk',
-    :domainname		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk'
-  },
-  {
-    :type		=> Types.TXT,
-    :name		=> 'txt.t.dnsruby.validation-test-servers.nominet.org.uk',
-    :strings		=> ['Net-DNS']
-  }		
+    {
+      :type   		=> Types.A,
+      :name   		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
+      :address 	=> '10.0.1.128'
+    },
+    {
+      :type		=> Types::MX,
+      :name		=> 'mx.t.dnsruby.validation-test-servers.nominet.org.uk',
+      :exchange	=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
+      :preference 	=> 10
+    },
+    {
+      :type		=> 'CNAME',
+      :name		=> 'cname.t.dnsruby.validation-test-servers.nominet.org.uk',
+      :domainname		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk'
+    },
+    {
+      :type		=> Types.TXT,
+      :name		=> 'txt.t.dnsruby.validation-test-servers.nominet.org.uk',
+      :strings		=> ['Net-DNS']
+    }		
   ]		
   
   def test_simple
@@ -120,21 +120,21 @@ class TestSingleResolver < Test::Unit::TestCase
     end # do
   end # test_queries
 
-# @TODO@ Although the test_thread_stopped test runs in isolation, it won't run as part
-# of the whole test suite (ts_dnsruby.rb). Commented out until I can figure out how to 
-# get Test::Unit to run this one sequentially...  
-#  def test_thread_stopped
-#    res=SingleResolver.new
-#    # Send a query, and check select_thread running.
-#    m = res.query("example.com")
-#    assert(Dnsruby::SelectThread.instance.select_thread_alive?)
-#    # Wait a second, and check select_thread stopped.
-#    sleep(2)
-#    assert(!Dnsruby::SelectThread.instance.select_thread_alive?)
-#    # Send another query, and check select_thread running.
-#    m = res.query("example.com")
-#    assert(Dnsruby::SelectThread.instance.select_thread_alive?)
-#  end
+  # @TODO@ Although the test_thread_stopped test runs in isolation, it won't run as part
+  # of the whole test suite (ts_dnsruby.rb). Commented out until I can figure out how to 
+  # get Test::Unit to run this one sequentially...  
+  #  def test_thread_stopped
+  #    res=SingleResolver.new
+  #    # Send a query, and check select_thread running.
+  #    m = res.query("example.com")
+  #    assert(Dnsruby::SelectThread.instance.select_thread_alive?)
+  #    # Wait a second, and check select_thread stopped.
+  #    sleep(2)
+  #    assert(!Dnsruby::SelectThread.instance.select_thread_alive?)
+  #    # Send another query, and check select_thread running.
+  #    m = res.query("example.com")
+  #    assert(Dnsruby::SelectThread.instance.select_thread_alive?)
+  #  end
   
   def test_persistent_socket
     #@TODO@ Really need a test server for this one!
@@ -151,5 +151,13 @@ class TestSingleResolver < Test::Unit::TestCase
     res.server=('cname.t.dnsruby.validation-test-servers.nominet.org.uk')
     ip = res.server
     assert_equal(ip, '10.0.1.128', 'nameserver() looks up cname.')
+  end
+  
+  def test_truncated_response
+    res = SingleResolver.new
+    res.server=('ns0.validation-test-servers.nominet.org.uk')
+    m = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", 'txt')
+    assert(m.header.ancount == 61, "61 answer records expected, got #{m.header.ancount}")
+    assert(!m.header.tc, "Message was truncated!")
   end
 end
