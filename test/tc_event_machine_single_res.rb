@@ -59,15 +59,15 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
     res.packet_timeout=2
     res.use_tcp=true
     q = Queue.new
-    start=Time.now
     msg = Dnsruby::Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk")
     res.send_async(msg, q, 1)
+    start=Time.now
     id,ret,error = q.pop
     end_time = Time.now
     assert(id==1)
     assert(ret==nil)
-    p error
     assert(error.class == Dnsruby::ResolvTimeout)
+    p "Difference = #{end_time-start}"
     assert(end_time - start >= 1.5)
     assert(end_time - start <= 2.5)
   end
@@ -84,6 +84,7 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
     end_time = Time.now
     assert(id==1)
     assert(ret==nil)
+    p "Difference = #{end_time-start}"
     assert(error.class == Dnsruby::ResolvTimeout)
     assert(end_time - start >= 1.5)
     assert(end_time - start <= 2.5)

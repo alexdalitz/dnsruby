@@ -95,19 +95,19 @@ module Dnsruby
       connection = EventMachine::connect(args[:server], args[:port], EmTcpHandler) { |c|
         #@TODO SRC_PORT FOR TCP!!!
         c.timeout_time=Time.now + args[:timeout]
+        #        c.comm_inactivity_timeout = args[:timeout]
         c.instance_eval {@args = args}
         lenmsg = [args[:msg].length].pack('n')
         c.send_data(lenmsg)
         c.send_data args[:msg] # , args[:server], args[:port]
         TheLog.debug"EventMachine : Sent TCP packet to #{args[:server]}:#{args[:port]}" + # from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
         ", timeout=#{args[:timeout]}"
-#        c.timer = EventMachine::Timer.new(args[:timeout]) {
-#          # Cancel the send
-#          c.closing=true
-#          c.close_connection
-#          c.send_timeout
-#        }
-      c.comm_inactivity_timeout = args[:timeout]
+        c.timer = EventMachine::Timer.new(args[:timeout]) {
+          # Cancel the send
+          c.closing=true
+          c.close_connection
+          c.send_timeout
+        }
       }
       return connection # allows clients to set callback, errback, etc., if desired
     end
@@ -115,16 +115,16 @@ module Dnsruby
     def EventMachineInterface::send_udp(args={})# msg, timeout, server, port, src_add, src_port, tsig_key, ignore_truncation, use_cp)
       connection = EventMachine::open_datagram_socket(args[:src_addr], args[:src_port], EmUdpHandler) { |c|
         c.timeout_time=Time.now + args[:timeout]
+        #       c.comm_inactivity_timeout = args[:timeout]
         c.instance_eval {@args = args}
         c.send_datagram args[:msg], args[:server], args[:port]
         TheLog.debug"EventMachine : Sent datagram to #{args[:server]}:#{args[:port]} from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
-#        c.timer = EventMachine::Timer.new(args[:timeout]) {
-#          # Cancel the send
-#          c.closing=true
-#          c.close_connection
-#          c.send_timeout
-#        }
-      c.comm_inactivity_timeout = args[:timeout]
+        c.timer = EventMachine::Timer.new(args[:timeout]) {
+          # Cancel the send
+          c.closing=true
+          c.close_connection
+          c.send_timeout
+        }
       }
       return connection # allows clients to set callback, errback, etc., if desired
     end
@@ -170,11 +170,8 @@ module Dnsruby
         
       def unbind
         TheLog.debug("Unbind called")
-        if (@timer)
-          @timer.cancel
-        end
         if (!@closing)
-          if (@timeout_time >= Time.now)
+          if (@timeout_time <= Time.now + 1)
             send_timeout
           else
             #@TODO@ RAISE OTHER NETWORK ERROR!
@@ -196,6 +193,9 @@ module Dnsruby
           set_deferred_status :failed, msg, err
         else
           set_deferred_status :succeeded, msg
+        end
+        if (@timer)
+          @timer.cancel
         end
       end
     end
