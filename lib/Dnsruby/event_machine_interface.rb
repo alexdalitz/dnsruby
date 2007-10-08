@@ -101,12 +101,13 @@ module Dnsruby
         c.send_data args[:msg] # , args[:server], args[:port]
         TheLog.debug"EventMachine : Sent TCP packet to #{args[:server]}:#{args[:port]}" + # from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
         ", timeout=#{args[:timeout]}"
-        EventMachine::add_timer(args[:timeout]) {
-          # Cancel the send
-          c.closing=true
-          c.close_connection
-          c.send_timeout
-        }
+#        c.timer = EventMachine::Timer.new(args[:timeout]) {
+#          # Cancel the send
+#          c.closing=true
+#          c.close_connection
+#          c.send_timeout
+#        }
+      c.comm_inactivity_timeout = args[:timeout]
       }
       return connection # allows clients to set callback, errback, etc., if desired
     end
@@ -117,12 +118,13 @@ module Dnsruby
         c.instance_eval {@args = args}
         c.send_datagram args[:msg], args[:server], args[:port]
         TheLog.debug"EventMachine : Sent datagram to #{args[:server]}:#{args[:port]} from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
-        EventMachine::add_timer(args[:timeout]) {
-          # Cancel the send
-          c.closing=true
-          c.close_connection
-          c.send_timeout
-        }
+#        c.timer = EventMachine::Timer.new(args[:timeout]) {
+#          # Cancel the send
+#          c.closing=true
+#          c.close_connection
+#          c.send_timeout
+#        }
+      c.comm_inactivity_timeout = args[:timeout]
       }
       return connection # allows clients to set callback, errback, etc., if desired
     end
@@ -136,7 +138,7 @@ module Dnsruby
     
     class EmUdpHandler < EventMachine::Connection
       include EM::Deferrable
-      attr_accessor :closing, :timeout_time
+      attr_accessor :closing, :timeout_time, :timer
       def post_init
         @closing=false
       end
@@ -168,6 +170,9 @@ module Dnsruby
         
       def unbind
         TheLog.debug("Unbind called")
+        if (@timer)
+          @timer.cancel
+        end
         if (!@closing)
           if (@timeout_time >= Time.now)
             send_timeout

@@ -445,7 +445,7 @@ module Dnsruby
     def reset_attributes #:nodoc: all
     end
     class PersistentData
-      attr_accessor :outstanding, :deferrable, :to_send, :timers
+      attr_accessor :outstanding, :deferrable, :to_send, :timers, :total_timer
     end
     def send_async(msg, client_queue=nil, client_query_id=nil)
       # We want to send the query to the first resolver.
@@ -485,10 +485,10 @@ module Dnsruby
       end
       query_timeout = @parent.query_timeout
       if (query_timeout > 0)
-        EventMachine::add_timer(query_timeout.round) {
+        persistent_data.timers.push(EventMachine::Timer.new(query_timeout.round) {
           cancel_queries(persistent_data)
           return_to_client(persistent_data.deferrable, client_queue, client_query_id, nil, ResolvTimeout.new("Query timed out after query_timeout=#{query_timeout.round} seconds"))
-        }
+        })
       end
       return persistent_data.deferrable
     end

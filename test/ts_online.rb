@@ -37,6 +37,7 @@ begin
     require 'eventmachine'
     require 'test/tc_event_machine_single_res.rb'
     require 'test/tc_event_machine_res.rb'
+    require 'test/tc_event_machine_deferrable.rb'
   rescue LoadError => e
     puts "EventMachine not installed - skipping test"
   end

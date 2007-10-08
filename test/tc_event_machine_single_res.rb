@@ -8,7 +8,7 @@ require 'Dnsruby'
 class EventMachineTestSingleResolver < Test::Unit::TestCase
   Dnsruby::Resolver.use_eventmachine(true)
   def setup
-    Dnsruby::TheLog.level=Logger::DEBUG
+#    Dnsruby::TheLog.level=Logger::DEBUG
     Dnsruby::Resolver.use_eventmachine(true)
     Dnsruby::Resolver.start_eventmachine_loop(true)
   end
@@ -64,10 +64,9 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
     res.send_async(msg, q, 1)
     id,ret,error = q.pop
     end_time = Time.now
-    print id, ret, error
     assert(id==1)
     assert(ret==nil)
-    puts "Timeout returns " + error.class.to_s
+    p error
     assert(error.class == Dnsruby::ResolvTimeout)
     assert(end_time - start >= 1.5)
     assert(end_time - start <= 2.5)
@@ -85,49 +84,42 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
     end_time = Time.now
     assert(id==1)
     assert(ret==nil)
-    puts "Timeout returns " + error.class.to_s
     assert(error.class == Dnsruby::ResolvTimeout)
     assert(end_time - start >= 1.5)
     assert(end_time - start <= 2.5)
   end
   
-  def test_deferrable_success
-    res = Dnsruby::SingleResolver.new
-    Dnsruby::Resolver.use_eventmachine
-    Dnsruby::Resolver.start_eventmachine_loop(false)
-    done = false
-    EM.run {
-      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
-      df.callback {|msg| puts "callback: #{msg}"; done = true; EM.stop}
-      df.errback {|msg, err| 
-        puts "errback: #{msg}, #{err}"
-        done = true
-        EM.stop 
-        assert(false)}
-    }
-    Dnsruby::Resolver.start_eventmachine_loop(true)
-  end
-  
-  def test_deferrable_timeout
-    res = Dnsruby::SingleResolver.new("10.0.1.128")
-    Dnsruby::Resolver.use_eventmachine
-    res.packet_timeout=2
-    Dnsruby::Resolver.start_eventmachine_loop(false)
-    done = false
-    EM.run {
-      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
-      df.callback {|msg| puts "callback: #{msg}"; done = true; EM.stop; assert(false)}
-      df.errback {|msg, err| 
-        puts "errback: #{msg}, #{err}"
-        done = true
-        EM.stop 
-        }
-    }
-    Dnsruby::Resolver.start_eventmachine_loop(true)
-  end
+#  def test_deferrable_success
+#    res = Dnsruby::SingleResolver.new
+#    Dnsruby::Resolver.use_eventmachine
+#    Dnsruby::Resolver.start_eventmachine_loop(false)
+#    EM.run {
+#      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
+#      df.callback {|msg| EM.stop}
+#      df.errback {|msg, err| 
+#        EM.stop 
+#        assert(false)}
+#    }
+#    Dnsruby::Resolver.start_eventmachine_loop(true)
+#  end
+#  
+#  def test_deferrable_timeout
+#    res = Dnsruby::SingleResolver.new("10.0.1.128")
+#    Dnsruby::Resolver.use_eventmachine
+#    res.packet_timeout=2
+#    Dnsruby::Resolver.start_eventmachine_loop(false)
+#    EM.run {
+#      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
+#      df.callback {|msg| EM.stop; assert(false)}
+#      df.errback {|msg, err| 
+#        EM.stop 
+#        }
+#    }
+#    Dnsruby::Resolver.start_eventmachine_loop(true)
+#  end
 
   def test_truncated_response
-    res = Dnsruby::SingleResolver.new
+   res = Dnsruby::SingleResolver.new
     res.packet_timeout = 10
     res.server=('ns0.validation-test-servers.nominet.org.uk')
     m = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", 'txt')
