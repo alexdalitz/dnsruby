@@ -26,6 +26,7 @@ class TestResolver < Test::Unit::TestCase
   include Dnsruby
   Thread::abort_on_exception = true
   PORT = 42138
+  @@port = PORT
   def setup
     Dnsruby::Config.reset
   end
@@ -63,10 +64,10 @@ class TestResolver < Test::Unit::TestCase
     assert(error==nil)
   end
 
-# @TODO@ Implement!!  
-#  def test_many_threaded_clients
-#    assert(false, "IMPLEMENT!")
-#  end
+  # @TODO@ Implement!!  
+  #  def test_many_threaded_clients
+  #    assert(false, "IMPLEMENT!")
+  #  end
   
   def test_reverse_lookup
     m = Message.new("210.251.121.214", Types.PTR)
@@ -82,7 +83,7 @@ class TestResolver < Test::Unit::TestCase
         assert(answer.domainname.to_s=~/ruby-lang/)      
       end
     end
-      assert(!no_pointer)
+    assert(!no_pointer)
   end
   
   def test_bad_host
@@ -113,79 +114,72 @@ class TestResolver < Test::Unit::TestCase
     #@TODO@ test timeout behaviour for different retry, retrans, total timeout etc.
     #Problem here is that many sockets will be created for queries which time out. 
     # Run a query which will not respond, and check that the timeout works
-    start_timeout_server {
-    start=stop=0
-    retry_times = 3
-    retry_delay=1
-    packet_timeout=2
-    # Work out what time should be, then time it to check
-    expected = ((2**(retry_times-1))*retry_delay) + packet_timeout
-    begin
-      res = Resolver.new({:nameserver => "localhost", :port=>PORT})
-      #      res = Resolver.new({:nameserver => "213.248.199.17"})
-      res.packet_timeout=packet_timeout
-      res.retry_times=retry_times
-      res.retry_delay=retry_delay
-      start=Time.now
-      m = res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
-      fail
-    rescue ResolvTimeout
-      stop=Time.now
-      time = stop-start
-      assert(time <= expected *1.2 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
-    end
-    }
+    if (!RUBY_PLATFORM=~/darwin/)
+      start=stop=0
+      retry_times = 3
+      retry_delay=1
+      packet_timeout=2
+      # Work out what time should be, then time it to check
+      expected = ((2**(retry_times-1))*retry_delay) + packet_timeout
+      begin
+        res = Resolver.new({:nameserver => "10.0.1.128"})
+        #      res = Resolver.new({:nameserver => "213.248.199.17"})
+        res.packet_timeout=packet_timeout
+        res.retry_times=retry_times
+        res.retry_delay=retry_delay
+        start=Time.now
+        m = res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
+        fail
+      rescue ResolvTimeout
+        stop=Time.now
+        time = stop-start
+        assert(time <= expected *1.2 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
+      end
+  end
   end
   
   def test_packet_timeout
-    start_timeout_server {
-    res = Resolver.new({:nameserver => "localhost", :port => PORT})
-    start=stop=0
-    retry_times = retry_delay = packet_timeout= 10
-    query_timeout=1
-    begin
-      res.packet_timeout=packet_timeout
-      res.retry_times=retry_times
-      res.retry_delay=retry_delay
-      res.query_timeout=query_timeout
-      # Work out what time should be, then time it to check
-      expected = query_timeout
-      start=Time.now
-      m = res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
-      fail
-    rescue ResolvTimeout
-      stop=Time.now
-      time = stop-start
-      assert(time <= expected *1.1 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
-    end    #
-   }
+    if (!RUBY_PLATFORM=~/darwin/)
+      res = Resolver.new({:nameserver => "10.0.1.128"})
+      start=stop=0
+      retry_times = retry_delay = packet_timeout= 10
+      query_timeout=1
+      begin
+        res.packet_timeout=packet_timeout
+        res.retry_times=retry_times
+        res.retry_delay=retry_delay
+        res.query_timeout=query_timeout
+        # Work out what time should be, then time it to check
+        expected = query_timeout
+        start=Time.now
+        m = res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
+        fail
+      rescue ResolvTimeout
+        stop=Time.now
+        time = stop-start
+        assert(time <= expected *1.1 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
+      end    #
+  end
   end
   
   def test_queue_packet_timeout
-    start_timeout_server {
-    res = Resolver.new({:nameserver => "localhost", :port=>PORT})
-    bad = SingleResolver.new("localhost")
-    res.add_resolver(bad)
-    expected = 1
-    res.query_timeout=expected    
-    q = Queue.new
-    start = Time.now
-    m = res.send_async(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A), q, q)
-    id,ret,err = q.pop
-    stop = Time.now
-    assert(id=q)
-    assert(ret==nil)
-    assert(err.class == ResolvTimeout, "#{err.class}, #{err}")
-    time = stop-start
-    assert(time <= expected *1.2 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")            
-    }
+    if (!RUBY_PLATFORM=~/darwin/)
+      res = Resolver.new({:nameserver => "10.0.1.128"})
+      bad = SingleResolver.new("localhost")
+      res.add_resolver(bad)
+      expected = 1
+      res.query_timeout=expected    
+      q = Queue.new
+      start = Time.now
+      m = res.send_async(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A), q, q)
+      id,ret,err = q.pop
+      stop = Time.now
+      assert(id=q)
+      assert(ret==nil)
+      assert(err.class == ResolvTimeout, "#{err.class}, #{err}")
+      time = stop-start
+      assert(time <= expected *1.2 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")            
+    end
   end
   
-  def start_timeout_server
-      s=UDPSocket.new
-      s.bind("localhost", PORT)
-      yield
-      s.close
-  end
-      
 end

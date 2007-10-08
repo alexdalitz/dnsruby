@@ -21,7 +21,7 @@ class TestSingleResolver < Test::Unit::TestCase
   # @todo@ Test udppacketsize
   Thread::abort_on_exception = true
   #  Dnsruby::TheLog.level=Logger::DEBUG
-
+  
   def setup
     Dnsruby::Config.reset
   end
@@ -56,27 +56,34 @@ class TestSingleResolver < Test::Unit::TestCase
   end
   
   def test_timeout
-    # Run a query which will not respond, and check that the timeout works
-    begin
-      res = SingleResolver.new("10.0.1.128")
-      res.packet_timeout=1
-      m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
-      fail
-    rescue ResolvTimeout
+    if (!RUBY_PLATFORM=~/darwin/)
+      # Run a query which will not respond, and check that the timeout works
+      begin
+        res = SingleResolver.new("10.0.1.128")
+        res.port = port
+        res.packet_timeout=1
+        m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
+        fail
+      rescue ResolvTimeout
+      end
     end
   end
   
   def test_queue_timeout
-    res = SingleResolver.new("10.0.1.128")
-    res.packet_timeout=1
-    q = Queue.new
-    msg = Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk")
-    res.send_async(msg, q, msg)
-    id,ret, error = q.pop
-    assert(id==msg)
-    assert(ret==nil)
-    p error.class
-    assert(error.class == ResolvTimeout)
+    port = 46129
+    if (!RUBY_PLATFORM=~/darwin/)
+      res = SingleResolver.new("10.0.1.128")
+      res.port = port
+      res.packet_timeout=1
+      q = Queue.new
+      msg = Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk")
+      res.send_async(msg, q, msg)
+      id,ret, error = q.pop
+      assert(id==msg)
+      assert(ret==nil)
+      p error
+      assert(error.class == ResolvTimeout)
+    end
   end
   
   def test_queries
@@ -119,7 +126,7 @@ class TestSingleResolver < Test::Unit::TestCase
       end
     end # do
   end # test_queries
-
+  
   # @TODO@ Although the test_thread_stopped test runs in isolation, it won't run as part
   # of the whole test suite (ts_dnsruby.rb). Commented out until I can figure out how to 
   # get Test::Unit to run this one sequentially...  
