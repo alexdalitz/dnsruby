@@ -53,11 +53,6 @@ class EventMachineTestResolver < Test::Unit::TestCase
     assert(error==nil)
   end
   
-  # @TODO@ Implement!!  
-  #  def test_many_threaded_clients
-  #    assert(false, "IMPLEMENT!")
-  #  end
-  
   def test_reverse_lookup
     m = Message.new("210.251.121.214", Types.PTR)
     r = Resolver.new
@@ -73,20 +68,6 @@ class EventMachineTestResolver < Test::Unit::TestCase
       end
     end
     assert(!no_pointer)
-  end
-  
-  def test_bad_host
-    res = Resolver.new({:nameserver => "localhost"})
-    res.retry_times=1
-    res.retry_delay=0
-    res.query_timeout = 2
-    res.packet_timeout = 1
-    q = Queue.new
-    res.send_async(Message.new("example.com", Types.A), q, q)
-    id, m, err = q.pop
-    assert(id==q)
-    assert(m == nil)
-    assert(err.kind_of?(OtherResolvError), "Expecting OtherResolvError, got #{err.class}")
   end
   
   def test_nxdomain
@@ -190,40 +171,4 @@ class EventMachineTestResolver < Test::Unit::TestCase
     assert(!m.header.tc, "Message was truncated!")
   end
   
-#  def test_deferrable_success
-#    sleep(0.1) # Give the Event loop a chance to close down from previous test
-#    Dnsruby::Resolver.use_eventmachine
-#    Dnsruby::Resolver.start_eventmachine_loop(false)
-#    res = Dnsruby::Resolver.new
-#    q = Queue.new
-#    id = 1
-#    EM.run {
-#      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
-#      df.callback {|msg| done = true; EM.stop}
-#      df.errback {|msg, err| 
-#        puts "errback: #{msg}, #{err}"
-#        done = true
-#        EM.stop 
-#        assert(false)}
-#    }
-#    Dnsruby::Resolver.start_eventmachine_loop(true)
-#  end
-#  
-#  def test_deferrable_timeout
-#    sleep(0.1) # Give the Event loop a chance to close down from previous test
-#    Dnsruby::Resolver.start_eventmachine_loop(false)
-#    Dnsruby::Resolver.use_eventmachine
-#    res = Dnsruby::Resolver.new("10.0.1.128")
-#    res.query_timeout=2
-#    q = Queue.new
-#    id = 1
-#    EM.run {
-#      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
-#      df.callback {|msg| EM.stop; assert(false)}
-#      df.errback {|msg, err| 
-#        EM.stop 
-#      }
-#    }
-#    Dnsruby::Resolver.start_eventmachine_loop(true)
-#  end
 end

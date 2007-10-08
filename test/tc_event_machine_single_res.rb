@@ -90,35 +90,6 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
     assert(end_time - start <= 2.5)
   end
   
-#  def test_deferrable_success
-#    res = Dnsruby::SingleResolver.new
-#    Dnsruby::Resolver.use_eventmachine
-#    Dnsruby::Resolver.start_eventmachine_loop(false)
-#    EM.run {
-#      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
-#      df.callback {|msg| EM.stop}
-#      df.errback {|msg, err| 
-#        EM.stop 
-#        assert(false)}
-#    }
-#    Dnsruby::Resolver.start_eventmachine_loop(true)
-#  end
-#  
-#  def test_deferrable_timeout
-#    res = Dnsruby::SingleResolver.new("10.0.1.128")
-#    Dnsruby::Resolver.use_eventmachine
-#    res.packet_timeout=2
-#    Dnsruby::Resolver.start_eventmachine_loop(false)
-#    EM.run {
-#      df = res.send_async(Dnsruby::Message.new("nominet.org.uk"))
-#      df.callback {|msg| EM.stop; assert(false)}
-#      df.errback {|msg, err| 
-#        EM.stop 
-#        }
-#    }
-#    Dnsruby::Resolver.start_eventmachine_loop(true)
-#  end
-
   def test_truncated_response
    res = Dnsruby::SingleResolver.new
     res.packet_timeout = 10

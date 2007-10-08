@@ -25,6 +25,7 @@ include Dnsruby
 class TestResolver < Test::Unit::TestCase
   include Dnsruby
   Thread::abort_on_exception = true
+  PORT = 42138
   def setup
     Dnsruby::Config.reset
   end
@@ -95,7 +96,7 @@ class TestResolver < Test::Unit::TestCase
     assert(id==q)
     assert(m == nil)
     print err.class
-    assert(err.kind_of?(OtherResolvError))
+    assert(err.kind_of?(OtherResolvError), "OtherResolvError expected : got #{err.class}")
   end
   
   def test_nxdomain
@@ -112,6 +113,7 @@ class TestResolver < Test::Unit::TestCase
     #@TODO@ test timeout behaviour for different retry, retrans, total timeout etc.
     #Problem here is that many sockets will be created for queries which time out. 
     # Run a query which will not respond, and check that the timeout works
+    start_timeout_server {
     start=stop=0
     retry_times = 3
     retry_delay=1
@@ -119,7 +121,7 @@ class TestResolver < Test::Unit::TestCase
     # Work out what time should be, then time it to check
     expected = ((2**(retry_times-1))*retry_delay) + packet_timeout
     begin
-      res = Resolver.new({:nameserver => "10.0.1.128"})
+      res = Resolver.new({:nameserver => "localhost", :port=>PORT})
       #      res = Resolver.new({:nameserver => "213.248.199.17"})
       res.packet_timeout=packet_timeout
       res.retry_times=retry_times
@@ -132,10 +134,12 @@ class TestResolver < Test::Unit::TestCase
       time = stop-start
       assert(time <= expected *1.2 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
     end
+    }
   end
   
   def test_packet_timeout
-    res = Resolver.new({:nameserver => "10.0.1.128"})
+    start_timeout_server {
+    res = Resolver.new({:nameserver => "localhost", :port => PORT})
     start=stop=0
     retry_times = retry_delay = packet_timeout= 10
     query_timeout=1
@@ -153,11 +157,13 @@ class TestResolver < Test::Unit::TestCase
       stop=Time.now
       time = stop-start
       assert(time <= expected *1.1 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
-    end    
+    end    #
+   }
   end
   
   def test_queue_packet_timeout
-    res = Resolver.new({:nameserver => "10.0.1.128"})
+    start_timeout_server {
+    res = Resolver.new({:nameserver => "localhost", :port=>PORT})
     bad = SingleResolver.new("localhost")
     res.add_resolver(bad)
     expected = 1
@@ -172,6 +178,14 @@ class TestResolver < Test::Unit::TestCase
     assert(err.class == ResolvTimeout, "#{err.class}, #{err}")
     time = stop-start
     assert(time <= expected *1.2 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")            
+    }
   end
-    
+  
+  def start_timeout_server
+      s=UDPSocket.new
+      s.bind("localhost", PORT)
+      yield
+      s.close
+  end
+      
 end
