@@ -75,7 +75,8 @@ module Dnsruby
         # Send an initial query
         msg = Message.new(zone, @transfer_type, @klass)
         if @transfer_type == Types.IXFR
-          rr = RR.create("#{zone} 0 IN SOA" + '. . %u 0 0 0 0' % @serial)
+#          rr = RR.create("#{zone} 0 IN SOA" + '. . %u 0 0 0 0' % @serial)
+          rr = RR.create("#{zone} 0 IN SOA" + '0 0 %u 0 0 0 0' % @serial)
           msg.add_authority(rr)
         end
         # @TODO@ TSIG?
@@ -269,6 +270,8 @@ module Dnsruby
       end
     end
     
+    
+    # @TODO@ Do all this with EventMachine?
     def send_message(socket, msg) #:nodoc: all
       query_packet = msg.encode
       lenmsg = [query_packet.length].pack('n')
