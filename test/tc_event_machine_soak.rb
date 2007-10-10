@@ -19,9 +19,10 @@ class TestEventMachineSoak < Test::Unit::TestCase
   def test_single_res
     #    TestSoakBase.test_continuous_queries_asynch_single_res
   end
-  @@dfs = {}
-  @@num_sent = 0
-  def test_deferrable
+  def test_single_deferrable
+    sleep(0.1)
+    @@dfs = {}
+    @@num_sent = 0
     #Dnsruby::TheLog.level=Logger::DEBUG
     res = Dnsruby::SingleResolver.new
     Dnsruby::Resolver.use_eventmachine
@@ -30,7 +31,7 @@ class TestEventMachineSoak < Test::Unit::TestCase
     id = 1
     done = false
     EM.run {
-      150.times do |i|
+      100.times do |i|
         send_next_deferrable(res)
       end
     }
@@ -38,13 +39,11 @@ class TestEventMachineSoak < Test::Unit::TestCase
   end
   
   def send_next_deferrable(res)
-    if (@@num_sent>5000) 
+    if (@@num_sent>2000) 
       EM.stop
       return
     end
-    puts "dfs.length = #{@@dfs.length}"
     id = @@num_sent
-    puts @@num_sent
     @@num_sent+=1
     @@dfs[id] = res.send_async(Dnsruby::Message.new("example.com"))
     @@dfs[id].callback {|msg| puts "callback: #{id}"
@@ -78,8 +77,22 @@ class TestEventMachineSoak < Test::Unit::TestCase
     end
   end
   
-  # @TODO@ Need to test Resolver EM implementation here!
-  def test_resolver_em
-    
+  def test_resolver_deferrable
+    sleep(0.1)
+    @@dfs = {}
+    @@num_sent = 0
+    #Dnsruby::TheLog.level=Logger::DEBUG
+    res = Dnsruby::Resolver.new
+    Dnsruby::Resolver.use_eventmachine
+    Dnsruby::Resolver.start_eventmachine_loop(false)
+    q = Queue.new
+    id = 1
+    done = false
+    EM.run {
+      50.times do |i|
+        send_next_deferrable(res)
+      end
+    }
+    Dnsruby::Resolver.start_eventmachine_loop(true)    
   end
 end

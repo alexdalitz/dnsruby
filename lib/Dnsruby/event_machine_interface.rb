@@ -190,9 +190,9 @@ module Dnsruby
           ans = Message.decode(data)
         rescue Exception => e
           TheLog.error("Decode error! #{e.class}, #{e}\nfor msg (length=#{data.length}) : #{data}")
-          send_to_client(nil, e)
           @closing=true
           close_connection
+          send_to_client(nil, e)
           return
         end
         TheLog.debug("#{ans}")
@@ -200,8 +200,8 @@ module Dnsruby
         ans.answersize=(data.length)
         exception = ans.header.getException
         @closing=true
-        send_to_client(ans, exception)
         close_connection
+        send_to_client(ans, exception)
       end
         
       def unbind
