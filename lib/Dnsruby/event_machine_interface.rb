@@ -1,14 +1,71 @@
 require 'eventmachine'
-#require 'singleton'
 module Dnsruby
   class EventMachineInterface
-    #    include Singleton
     @@started_em_here = false
     @@running_clients=[]
     @@outstanding_sends = []
     @@em_thread=nil
     # We want to have one EM loop running continuously in this class.
     # Remember to use stop_event_loop inside of EM callback in order to stop the event machine
+    
+    # Timers - can't use EM timers as they max out at 1000.
+    # Instead, while queries are outstanding, call next_tick to manage our own list of timers.
+    
+    @@timer_procs={} # timeout=>[proc
+    @@timer_keys_sorted=[]
+    TIMER_PERIOD = 1  # @TODO@ Lessen this when EventMachine allows!!
+    FUDGE_FACTOR = +TIMER_PERIOD/2 #  try to cope with coarse-grained timer
+    
+    def EventMachineInterface::process_timers
+      # Go through list of timers
+      now = Time.now
+      @@timer_keys_sorted.each do |timeout|
+        if (timeout > now) 
+          break
+        end
+        c, proc = @@timer_procs[timeout]
+        proc.call
+        @@timer_procs.delete(timeout)
+        @@timer_keys_sorted.delete(timeout)
+      end
+        
+      if (!@@outstanding_sends.empty?)
+        EventMachine::Timer.new(TIMER_PERIOD) {process_timers}
+      end
+    end
+    
+    def EventMachineInterface::remove_timer(c)
+      # Remove from timer structures - if still there!
+      @@timer_procs.each do |timeout, value|
+        conn, proc = value
+        if (c==conn)
+          @@timer_procs.delete(timeout)
+          @@timer_keys_sorted.delete(timeout)
+        end
+      end
+    end
+    
+    def EventMachineInterface::add_to_outstanding(c, timeout)
+      # Add to timer structures
+      @@timer_procs[Time.now+timeout+FUDGE_FACTOR]=[c, Proc.new {
+          # Cancel the send
+          c.closing=true
+          c.close_connection
+          c.send_timeout
+        }]
+      @@timer_keys_sorted=@@timer_procs.keys.sort
+      @@outstanding_sends.push(c)
+      if (@@outstanding_sends.length==1)
+        EventMachine::Timer.new(0) {process_timers}
+      end
+    end
+    
+    def EventMachineInterface::remove_from_outstanding(c)
+      @@outstanding_sends.delete(c)
+      remove_timer(c)
+      # If we explicitly started the EM loop, and there are no more outstanding sends, then stop the EM loop
+      stop_eventmachine
+    end
     
     def EventMachineInterface::start_eventmachine
       if (!eventmachine_running?)
@@ -86,29 +143,20 @@ module Dnsruby
         df = send_udp(args)
       end 
       # Need to add this send to the list of outstanding sends
-      @@outstanding_sends.push(df)
+      add_to_outstanding(df, args[:timeout])
       return df
     end
 
     def EventMachineInterface::send_tcp(args={})#msg, timeout, server, port, src_add, src_port, tsig_key, ignore_truncation, use_tcp)
-      #      connection = EventMachine::connect(args[:src_addr], args[:src_port], EmTcpHandler) { |c|
       connection = EventMachine::connect(args[:server], args[:port], EmTcpHandler) { |c|
         #@TODO SRC_PORT FOR TCP!!!
         c.timeout_time=Time.now + args[:timeout]
-        #        c.comm_inactivity_timeout = args[:timeout]
         c.instance_eval {@args = args}
         lenmsg = [args[:msg].length].pack('n')
         c.send_data(lenmsg)
         c.send_data args[:msg] # , args[:server], args[:port]
         TheLog.debug"EventMachine : Sent TCP packet to #{args[:server]}:#{args[:port]}" + # from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
         ", timeout=#{args[:timeout]}"
-        # @TODO@ Timers max out at 1000 - use another system
-        c.timer = EventMachine::Timer.new(args[:timeout]) {
-          # Cancel the send
-          c.closing=true
-          c.close_connection
-          c.send_timeout
-        }
       }
       return connection # allows clients to set callback, errback, etc., if desired
     end
@@ -116,31 +164,17 @@ module Dnsruby
     def EventMachineInterface::send_udp(args={})# msg, timeout, server, port, src_add, src_port, tsig_key, ignore_truncation, use_cp)
       connection = EventMachine::open_datagram_socket(args[:src_addr], args[:src_port], EmUdpHandler) { |c|
         c.timeout_time=Time.now + args[:timeout]
-        #       c.comm_inactivity_timeout = args[:timeout]
         c.instance_eval {@args = args}
         c.send_datagram args[:msg], args[:server], args[:port]
         TheLog.debug"EventMachine : Sent datagram to #{args[:server]}:#{args[:port]} from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
-        # @TODO@ Timers max out at 1000 - use another system
-        c.timer = EventMachine::Timer.new(args[:timeout]) {
-          # Cancel the send
-          c.closing=true
-          c.close_connection
-          c.send_timeout
-        }
       }
       return connection # allows clients to set callback, errback, etc., if desired
-    end
-    
-    def EventMachineInterface::remove_from_outstanding(df)
-      @@outstanding_sends.delete(df)
-      # If we explicitly started the EM loop, and there are no more outstanding sends, then stop the EM loop
-      stop_eventmachine
     end
     
     
     class EmUdpHandler < EventMachine::Connection
       include EM::Deferrable
-      attr_accessor :closing, :timeout_time, :timer
+      attr_accessor :closing, :timeout_time
       def post_init
         @closing=false
       end
@@ -195,9 +229,6 @@ module Dnsruby
           set_deferred_status :failed, msg, err
         else
           set_deferred_status :succeeded, msg
-        end
-        if (@timer)
-          @timer.cancel
         end
       end
     end

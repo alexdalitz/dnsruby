@@ -241,12 +241,9 @@ module Dnsruby
     end
       
     def send_eventmachine(msg, header_id, client_query_id, client_queue, use_tcp, client_deferrable=nil) #:nodoc: all
-      #        em = EventMachineInterface.instance
-      #        return em.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
       if (!client_deferrable)
         client_deferrable = EventMachine::DefaultDeferrable.new
       end
-      #      packet_deferrable = EventMachineInterface.send(:msg=>msg, :header_id=>header_id, :client_query_id=>client_query_id, :client_queue=>client_queue, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
       packet_deferrable = EventMachineInterface.send(:msg=>msg, :header_id=>header_id, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
       packet_deferrable.callback { |response|
         TheLog.debug("EM callback #{response}")

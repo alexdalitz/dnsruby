@@ -407,7 +407,7 @@ module Dnsruby
     def Resolver.start_eventmachine_loop?
       return @@start_eventmachine_loop
     end
-    def generate_timeouts(base=0)
+    def generate_timeouts(base=0, fudge_factor = 0)
       #These should be be pegged to the single_resolver they are targetting :
       #  e.g. timeouts[timeout1]=nameserver
       timeouts = {}
@@ -422,13 +422,13 @@ module Dnsruby
           res= @single_resolvers[i]
           offset = (i*@retry_delay.to_f/@single_resolvers.length)
           if (retry_count==0)
-            timeouts[base+offset]=[res, retry_count]
+            timeouts[base+offset+fudge_factor]=[res, retry_count]
           else
             if (timeouts.has_key?(base+retry_delay+offset))
               TheLog.error("Duplicate timeout key!")
               raise RuntimeError.new("Duplicate timeout key!")
             end
-            timeouts[base+retry_delay+offset]=[res, retry_count]
+            timeouts[base+retry_delay+offset+fudge_factor]=[res, retry_count]
           end
         end
       end
@@ -439,6 +439,8 @@ module Dnsruby
   # This class implements the I/O using EventMachine.
   # NOTE - EM does not work properly on Windows with version 0.8.1 - do not use!
   class ResolverEM #:nodoc: all
+    TIMER_PERIOD = 1 # @TODO@ Lessen this when EventMachine allows!!
+    FUDGE_FACTOR = +TIMER_PERIOD/2 # Cope with coarse-grained EM timer
     def initialize(parent)
       @parent=parent
     end
@@ -459,7 +461,7 @@ module Dnsruby
       persistent_data.deferrable = EM::DefaultDeferrable.new
       persistent_data.outstanding = []
       persistent_data.to_send = 0
-      persistent_data.timeouts=@parent.generate_timeouts(Time.now)
+      persistent_data.timeouts=@parent.generate_timeouts(Time.now, FUDGE_FACTOR)
       persistent_data.timer_procs = {}
       persistent_data.finish = false
       persistent_data.timeouts.keys.sort.each do |timeout|
@@ -484,17 +486,17 @@ module Dnsruby
       end
       query_timeout = @parent.query_timeout
       if (query_timeout > 0)
-        persistent_data.timer_procs[Time.now+query_timeout]=Proc.new{
+        persistent_data.timer_procs[Time.now+query_timeout + FUDGE_FACTOR]=Proc.new{
           cancel_queries(persistent_data)
           return_to_client(persistent_data.deferrable, client_queue, client_query_id, nil, ResolvTimeout.new("Query timed out after query_timeout=#{query_timeout.round} seconds"))
         }
       end
       persistent_data.timer_keys_sorted = persistent_data.timer_procs.keys.sort
-      EventMachine::next_tick {process_eventmachine_tick(persistent_data)}
+      EventMachine::Timer.new(0) {process_eventmachine_timers(persistent_data)}
       return persistent_data.deferrable
     end
     
-    def process_eventmachine_tick(persistent_data)
+    def process_eventmachine_timers(persistent_data)
       if (persistent_data.finish)
         return
       end
@@ -507,7 +509,7 @@ module Dnsruby
         persistent_data.timer_procs.delete(timeout)
         persistent_data.timer_keys_sorted.delete(timeout)
       end
-      EventMachine::next_tick {process_eventmachine_tick(persistent_data)}
+      EventMachine::Timer.new(TIMER_PERIOD) {process_eventmachine_timers(persistent_data)}
     end
     
     def send_new_em_query(single_resolver, msg, client_queue, client_query_id, persistent_data)

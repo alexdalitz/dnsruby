@@ -101,15 +101,15 @@ class EventMachineTestResolver < Test::Unit::TestCase
     rescue ResolvTimeout
       stop=Time.now
       time = stop-start
-      assert(time <= expected *1.2 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
+      assert(time <= expected *1.3 && time >= expected *0.9, "Wrong time taken, expected #{expected}, took #{time}")        
     end
   end
   
-  def test_packet_timeout
+  def test_query_timeout
     res = Resolver.new({:nameserver => "10.0.1.128"})
     start=stop=0
     retry_times = retry_delay = packet_timeout= 10
-    query_timeout=1
+    query_timeout=2
     begin
       res.packet_timeout=packet_timeout
       res.retry_times=retry_times
@@ -123,16 +123,16 @@ class EventMachineTestResolver < Test::Unit::TestCase
     rescue ResolvTimeout
       stop=Time.now
       time = stop-start
-      assert(time <= expected *1.1 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
+      assert(time <= expected *1.2 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
     end    
   end
   
-  def test_queue_packet_timeout
+  def test_queue_query_timeout
     res = Resolver.new({:nameserver => "10.0.1.128"})
     bad = SingleResolver.new("localhost")
     res.add_resolver(bad)
-    expected = 1
-    res.query_timeout=expected    
+    expected = 2
+    res.query_timeout=expected
     q = Queue.new
     start = Time.now
     m = res.send_async(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A), q, q)
