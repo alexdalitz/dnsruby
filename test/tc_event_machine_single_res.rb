@@ -69,7 +69,7 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
     assert(error.class == Dnsruby::ResolvTimeout)
     p "Difference = #{end_time-start}"
     assert(end_time - start >= 1.5)
-    assert(end_time - start <= 2.6)
+    assert(end_time - start <= 3)
   end
   
   def test_udp_queue_timeout
