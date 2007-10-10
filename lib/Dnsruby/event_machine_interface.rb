@@ -102,6 +102,7 @@ module Dnsruby
         c.send_data args[:msg] # , args[:server], args[:port]
         TheLog.debug"EventMachine : Sent TCP packet to #{args[:server]}:#{args[:port]}" + # from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
         ", timeout=#{args[:timeout]}"
+        # @TODO@ Timers max out at 1000 - use another system
         c.timer = EventMachine::Timer.new(args[:timeout]) {
           # Cancel the send
           c.closing=true
@@ -119,6 +120,7 @@ module Dnsruby
         c.instance_eval {@args = args}
         c.send_datagram args[:msg], args[:server], args[:port]
         TheLog.debug"EventMachine : Sent datagram to #{args[:server]}:#{args[:port]} from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
+        # @TODO@ Timers max out at 1000 - use another system
         c.timer = EventMachine::Timer.new(args[:timeout]) {
           # Cancel the send
           c.closing=true

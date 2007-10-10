@@ -438,14 +438,14 @@ module Dnsruby
   
   # This class implements the I/O using EventMachine.
   # NOTE - EM does not work properly on Windows with version 0.8.1 - do not use!
-  class ResolverEM
+  class ResolverEM #:nodoc: all
     def initialize(parent)
       @parent=parent
     end
     def reset_attributes #:nodoc: all
     end
     class PersistentData
-      attr_accessor :outstanding, :deferrable, :to_send, :timers, :total_timer
+      attr_accessor :outstanding, :deferrable, :to_send, :timeouts, :timer_procs, :timer_keys_sorted, :finish
     end
     def send_async(msg, client_queue=nil, client_query_id=nil)
       # We want to send the query to the first resolver.
@@ -458,12 +458,13 @@ module Dnsruby
       persistent_data = PersistentData.new
       persistent_data.deferrable = EM::DefaultDeferrable.new
       persistent_data.outstanding = []
-      persistent_data.timers = []
       persistent_data.to_send = 0
-      timeouts=@parent.generate_timeouts
-      timeouts.keys.sort.each do |timeout|
-        value = timeouts[timeout]
-        timeout = timeout.round
+      persistent_data.timeouts=@parent.generate_timeouts(Time.now)
+      persistent_data.timer_procs = {}
+      persistent_data.finish = false
+      persistent_data.timeouts.keys.sort.each do |timeout|
+        value = persistent_data.timeouts[timeout]
+        #        timeout = timeout.round
         single_resolver, retry_count = value
         persistent_data.to_send+=1
         df = nil
@@ -474,23 +475,39 @@ module Dnsruby
           persistent_data.outstanding.push(df)
         else
           # Send later
-          #          timer = EventMachine::add_timer(timeout) {
-          timer = EventMachine::Timer.new(timeout) {
+          persistent_data.timer_procs[timeout]=Proc.new{
             TheLog.debug("Sending #{timeout} delayed EM query")
             df = send_new_em_query(single_resolver, msg, client_queue, client_query_id, persistent_data)
             persistent_data.outstanding.push(df)
           }
-          persistent_data.timers.push(timer)
         end
       end
       query_timeout = @parent.query_timeout
       if (query_timeout > 0)
-        persistent_data.timers.push(EventMachine::Timer.new(query_timeout.round) {
+        persistent_data.timer_procs[Time.now+query_timeout]=Proc.new{
           cancel_queries(persistent_data)
           return_to_client(persistent_data.deferrable, client_queue, client_query_id, nil, ResolvTimeout.new("Query timed out after query_timeout=#{query_timeout.round} seconds"))
-        })
+        }
       end
+      persistent_data.timer_keys_sorted = persistent_data.timer_procs.keys.sort
+      EventMachine::next_tick {process_eventmachine_tick(persistent_data)}
       return persistent_data.deferrable
+    end
+    
+    def process_eventmachine_tick(persistent_data)
+      if (persistent_data.finish)
+        return
+      end
+      now = Time.now
+      persistent_data.timer_keys_sorted.each do |timeout|
+        if (timeout > now)
+          break
+        end
+        persistent_data.timer_procs[timeout].call
+        persistent_data.timer_procs.delete(timeout)
+        persistent_data.timer_keys_sorted.delete(timeout)
+      end
+      EventMachine::next_tick {process_eventmachine_tick(persistent_data)}
     end
     
     def send_new_em_query(single_resolver, msg, client_queue, client_query_id, persistent_data)
@@ -522,21 +539,13 @@ module Dnsruby
             cancel_queries(persistent_data)
             return_to_client(persistent_data.deferrable, client_queue, client_query_id, response, error)
           else
-            # @TODO@ How do we remove a single server from all the deferrables?
             #   - if it was any other error, then remove that server from the list for that query
             #   If a Too Many Open Files error, then don't remove, but let retry work.
             if (!(error.to_s=~/Errno::EMFILE/))
-              # @TODO@ Remove server from list!
-              p "@TODO@ !!! Remove server from list due to error #{error}"
-              #              TheLog.debug("Removing #{resolver.server} from resolver list for this query")
-              #              timeouts[1].each do |key, value|
-              #                res = value[0]
-              #                if (res == resolver)
-              #                  timeouts[1].delete(key)
-              #                end
-              #              end
+              remove_server(single_resolver, persistent_data)
+              TheLog.debug("Removing #{single_resolver.server} from resolver list for this query")
             else
-              TheLog.debug("NOT Removing #{resolver.server} due to Errno::EMFILE")          
+              TheLog.debug("NOT Removing #{single_resolver.server} due to Errno::EMFILE")          
             end
             #        - if it was the last server, then return an error to the client (and clean up)
             if (persistent_data.outstanding.empty? && persistent_data.to_send==0)
@@ -550,14 +559,24 @@ module Dnsruby
       return df
     end
     
+    def remove_server(server, persistent_data)
+      # Go through persistent_data.timeouts and check all the values for that resolver
+      persistent_data.timeouts.each do |key, value|
+        if (value[0] == server)
+          # Remove the server from the list
+          persistent_data.timer_procs.delete(key)
+          persistent_data.timer_keys_sorted.delete(key)
+        end
+      end      
+    end
+    
     def cancel_queries(persistent_data)
       TheLog.debug("Cancelling EM queries")
       persistent_data.outstanding.each do |df|
         df.set_deferred_status :failed, "cancelling", "cancelling"
       end
-      persistent_data.timers.each do |timer|
-        timer.cancel
-      end
+      # Cancel the next tick
+      persistent_data.finish = true
     end
     
     def return_to_client(deferrable, client_queue, client_query_id, answer, error)
