@@ -476,7 +476,16 @@ module Dnsruby
     class PersistentData
       attr_accessor :outstanding, :deferrable, :to_send, :timeouts, :timer_procs, :timer_keys_sorted, :finish
     end
-    def send_async(msg, client_queue=nil, client_query_id=nil)
+    def send_async(*args) #msg, client_queue=nil, client_query_id=nil)
+      msg=args[0]
+      client_queue=nil
+      client_query_id=nil
+      if (args.length>1)
+        client_queue=args[1]
+        if (args.length > 2)
+          client_query_id = args[2]
+        end
+      end
       # We want to send the query to the first resolver.
       # We then want to set up all the timers for all of the events which might happen
       #   (first round timers, retry timers, etc.)
@@ -519,7 +528,7 @@ module Dnsruby
         }
       end
       persistent_data.timer_keys_sorted = persistent_data.timer_procs.keys.sort
-      EventMachine::add_timer(TIMER_PERIOD) {process_eventmachine_timers(persistent_data)}
+      EventMachine::add_timer(0) {process_eventmachine_timers(persistent_data)}
       return persistent_data.deferrable
     end
     
@@ -635,8 +644,14 @@ module Dnsruby
       @query_list = {}
       @timeouts = {}
     end
-    def send_async(msg, client_queue, client_query_id)
-      # @TODO@ send_async arguments!
+    def send_async(*args) # msg, client_queue, client_query_id=nil)
+      msg=args[0]
+      client_queue=nil
+      client_query_id=nil
+        client_queue=args[1]
+        if (args.length > 2)
+          client_query_id = args[2]
+      end
       
       # This is the whole point of the Resolver class.
       # We want to use multiple SingleResolvers to run a query.
@@ -648,6 +663,9 @@ module Dnsruby
       # to the client queue.
       
       q = Queue.new
+      if (client_query_id==nil)
+        client_query_id = msg
+      end
       
       if (!client_queue.kind_of?Queue)
         TheLog.error("Wrong type for client_queue in Resolver#send_async")
@@ -685,6 +703,7 @@ module Dnsruby
       st = SelectThread.instance
       st.add_observer(q, self)
       tick if tick_needed
+      return client_query_id
     end
     
     def generate_timeouts() #:nodoc: all

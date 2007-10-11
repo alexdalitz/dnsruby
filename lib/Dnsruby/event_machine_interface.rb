@@ -56,13 +56,13 @@ module Dnsruby
       @@outstanding_sends.push(c)
 #      puts "#{@@outstanding_sends.length} outstanding connections"
       if (@@outstanding_sends.length==1)
-        EventMachine::add_timer(TIMER_PERIOD) {process_timers}
+        EventMachine::add_timer(0) {process_timers}
       end
     end
     
     def EventMachineInterface::remove_from_outstanding(c)
       @@outstanding_sends.delete(c)
- #     puts "#{@@outstanding_sends.length} outstanding connections"
+#      puts "#{@@outstanding_sends.length} outstanding connections"
       remove_timer(c)
       # If we explicitly started the EM loop, and there are no more outstanding sends, then stop the EM loop
       stop_eventmachine
