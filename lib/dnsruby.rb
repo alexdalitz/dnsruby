@@ -68,6 +68,14 @@ require 'timeout'
 #  
 #  * NXDomain < ResolvError
 #  
+#  * FormErr < ResolvError
+#  
+#  * ServFail < ResolvError
+#  
+#  * NotImp < ResolvError
+#  
+#  * Refused < ResolvError
+#  
 #  * OtherResolvError < ResolvError
 #  
 #

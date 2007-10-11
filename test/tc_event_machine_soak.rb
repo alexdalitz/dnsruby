@@ -38,25 +38,6 @@ class TestEventMachineSoak < Test::Unit::TestCase
     Dnsruby::Resolver.start_eventmachine_loop(true)
   end
   
-  def send_next_deferrable(res)
-    if (@@num_sent>2000) 
-      EM.stop
-      return
-    end
-    id = @@num_sent
-    @@num_sent+=1
-    @@dfs[id] = res.send_async(Dnsruby::Message.new("example.com"))
-    @@dfs[id].callback {|msg| puts "callback: #{id}"
-      @@dfs.delete(id)
-      send_next_deferrable(res)
-    }
-    @@dfs[id].errback {|msg, err| 
-      @@dfs.delete(id)
-      puts "errback: #{id}, #{err}"
-      send_next_deferrable(res)
-    }
-  end
-  
   def test_sequential
     #Dnsruby::TheLog.level=Logger::DEBUG
     Dnsruby::Resolver.use_eventmachine(true)
@@ -95,4 +76,23 @@ class TestEventMachineSoak < Test::Unit::TestCase
     }
     Dnsruby::Resolver.start_eventmachine_loop(true)    
   end
+
+  def send_next_deferrable(res)
+    if (@@num_sent>2000) 
+      EM.stop
+      return
+    end
+    id = @@num_sent
+    @@num_sent+=1
+    @@dfs[id] = res.send_async(Dnsruby::Message.new("example.com"))
+    @@dfs[id].callback {|msg| puts "callback: #{id}"
+      @@dfs.delete(id)
+      send_next_deferrable(res)
+    }
+    @@dfs[id].errback {|msg, err| 
+      @@dfs.delete(id)
+      puts "errback: #{id}, #{err}"
+      send_next_deferrable(res)
+    }
+  end  
 end

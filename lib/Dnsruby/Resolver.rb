@@ -42,7 +42,16 @@ module Dnsruby
   #
   #*  Dnsruby::Resolver#send_async(msg, response_queue, query_id)
   #
-  
+  #== Event Loop
+  #Dnsruby runs a pure Ruby event loop to handle I/O in a single thread.
+  #It is also possible to configure Dnsruby to use EventMachine instead.
+  #See the Dnsruby::Resolver::use_eventmachine method for details.
+  #
+  #Note that, if using Dnsruby from an EventMachine loop, you will need to tell
+  #Dnsruby not to start the event loop itself :
+  #
+  #   Dnsruby::Resolver::use_eventmachine(true)
+  #   Dnsruby::Resolver::start_eventmachine_loop(true)
   class Resolver
     @@event_machine_available=false
     begin
@@ -382,6 +391,14 @@ module Dnsruby
       @udp_size = s
       update
     end
+    #Tell Dnsruby to use EventMachine for I/O. 
+    #
+    #If EventMachine is not used, then the pure Ruby event loop in Dnsruby will
+    #be used instead.
+    #
+    #If EventMachine is not available on the platform, then a RuntimeError will be raised.
+    #
+    #Takes a bool to say whether or not to use EventMachine.
     def Resolver.use_eventmachine(on=true)
       if (!@@event_machine_available)
         raise RuntimeError.new("EventMachine is not available in this environment!")
@@ -393,9 +410,19 @@ module Dnsruby
         TheLog.info("EventMachine will not be used for IO")
       end
     end
+    #Check whether EventMachine will be used by Dnsruby
     def Resolver.eventmachine?
       return @@use_eventmachine
     end
+    #If EventMachine is being used, then this method tells Dnsruby whether or not
+    #to start the EventMachine loop. If you want to use Dnsruby client code as 
+    #is, but using EventMachine for I/O, then Dnsruby must start the EventMachine
+    #loop for you. This is the default behaviour.
+    #If you want to use EventMachine-style code, where everything is wrapped
+    #up in an EventMachine::run{} call, then this method should be called with
+    #false as the parameter.
+    #
+    #Takes a bool argument to say whether or not to start the event loop when required.
     def Resolver.start_eventmachine_loop(on=true)
       @@start_eventmachine_loop=on
       if (on)
@@ -404,10 +431,11 @@ module Dnsruby
         TheLog.info("EventMachine loop will not be started by Dnsruby")
       end
     end
+    #Checks whether Dnsruby will start the EventMachine loop when required.
     def Resolver.start_eventmachine_loop?
       return @@start_eventmachine_loop
     end
-    def generate_timeouts(base=0, fudge_factor = 0)
+    def generate_timeouts(base=0) #:nodoc: all
       #These should be be pegged to the single_resolver they are targetting :
       #  e.g. timeouts[timeout1]=nameserver
       timeouts = {}
@@ -422,13 +450,13 @@ module Dnsruby
           res= @single_resolvers[i]
           offset = (i*@retry_delay.to_f/@single_resolvers.length)
           if (retry_count==0)
-            timeouts[base+offset+fudge_factor]=[res, retry_count]
+            timeouts[base+offset]=[res, retry_count]
           else
             if (timeouts.has_key?(base+retry_delay+offset))
               TheLog.error("Duplicate timeout key!")
               raise RuntimeError.new("Duplicate timeout key!")
             end
-            timeouts[base+retry_delay+offset+fudge_factor]=[res, retry_count]
+            timeouts[base+retry_delay+offset]=[res, retry_count]
           end
         end
       end
@@ -439,8 +467,7 @@ module Dnsruby
   # This class implements the I/O using EventMachine.
   # NOTE - EM does not work properly on Windows with version 0.8.1 - do not use!
   class ResolverEM #:nodoc: all
-    TIMER_PERIOD = 1 # @TODO@ Lessen this when EventMachine allows!!
-    FUDGE_FACTOR = +TIMER_PERIOD/2 # Cope with coarse-grained EM timer
+    TIMER_PERIOD = 0.1
     def initialize(parent)
       @parent=parent
     end
@@ -461,7 +488,7 @@ module Dnsruby
       persistent_data.deferrable = EM::DefaultDeferrable.new
       persistent_data.outstanding = []
       persistent_data.to_send = 0
-      persistent_data.timeouts=@parent.generate_timeouts(Time.now, FUDGE_FACTOR)
+      persistent_data.timeouts=@parent.generate_timeouts(Time.now)
       persistent_data.timer_procs = {}
       persistent_data.finish = false
       persistent_data.timeouts.keys.sort.each do |timeout|
@@ -486,13 +513,13 @@ module Dnsruby
       end
       query_timeout = @parent.query_timeout
       if (query_timeout > 0)
-        persistent_data.timer_procs[Time.now+query_timeout + FUDGE_FACTOR]=Proc.new{
+        persistent_data.timer_procs[Time.now+query_timeout]=Proc.new{
           cancel_queries(persistent_data)
           return_to_client(persistent_data.deferrable, client_queue, client_query_id, nil, ResolvTimeout.new("Query timed out after query_timeout=#{query_timeout.round} seconds"))
         }
       end
       persistent_data.timer_keys_sorted = persistent_data.timer_procs.keys.sort
-      EventMachine::Timer.new(0) {process_eventmachine_timers(persistent_data)}
+      EventMachine::add_timer(TIMER_PERIOD) {process_eventmachine_timers(persistent_data)}
       return persistent_data.deferrable
     end
     
@@ -509,7 +536,7 @@ module Dnsruby
         persistent_data.timer_procs.delete(timeout)
         persistent_data.timer_keys_sorted.delete(timeout)
       end
-      EventMachine::Timer.new(TIMER_PERIOD) {process_eventmachine_timers(persistent_data)}
+      EventMachine::add_timer(TIMER_PERIOD) {process_eventmachine_timers(persistent_data)}
     end
     
     def send_new_em_query(single_resolver, msg, client_queue, client_query_id, persistent_data)

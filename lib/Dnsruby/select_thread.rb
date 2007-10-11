@@ -42,17 +42,7 @@ module Dnsruby
     # and socket->[client_id]
     # 
     # @todo@ should we implement some of cancel function?
-    # 
-    # @todo@ How do we ensure that sockets all get closed?
-    # 
-    # @todo@ Should the thread be killed when no queries are active?
     
-    # For each query to monitor, we need to know : 
-    # |a) The socket the query was sent on
-    # |b) The query header ID
-    #  c) The query response queue
-    # So we could have a hash which maps <socket, headerID> to <queue>
-    # Note that multiple values of <queue> could refer to the same Queue
     def initialize
       @@mutex = Mutex.new
       @@mutex.synchronize {
@@ -102,14 +92,6 @@ module Dnsruby
         @@socket_hash[query_settings.socket]=[query_settings.client_query_id] # @todo@ If we use persistent sockets then we need to update this array
         @@timeouts[query_settings.client_query_id]=query_settings.endtime
         @@sockets.push(query_settings.socket)
-        
-        #        # Only do this if we're currently in select
-        #        if @@in_select
-        #          @@in_select=false
-        #          p "in_select now false - sending signal"
-        #          @@select_thread.raise SelectWakeup # Wake up the select thread so it listens to socket too
-        #          #        # @todo@ This would probably be more elegant if we send a signal through select
-        #        end
       }
     end
     
@@ -158,21 +140,11 @@ module Dnsruby
           timeout = tick_time
         end
         begin
-          #          @@mutex.synchronize{
-          #            @@in_select=true
-          ##          p "in_select now true"
-          #          }
           ready, write, errors = IO.select(sockets, nil, nil, timeout)
-          #          @@mutex.synchronize{
-          #            @@in_select=false
-          ##          p "in_select now false"
-          #          }
         rescue SelectWakeup
           # If SelectWakeup, then just restart this loop - the select call will be made with the new data
-          #          p "signal received!"
           next
         end
-        #              @@mutex.synchronize{
         if (ready == nil)
           # proces the timeouts
           process_timeouts
@@ -198,25 +170,14 @@ module Dnsruby
     end
     
     def process_ready(ready)
-      #      while (ready.length > 0) do
-      #      @@mutex.synchronize{
       ready.each do |socket|
-        #        if (socket==@@notified)
-        #          @@notified.getc
-        #          ##          @@notified.close
-        #          next
-        #        end
-        #        socket = ready.pop
         packet_size = 512 # @TODO@ Sort out per-query packet sizes!!!
-        #        @@mutex.synchronize{
         msg = get_incoming_data(socket, packet_size)
         if (msg!=nil)
           send_response_to_client(msg, socket)
         end
-        #        }
         ready.delete(socket)
       end
-      #      }
     end
     
     def send_response_to_client(msg, socket)
@@ -241,12 +202,11 @@ module Dnsruby
             res = @@query_hash[id].single_resolver
             query = @@query_hash[id].query
           }
-          # @TODO@ At this point, we should call SingleResolver::process_response
-          # to check if the response is OK
           tcp = (socket.class == TCPSocket)
+          # At this point, we should check if the response is OK
           if (res.check_response(msg, query, client_queue, id, tcp))
             remove_id(id)
-            exception = msg.header.getException
+            exception = msg.header.get_exception
             TheLog.debug("Pushing response to client queue")
             client_queue.push([id, msg, exception])
             notify_queue_observers(client_queue, id)
@@ -266,16 +226,14 @@ module Dnsruby
         socket = @@query_hash[id].socket
         @@timeouts.delete(id)
         @@query_hash.delete(id)      
-        @@sockets.delete(socket) # @todo@ Not if persistent!
+        @@sockets.delete(socket) # @TODO@ Not if persistent!
       }
       TheLog.debug("Closing socket #{socket}")
-      socket.close # @todo@ Not if persistent!
+      socket.close # @TODO@ Not if persistent!
     end
     
     def process_timeouts
       time_now = Time.now
-      #      timeouts = @@timeouts.values
-      #     timeouts.sort!
       timeouts={}
       @@mutex.synchronize {
         timeouts = @@timeouts
@@ -283,8 +241,6 @@ module Dnsruby
       timeouts.each do |client_id, timeout|
         if (timeout < time_now)
           send_exception_to_client(ResolvTimeout.new("Query timed out"), nil, client_id)
-          #        else
-          #          return # @@timeouts is sorted, so all others will be later than this one
         end
       end
     end
@@ -306,7 +262,7 @@ module Dnsruby
           # We'd like to do a socket.recvfrom, but that raises an Exception
           # on Windows for TCPSocket for Ruby 1.8.5 (and 1.8.6).
           # So, we need to do something different for TCP than UDP. *sigh*
-          # @todo@ This workaround will only work if there is exactly one socket per query
+          # @TODO@ This workaround will only work if there is exactly one socket per query
           #    - *not* ideal TCP use!
           @@mutex.synchronize{
             client_id = @@socket_hash[socket][0]
@@ -360,7 +316,7 @@ module Dnsruby
     end
     
     def handle_recvfrom_failure(socket)
-      #          @todo@ No way to notify the client about this error, unless there was only one connection on the socket
+      #  @TODO@ No way to notify the client about this error, unless there was only one connection on the socket
       ids_for_socket = []
       @@mutex.synchronize{
         ids_for_socket = @@socket_hash[socket]
@@ -387,7 +343,7 @@ module Dnsruby
           query_settings = @@query_hash[id]
           if (answerip == query_settings.dest_server && answerport == query_settings.dest_port)
             # We have a match
-            # - @todo@ as long as we're not speaking to the same server on two ports!
+            # - @TODO@ as long as we're not speaking to the same server on two ports!
             client_id = id
             break
           end
@@ -397,8 +353,6 @@ module Dnsruby
     end
     
     def send_exception_to_client(err, socket, client_id, msg=nil)
-      # first ensure the error is of the right type
-      # @TODO@ What about FORMERR, and other RCode errors?
       if ((!err.kind_of?ResolvError) && (!err.kind_of?ResolvTimeout))
         TheLog.error("INCORRECT ERROR TYPE BEING RETURNED TO CLIENT")
         raise RuntimeError.new("INCORRECT ERROR TYPE BEING RETURNED TO CLIENT")
@@ -440,7 +394,7 @@ module Dnsruby
     def add_observer(client_queue, observer)
       @@mutex.synchronize {
         @@observers[client_queue]=observer
-        check_select_thread_synchronized # @TODO@ Is this really necessary? The client should start the thread by sending a query, really...        
+        check_select_thread_synchronized # Is this really necessary? The client should start the thread by sending a query, really...        
         if (!@@tick_observers.include?observer)
           @@tick_observers.push(observer)
         end

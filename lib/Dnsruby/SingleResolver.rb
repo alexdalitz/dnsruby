@@ -176,7 +176,12 @@ module Dnsruby
     end
     
     
-    # Asynchronously send a Message to the server. A client_queue is supplied by the client, 
+    # Asynchronously send a Message to the server. The send can be done using just
+    # Dnsruby, or using EventMachine.
+    # 
+    #= If the pure Ruby event loop supplied weith Dnsruby is being used, then :
+    # 
+    # A client_queue is supplied by the client, 
     # along with a client_query_id to identify the response. When the response is known, the tuple
     # (query_id, response_message, response_exception) is put in the queue for the client to process. 
     # 
@@ -191,18 +196,22 @@ module Dnsruby
     # * client_query_id - an ID to identify the query to the client
     # * use_tcp - whether to use TCP (defaults to SingleResolver.use_tcp)
     #
-    #
-    # If EventMachine is being used (see Dnsruby::Resolver::use_eventmachine, then this method returns
-    # an EM::Deferrable object
-    #
     # If the native Dsnruby networking layer is being used, then this method returns the client_query_id
-    #    deferrable = res.send_async(msg)
-    #    deferrable = res.send_async(msg, true)
-    #    deferrable = res.send_async(msg, q, id, true)
+    # 
     #    id = res.send_async(msg, queue)
-    #    NOT SUPPORTED : id = res.send_async(msg, queue, true)
-    #    res.send_async(msg, queue, id)
-    #    res.send_async(msg, queue, id, true)
+    #    NOT SUPPORTED : id = res.send_async(msg, queue, use_tcp)
+    #    id = res.send_async(msg, queue, id)
+    #    id = res.send_async(msg, queue, id, use_tcp)
+    #
+    #= If EventMachine is being used :
+    # 
+    # If EventMachine is being used (see Dnsruby::Resolver::use_eventmachine, then this method returns
+    # an EM::Deferrable object. If a queue (and ID) is passed in, then the response will also be 
+    # pushed to the Queue (as well as the deferrable completing).
+    #
+    #    deferrable = res.send_async(msg)
+    #    deferrable = res.send_async(msg, use_tcp)
+    #    deferrable = res.send_async(msg, q, id, use_tcp)
     def send_async(*args) # msg, client_queue, client_query_id, use_tcp=@use_tcp)
       msg = args[0]
       client_query_id = nil
@@ -239,7 +248,8 @@ module Dnsruby
         return client_query_id
       end
     end
-      
+
+    # This method sends the packet using EventMachine
     def send_eventmachine(msg, header_id, client_query_id, client_queue, use_tcp, client_deferrable=nil) #:nodoc: all
       if (!client_deferrable)
         client_deferrable = EventMachine::DefaultDeferrable.new
@@ -270,6 +280,7 @@ module Dnsruby
       return client_deferrable
     end
 
+    # This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
     def send_dnsruby(query_packet, header_id, client_query_id, client_queue, use_tcp) #:nodoc: all
       endtime = Time.now + @packet_timeout
       # First send the query (synchronously)

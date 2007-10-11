@@ -163,6 +163,7 @@ class TestSingleResolver < Test::Unit::TestCase
   def test_truncated_response
     res = SingleResolver.new
     res.server=('ns0.validation-test-servers.nominet.org.uk')
+    res.packet_timeout = 15
     m = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", 'txt')
     assert(m.header.ancount == 61, "61 answer records expected, got #{m.header.ancount}")
     assert(!m.header.tc, "Message was truncated!")

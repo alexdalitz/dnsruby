@@ -63,7 +63,7 @@ class TestSingleResolverSoak < Test::Unit::TestCase
     # We run four queries per iteration, so we're limited to 64 runs.
     63.times do |i|
       rr_count = 0
-      Rrs.each do |data|
+      TestSoakBase::Rrs.each do |data|
         rr_count+=1
         res = resolvers[res_pos]
         res_pos=+1
@@ -112,7 +112,7 @@ class TestSingleResolverSoak < Test::Unit::TestCase
     num_times.times do |i|
       threads[i] = Thread.new{
         4.times do |j|
-          Rrs.each do |data|
+          TestSoakBase::Rrs.each do |data|
             mutex.synchronize do
               query_count+=1
             end
@@ -172,7 +172,7 @@ class TestSingleResolverSoak < Test::Unit::TestCase
         res = SingleResolver.new
         res.packet_timeout=4
         4.times do |j|
-          Rrs.each do |data|
+          TestSoakBase::Rrs.each do |data|
             mutex.synchronize do
               query_count+=1
             end

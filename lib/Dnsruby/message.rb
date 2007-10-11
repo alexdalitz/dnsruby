@@ -520,7 +520,7 @@ module Dnsruby
       @opcode = OpCode.new(newcode)
     end
     
-    def getException
+    def get_exception
       exception = nil
       if (@rcode==RCode.NXDOMAIN)
         exception = NXDomain.new

@@ -1,6 +1,6 @@
 require 'eventmachine'
 module Dnsruby
-  class EventMachineInterface
+  class EventMachineInterface#:nodoc: all
     @@started_em_here = false
     @@running_clients=[]
     @@outstanding_sends = []
@@ -13,8 +13,7 @@ module Dnsruby
     
     @@timer_procs={} # timeout=>[proc
     @@timer_keys_sorted=[]
-    TIMER_PERIOD = 1  # @TODO@ Lessen this when EventMachine allows!!
-    FUDGE_FACTOR = +TIMER_PERIOD/2 #  try to cope with coarse-grained timer
+    TIMER_PERIOD = 0.1
     
     def EventMachineInterface::process_timers
       # Go through list of timers
@@ -30,7 +29,7 @@ module Dnsruby
       end
         
       if (!@@outstanding_sends.empty?)
-        EventMachine::Timer.new(TIMER_PERIOD) {process_timers}
+        EventMachine::add_timer(TIMER_PERIOD) {process_timers}
       end
     end
     
@@ -47,7 +46,7 @@ module Dnsruby
     
     def EventMachineInterface::add_to_outstanding(c, timeout)
       # Add to timer structures
-      @@timer_procs[Time.now+timeout+FUDGE_FACTOR]=[c, Proc.new {
+      @@timer_procs[Time.now+timeout]=[c, Proc.new {
           # Cancel the send
           c.closing=true
           c.close_connection
@@ -55,13 +54,15 @@ module Dnsruby
         }]
       @@timer_keys_sorted=@@timer_procs.keys.sort
       @@outstanding_sends.push(c)
+#      puts "#{@@outstanding_sends.length} outstanding connections"
       if (@@outstanding_sends.length==1)
-        EventMachine::Timer.new(0) {process_timers}
+        EventMachine::add_timer(TIMER_PERIOD) {process_timers}
       end
     end
     
     def EventMachineInterface::remove_from_outstanding(c)
       @@outstanding_sends.delete(c)
+ #     puts "#{@@outstanding_sends.length} outstanding connections"
       remove_timer(c)
       # If we explicitly started the EM loop, and there are no more outstanding sends, then stop the EM loop
       stop_eventmachine
@@ -74,6 +75,7 @@ module Dnsruby
           @@started_em_here = true
           @@em_thread = Thread.new {
             EM.run {
+              EventMachine::add_periodic_timer(0.1) {EventMachineInterface::process_timers}
               @@df = EventMachine::DefaultDeferrable.new
               @@df.callback{
                 TheLog.debug("Stopping EventMachine")
@@ -172,7 +174,7 @@ module Dnsruby
     end
     
     
-    class EmUdpHandler < EventMachine::Connection
+    class EmUdpHandler < EventMachine::Connection #:nodoc: all
       include EM::Deferrable
       attr_accessor :closing, :timeout_time
       def post_init
@@ -198,7 +200,7 @@ module Dnsruby
         TheLog.debug("#{ans}")
         ans.answerfrom=(@args[:server])
         ans.answersize=(data.length)
-        exception = ans.header.getException
+        exception = ans.header.get_exception
         @closing=true
         close_connection
         send_to_client(ans, exception)
@@ -234,7 +236,7 @@ module Dnsruby
     end
 
 
-    class EmTcpHandler < EmUdpHandler
+    class EmTcpHandler < EmUdpHandler #:nodoc: all
       def post_init
         super
         @data=""
