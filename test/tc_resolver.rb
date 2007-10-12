@@ -97,7 +97,7 @@ class TestResolver < Test::Unit::TestCase
     assert(id==q)
     assert(m == nil)
     print err.class
-    assert(err.kind_of?(OtherResolvError), "OtherResolvError expected : got #{err.class}")
+    assert(err.kind_of?(OtherResolvError) || err.kind_of?(IOError), "OtherResolvError or IOError expected : got #{err.class}")
   end
   
   def test_nxdomain
@@ -111,7 +111,7 @@ class TestResolver < Test::Unit::TestCase
   end
   
   def test_timeouts
-    #@TODO@ test timeout behaviour for different retry, retrans, total timeout etc.
+    #test timeout behaviour for different retry, retrans, total timeout etc.
     #Problem here is that many sockets will be created for queries which time out. 
     # Run a query which will not respond, and check that the timeout works
     if (!RUBY_PLATFORM=~/darwin/)
