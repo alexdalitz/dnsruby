@@ -22,7 +22,7 @@ sock = UDPSocket.new()
 begin
   sock.connect('193.0.14.129', # k.root-servers.net.
     25)
-  # OK - online and ready to go
+  #   OK - online and ready to go
   require "test/tc_res_config.rb"
   require "test/tc_single_resolver.rb"
   require "test/tc_resolver.rb"

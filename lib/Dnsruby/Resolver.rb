@@ -51,7 +51,7 @@ module Dnsruby
   #Dnsruby not to start the event loop itself :
   #
   #   Dnsruby::Resolver::use_eventmachine(true)
-  #   Dnsruby::Resolver::start_eventmachine_loop(true)
+  #   Dnsruby::Resolver::start_eventmachine_loop(false)
   class Resolver
     @@event_machine_available=false
     begin

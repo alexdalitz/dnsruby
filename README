@@ -9,8 +9,8 @@ resolv.rb Resolv API, but has been much extended to provide a
 complete DNS implementation.
 
 Dnsruby runs a single I/O thread to handle all concurrent
-queries, and is therefore suitable for high volume DNS 
-applications.
+queries. It is also able to use EventMachine if it is installed.
+It is therefore suitable for high volume DNS applications.
 
 The following is a (non-exhaustive) list of features :
 

@@ -1,0 +1,64 @@
+Using the Dnsruby EventMachine code
+===============================================================
+
+Dnsruby can use either its inbuilt (pure Ruby) event loop, or
+EventMachine (a native extension to Ruby which must be installed
+on the local platform).
+
+
+Configuring Dnsruby to use EventMachine
+----------------------------------------------------------------
+
+I left a couple of switches in Dnsruby::Resolver :
+
+    Dnsruby::Resolver.use_eventmachine(on=true)
+    Dnsruby::Resolver.start_eventmachine_loop(on=true)
+
+The first of these tells Dnsruby to use EventMachine, rather
+ than its own event loop.
+
+The second tells Dnsruby whether to start the EventMachine loop
+or not. 
+
+If standard Dnsruby client code is used, then Dnsruby needs to 
+call EventMachine::run{} in order to start the EventMachine loop.
+However, if more than one EventMachine loop is started in a Ruby
+process, then the process terminates. 
+
+So, if client code is written in an EventMachine style, contained
+in an EventMachine::run{} call, then it will need to tell Dnsruby 
+NOT to start the EventMachine loop (on pain of sudden death!).
+
+
+
+Example code
+----------------------------------------------------------------
+
+Here is an example of using the code in an EventMachine style :
+
+require 'Dnsruby'
+require 'eventmachine'
+res = Dnsruby::Resolver.new
+Dnsruby::Resolver.use_eventmachine
+Dnsruby::Resolver.start_eventmachine_loop(false)
+EventMachine::run {
+  df = res.send_async(Dnsruby::Message.new("example.com"))
+  df.callback {|msg| 
+     puts "Response : #{msg}"
+     EM.stop}
+  df.errback {|msg, err|
+     puts "Response : #{msg}"
+     puts "Error: #{err}"
+     EM.stop}
+}
+
+And an example in a normal Dnsruby style :
+
+require 'Dnsruby'
+res = Dnsruby::Resolver.new
+Dnsruby::Resolver.use_eventmachine
+Dnsruby::Resolver.start_eventmachine_loop(true) # default
+q = Queue.new
+id = res.send_async(Dnsruby::Message.new("example.com"),q)
+id, response = q.pop
+

@@ -18,12 +18,12 @@ require 'test/unit'
 require 'Dnsruby'
 begin
 require 'test/tc_single_resolver'
-rescue Exception
+rescue LoadError
   require 'tc_single_resolver'
 end
 begin
 require 'test/tc_soak_base'
-rescue Exception
+rescue LoadError
   require 'tc_soak_base'
 end
 include Dnsruby

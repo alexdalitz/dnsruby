@@ -1,6 +1,5 @@
 require 'rubygems'
 require 'test/unit'
-require 'eventmachine'
 require 'Dnsruby'
 
 class TestSoakBase # < Test::Unit::TestCase
