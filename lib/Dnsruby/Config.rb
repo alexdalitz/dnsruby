@@ -118,10 +118,14 @@ module Dnsruby
     
     # Set the default domain
     def domain=(dom)
-      if !dom.kind_of?(String)
-        raise ArgumentError.new("invalid domain config: #{@domain.inspect}")
+      if (dom)
+        if !dom.kind_of?(String)
+          raise ArgumentError.new("invalid domain config: #{@domain.inspect}")
+        end
+        @domain = Name::Label.split(dom)
+      else
+        @domain=nil
       end
-      @domain = Name::Label.split(dom)
     end
     
     # Set ndots
@@ -151,7 +155,7 @@ module Dnsruby
       end
       
       if !@search.kind_of?(Array) ||
-        #              !@search.all? {|ls| ls.all? {|l| Label::Str === l } }
+          #              !@search.all? {|ls| ls.all? {|l| Label::Str === l } }
         !@search.all? {|ls| ls.all? {|l| Name::Label === l } }
         raise ArgumentError.new("invalid search config: #{@search.inspect}")
       end
@@ -159,7 +163,7 @@ module Dnsruby
     
     def check_ns(ns) #:nodoc: all
       if !ns.kind_of?(Array) ||
-        !ns.all? {|n| (String === n || IPv4 === n || IPv6 === n)}
+          !ns.all? {|n| (String === n || IPv4 === n || IPv6 === n)}
         raise ArgumentError.new("invalid nameserver config: #{ns.inspect}")
       end    
       ns.each_index do |i|
