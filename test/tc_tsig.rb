@@ -1,0 +1,105 @@
+#--
+#Copyright 2007 Nominet UK
+#
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License. 
+#You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0 
+#
+#Unless required by applicable law or agreed to in writing, software 
+#distributed under the License is distributed on an "AS IS" BASIS, 
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+#See the License for the specific language governing permissions and 
+#limitations under the License.
+#++
+require 'rubygems'
+require 'test/unit'
+require 'dnsruby'
+require "digest/md5"
+class TestTKey < Test::Unit::TestCase
+  def is_empty(string)
+    return (string == "; no data" || string == "; rdlength = 0")
+  end
+  def test_signed_update
+    Dnsruby::Resolver::use_eventmachine(false)
+    run_test_client_signs
+    run_test_resolver_signs
+  end
+  def test_signed_update_em
+    Dnsruby::Resolver::use_eventmachine(true)
+    run_test_client_signs
+    run_test_resolver_signs
+    Dnsruby::Resolver::use_eventmachine(false)
+  end
+  
+  def run_test_client_signs
+    Dnsruby::TheLog.level=Logger::ERROR
+    name="rubytsig"
+    key = "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw=="
+    tsig = Dnsruby::RR.create({
+        :name        => name,
+        :type        => "TSIG",
+        :ttl         => 0,
+        :klass       => "ANY",
+        :algorithm   => "hmac-md5",
+        :fudge       => 300,
+        :key         => key,
+        :error       => 0
+      })
+    
+    update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
+    # Generate update record name, and test it has been made. Then delete it and check it has been deleted
+    update_name = generate_update_name
+    update.absent(update_name)
+    update.add(update_name, 'TXT', 100, "test signed update")
+    tsig.apply(update)
+    assert(update.signed?, "Update has not been signed")
+    
+    res = Dnsruby::SingleResolver.new("ns0.validation-test-servers.nominet.org.uk")
+    res.recurse=false
+    response = res.send_message(update)
+
+    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+    assert(response.verified?, "Response has not been verified")
+    
+    # Now check the record exists
+    rr = res.query(update_name, 'TXT')
+    assert_equal("test signed update", rr.answer()[0].strings.join(" "), "TXT record has not been created in zone")
+    
+    # Now delete the record
+    update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
+    update.present(update_name, 'TXT')
+    update.delete(update_name)
+    tsig.apply(update)
+    assert(update.signed?, "Update has not been signed")
+    response = res.send_message(update)
+    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+    assert(response.verified?, "Response has not been verified")
+         
+    # Now check the record does not exist
+    begin
+    rr = res.query(update_name, 'TXT')
+    assert(false)
+    rescue Dnsruby::NXDomain
+    end
+  end
+  
+  @@fudge = 0
+  def generate_update_name
+    update_name = Time.now.to_i.to_s + @@fudge.to_s
+    @@fudge+=1
+    update_name += ".update.validation-test-servers.nominet.org.uk"
+    return update_name
+  end
+  
+  def run_test_resolver_signs
+    #@TODO@ Resolver should apply signature itself!
+    assert(false, "TEST RESOLVER SIGNING!!!")
+  end
+  
+  def test_message_signing
+    # @TODO@ Test Message#sign
+    assert(false, "Test Message#sign!")
+  end
+end
