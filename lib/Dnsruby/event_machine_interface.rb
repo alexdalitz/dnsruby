@@ -122,7 +122,7 @@ module Dnsruby
       end
     end
 
-    def EventMachineInterface::send(args={})#msg, timeout, server, port, src_add, src_port, tsig_key, ignore_truncation, use_tcp)
+    def EventMachineInterface::send(args={})#msg, timeout, server, port, src_add, src_port, use_tcp)
       # Is the EventMachine loop running? If not, we need to start it (and mark that we started it)
       begin
         if (!EventMachine.reactor_running?)
@@ -149,7 +149,7 @@ module Dnsruby
       return df
     end
 
-    def EventMachineInterface::send_tcp(args={})#msg, timeout, server, port, src_add, src_port, tsig_key, ignore_truncation, use_tcp)
+    def EventMachineInterface::send_tcp(args={})#msg, timeout, server, port, src_add, src_port, use_tcp)
       connection = EventMachine::connect(args[:server], args[:port], EmTcpHandler) { |c|
         #@TODO SRC_PORT FOR TCP!!!
         c.timeout_time=Time.now + args[:timeout]
@@ -163,7 +163,7 @@ module Dnsruby
       return connection # allows clients to set callback, errback, etc., if desired
     end
     
-    def EventMachineInterface::send_udp(args={})# msg, timeout, server, port, src_add, src_port, tsig_key, ignore_truncation, use_cp)
+    def EventMachineInterface::send_udp(args={})# msg, timeout, server, port, src_add, src_port, use_tcp)
       connection = EventMachine::open_datagram_socket(args[:src_addr], args[:src_port], EmUdpHandler) { |c|
         c.timeout_time=Time.now + args[:timeout]
         c.instance_eval {@args = args}
@@ -194,7 +194,7 @@ module Dnsruby
           TheLog.error("Decode error! #{e.class}, #{e}\nfor msg (length=#{data.length}) : #{data}")
           @closing=true
           close_connection
-          send_to_client(nil, e)
+          send_to_client(nil, nil, e)
           return
         end
         TheLog.debug("#{ans}")
@@ -203,7 +203,7 @@ module Dnsruby
         exception = ans.header.get_exception
         @closing=true
         close_connection
-        send_to_client(ans, exception)
+        send_to_client(ans, data, exception)
       end
         
       def unbind
@@ -214,7 +214,7 @@ module Dnsruby
           else
             #@TODO@ RAISE OTHER NETWORK ERROR!
             TheLog.debug("Sending IOError to client")
-            send_to_client(nil, IOError.new("Network error"))
+            send_to_client(nil, nil, IOError.new("Network error"))
           end
         end
         @closing=false
@@ -223,14 +223,14 @@ module Dnsruby
       end
       def send_timeout
         TheLog.debug("Sending timeout to client")
-        send_to_client(nil, ResolvTimeout.new("Query timed out"))
+        send_to_client(nil, nil, ResolvTimeout.new("Query timed out"))
       end
-      def send_to_client(msg, err)
+      def send_to_client(msg, bytes, err)
         #  We call set_defered_status when done
         if (err != nil)
           set_deferred_status :failed, msg, err
         else
-          set_deferred_status :succeeded, msg
+          set_deferred_status :succeeded, msg, bytes
         end
       end
     end

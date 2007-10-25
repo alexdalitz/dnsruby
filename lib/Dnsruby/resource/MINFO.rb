@@ -27,8 +27,12 @@ module Dnsruby
       attr_accessor :emailbx
       
       def from_hash(hash) #:nodoc: all
-        @rmailbx = Name.create(hash[:rmailbx])
-        @emailbx = Name.create(hash[:emailbx])
+        if (hash[:rmailbx])
+          @rmailbx = Name.create(hash[:rmailbx])
+        end
+        if (hash[:emailbx])
+          @emailbx = Name.create(hash[:emailbx])
+        end
       end
       
       def from_data(data) #:nodoc: all

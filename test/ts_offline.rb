@@ -30,6 +30,6 @@ require "test/tc_rr-opt.rb"
 require "test/tc_rr-txt.rb"
 require "test/tc_rr-unknown.rb"
 require "test/tc_rr.rb"
-#require "test/tc_tkey.rb" # @TODO@
+require "test/tc_tkey.rb"
 require "test/tc_update.rb"
 require "test/tc_escapedchars.rb"

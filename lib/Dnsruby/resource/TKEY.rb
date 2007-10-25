@@ -34,7 +34,6 @@ module Dnsruby
   end
   
   class RR
-    #@TODO@ Implement this RR!
     #RFC2930
     class TKEY < RR
       ClassHash[[TypeValue = Types::TKEY, ClassValue = Classes.ANY]] = self #:nodoc: all
@@ -108,6 +107,13 @@ module Dnsruby
         @ttl = 0 
       end
       
+      def from_hash(hash)
+        super(hash)
+        if (algorithm)
+        @algorithm = Name.create(hash[:algorithm])
+        end
+      end
+      
       def from_data(data) #:nodoc: all
         @algorithm, @inception, @expiration, @mode, @error, @key_size, @key, @other_size, @other_data = data
       end
@@ -149,11 +155,11 @@ module Dnsruby
       def self.decode_rdata(msg) #:nodoc: all
         alg=msg.get_name
         inc, exp, mode, error  = msg.get_unpack("NNnn")
-        key_size=msg.get_unpack("n")
+        key_size, =msg.get_unpack("n")
         key=msg.get_bytes(key_size)
-        other_size=msg.get_unpack("n")
+        other_size, =msg.get_unpack("n")
         other=msg.get_bytes(other_size)
-        return self.new(alg, inc, exp, mode, error, key_size, key, other_size, other)
+        return self.new([alg, inc, exp, mode, error, key_size, key, other_size, other])
       end
     end
   end   

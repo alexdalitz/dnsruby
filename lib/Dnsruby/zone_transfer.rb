@@ -213,7 +213,7 @@ module Dnsruby
         
       when :Ixfr_DelSoa
         delta = Delta.new
-        @ixfr.push(delta);
+        @ixfr.push(delta)
         delta.start = rec.serial
         delta.deletes << rec
         @state = :Ixfr_Del
@@ -221,11 +221,11 @@ module Dnsruby
       when :Ixfr_Del
         if (type == Types.SOA)
           @current_serial = rec.serial
-          @state = :Ixfr_AddSoa;
+          @state = :Ixfr_AddSoa
           parseRR(rec); # Restart...
           return;
         end
-        delta = @ixfr.get(@ixfr.length - 1);
+        delta = @ixfr[@ixfr.length - 1]
         delta.deletes << rec
         
       when :Ixfr_AddSoa

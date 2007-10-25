@@ -31,6 +31,7 @@ begin
   #  require "test/tc_inet6.rb"
   #  require "test/tc_recurse.rb"
   require "test/tc_tcp.rb"
+  require "test/tc_tsig.rb"
   #  require "test/tc_soak.rb"
   require "test/tc_axfr.rb" #@TODO@
   begin

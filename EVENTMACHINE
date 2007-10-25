@@ -60,5 +60,5 @@ Dnsruby::Resolver.use_eventmachine
 Dnsruby::Resolver.start_eventmachine_loop(true) # default
 q = Queue.new
 id = res.send_async(Dnsruby::Message.new("example.com"),q)
-id, response = q.pop
+id, response, error = q.pop
 

@@ -105,12 +105,15 @@ module Dnsruby
     # If this Message is a response from a server, then answersize contains the size of the response
     attr_accessor :answersize
     
-    attr_accessor :tsigkey
-    attr_reader :querytsig
     attr_reader :tsigerror
     
-    attr_accessor :tsigstart
     attr_accessor :tsigstate
+
+    attr_accessor :tsigstart
+
+    # @TODO@ Where should signing be done? By TSIG - but have wrapper method in Message :
+    # Message#sign(tsig_rr)
+    # Message#sign(key_name, key))
     
     def ==(other)
       ret = false
@@ -193,22 +196,24 @@ module Dnsruby
     
     # Returns the TSIG record from the ADDITIONAL section, if one is present.
     def tsig
-      if (@additional.last.type == Types.TSIG)
-        return @additional.last
+      if (@additional.last)
+        if (@additional.last.rr_type == Types.TSIG)
+          return @additional.last
+        end
       end
       return nil
     end
     
     # Was this message signed by a TSIG?
-    def is_signed
-      return (tsigstate == :Signed ||
-          tsigstate == :Verified ||
-          tsigstate == :Failed)
+    def signed?
+      return (@tsigstate == :Signed ||
+          @tsigstate == :Verified ||
+          @tsigstate == :Failed)
     end
     
     # If this message was signed by a TSIG, was the TSIG verified?
-    def is_verified
-      return (tsigstate == :Verified)
+    def verified?
+      return (@tsigstate == :Verified)
     end
     
     def to_s
@@ -255,9 +260,6 @@ module Dnsruby
     def encode
       return MessageEncoder.new {|msg|
         header = @header
-        if (@tsigkey)
-          header.arcount += 1
-        end
         header.encode(msg)
         @question.each {|q|
           msg.put_name(q.qname)
@@ -268,15 +270,15 @@ module Dnsruby
             # name, ttl, data = r
             name = r.name
             ttl = r.ttl
-            msg.put_name(name)
+            if (r.type == Types.TSIG)
+              msg.put_name(name, true)
+            else
+              msg.put_name(name)
+            end
             msg.put_pack('nnN', r.type.code, r.klass.code, ttl)
             msg.put_length16 {r.encode_rdata(msg)}
           }
         }
-        if (@tsigkey)
-          tsigrec = @tsigkey.generate(this, msg, tsigerror, querytsig)
-          tsigrec.encode(msg, Section.ADDITIONAL, c)
-        end
       }.to_s
     end
     
@@ -298,13 +300,14 @@ module Dnsruby
           o.authority << rr
         }
         o.header.arcount.times { |count|
+          start = msg.index
           rr = msg.get_rr
           if (rr.type == Types.TSIG)
             if (count!=o.header.arcount-1)
               TheLog.Error("Incoming message has TSIG record before last record")
+              raise DecodeError.new("TSIG record present before last record")
             end
-            # @TODO@ Sort TSIG stuff out!
-            # o.tsigstart = pos
+            o.tsigstart = start
           end
           o.additional << rr
         }
@@ -453,6 +456,19 @@ module Dnsruby
         @arcount)
     end
     
+    def Header.decrement_arcount_encoded(bytes)
+      header = Header.new
+      header_end = 0
+      MessageDecoder.new(bytes) {|msg|
+        header.decode(msg)
+        header_end = msg.index
+      }
+      header.arcount = header.arcount - 1
+      bytes[0,header_end]=MessageEncoder.new {|msg|
+        header.encode(msg)}.to_s
+      return bytes
+    end
+    
     def ==(other)
       return @qr == other.qr &&
         @opcode == other.opcode &&
@@ -551,6 +567,7 @@ module Dnsruby
   end
   
   class MessageDecoder #:nodoc: all
+    attr_reader :index
     def initialize(data)
       @data = data
       @index = 0
@@ -666,6 +683,7 @@ module Dnsruby
     def get_rr
       name = self.get_name
       type, klass, ttl = self.get_unpack('nnN')
+      klass = Classes.new(klass)
       typeclass = RR.get_class(type, klass)
       # @TODO@ Trap decode errors here, and somehow mark the record as bad.
       # Need some way to represent raw data only

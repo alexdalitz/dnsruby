@@ -29,7 +29,7 @@ module Dnsruby
   # update = Dnsruby::Update.new('example.com')
   # 
   # # Prerequisite is that no A records exist for the name.
-  # update.absent('foo.example.com. A')
+  # update.absent('foo.example.com.', 'A')
   # 
   # # Add two A records for the name.
   # update.add('foo.example.com.', 'A', 86400, '192.168.1.2')
@@ -60,7 +60,7 @@ module Dnsruby
   #== Delete all A records for a name
   #
   #    update = Dnsruby::Update.new('example.com')
-  #    update.present('foo.example.com A')
+  #    update.present('foo.example.com', 'A')
   #    update.delete('foo.example.com', 'A')
   #
   #== Delete all RRs for a name
@@ -77,7 +77,7 @@ module Dnsruby
   #    update = Dnsruby::Update.new('example.com')
   #    update.add('foo.example.com', 'A', 86400, 10.1.2.3'))
   #    update.add('bar.example.com', 'A', 86400, 10.4.5.6'))
-  #    res.tsig_key=key
+  #    res.tsig=(key_name,key)
   #
   class Update < Message
     #Returns a Dnsruby::Update object suitable for performing a DNS

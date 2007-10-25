@@ -71,36 +71,4 @@ class TestTKey < Test::Unit::TestCase
     
     
   end
-  
-  def test_tsig
-    
-    name="example.com."
-    key = "1234"
-    print key.to_s + "\n"
-    tsig = Dnsruby::RR.create({
-        :name        => name,
-        :type        => "TSIG",
-        :ttl         => 0,
-        :klass       => "ANY",
-        :algorithm   => "HMAC-MD5.SIG-ALG.REG.INT.",
-        :time_signed => 1189686346,
-        :fudge       => 300,
-        :key         => key,
-        :error       => 0
-      })
-
-
-    message = Dnsruby::Message.new
-    message.header.id=(1234)
-    tsig.apply(message)
-    
-    mac_string = Base64.encode64(message.additional[0].mac)
-    print mac_string + "\n"
-    
-    assert_equal("S8w22c0nlOhC9wNwwHPY7g==", mac_string, "MAC wrong")
-        
-    res = Dnsruby::Resolver.new
-    response = res.send_message(message)
-    print response+"\n"
   end
-end

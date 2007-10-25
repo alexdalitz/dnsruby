@@ -78,6 +78,10 @@ require 'timeout'
 #  
 #  * OtherResolvError < ResolvError
 #  
+#== I/O
+#Dnsruby implements a pure Ruby event loop to perform I/O.
+#Dnsruby can also use EventMachine to perform I/O, if it is available on the 
+#platform - but it must be enabled through the Dnsruby::Resolver class
 #
 #== Bugs
 #* NIS is not supported.

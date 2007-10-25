@@ -30,9 +30,13 @@ module Dnsruby
   #*  Dnsruby::SingleResolver#query(name [, type [, klass]])
   #
   #=== Asynchronous
-  #These methods use a response queue to return the response and the error
+  #These methods use a response queue, or an EventMachine::Deferrable
+  #to return the response and the error to the client. See Dnsruby::Resolver for 
+  #details of how to enable the EventMachine implementation.
+  #More information about the EventMachine implementation is available in the 
+  #EVENTMACHINE file in the Dnsruby distribution
   #
-  #*  Dnsruby::SingleResolver#send_async(msg, query_id, response_queue [, use_tcp])
+  #*  Dnsruby::SingleResolver#send_async(...)
   #
   class SingleResolver
     attr_accessor :packet_timeout
@@ -47,7 +51,8 @@ module Dnsruby
     # Defaults to false
     attr_accessor :use_tcp
     
-    attr_accessor :tsig_key
+    # The TSIG record to sign/verify messages with
+    attr_accessor :tsig
     
     # Don't worry if the response is truncated - return it anyway.
     # 
@@ -86,6 +91,25 @@ module Dnsruby
     # The address of the resolver to send queries to
     attr_reader :server
     
+    #Sets the TSIG to sign outgoing messages with.
+    #Pass in either a Dnsruby::RR::TSIG, or a key_name and key.
+    #Pass in nil to stop tsig signing.
+    #It is possible for client code to sign packets prior to sending - see
+    #Dnsruby::RR::TSIG#apply and Dnsruby::Message#sign
+    #Note that pre-signed packets will not be signed by SingleResolver.
+    #* res.tsig=(tsig_rr)
+    #* res.tsig=(key_name, key)
+    #* res.tsig=nil # Stop the resolver from signing
+    def tsig=(*args)
+      if (args.length == 1)
+        @tsig = args[0]
+      elsif (args.length ==2)
+        @tsig = TSIG.new(args)
+      else
+        raise ArgumentError.new("Wrong number of arguments to Dsnruby::SingleResolver#tsig=")
+      end
+    end
+    
     def udp_size=(size)
       @udp_size = size
     end
@@ -106,7 +130,7 @@ module Dnsruby
     # * :udp_size
     # * :persistent_tcp
     # * :persistent_udp
-    # * :tsig_key
+    # * :tsig
     # * :packet_timeout
     # * :recurse
     def initialize(*args)
@@ -115,7 +139,7 @@ module Dnsruby
       @port = Resolver::DefaultPort
       @udp_size = Resolver::DefaultUDPSize
       @use_tcp = false
-      @tsig_key = nil
+      @tsig = nil
       @ignore_truncation = false
       @src_addr        = '0.0.0.0'
       @src_port        = 0
@@ -176,38 +200,45 @@ module Dnsruby
     end
     
     
-    # Asynchronously send a Message to the server. The send can be done using just
-    # Dnsruby, or using EventMachine.
+    #Asynchronously send a Message to the server. The send can be done using just
+    #Dnsruby, or using EventMachine.
     # 
-    #= If the pure Ruby event loop supplied weith Dnsruby is being used, then :
+    #== Dnsruby pure Ruby event loop :
     # 
-    # A client_queue is supplied by the client, 
-    # along with a client_query_id to identify the response. When the response is known, the tuple
-    # (query_id, response_message, response_exception) is put in the queue for the client to process. 
+    #A client_queue is supplied by the client, 
+    #along with an optional client_query_id to identify the response. The client_query_id
+    #is generated, if not supplied, and returned to the client.
+    #When the response is known, the tuple
+    #(query_id, response_message, response_exception) is put in the queue for the client to process. 
     # 
-    # The query is sent synchronously in the caller's thread. The select thread is then used to 
-    # listen for and process the response (up to pushing it to the client_queue). The client thread 
-    # is then used to retrieve the response and deal with it.
+    #The query is sent synchronously in the caller's thread. The select thread is then used to 
+    #listen for and process the response (up to pushing it to the client_queue). The client thread 
+    #is then used to retrieve the response and deal with it.
     # 
-    # Takes :
+    #Takes :
     # 
-    # * msg - the message to send
-    # * client_queue - a Queue to push the response to, when it arrives
-    # * client_query_id - an ID to identify the query to the client
-    # * use_tcp - whether to use TCP (defaults to SingleResolver.use_tcp)
+    #* msg - the message to send
+    #* client_queue - a Queue to push the response to, when it arrives
+    #* client_query_id - an optional ID to identify the query to the client
+    #* use_tcp - whether to use TCP (defaults to SingleResolver.use_tcp)
+    # 
+    #Returns :
+    # 
+    #* client_query_id - to identify the query response to the client. This ID is
+    #generated if it is not passed in by the client
     #
-    # If the native Dsnruby networking layer is being used, then this method returns the client_query_id
+    #If the native Dsnruby networking layer is being used, then this method returns the client_query_id
     # 
     #    id = res.send_async(msg, queue)
     #    NOT SUPPORTED : id = res.send_async(msg, queue, use_tcp)
     #    id = res.send_async(msg, queue, id)
     #    id = res.send_async(msg, queue, id, use_tcp)
     #
-    #= If EventMachine is being used :
+    #== If EventMachine is being used :
     # 
-    # If EventMachine is being used (see Dnsruby::Resolver::use_eventmachine, then this method returns
-    # an EM::Deferrable object. If a queue (and ID) is passed in, then the response will also be 
-    # pushed to the Queue (as well as the deferrable completing).
+    #If EventMachine is being used (see Dnsruby::Resolver::use_eventmachine),then this method returns
+    #an EM::Deferrable object. If a queue (and ID) is passed in, then the response will also be 
+    #pushed to the Queue (as well as the deferrable completing).
     #
     #    deferrable = res.send_async(msg)
     #    deferrable = res.send_async(msg, use_tcp)
@@ -237,33 +268,39 @@ module Dnsruby
           end
         end
       end
+      # @TODO@ TSIG over TCP!!!
+      # Need to keep track of the request mac (if using tsig) so we can validate the response (RFC2845 4.1)
       #Are we using EventMachine or native Dnsruby?
       if (Resolver.eventmachine?)
-        return send_eventmachine(query_packet, msg.header.id, client_query_id, client_queue, use_tcp)
+        return send_eventmachine(query_packet, msg, client_query_id, client_queue, use_tcp)
       else
         if (!client_query_id)
           client_query_id = msg
         end
-        send_dnsruby(query_packet, msg.header.id, client_query_id, client_queue, use_tcp)
+        send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
         return client_query_id
       end
     end
 
     # This method sends the packet using EventMachine
-    def send_eventmachine(msg, header_id, client_query_id, client_queue, use_tcp, client_deferrable=nil) #:nodoc: all
+    def send_eventmachine(msg_bytes, msg, client_query_id, client_queue, use_tcp, client_deferrable=nil, packet_timeout = @packet_timeout) #:nodoc: all
+      start_time = Time.now
       if (!client_deferrable)
         client_deferrable = EventMachine::DefaultDeferrable.new
       end
-      packet_deferrable = EventMachineInterface.send(:msg=>msg, :header_id=>header_id, :timeout=>@packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :tsig_key=>@tsig_key, :ignore_truncation=>@ignore_truncation, :use_tcp=>use_tcp)
-      packet_deferrable.callback { |response|
+      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :use_tcp=>use_tcp)
+      packet_deferrable.callback { |response, response_bytes|
         TheLog.debug("EM callback #{response}")
-        # @TODO@ Check TSIG!
         ret = true
-        if (response.header.tc && !use_tcp)
+        if (response.header.tc && !use_tcp && !@ignore_truncation)
           # Try to resend over tcp
           TheLog.debug("Truncated - resending over TCP")
-          send_eventmachine(msg, header_id, client_query_id, client_queue, true, client_deferrable)
+          send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
         else
+          if (!check_tsig(msg, response, response_bytes))
+            send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
+            return
+          end
           client_deferrable.set_deferred_status :succeeded, response
           if (client_queue)
             client_queue.push([client_query_id, response, nil])
@@ -281,7 +318,7 @@ module Dnsruby
     end
 
     # This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
-    def send_dnsruby(query_packet, header_id, client_query_id, client_queue, use_tcp) #:nodoc: all
+    def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp) #:nodoc: all
       endtime = Time.now + @packet_timeout
       # First send the query (synchronously)
       # @TODO@ persisent sockets
@@ -310,7 +347,7 @@ module Dnsruby
         return
       end
       if (socket==nil)
-        err=IOError.new("dnsruby can't connect to #{@server}:#{port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}")
+        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}")
         TheLog.error("#{err}")
         st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
         return
@@ -318,10 +355,10 @@ module Dnsruby
       TheLog.debug("Sending packet to #{@server}:#{@port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}")
       begin
         if (use_tcp)
-          lenmsg = [query_packet.length].pack('n')
+          lenmsg = [query_bytes.length].pack('n')
           socket.send(lenmsg, 0)
         end
-        socket.send(query_packet, 0)
+        socket.send(query_bytes, 0)
       rescue Exception => e
         socket.close
         err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}, exception : #{e}")
@@ -331,22 +368,44 @@ module Dnsruby
       end
       
       # Then listen for the response
-      query_settings = SelectThread::QuerySettings.new(query_packet, header_id, @tsig_key, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, self)
+      query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
       # The select thread will now wait for the response and send that or a timeout
       # back to the client_queue.
       st.add_to_select(query_settings)
     end
     
-    def check_response(response, query, client_queue, client_query_id, tcp)
-      # @TODO@ Check TSIG!
-      ret = true
+    def check_response(response, response_bytes, query, client_queue, client_query_id, tcp)
+      if (!check_tsig(query, response, response_bytes))
+        return false
+      end
       if (response.header.tc && !tcp)
         # Try to resend over tcp
         TheLog.debug("Truncated - resending over TCP")
-        send_async(Message.decode(query), client_queue, client_query_id, true)
-        ret=false
+        send_async(query, client_queue, client_query_id, true)
+        return false
       end
-      return ret
+      return true
+    end
+    
+    def check_tsig(query, response, response_bytes)
+      if (query.tsig)
+        if (response.tsig)
+          if !query.tsig.verify(query, response, response_bytes)
+            # Discard packet and wait for correctly signed response
+            TheLog.error("TSIG authentication failed!")
+            return false
+          end
+        else
+          # Treated as having format error and discarded (RFC2845, 4.6)
+          TheLog.error("Expecting TSIG signed response, but got unsigned response - discarding")
+          return false
+        end
+      elsif (response.tsig)
+        # @TODO@ Error - signed response to unsigned query
+        TheLog.error("Signed response to unsigned query")
+        return false
+      end      
+      return true
     end
     
     # Prepare the packet for sending
@@ -381,18 +440,9 @@ module Dnsruby
         packet.add_additional(optrr)
       end
       
-      if (@tsig_key)
-        @tsig_key.apply(packet)
+      if (@tsig && !packet.signed?)
+        @tsig.apply(packet)
       end
-      # @TODO@ TSIG!!!      
-      #      if (@tsig_rr != nil && @tsig_rr.length > 0)
-      #        #          if (!grep { $_.type == 'TSIG' } packet.additional)
-      #        if (packet.additional.select { |i| i.type == 'TSIG' }.length > 0)
-      #          packet.push('additional', @tsig_rr)
-      #        end
-      #      end
-      
-      #      TheLog.debug("#{packet}")
       return packet.encode
     end
     

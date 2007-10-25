@@ -65,22 +65,23 @@ module Dnsruby
     end
     
     class QuerySettings
-      attr_accessor :query, :query_header_id, :tsig, :ignore_truncation, :client_queue, 
-        :client_query_id, :socket, :dest_server, :dest_port, :endtime, :single_resolver
-      # new(query, query_header_id, tsig, ignore_truncation, client_queue, client_query_id,
-      #     socket, dest_server, dest_port, endtime, single_resolver)
+      attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue, 
+        :client_query_id, :socket, :dest_server, :dest_port, :endtime, :udp_packet_size,
+        :single_resolver
+      # new(query_bytes, query, ignore_truncation, client_queue, client_query_id,
+      #     socket, dest_server, dest_port, endtime, , udp_packet_size, single_resolver)
       def initialize(*args)
-        @query = args[0]
-        @query_header_id = args[1]
-        @tsig=args[2]
-        @ignore_truncation=args[3]
-        @client_queue = args[4]
-        @client_query_id = args[5]
-        @socket = args[6]
-        @dest_server = args[7]
-        @dest_port=args[8]
-        @endtime = args[9]  
-        @single_resolver = args[10]        
+        @query_bytes = args[0]
+        @query = args[1]
+        @ignore_truncation=args[2]
+        @client_queue = args[3]
+        @client_query_id = args[4]
+        @socket = args[5]
+        @dest_server = args[6]
+        @dest_port=args[7]
+        @endtime = args[8]  
+        @udp_packet_size = args[9]
+        @single_resolver = args[10]
       end
     end
     
@@ -172,15 +173,16 @@ module Dnsruby
     def process_ready(ready)
       ready.each do |socket|
         packet_size = 512 # @TODO@ Sort out per-query packet sizes!!!
-        msg = get_incoming_data(socket, packet_size)
+        # query_settings.udp_packet_size - but how do we get query_settings when all we have is socket?
+        msg, bytes = get_incoming_data(socket, packet_size)
         if (msg!=nil)
-          send_response_to_client(msg, socket)
+          send_response_to_client(msg, bytes, socket)
         end
         ready.delete(socket)
       end
     end
     
-    def send_response_to_client(msg, socket)
+    def send_response_to_client(msg, bytes, socket)
       # Figure out which client_ids we were expecting on this socket, then see if any header ids match up
       client_ids=[]
       @@mutex.synchronize{
@@ -190,7 +192,7 @@ module Dnsruby
       client_ids.each do |id|
         query_header_id=nil
         @@mutex.synchronize{
-          query_header_id = @@query_hash[id].query_header_id
+          query_header_id = @@query_hash[id].query.header.id
         }
         if (query_header_id == msg.header.id)
           # process the response
@@ -204,7 +206,7 @@ module Dnsruby
           }
           tcp = (socket.class == TCPSocket)
           # At this point, we should check if the response is OK
-          if (res.check_response(msg, query, client_queue, id, tcp))
+          if (res.check_response(msg, bytes, query, client_queue, id, tcp))
             remove_id(id)
             exception = msg.header.get_exception
             TheLog.debug("Pushing response to client queue")
@@ -312,7 +314,7 @@ module Dnsruby
         ans.answerfrom=(answerfrom)
         ans.answersize=(answersize)
       end
-      return ans
+      return ans, buf
     end
     
     def handle_recvfrom_failure(socket)
@@ -353,10 +355,6 @@ module Dnsruby
     end
     
     def send_exception_to_client(err, socket, client_id, msg=nil)
-      if ((!err.kind_of?ResolvError) && (!err.kind_of?ResolvTimeout))
-        TheLog.error("INCORRECT ERROR TYPE BEING RETURNED TO CLIENT")
-        raise RuntimeError.new("INCORRECT ERROR TYPE BEING RETURNED TO CLIENT")
-      end
       # find the client response queue
       client_queue = nil
       @@mutex.synchronize {

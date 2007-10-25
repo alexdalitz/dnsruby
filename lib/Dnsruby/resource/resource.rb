@@ -124,6 +124,7 @@ module Dnsruby
     def type=(type)
       @type = Types.new(type)
     end
+    alias :rr_type :type
     
     def klass=(klass)
       @klass= Classes.new(klass)
@@ -136,8 +137,13 @@ module Dnsruby
       return (@type == rec.type && @klass == rec.klass && @name== rec.name)
     end
     
+    def init_defaults
+      # Default to do nothing
+    end
+    
     private
     def initialize(*args) #:nodoc: all
+      init_defaults
       if (args.length > 0)
         if (args[0].class == Hash)
           from_hash(args[0])
