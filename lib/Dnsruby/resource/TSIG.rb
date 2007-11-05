@@ -31,39 +31,30 @@ module Dnsruby
       #  Generates a TSIG record and adds it to the message.
       #  Takes an optional original_request argument for the case where this is
       #  a response to a query (RFC2845 3.4.1)
+      #
+      # Message#tsigstate will be set to :Signed.
       def apply(message, original_request=nil)
         if (!message.signed?)
           tsig_rr = generate(message, original_request)
           message.add_additional(tsig_rr)
           message.tsigstate = :Signed
+          @query = message
+          tsig_rr.query = message
         end
       end
       
+      def query=q
+        @query = q
+      end
       
-      #@TODO@ How is the generate / verify method going to be called?
-      # resolver will encode packet, and then add TSIG to it.
-      #  [res] b = packet.encode
-      #        rr = @tsig.generate(packet, b)
-      #        packet.add_additional(rr)
-      #        b = packet.encode
-      #        send(b)
-      # @TODO@ Then generate signed response to that message : need request_tsig_rr
       
       # [res]  bytes = get_incoming
       #        msg = Message.decode(bytes)
       #        request_tsig_rr.verify(msg)
       # @TODO@ OR msg.verify(key, request_tsig_rr)
-      # #@TODO@ Need to know the request mac so we can validate the response (rfc2845 4.1/4.2/4.3)
-      # #@TODO@ Remove TSIG from packet before passing to client?
-      # YES! RFC2845 says TSIG should be removed. Then client doesn't have to do
-      # any verify stuff - all handled in Resolver.
-      # @TODO@ But client *should* be able to do verification stuff if it wants to
-      # Client just sets TSIG_RR (or just key name and key) in Resolver and off it goes.
-      # @TODO@ Resolver will throw some kinda error if verify fails?
-      
-      
+      # Need to know the request mac so we can validate the response (rfc2845 4.1/4.2/4.3)
       # Generates a TSIG record
-      def generate(msg, msg_bytes=nil, original_request = nil, tsig_rr=self)
+      def generate(msg, original_request = nil, data="", msg_bytes=nil, tsig_rr=self)
         time_signed=@time_signed
         if (!time_signed)
           time_signed=Time.now.to_i
@@ -74,9 +65,7 @@ module Dnsruby
         
         key = @key.gsub(" ", "")
         key = Base64::decode64(key)
-      
-        data = ""
-        
+              
         if (original_request)
           #	# Add the request MAC if present (used to validate responses).
           #	  hmac.update(pack("H*", request_mac))
@@ -139,7 +128,8 @@ module Dnsruby
         
       end
       
-      def sig_data(tsig_rr, time_signed=@time_signed)
+      # Private method to return the TSIG RR data to be signed
+      def sig_data(tsig_rr, time_signed=@time_signed) #:nodoc: all
         return MessageEncoder.new { |msg|
           msg.put_name(tsig_rr.name.downcase, true)
           msg.put_pack('nN', tsig_rr.klass.code, tsig_rr.ttl)
@@ -155,7 +145,12 @@ module Dnsruby
         }.to_s
       end
       
-      def verify(query, response, response_bytes)
+      # TSIG removed from packet before passing to client.
+      # Message#tsigstate and Message#tsigerror set accordingly.
+      # Message#tsigstate will be set to one of :
+      #*  :Failed
+      #*  :Verified
+      def verify(query, response, response_bytes, buf="")
         #        4.6. Client processing of answer
         #
         #   When a client receives a response from a server and expects to see a
@@ -177,23 +172,191 @@ module Dnsruby
         # Side effect is packet is stripped of TSIG.
         # Resolver (or client) can then decide what to do...
 
-        
         msg_tsig_rr = response.tsig
-        response.additional.delete(msg_tsig_rr)
-        response.header.arcount-=1
-        new_msg_tsig_rr = generate(response, response_bytes, query, msg_tsig_rr)
-        
-        # @TODO@ CHECK THE TIME_SIGNED!!! (RFC2845, 4.5.2)
+        if (!verify_common(response))
+          return false
+        end
+
+        new_msg_tsig_rr = generate(response, query, buf, response_bytes, msg_tsig_rr)
         
         if (msg_tsig_rr.mac == new_msg_tsig_rr.mac)
           response.tsigstate = :Verified
+          response.tsigerror = RCode.NOERROR
           return true
         else
           response.tsigstate = :Failed
+          response.tsigerror = RCode.BADSIG
           return false
         end
       end
       
+      def verify_common(response)
+        tsig_rr = response.tsig
+
+	if (!tsig_rr)
+          response.tsigerror = RCode.FORMERR
+          response.tsigstate = :Failed
+          return false
+        end
+
+        response.additional.delete(tsig_rr)
+        response.header.arcount-=1
+
+        # First, check the TSIG error in the RR
+        if (tsig_rr.error != RCode.NOERROR)
+          response.tsigstate = :Failed
+          response.tsigerror = tsig_rr.error
+          return false                    
+        end
+        
+	if ((tsig_rr.name != @name) || (tsig_rr.algorithm.downcase != @algorithm.downcase))
+          TheLog.error("BADKEY failure")
+          response.tsigstate = :Failed
+          response.tsigerror = RCode.BADKEY
+          return false          
+        end
+        
+        # Check time_signed (RFC2845, 4.5.2) - only really necessary for server
+        if (Time.now.to_i > tsig_rr.time_signed + tsig_rr.fudge  ||
+              Time.now.to_i < tsig_rr.time_signed - tsig_rr.fudge)
+          TheLog.error("TSIG failed with BADTIME")
+          response.tsigstate = :Failed
+          response.tsigerror = RCode.BADTIME
+          return false          
+        end
+        
+        return true
+      end
+      
+      #verify_session checks TSIG signatures across sessions of multiple DNS
+      #envelopes.
+      #This method is called each time a new envelope comes in. The envelope
+      #is checked - if a TSIG is present, them the stream so far is verified, 
+      #and the response#tsigstate set to :Verified. If a TSIG is not present,
+      #and does not need to be present, then the message is added to the digest
+      #stream and the response#tsigstate is set to :Intermediate.
+      #If there is an error with the TSIG verification, then the response#tsigstate 
+      #is set to :Failed.
+      def verify_envelope(response, response_bytes)
+        #RFC2845 Section 4.4
+        #-----
+        #A DNS TCP session can include multiple DNS envelopes.  This is, for
+        #example, commonly used by zone transfer.  Using TSIG on such a
+        #connection can protect the connection from hijacking and provide data
+        #integrity.  The TSIG MUST be included on the first and last DNS
+        #envelopes.  It can be optionally placed on any intermediary
+        #envelopes.  It is expensive to include it on every envelopes, but it
+        #MUST be placed on at least every 100'th envelope.  The first envelope
+        #is processed as a standard answer, and subsequent messages have the
+        #following digest components:
+        #
+        #*   Prior Digest (running)
+        #*   DNS Messages (any unsigned messages since the last TSIG)
+        #*   TSIG Timers (current message)
+        #
+        #This allows the client to rapidly detect when the session has been
+        #altered; at which point it can close the connection and retry.  If a
+        #client TSIG verification fails, the client MUST close the connection.
+        #If the client does not receive TSIG records frequently enough (as
+        #specified above) it SHOULD assume the connection has been hijacked
+        #and it SHOULD close the connection.  The client SHOULD treat this the
+        #same way as they would any other interrupted transfer (although the
+        #exact behavior is not specified).
+        #-----
+        #
+        # Each time a new envelope comes in, this method is called on the QUERY TSIG RR.
+        # It will set the response tsigstate to :Verified :Intermediate or :Failed
+        # as appropriate.
+        
+        # Keep digest going of messages as they come in (and mark them intermediate)
+        # When TSIG comes in, work out what key should be and check. If OK, mark 
+        # verified. Can reset digest then.
+        if (!@buf)
+          @num_envelopes = 0
+          @last_signed = 0
+        end
+        @num_envelopes += 1
+        if (!response.tsig)
+          if ((@num_envelopes > 1) && (@num_envelopes - @last_signed < 100))
+            TheLog.debug("Receiving intermediate envelope in TSIG TCP session")
+            response.tsigstate = :Intermediate
+            response.tsigerror = RCode.NOERROR
+            @buf = @buf + response_bytes
+            return
+          else
+            response.tsigstate = :Failed
+            TheLog.error("Expecting signed packet")
+            return false
+          end
+        end
+        @last_signed = @num_envelopes
+        
+        # We have a TSIG - process it!
+        tsig = response.tsig
+        if (@num_envelopes == 1)
+          TheLog.debug("First response in TSIG TCP session - verifying normally")
+          # Process it as a standard answer
+          ok = verify(@query, response, response_bytes)
+          if (ok)
+            mac_bytes = MessageEncoder.new {|m|
+              m.put_pack('n', tsig.mac_size)
+              m.put_bytes(tsig.mac)
+            }.to_s
+            @buf = mac_bytes
+          else
+          end
+          return ok
+        end
+        TheLog.debug("Processing TSIG on TSIG TCP session")
+
+        if (!verify_common(response))
+          return false
+        end
+        
+        # Now add the current message data - remember to frig the arcount
+        response_bytes = Header.decrement_arcount_encoded(response_bytes)
+        @buf += response_bytes[0, response.tsigstart]
+        
+        # Let's add the timers
+        timers_data = MessageEncoder.new { |msg|
+          time_high = (tsig.time_signed >> 32)
+          time_low = (tsig.time_signed & 0xFFFFFFFF)
+          msg.put_pack('nN', time_high, time_low)
+          msg.put_pack('n', tsig.fudge)
+        }.to_s
+        @buf += timers_data
+        
+        mac = nil
+        key = @key.gsub(" ", "")
+        key = Base64::decode64(key)
+        if (tsig.algorithm == HMAC_MD5)
+          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, key, @buf)
+        elsif (tsig.algorithm == HMAC_SHA1)
+          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA1.new, key, @buf)
+        elsif (tsig.algorithm == HMAC_SHA256)
+          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA256.new, key, @buf)
+        else
+          # Should we allow client to pass in their own signing function?
+          raise RuntimeError.new("Algorithm #{tsig.algorithm} unsupported by TSIG")
+        end
+
+        if (mac != tsig.mac)
+          TheLog.error("TSIG Verify error on TSIG TCP session")
+          response.tsigstate = :Failed
+          return false
+        end
+        mac_bytes = MessageEncoder.new {|m|
+          m.put_pack('n', mac.length)
+          m.put_bytes(mac)
+        }.to_s
+        @buf=mac_bytes
+
+        response.tsigstate = :Verified
+        response.tsigerror = RCode.NOERROR
+        return true
+      end
+
+            
       TypeValue = Types::TSIG #:nodoc: all
       ClassValue = nil #:nodoc: all
       ClassHash[[TypeValue, Classes.ANY.code]] = self #:nodoc: all
@@ -270,12 +433,13 @@ module Dnsruby
       #    print "other data = ", rr.other_data, "\n"
       #
       attr_accessor :other_data
+      
+      #Stores the secret key used for signing/verifying messages.
       attr_accessor :key
       
       def init_defaults
         # @TODO@ Have new() method which takes key_name and key?
         @algorithm   = DEFAULT_ALGORITHM
-        #        @time_signed = Time.now.to_i
         @fudge       = DEFAULT_FUDGE
         @mac_size    = 0
         @mac         = ""
@@ -292,6 +456,17 @@ module Dnsruby
       
       def from_data(data) #:nodoc: all
         @algorithm, @time_signed, @fudge, @mac_size, @mac, @original_id, @error, @other_size, @other_data = data
+      end
+      
+      def name=(n)
+        if (n.instance_of?String)
+          n = Name.create(n)
+        end
+        if (!n.absolute?)
+          @name = Name.create(n.to_s + ".")
+        else 
+          @name = n
+        end
       end
       
       # Create the RR from a standard string
@@ -313,23 +488,25 @@ module Dnsruby
       #* hmac-sha1
       #* hmac-sha256
       def algorithm=(alg)
-        case alg.class
-        when String
+        if (alg.class == String)
           if (alg.downcase=="hmac-md5")
             @algorithm = HMAC_MD5;
-          elsif (algorithm.downcase=="hmac-sha1")
+          elsif (alg.downcase=="hmac-sha1")
             @algorithm = HMAC_SHA1;
-          elsif (algorithm.downcase=="hmac-sha256")
+          elsif (alg.downcase=="hmac-sha256")
             @algorithm = HMAC_SHA256;
           else
-            raise ArgumentException.new("Invalid TSIG algorithm")
+            raise ArgumentError.new("Invalid TSIG algorithm")
           end
-        when Name
+        elsif (alg.class == Name)
           if (alg!=HMAC_MD5 && alg!=HMAC_SHA1 && alg!=HMAC_SHA256)
             raise ArgumentException.new("Invalid TSIG algorithm")
           end
           @algorithm=alg
+        else
+          raise ArgumentError.new("#{alg.class} not valid type for Dnsruby::RR::TSIG#algorithm=  - use String or Name")
         end
+        TheLog.debug("Using #{@algorithm.to_s} algorithm")
       end
       
       def fudge=(f)
@@ -356,7 +533,7 @@ module Dnsruby
       end
       
       def encode_rdata(msg) #:nodoc: all
-        # @TODO@ Name needs to be added with no compression!
+        # Name needs to be added with no compression - done in Dnsruby::Message#encode
         msg.put_name(@algorithm.downcase, true)
         time_high = (@time_signed >> 32)
         time_low = (@time_signed & 0xFFFFFFFF)

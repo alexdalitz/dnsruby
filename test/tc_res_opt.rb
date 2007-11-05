@@ -47,6 +47,7 @@ class TestResOpt < Test::Unit::TestCase
   end
   
   def test_no_file
+    Dnsruby::TheLog.level=Logger::FATAL
     res=nil
     begin
       res = DNS.new('nosuch.txt')
@@ -58,6 +59,7 @@ class TestResOpt < Test::Unit::TestCase
       assert_equal(["0.0.0.0"], res.nameserver,"No nameservers should be set for #{test} = #{input}")
     rescue Exception
     end
+    Dnsruby::TheLog.level=Logger::ERROR
   end
   
   def test_config_hash_singleresolver
@@ -141,6 +143,7 @@ class TestResOpt < Test::Unit::TestCase
   
   def test_bad_config
     res=nil
+    Dnsruby::TheLog.level=Logger::FATAL
     
     bad_input = {
       :tsig_rr        => 'set',
@@ -180,6 +183,7 @@ class TestResOpt < Test::Unit::TestCase
         rescue Exception
         end
       end
+      Dnsruby::TheLog.level=Logger::ERROR
     end
   end
 end

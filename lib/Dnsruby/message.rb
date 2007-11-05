@@ -73,6 +73,7 @@ module Dnsruby
       @answer = []
       @authority = []
       @additional = []
+      @tsigstate = :Unsigned
       type = Types.A
       klass = Classes.IN
       if (args.length > 0)
@@ -105,11 +106,21 @@ module Dnsruby
     # If this Message is a response from a server, then answersize contains the size of the response
     attr_accessor :answersize
     
-    attr_reader :tsigerror
+    # If this message has been verified using a TSIG RR then tsigerror contains 
+    # the error code returned by the TSIG verification
+    attr_accessor :tsigerror
     
+    #Can be
+    #* :Unsigned - the default state
+    #* :Signed - the outgoing message has been signed
+    #* :Verified - the incoming message has been verified
+    #* :Intermediate - the incoming message is an intermediate packet in a TCP session
+    #* :Failed - the incoming response failed verification
     attr_accessor :tsigstate
 
+    #--
     attr_accessor :tsigstart
+    #++
 
     # @TODO@ Where should signing be done? By TSIG - but have wrapper method in Message :
     # Message#sign(tsig_rr)
@@ -307,7 +318,7 @@ module Dnsruby
               TheLog.Error("Incoming message has TSIG record before last record")
               raise DecodeError.new("TSIG record present before last record")
             end
-            o.tsigstart = start
+            o.tsigstart = start # needed for TSIG verification
           end
           o.additional << rr
         }
@@ -763,7 +774,7 @@ module Dnsruby
     
     def put_label(d)
       s, = Name.encode(d)
-      raise RuntimeError, "length of #{s} is #{s.string.length} (larger than 63 octets)" if s.string.length > 63 # @todo@ Error type
+      raise RuntimeError, "length of #{s} is #{s.string.length} (larger than 63 octets)" if s.string.length > 63
       self.put_string(s.string)
     end
   end

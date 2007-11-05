@@ -331,7 +331,7 @@ module Dnsruby
           @config = args[0]
         end
       else
-        #@TODO@ ?
+        # Anything to do?
       end
       if (@single_resolvers==[])
         add_config_nameservers
@@ -421,11 +421,7 @@ module Dnsruby
     end
     
     def tsig=(t)
-      # @TODO@ Sort out this method
-      # Should take :
-      #  tsig=(tsig_rr)
-      #  tsig=(key_name, key)
-      @tsig = t
+      @tsig=t
       update
     end
     
@@ -472,7 +468,7 @@ module Dnsruby
     #
     #Takes a bool to say whether or not to use EventMachine.
     def Resolver.use_eventmachine(on=true)
-      if (!@@event_machine_available)
+      if (on && !@@event_machine_available)
         raise RuntimeError.new("EventMachine is not available in this environment!")
       end
       @@use_eventmachine = on

@@ -182,7 +182,7 @@ module Dnsruby
     def RR.new_from_hash(inhash)
       hash = inhash.clone        
       type = hash[:type] || Types::ANY
-      klass = hash[:class] || Classes::IN
+      klass = hash[:klass] || Classes::IN
       ttl = hash[:ttl] || 0
       recordclass = get_class(type, klass)
       record = recordclass.new
@@ -196,7 +196,7 @@ module Dnsruby
       hash.delete(:name)
       hash.delete(:type)
       hash.delete(:ttl)
-      hash.delete(:class)
+      hash.delete(:klass)
       record.from_hash(hash)
       return record
     end

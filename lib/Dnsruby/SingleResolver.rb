@@ -92,7 +92,7 @@ module Dnsruby
     attr_reader :server
     
     #Sets the TSIG to sign outgoing messages with.
-    #Pass in either a Dnsruby::RR::TSIG, or a key_name and key.
+    #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
     #Pass in nil to stop tsig signing.
     #It is possible for client code to sign packets prior to sending - see
     #Dnsruby::RR::TSIG#apply and Dnsruby::Message#sign
@@ -101,13 +101,29 @@ module Dnsruby
     #* res.tsig=(key_name, key)
     #* res.tsig=nil # Stop the resolver from signing
     def tsig=(*args)
+      @tsig = SingleResolver.get_tsig(args)
+    end
+    
+    def SingleResolver.get_tsig(args)
+      tsig = nil
       if (args.length == 1)
-        @tsig = args[0]
+        if (args[0])
+          if (args[0].instance_of?RR::TSIG)
+            tsig = args[0]
+          elsif (args[0].instance_of?Array)
+            tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1]})
+          end
+        else
+          TheLog.info("TSIG signing switched off")
+          return nil
+        end
       elsif (args.length ==2)
-        @tsig = TSIG.new(args)
+        tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0], :key => args[1]})
       else
-        raise ArgumentError.new("Wrong number of arguments to Dsnruby::SingleResolver#tsig=")
+        raise ArgumentError.new("Wrong number of arguments to tsig=")
       end
+      TheLog.info("TSIG signing now using #{tsig.name}, key=#{tsig.key}")
+      return tsig
     end
     
     def udp_size=(size)
@@ -268,7 +284,6 @@ module Dnsruby
           end
         end
       end
-      # @TODO@ TSIG over TCP!!!
       # Need to keep track of the request mac (if using tsig) so we can validate the response (RFC2845 4.1)
       #Are we using EventMachine or native Dnsruby?
       if (Resolver.eventmachine?)
@@ -401,7 +416,7 @@ module Dnsruby
           return false
         end
       elsif (response.tsig)
-        # @TODO@ Error - signed response to unsigned query
+        # Error - signed response to unsigned query
         TheLog.error("Signed response to unsigned query")
         return false
       end      

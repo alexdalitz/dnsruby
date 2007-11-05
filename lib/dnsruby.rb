@@ -18,9 +18,6 @@ require 'Dnsruby/code_mapper'
 require 'Dnsruby/ipv4'
 require 'Dnsruby/ipv6'
 require 'timeout'
-#--
-#@TODO@ Add to this with ideas from DNS.rb?
-#++
 #= Dnsruby library
 #Dnsruby is a resolver library written in Ruby.
 #

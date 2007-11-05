@@ -52,10 +52,9 @@ module Dnsruby
     def self.method_missing(symbol, *args) #:nodoc: all
       @@mutex.synchronize{
         now = Time.now
-        #        p "#{now.hour}:#{now.min}:#{now.sec} - #{args}"
         @@logger.send(symbol, *args)
       }
     end
-    log = TheLog.instance # initialise @@logger
+    log = TheLog.instance
   end
 end

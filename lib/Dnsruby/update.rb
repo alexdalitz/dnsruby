@@ -139,7 +139,6 @@ module Dnsruby
       rdata = []
       klass = Classes.ANY
       if (args.length>=1) # domain (RFC2136, Section 2.4.4)
-        # @TODO@ Could also be an actual RR object?
         name = args[0]
         type = Types.ANY
         if (args.length>=2) # RRSET (RFC2136, Section 2.4.1)

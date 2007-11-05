@@ -11,6 +11,21 @@ module Dnsruby
     attr_accessor :port
     # If using IXFR, this is the SOA serial number to start the incrementals from
     attr_accessor :serial
+    # The TSIG record used to sign the transfer
+    attr_accessor :tsig
+    # Returns the tsigstate of the last transfer (nil if no TSIG signed transfer has occurred)
+    attr_reader :last_tsigstate
+    
+    #Sets the TSIG to sign the zone transfer with.
+    #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
+    #Pass in nil to stop tsig signing.
+    #* res.tsig=(tsig_rr)
+    #* res.tsig=(key_name, key)
+    #* res.tsig=nil # Don't sign the transfer
+    def tsig=(*args)
+      @tsig = SingleResolver.get_tsig(args)
+    end
+    
 
     def initialize
       @server=Config.new.nameserver[0]
@@ -18,6 +33,7 @@ module Dnsruby
       @klass=Classes.IN
       @port=53
       @serial=0
+      @tsig = nil
     end
     
     # Perform a zone transfer (RFC1995)
@@ -78,7 +94,6 @@ module Dnsruby
           rr = RR.create("#{zone} 0 IN SOA" + '0 0 %u 0 0 0 0' % @serial)
           msg.add_authority(rr)
         end
-        # @TODO@ TSIG?
         send_message(socket, msg)
         
         while (@state != :End)
@@ -95,7 +110,6 @@ module Dnsruby
                 @transfer_type=Types.AXFR
                 # Send an initial AXFR query
                 msg = Message.new(zone, @transfer_type, @klass)
-                # @TODO@ TSIG?
                 send_message(socket, msg)
                 next
               end
@@ -113,7 +127,6 @@ module Dnsruby
               # Send an initial AXFR query
               @state = :InitialSoa
               msg = Message.new(zone, @transfer_type, @klass)
-              # @TODO@ TSIG?
               send_message(socket, msg)
               next
             end
@@ -122,10 +135,17 @@ module Dnsruby
           response.each_answer { |rr|
             parseRR(rr)
           }
-          #        if (state == END &&
-          #            response.tsigState == Message.TSIG_INTERMEDIATE)
-          #          raise ResolvError.new("last message must be signed")
-          #        end
+          if (@state == :End &&
+                response.tsigstate == :Intermediate)
+            raise ResolvError.new("last message must be signed")
+          end
+          if (@state == :End && @tsig)
+            if (response.tsigstate != :Verified)
+              @last_tsigstate = :Failed
+              raise ResolvError.new("Zone transfer not correctly signed")
+            end
+            @last_tsigstate = :Verified
+          end
         end
         # This could return with an IXFR response, or an AXFR response.
         # If it fails completely, then try to send an AXFR query.
@@ -270,8 +290,11 @@ module Dnsruby
     end
     
     
-    # @TODO@ Do all this with EventMachine?
     def send_message(socket, msg) #:nodoc: all
+      if (@tsig)
+        @tsig.apply(msg)        
+        @tsig = msg.tsig
+      end
       query_packet = msg.encode
       lenmsg = [query_packet.length].pack('n')
       socket.send(lenmsg, 0)
@@ -291,7 +314,12 @@ module Dnsruby
       answersize = buf.unpack('n')[0]
       buf = tcp_read(socket, answersize)
       msg = Message.decode(buf)
-      
+      if (@tsig)
+          if !@tsig.verify_envelope(msg, buf)
+            TheLog.error("Bad signature on zone transfer - closing connection")
+            raise ResolvError.new("Bad signature on zone transfer")
+          end      
+      end
       return msg
     end  
   end

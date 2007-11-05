@@ -69,6 +69,7 @@ class TestTKey < Test::Unit::TestCase
     assert_equal(Dnsruby::Classes.IN,                       z.zclass, 'zclass correct')         #5
     assert_equal(Dnsruby::Types.TKEY,                     z.ztype,  'ztype correct')          #6       
     
+    #@TODO@ Test TKEY against server!
     
   end
   end

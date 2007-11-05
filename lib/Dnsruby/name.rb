@@ -93,7 +93,7 @@ module Dnsruby
       end
       return (labels[0].string == '*')
     end
-
+    
     def ==(other)
       return false unless Name === other
       return @labels == other.labels && @absolute == other.absolute?
@@ -143,7 +143,6 @@ module Dnsruby
     #   p Resolv::Name.create("x.y.z").to_s #=> "x.y.z"
     #
     def to_s
-      # @todo@ Need to think about escaped characters here?
       return @labels.collect{|l| (l.kind_of?String) ? l : l.string}.join('.')
       
     end

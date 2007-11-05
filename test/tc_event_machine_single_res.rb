@@ -67,7 +67,7 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
     assert(id==1)
     assert(ret==nil)
     assert(error.class == Dnsruby::ResolvTimeout)
-    p "Difference = #{end_time-start}"
+#    p "Difference = #{end_time-start}"
     assert(end_time - start >= 1.9)
     assert(end_time - start <= 2.2)
   end
@@ -84,7 +84,7 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
     end_time = Time.now
     assert(id==1)
     assert(ret==nil)
-    p "Difference = #{end_time-start}"
+#    p "Difference = #{end_time-start}"
     assert(error.class == Dnsruby::ResolvTimeout)
     assert(end_time - start >= 1.9)
     assert(end_time - start <= 2.2)

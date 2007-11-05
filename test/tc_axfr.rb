@@ -16,7 +16,6 @@
 require 'rubygems'
 require 'test/unit'
 require 'Dnsruby'
-require 'socket'
 class TestAxfr < Test::Unit::TestCase
   def test_axfr
     zt = Dnsruby::ZoneTransfer.new
@@ -24,12 +23,10 @@ class TestAxfr < Test::Unit::TestCase
     zt.server = "ns0.validation-test-servers.nominet.org.uk"
     zone = zt.transfer("validation-test-servers.nominet.org.uk")
     assert(zone.length > 0)
+    assert(zt.last_tsigstate==nil)
   end
   
   def test_ixfr
-    # @TODO@
-    #           zone.gsub!(/\.$/o, "")
-
     zt = Dnsruby::ZoneTransfer.new
     zt.transfer_type = Dnsruby::Types.IXFR
     zt.server = "ns0.validation-test-servers.nominet.org.uk"
@@ -38,5 +35,6 @@ class TestAxfr < Test::Unit::TestCase
     assert(deltas.length > 0)
     assert(deltas[0].class == Dnsruby::ZoneTransfer::Delta)
     assert_equal("Should show up in transfer", deltas[0].adds[1].data)
+    assert(zt.last_tsigstate==nil)
   end
 end

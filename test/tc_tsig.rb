@@ -17,7 +17,9 @@ require 'rubygems'
 require 'test/unit'
 require 'dnsruby'
 require "digest/md5"
-class TestTKey < Test::Unit::TestCase
+class TestTSig < Test::Unit::TestCase
+  KEY_NAME="rubytsig"
+  KEY = "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw=="
   def is_empty(string)
     return (string == "; no data" || string == "; rdlength = 0")
   end
@@ -34,20 +36,17 @@ class TestTKey < Test::Unit::TestCase
   end
   
   def run_test_client_signs
-    Dnsruby::TheLog.level=Logger::ERROR
-    name="rubytsig"
-    key = "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw=="
     tsig = Dnsruby::RR.create({
-        :name        => name,
+        :name        => KEY_NAME,
         :type        => "TSIG",
         :ttl         => 0,
         :klass       => "ANY",
         :algorithm   => "hmac-md5",
         :fudge       => 300,
-        :key         => key,
+        :key         => KEY,
         :error       => 0
       })
-    
+          
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
     # Generate update record name, and test it has been made. Then delete it and check it has been deleted
     update_name = generate_update_name
@@ -56,8 +55,9 @@ class TestTKey < Test::Unit::TestCase
     tsig.apply(update)
     assert(update.signed?, "Update has not been signed")
     
-    res = Dnsruby::SingleResolver.new("ns0.validation-test-servers.nominet.org.uk")
+    res = Dnsruby::Resolver.new("ns0.validation-test-servers.nominet.org.uk")
     res.recurse=false
+    res.query_timeout = 10
     response = res.send_message(update)
 
     assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
@@ -79,8 +79,8 @@ class TestTKey < Test::Unit::TestCase
          
     # Now check the record does not exist
     begin
-    rr = res.query(update_name, 'TXT')
-    assert(false)
+      rr = res.query(update_name, 'TXT')
+      assert(false)
     rescue Dnsruby::NXDomain
     end
   end
@@ -94,12 +94,90 @@ class TestTKey < Test::Unit::TestCase
   end
   
   def run_test_resolver_signs
-    #@TODO@ Resolver should apply signature itself!
-    assert(false, "TEST RESOLVER SIGNING!!!")
+    res = Dnsruby::Resolver.new("ns0.validation-test-servers.nominet.org.uk")
+    res.query_timeout=10
+    res.tsig=KEY_NAME, KEY
+    
+    update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
+    # Generate update record name, and test it has been made. Then delete it and check it has been deleted
+    update_name = generate_update_name
+    update.absent(update_name)
+    update.add(update_name, 'TXT', 100, "test signed update")
+    assert(!update.signed?, "Update has been signed")
+    
+    response = res.send_message(update)
+
+    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+    assert(response.verified?, "Response has not been verified")
+    
+    # Now check the record exists
+    rr = res.query(update_name, 'TXT')
+    assert_equal("test signed update", rr.answer()[0].strings.join(" "), "TXT record has not been created in zone")
+    
+    # Now delete the record
+    update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
+    update.present(update_name, 'TXT')
+    update.delete(update_name)
+    tsig = Dnsruby::RR.create({
+    :type => 'TSIG', :klass => 'ANY',
+        :name        => KEY_NAME,
+        :key         => KEY
+      })
+    tsig.apply(update)
+    assert(update.signed?, "Update has not been signed")
+    response = res.send_message(update)
+    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+    assert(response.verified?, "Response has not been verified")
+         
+    # Now check the record does not exist
+    begin
+      rr = res.query(update_name, 'TXT')
+      assert(false)
+    rescue Dnsruby::NXDomain
+    end
   end
   
   def test_message_signing
     # @TODO@ Test Message#sign
     assert(false, "Test Message#sign!")
+  end
+  
+#  def test_tcp
+#    # @TODO@ Test running over TCP - in particular, try sending several packets
+#    # over TCP session - BUT NEED STREAMING SOCKET TO DO THIS!
+#    # Currently, new TCP port opened (and closed) for every connection
+#    # But would single port even count towards RFC2845 setion 4.4?
+#  end
+  
+  def test_signed_zone_transfer
+    axfr
+    ixfr
+  end
+
+  def axfr
+    zt = Dnsruby::ZoneTransfer.new
+    zt.transfer_type = Dnsruby::Types.AXFR
+    zt.tsig=KEY_NAME, KEY
+    zt.server = "ns0.validation-test-servers.nominet.org.uk"
+    zone = zt.transfer("validation-test-servers.nominet.org.uk")
+    assert(zone.length > 0)
+    assert(zt.last_tsigstate==:Verified)
+  end
+  
+  def ixfr
+    zt = Dnsruby::ZoneTransfer.new
+    zt.transfer_type = Dnsruby::Types.IXFR
+    zt.server = "ns0.validation-test-servers.nominet.org.uk"
+    zt.tsig = Dnsruby::RR.create({
+    :type => 'TSIG', :klass => 'ANY',
+        :name        => KEY_NAME,
+        :key         => KEY
+      })
+    zt.serial = 2007090401
+    deltas = zt.transfer("validation-test-servers.nominet.org.uk")
+    assert(deltas.length > 0)
+    assert(deltas[0].class == Dnsruby::ZoneTransfer::Delta)
+    assert_equal("Should show up in transfer", deltas[0].adds[1].data)
+    assert(zt.last_tsigstate==:Verified)
   end
 end

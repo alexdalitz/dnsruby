@@ -1,8 +1,9 @@
 Dnsruby
 =======
 
-Dnsruby is a pure Ruby DNS implementation. It aims to comply
-with all DNS RFCs, including DNSSEC NSEC3 support.
+Dnsruby is a pure Ruby DNS client library which implements a
+stub resolver. It aims to comply with all DNS RFCs, including
+DNSSEC NSEC3 support.
 
 Dnsruby presents a new API for DNS. It is based on Ruby's core
 resolv.rb Resolv API, but has been much extended to provide a
@@ -16,19 +17,41 @@ The following is a (non-exhaustive) list of features :
 
 o Implemented RRs :  A, AAAA, AFSDB, ANY, CERT, CNAME, DNAME,
      HINFO, ISDN, LOC, MB, MG, MINFO, MR, MX, NAPTR, NS, NSAP,
-     OPT, PTR, PX, RP, RT, SOA, SPF, SRV, TKEY, TKEY, TSIG,
-     TSIG,TXT, WKS, X25
+     OPT, PTR, PX, RP, RT, SOA, SPF, SRV, TKEY, TSIG, TXT, WKS,
+     X25
 
 o Generic RR types supported (RFC3597)
 
-o Zone transfer (AXFR and IXFR) supported
+o (Signed) Zone transfer (AXFR and IXFR) supported
 
-o Dyamic updates supported
+o (Signed) Dyamic updates supported
 
 o DNSSEC support in progress
+
+Dependencies
+============
+
+Dnsruby can run with no dependencies. However, if you wish to
+use TSIG or DNSSEC then the OpenSSL library must be available.
+This is a part of the Ruby standard library, but appears not to
+be present on all Ruby platforms. If it is not available, then 
+the test code will not run the tests which require it. Code which
+attempts to use the library (if it is not present) will raise an
+exception.
+
+If EventMachine is to be used, then the EventMachine library must
+be present on the platform. If the EventMachine library is not 
+present then the test code will not run the EventMachine tests.
+
+Online tests
+============
+
+Nominet operate a test server which the Dnsruby test code queries.
+If this server is not available then some of the online tests will 
+not be run.
 
 
 Contact
 =======
 
-Use dnsruby rubyforge forums
+Use dnsruby rubyforge forums, or contact : alexd@nominet.org.uk

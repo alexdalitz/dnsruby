@@ -163,28 +163,18 @@ module Dnsruby
     end
     
     def send_query(name, type=Types.A, klass=Classes.IN)
-      q = Queue.new
       candidates = @config.generate_candidates(name)
       exception = nil
       candidates.each do |candidate|
+        q = Queue.new
         msg = Message.new
         msg.header.rd = 1
         msg.add_question(candidate, type, klass)
-        @resolver.send_async(msg, q, q)
+        @resolver.send_async(msg, q, id)
         id, ret, exception = q.pop
         if (exception == nil && ret.header.rcode == RCode.NOERROR)
           return ret, ret.question[0].qname
         end
-        #        if (ret.kind_of?Message)
-        #          exception = ret.header.rcode
-        #          if (ret.header.rcode==RCode.NOERROR)
-        #            return ret, ret.question[0].qname
-        #          end
-        #        else
-        #          #@TODO@ Keep trying until all the candidates are done
-        #          #          raise ret
-        #          exception = ret
-        #        end
       end
       raise exception
     end

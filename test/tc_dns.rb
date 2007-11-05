@@ -180,7 +180,6 @@ class TestDNS < Test::Unit::TestCase
                   :domain     => 't.dnsruby.validation-test-servers.nominet.org.uk',
     :search => ["t.dnsruby.validation-test-servers.nominet.org.uk", "dnsruby.validation-test-servers.nominet.org.uk"]
     )
-    p res
     
     #
     # test the send_query() appends the default domain and 

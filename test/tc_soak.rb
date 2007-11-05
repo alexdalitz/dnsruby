@@ -77,7 +77,6 @@ class TestSingleResolverSoak < Test::Unit::TestCase
     end
     query_count.times do |i|
       id,ret, error = q.pop
-      #      p "Got response #{i}"
       if (error.class == ResolvTimeout)
         timed_out+=1
       elsif (ret.class != Message)
@@ -120,7 +119,6 @@ class TestSingleResolverSoak < Test::Unit::TestCase
             begin
               packet = res.query(data[:name], data[:type])
             rescue ResolvTimeout
-              #              p "TIMEOUT for Thread #{i}, reply #{j}, type #{data[:type]}"
               mutex.synchronize {
                 timed_out+=1
               }
@@ -180,7 +178,6 @@ class TestSingleResolverSoak < Test::Unit::TestCase
             res.send_async(Message.new(data[:name], data[:type]), q, [i,j])
             id, packet, error = q.pop
             if (error.class == ResolvTimeout)
-              #              p "TIMEOUT for Thread #{i}, reply #{j}, type #{data[:type]}"
               mutex.synchronize {
                 timed_out+=1
               }
@@ -189,7 +186,6 @@ class TestSingleResolverSoak < Test::Unit::TestCase
               p "ERROR! #{error}"
             end
             
-            #            p packet.to_s
             assert(packet)
             assert_equal(packet.question[0].qclass,    'IN',             'Class correct'           )
           end

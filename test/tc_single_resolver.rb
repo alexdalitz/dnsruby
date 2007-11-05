@@ -81,7 +81,6 @@ class TestSingleResolver < Test::Unit::TestCase
       id,ret, error = q.pop
       assert(id==msg)
       assert(ret==nil)
-      p error
       assert(error.class == ResolvTimeout)
     end
   end
