@@ -74,7 +74,7 @@ class TestDNS < Test::Unit::TestCase
     #
     # Check that new() is vetting things properly.
     #
-    
+    Dnsruby::TheLog.level=Logger::FATAL
     [:nameserver].each do |test|
       [{}, 'string',1,'\1',nil].each do |input|
         res=nil
@@ -86,6 +86,7 @@ class TestDNS < Test::Unit::TestCase
         end
       end
     end
+    Dnsruby::TheLog.level=Logger::ERROR
   end
   
   def test_online

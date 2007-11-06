@@ -29,7 +29,12 @@ class TestTSig < Test::Unit::TestCase
     run_test_resolver_signs
   end
   def test_signed_update_em
+    begin
     Dnsruby::Resolver::use_eventmachine(true)
+    rescue RuntimeError
+      Dnsruby::TheLog.error("EventMachine not installed - not running tsig EM tests")
+      return 
+    end
     run_test_client_signs
     run_test_resolver_signs
     Dnsruby::Resolver::use_eventmachine(false)
@@ -142,14 +147,8 @@ class TestTSig < Test::Unit::TestCase
     assert(false, "Test Message#sign!")
   end
   
-#  def test_tcp
-#    # @TODO@ Test running over TCP - in particular, try sending several packets
-#    # over TCP session - BUT NEED STREAMING SOCKET TO DO THIS!
-#    # Currently, new TCP port opened (and closed) for every connection
-#    # But would single port even count towards RFC2845 setion 4.4?
-#  end
-  
   def test_signed_zone_transfer
+    # test TSIG over TCP session
     axfr
     ixfr
   end

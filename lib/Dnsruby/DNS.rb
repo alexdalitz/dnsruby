@@ -170,7 +170,7 @@ module Dnsruby
         msg = Message.new
         msg.header.rd = 1
         msg.add_question(candidate, type, klass)
-        @resolver.send_async(msg, q, id)
+        @resolver.send_async(msg, q)
         id, ret, exception = q.pop
         if (exception == nil && ret.header.rcode == RCode.NOERROR)
           return ret, ret.question[0].qname
