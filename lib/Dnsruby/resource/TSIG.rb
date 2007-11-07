@@ -19,6 +19,16 @@ require "digest/sha1"
 #require "digest/sha256"
 module Dnsruby
   class RR
+    #TSIG implements RFC2845.
+    #
+    #"This protocol allows for transaction level authentication using
+    #shared secrets and one way hashing.  It can be used to authenticate
+    #dynamic updates as coming from an approved client, or to authenticate
+    #responses as coming from an approved recursive name server."
+    #
+    #A Dnsruby::RR::TSIG can represent the data present in a TSIG RR.
+    #However, it can also represent the data (specified in RFC2845) used
+    #to sign or verify a DNS message.
     class TSIG < RR
       HMAC_MD5 = Name.create("HMAC-MD5.SIG-ALG.REG.INT.")
       HMAC_SHA1 = Name.create("hmac-sha1.")
@@ -28,11 +38,11 @@ module Dnsruby
       
       DEFAULT_ALGORITHM = HMAC_MD5
       
-      #  Generates a TSIG record and adds it to the message.
-      #  Takes an optional original_request argument for the case where this is
-      #  a response to a query (RFC2845 3.4.1)
+      #Generates a TSIG record and adds it to the message.
+      #Takes an optional original_request argument for the case where this is
+      #a response to a query (RFC2845 3.4.1)
       #
-      # Message#tsigstate will be set to :Signed.
+      #Message#tsigstate will be set to :Signed.
       def apply(message, original_request=nil)
         if (!message.signed?)
           tsig_rr = generate(message, original_request)
@@ -43,18 +53,13 @@ module Dnsruby
         end
       end
       
-      def query=q
+      def query=q#:nodoc: all
         @query = q
       end
       
       
-      # [res]  bytes = get_incoming
-      #        msg = Message.decode(bytes)
-      #        request_tsig_rr.verify(msg)
-      # @TODO@ OR msg.verify(key, request_tsig_rr)
-      # Need to know the request mac so we can validate the response (rfc2845 4.1/4.2/4.3)
-      # Generates a TSIG record
-      def generate(msg, original_request = nil, data="", msg_bytes=nil, tsig_rr=self)
+      #Generates a TSIG record
+      def generate(msg, original_request = nil, data="", msg_bytes=nil, tsig_rr=self)#:nodoc: all
         time_signed=@time_signed
         if (!time_signed)
           time_signed=Time.now.to_i
@@ -145,9 +150,11 @@ module Dnsruby
         }.to_s
       end
       
-      # TSIG removed from packet before passing to client.
-      # Message#tsigstate and Message#tsigerror set accordingly.
-      # Message#tsigstate will be set to one of :
+      #Verify a response. This method will be called by Dnsruby::SingleResolver
+      #before passing a response to the client code.
+      #The TSIG record will be removed from packet before passing to client, and
+      #the Message#tsigstate and Message#tsigerror will be set accordingly.
+      #Message#tsigstate will be set to one of :
       #*  :Failed
       #*  :Verified
       def verify(query, response, response_bytes, buf="")
@@ -228,8 +235,7 @@ module Dnsruby
         return true
       end
       
-      #verify_session checks TSIG signatures across sessions of multiple DNS
-      #envelopes.
+      #Checks TSIG signatures across sessions of multiple DNS envelopes.
       #This method is called each time a new envelope comes in. The envelope
       #is checked - if a TSIG is present, them the stream so far is verified, 
       #and the response#tsigstate set to :Verified. If a TSIG is not present,
@@ -237,6 +243,8 @@ module Dnsruby
       #stream and the response#tsigstate is set to :Intermediate.
       #If there is an error with the TSIG verification, then the response#tsigstate 
       #is set to :Failed.
+      #Like verify, this method will only be called by the Dnsruby::SingleResolver
+      #class. Client code need not call this method directly.
       def verify_envelope(response, response_bytes)
         #RFC2845 Section 4.4
         #-----
@@ -362,7 +370,7 @@ module Dnsruby
       ClassHash[[TypeValue, Classes.ANY.code]] = self #:nodoc: all
       
       #Gets or sets the domain name that specifies the name of the algorithm.
-      #The only algorithm currently supported is hmac-md5.
+      #The only algorithms currently supported are hmac-md5 and hmac-sha1.
       #
       #    rr.algorithm=(algorithm_name)
       #    print "algorithm = ", rr.algorithm, "\n"

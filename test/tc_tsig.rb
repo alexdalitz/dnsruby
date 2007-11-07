@@ -148,10 +148,16 @@ class TestTSig < Test::Unit::TestCase
     assert(!m.signed?)
     m.encode
     assert(m.signed?)
+    
     m = Dnsruby::Message.new("example.com")
     m.set_tsig("name", "key")
     assert(!m.signed?)
     m.sign!    
+    assert(m.signed?)
+    
+    m = Dnsruby::Message.new("example.com")
+    assert(!m.signed?)
+    m.sign!("name", "key")
     assert(m.signed?)
   end
   

@@ -405,6 +405,11 @@ module Dnsruby
       add_config_nameservers
     end
     
+    #--
+    #@TODO@ Should really auto-generate these methods.
+    #Also, any way to tie them up with SingleResolver RDoc?
+    #++
+    
     def packet_timeout=(t)
       @packet_timeout = t
       update
@@ -420,6 +425,15 @@ module Dnsruby
       update
     end
     
+    #Sets the TSIG to sign outgoing messages with.
+    #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
+    #Pass in nil to stop tsig signing.
+    #It is possible for client code to sign packets prior to sending - see
+    #Dnsruby::RR::TSIG#apply and Dnsruby::Message#sign
+    #Note that pre-signed packets will not be signed by SingleResolver.
+    #* res.tsig=(tsig_rr)
+    #* res.tsig=(key_name, key)
+    #* res.tsig=nil # Stop the resolver from signing
     def tsig=(t)
       @tsig=t
       update

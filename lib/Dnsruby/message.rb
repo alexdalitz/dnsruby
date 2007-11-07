@@ -59,13 +59,13 @@ module Dnsruby
   #      Dnsruby::Message#encode
   #      Dnsruby::Message::decode(data)
   class Message
-    # Create a new Message. Takes optional name, type and class
+    #Create a new Message. Takes optional name, type and class
     # 
-    # type defaults to A, and klass defaults to IN
+    #type defaults to A, and klass defaults to IN
     # 
-    #    Dnsruby::Message.new("example.com") # defaults to A, IN
-    #    Dnsruby::Message.new("example.com", 'AAAA')
-    #    Dnsruby::Message.new("example.com", Dnsruby::Types.PTR, "HS")
+    #*  Dnsruby::Message.new("example.com") # defaults to A, IN
+    #*  Dnsruby::Message.new("example.com", 'AAAA')
+    #*  Dnsruby::Message.new("example.com", Dnsruby::Types.PTR, "HS")
     #    
     def initialize(*args)
       @header = Header.new()
@@ -89,26 +89,26 @@ module Dnsruby
       end
     end
     
-    # The question section, an array of Dnsruby::Question objects.
+    #The question section, an array of Dnsruby::Question objects.
     attr_reader :question
     
-    # The answer section, an array of Dnsruby::RR objects.
+    #The answer section, an array of Dnsruby::RR objects.
     attr_reader :answer
-    # The authority section, an array of Dnsruby::RR objects.
+    #The authority section, an array of Dnsruby::RR objects.
     attr_reader :authority
-    # The additional section, an array of Dnsruby::RR objects.
+    #The additional section, an array of Dnsruby::RR objects.
     attr_reader :additional
-    # The header section, a Dnsruby::Header object.
+    #The header section, a Dnsruby::Header object.
     attr_accessor :header
     
-    # If this Message is a response from a server, then answerfrom contains the address of the server
+    #If this Message is a response from a server, then answerfrom contains the address of the server
     attr_accessor :answerfrom
     
-    # If this Message is a response from a server, then answersize contains the size of the response
+    #If this Message is a response from a server, then answersize contains the size of the response
     attr_accessor :answersize
     
-    # If this message has been verified using a TSIG RR then tsigerror contains 
-    # the error code returned by the TSIG verification. The error will be an RCode
+    #If this message has been verified using a TSIG RR then tsigerror contains 
+    #the error code returned by the TSIG verification. The error will be an RCode
     attr_accessor :tsigerror
     
     #Can be
@@ -124,10 +124,6 @@ module Dnsruby
     attr_accessor :tsigstart
     #++
 
-    # @TODO@ Where should signing be done? By TSIG - but have wrapper method in Message :
-    # Message#sign(tsig_rr)
-    # Message#sign(key_name, key))
-    
     def ==(other)
       ret = false
       if (other.kind_of?Message)
@@ -140,12 +136,12 @@ module Dnsruby
       return ret
     end
     
-    # Add a new Question to the Message. Takes either a Question, 
-    # or a name, and an optional type and class.
+    #Add a new Question to the Message. Takes either a Question, 
+    #or a name, and an optional type and class.
     # 
-    # msg.add_question(Question.new("example.com", 'MX'))
-    # msg.add_question("example.com") # defaults to Types.A, Classes.IN
-    # msg.add_question("example.com", Types.LOC)
+    #* msg.add_question(Question.new("example.com", 'MX'))
+    #* msg.add_question("example.com") # defaults to Types.A, Classes.IN
+    #* msg.add_question("example.com", Types.LOC)
     def add_question(question, type=Types.A, klass=Classes.IN)
       if (!question.kind_of?Question) 
         question = Question.new(question, type, klass)
@@ -217,9 +213,9 @@ module Dnsruby
       return nil
     end
     
-    # Sets the TSIG to sign this message with. Can either be a Dnsruby::RR::TSIG
-    # object, or it can be a (name, key) tuple, or it can be a hash which takes
-    # Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
+    #Sets the TSIG to sign this message with. Can either be a Dnsruby::RR::TSIG
+    #object, or it can be a (name, key) tuple, or it can be a hash which takes
+    #Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
     def set_tsig(*args)
       if (args.length == 1)
         if (args[0].instance_of?RR::TSIG)
@@ -227,23 +223,23 @@ module Dnsruby
         elsif (args[0].instance_of?Hash)
           @tsigkey = RR.create({:type=>'TSIG', :klass=>'ANY'}.merge(args[0]))
         else
-          raise ArgumentError.new("Wrong type of argument to Dnsruby::Message#tsig=() - should be TSIG or Hash")
+          raise ArgumentError.new("Wrong type of argument to Dnsruby::Message#set_tsig - should be TSIG or Hash")
         end
       elsif (args.length == 2)
         @tsigkey = RR.create({:type=>'TSIG', :klass=>'ANY', :name=>args[0], :key=>args[1]})
       else
-        raise ArgumentError.new("Wrong number of arguments to Dnsruby::Message#tsig=")
+        raise ArgumentError.new("Wrong number of arguments to Dnsruby::Message#set_tsig")
       end
     end
     
-    # Was this message signed by a TSIG?
+    #Was this message signed by a TSIG?
     def signed?
       return (@tsigstate == :Signed ||
           @tsigstate == :Verified ||
           @tsigstate == :Failed)
     end
     
-    # If this message was signed by a TSIG, was the TSIG verified?
+    #If this message was signed by a TSIG, was the TSIG verified?
     def verified?
       return (@tsigstate == :Verified)
     end
@@ -288,10 +284,19 @@ module Dnsruby
       return retval;
     end
     
-    def sign!
-      if ((@tsigkey) && @tsigstate == :Unsigned)
-        @tsigkey.apply(self)
-      end      
+    #Signs the message. If used with no arguments, then the message must have already 
+    #been set (set_tsig). Otherwise, the arguments can either be a Dnsruby::RR::TSIG
+    #object, or a (name, key) tuple, or a hash which takes
+    #Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
+    def sign!(*args)
+      if (args.length > 0)
+        set_tsig(*args)
+        sign!
+      else
+        if ((@tsigkey) && @tsigstate == :Unsigned)
+          @tsigkey.apply(self)
+        end      
+      end
     end
     
     #Return the encoded form of the message
