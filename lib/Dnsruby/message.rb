@@ -74,6 +74,7 @@ module Dnsruby
       @authority = []
       @additional = []
       @tsigstate = :Unsigned
+      @signing = false
       type = Types.A
       klass = Classes.IN
       if (args.length > 0)
@@ -107,17 +108,18 @@ module Dnsruby
     attr_accessor :answersize
     
     # If this message has been verified using a TSIG RR then tsigerror contains 
-    # the error code returned by the TSIG verification
+    # the error code returned by the TSIG verification. The error will be an RCode
     attr_accessor :tsigerror
     
     #Can be
     #* :Unsigned - the default state
     #* :Signed - the outgoing message has been signed
     #* :Verified - the incoming message has been verified
-    #* :Intermediate - the incoming message is an intermediate packet in a TCP session
+    #* :Intermediate - the incoming message is an intermediate envelope in a TCP session
+    #in which only every 100th envelope must be signed
     #* :Failed - the incoming response failed verification
     attr_accessor :tsigstate
-
+    
     #--
     attr_accessor :tsigstart
     #++
@@ -215,6 +217,25 @@ module Dnsruby
       return nil
     end
     
+    # Sets the TSIG to sign this message with. Can either be a Dnsruby::RR::TSIG
+    # object, or it can be a (name, key) tuple, or it can be a hash which takes
+    # Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
+    def set_tsig(*args)
+      if (args.length == 1)
+        if (args[0].instance_of?RR::TSIG)
+          @tsigkey = args[0]
+        elsif (args[0].instance_of?Hash)
+          @tsigkey = RR.create({:type=>'TSIG', :klass=>'ANY'}.merge(args[0]))
+        else
+          raise ArgumentError.new("Wrong type of argument to Dnsruby::Message#tsig=() - should be TSIG or Hash")
+        end
+      elsif (args.length == 2)
+        @tsigkey = RR.create({:type=>'TSIG', :klass=>'ANY', :name=>args[0], :key=>args[1]})
+      else
+        raise ArgumentError.new("Wrong number of arguments to Dnsruby::Message#tsig=")
+      end
+    end
+    
     # Was this message signed by a TSIG?
     def signed?
       return (@tsigstate == :Signed ||
@@ -267,8 +288,21 @@ module Dnsruby
       return retval;
     end
     
+    def sign!
+      if ((@tsigkey) && @tsigstate == :Unsigned)
+        @tsigkey.apply(self)
+      end      
+    end
+    
     #Return the encoded form of the message
+    # If there is a TSIG record present and the record has not been signed 
+    # then sign it
     def encode
+      if ((@tsigkey) && @tsigstate == :Unsigned && !@signing)
+        @signing = true
+        sign!
+        @signing = false
+      end
       return MessageEncoder.new {|msg|
         header = @header
         header.encode(msg)
@@ -278,7 +312,6 @@ module Dnsruby
         }
         [@answer, @authority, @additional].each {|rr|
           rr.each {|r|
-            # name, ttl, data = r
             name = r.name
             ttl = r.ttl
             if (r.type == Types.TSIG)

@@ -32,7 +32,6 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
       assert(item[0] <= id)
       assert(item[0] >= 0)
     end
-    Dnsruby::TheLog.level=Logger::ERROR
   end
   
   def test_tcp

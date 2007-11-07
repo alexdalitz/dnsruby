@@ -30,7 +30,7 @@ class TestTSig < Test::Unit::TestCase
   end
   def test_signed_update_em
     begin
-    Dnsruby::Resolver::use_eventmachine(true)
+      Dnsruby::Resolver::use_eventmachine(true)
     rescue RuntimeError
       Dnsruby::TheLog.error("EventMachine not installed - not running tsig EM tests")
       return 
@@ -42,16 +42,16 @@ class TestTSig < Test::Unit::TestCase
   
   def run_test_client_signs
     tsig = Dnsruby::RR.create({
-        :name        => KEY_NAME,
-        :type        => "TSIG",
-        :ttl         => 0,
-        :klass       => "ANY",
-        :algorithm   => "hmac-md5",
-        :fudge       => 300,
-        :key         => KEY,
-        :error       => 0
-      })
-          
+      :name        => KEY_NAME,
+      :type        => "TSIG",
+      :ttl         => 0,
+      :klass       => "ANY",
+      :algorithm   => "hmac-md5",
+      :fudge       => 300,
+      :key         => KEY,
+      :error       => 0
+    })
+    
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
     # Generate update record name, and test it has been made. Then delete it and check it has been deleted
     update_name = generate_update_name
@@ -64,7 +64,7 @@ class TestTSig < Test::Unit::TestCase
     res.recurse=false
     res.query_timeout = 10
     response = res.send_message(update)
-
+    
     assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
     assert(response.verified?, "Response has not been verified")
     
@@ -81,7 +81,7 @@ class TestTSig < Test::Unit::TestCase
     response = res.send_message(update)
     assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
     assert(response.verified?, "Response has not been verified")
-         
+    
     # Now check the record does not exist
     begin
       rr = res.query(update_name, 'TXT')
@@ -111,7 +111,7 @@ class TestTSig < Test::Unit::TestCase
     assert(!update.signed?, "Update has been signed")
     
     response = res.send_message(update)
-
+    
     assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
     assert(response.verified?, "Response has not been verified")
     
@@ -124,16 +124,16 @@ class TestTSig < Test::Unit::TestCase
     update.present(update_name, 'TXT')
     update.delete(update_name)
     tsig = Dnsruby::RR.create({
-    :type => 'TSIG', :klass => 'ANY',
-        :name        => KEY_NAME,
-        :key         => KEY
-      })
+      :type => 'TSIG', :klass => 'ANY',
+      :name        => KEY_NAME,
+      :key         => KEY
+    })
     tsig.apply(update)
     assert(update.signed?, "Update has not been signed")
     response = res.send_message(update)
     assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
     assert(response.verified?, "Response has not been verified")
-         
+    
     # Now check the record does not exist
     begin
       rr = res.query(update_name, 'TXT')
@@ -143,8 +143,16 @@ class TestTSig < Test::Unit::TestCase
   end
   
   def test_message_signing
-    # @TODO@ Test Message#sign
-    assert(false, "Test Message#sign!")
+    m = Dnsruby::Message.new("example.com")
+    m.set_tsig("name", "key")
+    assert(!m.signed?)
+    m.encode
+    assert(m.signed?)
+    m = Dnsruby::Message.new("example.com")
+    m.set_tsig("name", "key")
+    assert(!m.signed?)
+    m.sign!    
+    assert(m.signed?)
   end
   
   def test_signed_zone_transfer
@@ -152,7 +160,7 @@ class TestTSig < Test::Unit::TestCase
     axfr
     ixfr
   end
-
+  
   def axfr
     zt = Dnsruby::ZoneTransfer.new
     zt.transfer_type = Dnsruby::Types.AXFR
@@ -168,10 +176,10 @@ class TestTSig < Test::Unit::TestCase
     zt.transfer_type = Dnsruby::Types.IXFR
     zt.server = "ns0.validation-test-servers.nominet.org.uk"
     zt.tsig = Dnsruby::RR.create({
-    :type => 'TSIG', :klass => 'ANY',
-        :name        => KEY_NAME,
-        :key         => KEY
-      })
+      :type => 'TSIG', :klass => 'ANY',
+      :name        => KEY_NAME,
+      :key         => KEY
+    })
     zt.serial = 2007090401
     deltas = zt.transfer("validation-test-servers.nominet.org.uk")
     assert(deltas.length > 0)

@@ -190,6 +190,11 @@ module Dnsruby
         @adds = []
         @deletes = []
       end
+      
+      def to_s
+        ret = "Adds : " + @adds.join(",")
+        ret +=", Deletes : " + @deletes.join(",")
+      end
     end
     
     def parseRR(rec) #:nodoc: all

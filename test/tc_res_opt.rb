@@ -59,7 +59,7 @@ class TestResOpt < Test::Unit::TestCase
       assert_equal(["0.0.0.0"], res.nameserver,"No nameservers should be set for #{test} = #{input}")
     rescue Exception
     end
-    Dnsruby::TheLog.level=Logger::ERROR
+#    Dnsruby::TheLog.level=Logger::ERROR
   end
   
   def test_config_hash_singleresolver
@@ -183,7 +183,7 @@ class TestResOpt < Test::Unit::TestCase
         rescue Exception
         end
       end
-      Dnsruby::TheLog.level=Logger::ERROR
+#      Dnsruby::TheLog.level=Logger::ERROR
     end
   end
 end

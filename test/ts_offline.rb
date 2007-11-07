@@ -14,6 +14,8 @@
 #limitations under the License.
 #++
 require 'rubygems'
+require 'dnsruby'
+Dnsruby::TheLog.level = Logger::FATAL
 require "test/unit"
 require "test/tc_header.rb"
 require "test/tc_name.rb"

@@ -86,7 +86,6 @@ class TestDNS < Test::Unit::TestCase
         end
       end
     end
-    Dnsruby::TheLog.level=Logger::ERROR
   end
   
   def test_online

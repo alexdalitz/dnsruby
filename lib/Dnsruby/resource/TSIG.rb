@@ -190,7 +190,7 @@ module Dnsruby
         end
       end
       
-      def verify_common(response)
+      def verify_common(response)#:nodoc: all
         tsig_rr = response.tsig
 
 	if (!tsig_rr)
