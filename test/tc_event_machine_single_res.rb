@@ -3,7 +3,7 @@ $:.unshift File.join(File.dirname(__FILE__),'..','lib')
 require 'rubygems'
 require 'test/unit'
 require 'eventmachine'
-require 'Dnsruby'
+require 'dnsruby'
 
 class EventMachineTestSingleResolver < Test::Unit::TestCase
   Dnsruby::Resolver.use_eventmachine(true)
@@ -11,6 +11,7 @@ class EventMachineTestSingleResolver < Test::Unit::TestCase
 #    Dnsruby::TheLog.level=Logger::DEBUG
     Dnsruby::Resolver.use_eventmachine(true)
     Dnsruby::Resolver.start_eventmachine_loop(true)
+    sleep(0.01)
   end
   def teardown
     Dnsruby::Resolver.use_eventmachine(false)    

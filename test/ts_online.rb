@@ -15,7 +15,6 @@
 #++
 require 'rubygems'
 require "test/unit"
-require 'Dnsruby'
 # Disable these tests if we're not online
 require 'socket'
 sock = UDPSocket.new()

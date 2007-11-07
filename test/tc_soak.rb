@@ -15,7 +15,7 @@
 #++
 require 'rubygems'
 require 'test/unit'
-require 'Dnsruby'
+require 'dnsruby'
 begin
 require 'test/tc_single_resolver'
 rescue LoadError

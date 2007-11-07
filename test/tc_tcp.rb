@@ -15,7 +15,7 @@
 #++
 require 'rubygems'
 require 'test/unit'
-require 'Dnsruby'
+require 'dnsruby'
 class TestTcp < Test::Unit::TestCase
   def test_TCP
     res = Dnsruby::Resolver.new()

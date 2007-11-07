@@ -96,7 +96,6 @@ class TestResolver < Test::Unit::TestCase
     id, m, err = q.pop
     assert(id==q)
     assert(m == nil)
-    print err.class
     assert(err.kind_of?(OtherResolvError) || err.kind_of?(IOError), "OtherResolvError or IOError expected : got #{err.class}")
   end
   

@@ -15,7 +15,6 @@
 #++
 require 'rubygems'
 require "test/unit"
-require 'Dnsruby'
 require "test/tc_header.rb"
 require "test/tc_name.rb"
 require "test/tc_misc.rb"

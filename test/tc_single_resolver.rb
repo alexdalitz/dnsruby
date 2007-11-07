@@ -15,7 +15,7 @@
 #++
 require 'rubygems'
 require 'test/unit'
-require 'Dnsruby'
+require 'dnsruby'
 include Dnsruby
 class TestSingleResolver < Test::Unit::TestCase
   # @todo@ Test udppacketsize

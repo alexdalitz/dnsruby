@@ -15,7 +15,7 @@
 #++
 require 'rubygems'
 require 'test/unit'
-require 'Dnsruby'
+require 'dnsruby'
 class TestAxfr < Test::Unit::TestCase
   def test_axfr
     zt = Dnsruby::ZoneTransfer.new

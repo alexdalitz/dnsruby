@@ -1,6 +1,6 @@
 require 'rubygems'
 require 'test/unit'
-require 'Dnsruby'
+require 'dnsruby'
 
 class TestSoakBase # < Test::Unit::TestCase
   include Dnsruby

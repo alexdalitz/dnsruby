@@ -15,7 +15,7 @@
 #++
 require 'rubygems'
 require 'test/unit'
-require 'Dnsruby'
+require 'dnsruby'
 class TestResolverConfig < Test::Unit::TestCase
   def setup
     Dnsruby::Config.reset

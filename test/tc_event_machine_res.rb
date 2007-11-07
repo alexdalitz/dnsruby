@@ -3,7 +3,7 @@ $:.unshift File.join(File.dirname(__FILE__),'..','lib')
 require 'rubygems'
 require 'test/unit'
 require 'eventmachine'
-require 'Dnsruby'
+require 'dnsruby'
 
 class EventMachineTestResolver < Test::Unit::TestCase
   include Dnsruby

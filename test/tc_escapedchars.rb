@@ -32,23 +32,12 @@ class TestEscapedChars < Test::Unit::TestCase
     # invidual labels by a regular expression. It made no sense to remove
     # the more ackward tests as they have to pass anyway ...
     
-    
-    # @todo Net::DNS still to have this functionality
-    #~ message="Using the "
-    #~ message+= if (Net::HAVE_XS) then " XS compiled " else " perl implemented " end
-    #~ message+="dn_expand function "
-    #~ diag (message)
-    
-    
-    #~ had_xs=Net::HAVE_XS 
-    
-    
+        
     # Note that in perl the \\ in a presentation format can only be achieved
     # through \\\\ .
     
     # The hex codes are the names in wireformat:
     # length octet. content octets, length octet, content , NULL octet
-    
     
     
     # Below are test combos, 1st and 2nd array elements are
@@ -58,11 +47,6 @@ class TestEscapedChars < Test::Unit::TestCase
     # The 3rd element is a label count.
     # The 4th element represents the number of octets per label
     # The 5th element is a hexdump of the domain name in wireformat
-    
-    # The optional 6th element is a boolean instructing to use the perl
-    # based dn_expand.  This because the conversion between the native
-    # dn_expand output to a perl varialbe provides some problems.
-    
     
     testcombos=[
     ['bla.fo\.o.org',
@@ -108,8 +92,8 @@ class TestEscapedChars < Test::Unit::TestCase
 	 "05626c61003003666f6f036f726700"  ,
     ],
     
-    ['bla.fo\o.org',
-	 'bla.foo.org',
+    ["bla.fo\o.org",
+	 "bla.foo.org",
     3,
     [3,3,3],
     #Wire:            3 b l a 3 f o o 3 o r g 0   ignoring backslash on input	  
@@ -132,8 +116,8 @@ class TestEscapedChars < Test::Unit::TestCase
 	 "012003626c6103666f6f036f726700",
     ],
     
-    ['\\\\a.foo',
-	 '\\\\a.foo',
+    ["\\\\a.foo",
+	 "\\\\a.foo",
     2,
     [2,3],
     #Wire:            2 \ a  3 f o o 0		  

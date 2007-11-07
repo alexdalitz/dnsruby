@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'test/unit'
 require 'eventmachine'
-require 'Dnsruby'
+require 'dnsruby'
 begin
   require 'test/tc_soak_base'
 rescue Exception
