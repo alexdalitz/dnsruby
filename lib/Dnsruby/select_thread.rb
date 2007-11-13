@@ -89,6 +89,8 @@ module Dnsruby
       # Add the query to sockets, and then wake the select thread up
       @@mutex.synchronize {
         check_select_thread_synchronized
+        # @TODO@ This assumes that all client_query_ids are unique!
+        # Would be a good idea at least to check this...
         @@query_hash[query_settings.client_query_id]=query_settings
         @@socket_hash[query_settings.socket]=[query_settings.client_query_id] # @todo@ If we use persistent sockets then we need to update this array
         @@timeouts[query_settings.client_query_id]=query_settings.endtime
@@ -170,11 +172,18 @@ module Dnsruby
       # @todo@ Process errors [can we do this in single socket environment?]
     end
     
+#        @@query_hash[query_settings.client_query_id]=query_settings
+#        @@socket_hash[query_settings.socket]=[query_settings.client_query_id] # @todo@ If we use persistent sockets then we need to update this array
     def process_ready(ready)
       ready.each do |socket|
-        packet_size = 512 # @TODO@ Sort out per-query packet sizes!!!
-        # query_settings.udp_packet_size - but how do we get query_settings when all we have is socket?
-        msg, bytes = get_incoming_data(socket, packet_size)
+        query_settings = nil
+        @@mutex.synchronize{
+          # Can do this if we have a query per socket, but not otherwise...
+          c_q_id = @@socket_hash[socket][0] # @todo@ If we use persistent sockets then this won't work
+          query_settings = @@query_hash[c_q_id]
+        }
+        udp_packet_size = query_settings.udp_packet_size
+        msg, bytes = get_incoming_data(socket, udp_packet_size)
         if (msg!=nil)
           send_response_to_client(msg, bytes, socket)
         end

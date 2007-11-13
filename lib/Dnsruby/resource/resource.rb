@@ -345,7 +345,7 @@ module Dnsruby
     
     #Returns a string representation of the RR in zone file format
     def to_s
-      return (@name?@name.to_s():"") + ".\t" +(@ttl?@ttl.to_s():"") + "\t" + (klass()?klass.string():"") + "\t" + (type()?type.string():"") + "\t" + rdata_to_string
+      return (@name?@name.to_s():"") + ".\t" +(@ttl?@ttl.to_s():"") + "\t" + (klass()?klass.to_s():"") + "\t" + (type()?type.to_s():"") + "\t" + rdata_to_string
     end
     
     #Get a string representation of the data section of the RR (in zone file format)
@@ -399,6 +399,9 @@ module Dnsruby
     
     #Get an RR of the specified type and class
     def self.get_class(type_value, class_value) #:nodoc: all
+#      if (type_value == Types.OPT)
+#        return Class.new(OPT)
+#      end
       if (type_value.class == Class)
         type_value = type_value.const_get(:TypeValue)
         return ClassHash[[type_value, Classes.to_code(class_value)]] ||

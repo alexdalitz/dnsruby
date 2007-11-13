@@ -393,7 +393,6 @@ module Dnsruby
   #
   #RFC 1035 Section 4.1.1
   class Header
-    @@identifier = -1
     MAX_ID = 65535
     
     # The header ID
@@ -726,7 +725,6 @@ module Dnsruby
       type, klass = self.get_unpack("nn")
       q = Question.new(name, type, klass)
       return q
-      #      return name, RR.get_class(type, klass)
     end
     
     def get_rr

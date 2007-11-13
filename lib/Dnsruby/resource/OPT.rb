@@ -18,11 +18,38 @@ module Dnsruby
     #Class for EDNS pseudo resource record OPT.
     #This class is effectively internal to Dnsruby
     #See RFC 2671, RFC 2435 Section 3
+    # @TODO@ Extended labels RFC2671 section 3
     class OPT < RR #:nodoc: all
       ClassValue = nil #:nodoc: all
       TypeValue = Types::OPT #:nodoc: all
       DO_BIT = 0x8000
       attr_accessor :options
+
+      #Can be called with up to 3 arguments, none of which must be present
+      #* OPT.new()
+      #* OPT.new(size)
+      #* OPT.new(size,flags)
+      #* OPT.new(size,flags,options)
+      def initialize(*args)
+        @type = Types.new('OPT')
+        
+        @options=nil
+        if (args.length > 0)
+          self.payloadsize=(args[0])
+          if (args.length > 1)
+            self.flags=(args[1])
+            if (args.length > 2) 
+              self.options=(args[2])
+            else
+              self.options=nil
+            end
+          else
+            self.flags=0
+          end
+        else
+          self.payloadsize=0
+        end
+      end
       
       # From RFC 2671 :
       # 4.3. The fixed part of an OPT RR is structured as follows:
@@ -35,6 +62,24 @@ module Dnsruby
       #     TTL          u_int32_t      extended RCODE and flags
       #     RDLEN        u_int16_t      describes RDATA
       #     RDATA        octet stream   {attribute,value} pairs
+      
+      #4.6. The extended RCODE and flags (which OPT stores in the RR TTL field)
+      #are structured as follows:
+      #
+      #                 +0 (MSB)                            +1 (LSB)
+      #      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+      #   0: |         EXTENDED-RCODE        |            VERSION            |
+      #      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+      #   2: |                               Z                               |
+      #      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+      #
+      #   EXTENDED-RCODE  Forms upper 8 bits of extended 12-bit RCODE.  Note
+      #                   that EXTENDED-RCODE value "0" indicates that an
+      #                   unextended RCODE is in use (values "0" through "15").
+      #
+      #   VERSION         Indicates the implementation level of whoever sets
+      #                   it.  Full conformance with this specification is
+      #                   indicated by version "0." 
       
       def flags_from_ttl
         if (@ttl)
@@ -68,7 +113,7 @@ module Dnsruby
         set_flags(code)
       end
       
-      def set_flags(code)
+      def set_flags(code) # Should always be zero
         @ttl = (xrcode() << 24) + (version() << 16) + code
       end
       
@@ -84,22 +129,24 @@ module Dnsruby
         end
       end
       
-      attr_accessor :class
-      
       def payloadsize
-        return @class
+        return @klass
       end
       
       def payloadsize=(size)
-        @class=size
+        self.klass=size
       end
       
       def options(args)
         if (args==nil)
           return @options
         elsif args.kind_of?Fixnum
-          #@todo@ return list of options with that code
+          #@TODO@ return list of options with that code
         end
+      end
+      
+      def options=(options)
+        @options = options
       end
       
       def from_data(data)
@@ -112,7 +159,8 @@ module Dnsruby
         end
       end
       
-      def rdata_to_string
+      def to_s
+        ret = "OPT pseudo-record : #{klass.code} max UDP packet size, "
         ret = ""
         if @options
           @options.each do |opt|
@@ -124,22 +172,24 @@ module Dnsruby
       end
       
       def encode_rdata(msg)
-        options.each do |opt|
-          msg.pack('n', opt.code)
-          msg.pack('n', opt.data.length)
-          msg.put_bytes(opt.data)
+        if (@options)
+          @options.each do |opt|
+            msg.pack('n', opt.code)
+            msg.pack('n', opt.data.length)
+            msg.put_bytes(opt.data)
+          end
+          msg.put_array(@options)
         end
-        msg.put_array(@options)
       end
       
-      def self.decode_rdata(msg)
+      def self.decode_rdata(msg)#:nodoc: all
         if (msg.has_remaining)
-          options = new ArrayList();
+          options = []
           while (msg.has_remaining) do
-            code = msg.unpack('n');
-            len = msg.unpack('n');
-            data = msg.get_bytes(len);
-            options.add(Option.new(code, data));
+            code = msg.unpack('n')
+            len = msg.unpack('n')
+            data = msg.get_bytes(len)
+            options.add(Option.new(code, data))
           end
         end
         return self.new([options])

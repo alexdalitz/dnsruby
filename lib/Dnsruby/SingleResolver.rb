@@ -206,7 +206,7 @@ module Dnsruby
     # SingleResolver.use_tcp
     def send_message(msg, use_tcp=@use_tcp)
       q = Queue.new
-      send_async(msg, q, q, use_tcp)
+      send_async(msg, q, Time.now + rand(10000), use_tcp)
       id, msg, error = q.pop
       if (error != nil)
         raise error
@@ -260,6 +260,7 @@ module Dnsruby
     #    deferrable = res.send_async(msg, use_tcp)
     #    deferrable = res.send_async(msg, q, id, use_tcp)
     def send_async(*args) # msg, client_queue, client_query_id, use_tcp=@use_tcp)
+      # @TODO@ Need to select a good Header ID here - see forgery-resilience RFC draft for details
       msg = args[0]
       client_query_id = nil
       client_queue = nil
@@ -267,8 +268,9 @@ module Dnsruby
       if (msg.kind_of?String)
         msg = Message.new(msg)
       end
-      query_packet = make_query_packet(msg)
+      query_packet = make_query_packet(msg, use_tcp)
       if (udp_packet_size < query_packet.length)
+        TheLog.debug("Query packet length exceeds max UDP packet size - using TCP")
         use_tcp = true
       end
       if (args.length > 1)
@@ -290,7 +292,7 @@ module Dnsruby
         return send_eventmachine(query_packet, msg, client_query_id, client_queue, use_tcp)
       else
         if (!client_query_id)
-          client_query_id = msg
+          client_query_id = Time.now + rand(10000)
         end
         send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
         return client_query_id
@@ -305,7 +307,6 @@ module Dnsruby
       end
       packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :use_tcp=>use_tcp)
       packet_deferrable.callback { |response, response_bytes|
-        TheLog.debug("EM callback #{response}")
         ret = true
         if (response.header.tc && !use_tcp && !@ignore_truncation)
           # Try to resend over tcp
@@ -323,7 +324,6 @@ module Dnsruby
         end
       }
       packet_deferrable.errback { |response, error|
-        TheLog.debug("EM errback #{error}, #{response}")
         client_deferrable.set_deferred_status :failed, response, error
         if (client_queue)
           client_queue.push([client_query_id, response, error])
@@ -424,7 +424,7 @@ module Dnsruby
     end
     
     # Prepare the packet for sending
-    def make_query_packet(packet) #:nodoc: all
+    def make_query_packet(packet, use_tcp) #:nodoc: all
       if (packet.header.opcode == OpCode.QUERY || @recurse)
         packet.header.rd=true
       end
@@ -432,25 +432,15 @@ module Dnsruby
       if (@dnssec)
         # RFC 3225
         TheLog.debug(";; Adding EDNS extention with UDP packetsize #{udp_packet_size} and DNS OK bit set\n")
-        
-        optrr = Resource.create({
-            :type         => 'OPT',
-            :name         => '',
-            :rrclass        => udp_packet_size,  # Decimal UDPpayload
-            :ednsflags    => 0x8000, # first bit set see RFC 3225 
-          })
+        optrr = RR::OPT.new(udp_packet_size)   # Decimal UDPpayload
+        optrr.d_o=true
         
         packet.add_additional(optrr)
         
-      elsif (udp_packet_size > Resolver::DefaultUDPSize)
+      elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
         TheLog.debug(";; Adding EDNS extention with UDP packetsize  #{udp_packet_size}.\n")
         # RFC 3225
-        optrr = Resource.create( {
-            :type         => 'OPT',
-            :name         => '',
-            :rrclass        => udp_packet_size,  # Decimal UDPpayload
-            :ttl          => 0x0000 # RCODE 32bit Hex
-          })
+        optrr = RR::OPT.new(udp_packet_size)
         
         packet.add_additional(optrr)
       end

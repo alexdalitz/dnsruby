@@ -159,7 +159,7 @@ module Dnsruby
     def send_message(message)
       TheLog.debug("Resolver : sending message")
       q = Queue.new
-      send_async(message, q, q)
+      send_async(message, q)
       id, result, error = q.pop
       TheLog.debug("Resolver : result received")
       if (error != nil)
@@ -634,13 +634,13 @@ module Dnsruby
       df = single_resolver.send_async(msg) # client_queue, client_query_id)
       persistent_data.to_send-=1
       df.callback { |answer|
-        TheLog.debug("Response returned, answer=#{answer}")
+        TheLog.debug("Response returned")
         persistent_data.outstanding.delete(df)
         cancel_queries(persistent_data)
         return_to_client(persistent_data.deferrable, client_queue, client_query_id, answer, nil)
       }  
       df.errback { |response, error|
-        TheLog.debug("Error #{error} returned, response=#{response}")
+        TheLog.debug("Error #{error} returned")
         persistent_data.outstanding.delete(df)
         if (response!="cancelling")
 
@@ -700,7 +700,6 @@ module Dnsruby
     end
     
     def return_to_client(deferrable, client_queue, client_query_id, answer, error)
-      TheLog.debug("Returning answer=#{answer}, error=#{error} to client")
       if (client_queue)
         client_queue.push([client_query_id, answer, error])
       end
@@ -734,6 +733,7 @@ module Dnsruby
       if (args.length > 2)
         client_query_id = args[2]
       end
+
       
       # This is the whole point of the Resolver class.
       # We want to use multiple SingleResolvers to run a query.
@@ -746,7 +746,7 @@ module Dnsruby
       
       q = Queue.new
       if (client_query_id==nil)
-        client_query_id = msg
+        client_query_id = Time.now + rand(10000)
       end
       
       if (!client_queue.kind_of?Queue)
@@ -793,7 +793,7 @@ module Dnsruby
       # These are created at the same time in case the parameters change during the life of the query.
       # 
       # These should be absolute, rather than relative
-      # The first value should be Time.now
+      # The first value should be Time.now[      
       time_now = Time.now
       timeouts=@parent.generate_timeouts(time_now)
       return timeouts
@@ -814,7 +814,6 @@ module Dnsruby
     # Send the result back to the client, and close the socket for that query by removing 
     # the query from the select thread.
     def send_result_and_close(client_queue, client_query_id, select_queue, msg, error) #:nodoc: all
-      TheLog.debug("Sending result #{error} to client")
       # We might still get some callbacks, which we should ignore
       st = SelectThread.instance
       st.remove_observer(select_queue, self)
