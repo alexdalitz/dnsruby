@@ -23,7 +23,6 @@ module Dnsruby
       ClassValue = nil #:nodoc: all
       TypeValue = Types::OPT #:nodoc: all
       DO_BIT = 0x8000
-      attr_accessor :options
 
       #Can be called with up to 3 arguments, none of which must be present
       #* OPT.new()
@@ -32,6 +31,7 @@ module Dnsruby
       #* OPT.new(size,flags,options)
       def initialize(*args)
         @type = Types.new('OPT')
+        @ttl = nil
         
         @options=nil
         if (args.length > 0)

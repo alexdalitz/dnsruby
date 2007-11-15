@@ -15,7 +15,7 @@
 #++
 module Dnsruby
 #== Dnsruby::Hosts class
-#hostname resolver using /etc/hosts format.
+#Dnsruby::Hosts is a hostname resolver that uses the system hosts file
 #
 #=== class methods
 #* Dnsruby::Hosts.new(hosts='/etc/hosts')
@@ -39,13 +39,14 @@ module Dnsruby
       DefaultFileName = '/etc/hosts'
     end
     
+    #Creates a new Dnsruby::Hosts using +filename+ for its data source
     def initialize(filename = DefaultFileName)
       @filename = filename
       @mutex = Mutex.new
       @initialized = nil
     end
     
-    def lazy_initialize
+    def lazy_initialize# :nodoc:
       @mutex.synchronize {
         unless @initialized
           @name2addr = {}
@@ -80,17 +81,20 @@ module Dnsruby
       self
     end
     
+    #Gets the first IP address for +name+ from the hosts file
     def getaddress(name)
       each_address(name) {|address| return address}
       raise ResolvError.new("#{@filename} has no name: #{name}")
     end
     
+    #Gets all IP addresses for +name+ from the hosts file
     def getaddresses(name)
       ret = []
       each_address(name) {|address| ret << address}
       return ret
     end
     
+    #Iterates over all IP addresses for +name+ retrieved from the hosts file
     def each_address(name, &proc)
       lazy_initialize
       if @name2addr.include?(name)
@@ -98,17 +102,20 @@ module Dnsruby
       end
     end
     
+    #Gets the first hostname of +address+ from the hosts file
     def getname(address)
       each_name(address) {|name| return name}
       raise ResolvError.new("#{@filename} has no address: #{address}")
     end
     
+    #Gets all hostnames for +address+ from the hosts file
     def getnames(address)
       ret = []
       each_name(address) {|name| ret << name}
       return ret
     end
     
+    #Iterates over all hostnames for +address+ retrieved from the hosts file
     def each_name(address, &proc)
       lazy_initialize
       if @addr2name.include?(address)

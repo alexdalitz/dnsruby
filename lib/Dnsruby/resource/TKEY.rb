@@ -87,7 +87,7 @@ module Dnsruby
       #
       #    print "other data = ", rr.other_data, "\n"
       #
-      attr_accessor :other_data
+      attr_reader :other_data
       
       def other_data=(od)
         @other_data=od

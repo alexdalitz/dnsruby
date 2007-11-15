@@ -14,47 +14,45 @@
 #limitations under the License.
 #++
 module Dnsruby
-#== Dnsruby::IPv6 class
-#=== class methods
-#* Dnsruby::IPv6.create(address)
-#
-#=== methods
-#* Dnsruby::IPv6#to_s
-#* Dnsruby::IPv6#to_name
-#
-#=== constants
-#* Dnsruby::IPv6::Regex
-#    regular expression for IPv6 address.
-#    
+  #Dnsruby::IPv6 class
   class IPv6
+    #IPv6 address format a:b:c:d:e:f:g:h
     Regex_8Hex = /\A
      (?:[0-9A-Fa-f]{1,4}:){7}
     [0-9A-Fa-f]{1,4}
     \z/x
     
+    #Compresses IPv6 format a::b
     Regex_CompressedHex = /\A
      ((?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?) ::
      ((?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?)
     \z/x
     
+    # IPv4 mapped IPv6 address format a:b:c:d:e:f:w.x.y.z
     Regex_6Hex4Dec = /\A
      ((?:[0-9A-Fa-f]{1,4}:){6,6})
      (\d+)\.(\d+)\.(\d+)\.(\d+)
     \z/x
     
+    # Compressed IPv4 mapped IPv6 address format a::b:w.x.y.z
     Regex_CompressedHex4Dec = /\A
      ((?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?) ::
      ((?:[0-9A-Fa-f]{1,4}:)*)
      (\d+)\.(\d+)\.(\d+)\.(\d+)
     \z/x
     
+    # A composite IPv6 address RegExp
     Regex = /
      (?:#{Regex_8Hex}) |
      (?:#{Regex_CompressedHex}) |
      (?:#{Regex_6Hex4Dec}) |
      (?:#{Regex_CompressedHex4Dec})/x
      
-     def self.create(arg)
+    # Created a new IPv6 address from +arg+ which may be:
+    #
+    #* IPv6:: returns +arg+
+    #* String:: +arg+ must match one of the IPv6::Regex* constants
+    def self.create(arg)
       case arg
       when IPv6
         return arg
@@ -100,12 +98,14 @@ module Dnsruby
       end
     end
     
-    def initialize(address)
+    def initialize(address) #:nodoc:
       unless address.kind_of?(String) && address.length == 16
         raise ArgumentError.new('IPv6 address must be 16 bytes')
       end
       @address = address
     end
+    
+    # The raw IPv6 address as a String
     attr_reader :address
     
     def to_s
@@ -116,22 +116,24 @@ module Dnsruby
       return address
     end
     
-    def inspect
+    def inspect #:nodoc:
       return "#<#{self.class} #{self.to_s}>"
     end
-    
+
+    #Turns this IPv6 address into a Dnsruby::Name
+    #--    
+    # ip6.arpa should be searched too. [RFC3152]
     def to_name
-      # ip6.arpa should be searched too. [RFC3152]
       return Name.create(
-#                           @address.unpack("H32")[0].split(//).reverse + ['ip6', 'arpa'])
-                           @address.unpack("H32")[0].split(//).reverse.join(".") + ".ip6.arpa")
+        #                           @address.unpack("H32")[0].split(//).reverse + ['ip6', 'arpa'])
+        @address.unpack("H32")[0].split(//).reverse.join(".") + ".ip6.arpa")
     end
     
-    def ==(other)
+    def ==(other) #:nodoc:
       return @address == other.address
     end
     
-    def eql?(other)
+    def eql?(other) #:nodoc:
       return self == other
     end
     

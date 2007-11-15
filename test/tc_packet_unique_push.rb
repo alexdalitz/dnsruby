@@ -48,7 +48,7 @@ class TestPacketUniquePush < Test::Unit::TestCase
     RR.create('bar.example.com 60 IN A 10.0.0.1'),
     ],
     [ 
-    2,
+    1, # RFC 2136 section 1.1
     RR.create('foo.example.com 60 IN A 10.0.0.1'),
     RR.create('foo.example.com 60 IN A 10.0.0.1'),
     RR.create('foo.example.com 90 IN A 10.0.0.1'),

@@ -75,6 +75,8 @@ module Dnsruby
       @additional = []
       @tsigstate = :Unsigned
       @signing = false
+      @tsigkey = nil
+      @answerfrom = nil
       type = Types.A
       klass = Classes.IN
       if (args.length > 0)
@@ -466,7 +468,7 @@ module Dnsruby
     end
     
     def opcode=(op)
-      @opcode = Opcode.new(op)
+      @opcode = OpCode.new(op)
     end
     
     def rcode=(rcode)
@@ -574,14 +576,6 @@ module Dnsruby
       @ad = (((flag >> 5)&1)==1)?true:false
       @cd = (((flag >> 4)&1)==1)?true:false
       @rcode = RCode.new(flag & 15)
-    end
-    
-    def rcode=(newcode)
-      @rcode = RCode.new(newcode)
-    end
-    
-    def opcode=(newcode)
-      @opcode = OpCode.new(newcode)
     end
     
     def get_exception
@@ -818,7 +812,7 @@ module Dnsruby
   class EncodeError < StandardError
   end
   
-  #A Net::DNS::Question object represents a record in the
+  #A Dnsruby::Question object represents a record in the
   #question section of a DNS packet.
   #
   #RFC 1035 Section 4.1.2

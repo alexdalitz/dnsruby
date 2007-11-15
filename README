@@ -43,6 +43,12 @@ If EventMachine is to be used, then the EventMachine library must
 be present on the platform. If the EventMachine library is not 
 present then the test code will not run the EventMachine tests.
 
+Demo code
+=========
+
+The demo folder contains some example programs using Dnsruby.
+These examples include 
+
 Online tests
 ============
 

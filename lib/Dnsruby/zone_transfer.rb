@@ -12,7 +12,7 @@ module Dnsruby
     # If using IXFR, this is the SOA serial number to start the incrementals from
     attr_accessor :serial
     # The TSIG record used to sign the transfer
-    attr_accessor :tsig
+    attr_reader :tsig
     # Returns the tsigstate of the last transfer (nil if no TSIG signed transfer has occurred)
     attr_reader :last_tsigstate
     
@@ -34,6 +34,7 @@ module Dnsruby
       @port=53
       @serial=0
       @tsig = nil
+      @axfr = nil
     end
     
     # Perform a zone transfer (RFC1995)

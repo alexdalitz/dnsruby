@@ -22,7 +22,7 @@ module Dnsruby
       class AAAA < RR
         ClassHash[[TypeValue = Types::AAAA, ClassValue = ClassValue]] = self #:nodoc: all
         
-        #  The RR's address field
+        #  The RR's (Resolv::IPv6) address field
         attr_accessor :address
         
         def from_data(data) #:nodoc: all

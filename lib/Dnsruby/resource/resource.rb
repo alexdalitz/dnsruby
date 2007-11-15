@@ -99,11 +99,11 @@ module Dnsruby
     @@RR_REGEX = Regexp.new("^\\s*(\\S+)\\s*(\\d+)?\\s*(#{Classes.regexp + "|CLASS\\d+"})?\\s*(#{Types.regexp + '|TYPE\\d+'})?\\s*([\\s\\S]*)\$") #:nodoc: all
     
     #The Resource's domain name
-    attr_accessor :name
+    attr_reader :name
     #The Resource type
-    attr_accessor :type
+    attr_reader :type
     #The Resource class
-    attr_accessor :klass
+    attr_reader :klass
     #The Resource Time-To-Live
     attr_accessor :ttl
     #The Resource data section
@@ -159,7 +159,7 @@ module Dnsruby
           end
         end
       end
-#      raise ArgumentError.new("Don't call new! Use Dnsruby::RR::create() instead")
+      #      raise ArgumentError.new("Don't call new! Use Dnsruby::RR::create() instead")
     end
     public
     
@@ -378,30 +378,39 @@ module Dnsruby
     end
     
     def ==(other)
-      # @TODO@ TTL should not be compared for Updates! (RFC 2136, 1.1.1)
-      return self.class == other.class &&
-        self.instance_variables == other.instance_variables &&
-        self.instance_variables.collect {|name| self.instance_eval name} ==
-        other.instance_variables.collect {|name| other.instance_eval name}
+      return false unless self.class == other.class
+      s_ivars = self.instance_variables
+      s_ivars.sort!
+      s_ivars.delete "@ttl" # RFC 2136 section 1.1
+      
+      o_ivars = other.instance_variables
+      o_ivars.sort!
+      o_ivars.delete "@ttl" # RFC 2136 section 1.1
+      
+      return s_ivars == o_ivars &&
+        s_ivars.collect {|name| self.instance_variable_get name} == 
+        o_ivars.collect {|name| other.instance_variable_get name}
     end
     
-    def eql?(other)
+    def eql?(other) #:nodoc:
       return self == other
     end
     
-    def hash
-      h = 0
-      self.instance_variables.each {|name|
-        h ^= self.instance_eval("#{name}.hash")
+    def hash # :nodoc:
+      h = 0      
+      vars = self.instance_variables
+      vars.delete "@ttl"
+      vars.each {|name|
+        h ^= self.instance_variable_get(name).hash
       }
       return h
     end
     
     #Get an RR of the specified type and class
     def self.get_class(type_value, class_value) #:nodoc: all
-#      if (type_value == Types.OPT)
-#        return Class.new(OPT)
-#      end
+      #      if (type_value == Types.OPT)
+      #        return Class.new(OPT)
+      #      end
       if (type_value.class == Class)
         type_value = type_value.const_get(:TypeValue)
         return ClassHash[[type_value, Classes.to_code(class_value)]] ||

@@ -60,6 +60,8 @@ module Dnsruby
     #        domain (String)
     #        search (String)
     #        ndots (Fixnum)
+    #
+    # This method should not normally be called by client code.
     def set_config_info(config_info)
       parse_config(config_info)
     end

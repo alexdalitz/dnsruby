@@ -16,12 +16,12 @@
 module Dnsruby
   class RR
     ClassInsensitiveTypes = [
-    NS, CNAME, DNAME, SOA, PTR, HINFO, MINFO, MX, TXT,
-    ISDN, MB, MG, MR, NAPTR, NSAP, OPT, RP, RT, X25,
-    SPF, CERT, LOC, TSIG, TKEY, ANY
+      NS, CNAME, DNAME, SOA, PTR, HINFO, MINFO, MX, TXT,
+      ISDN, MB, MG, MR, NAPTR, NSAP, OPT, RP, RT, X25,
+      SPF, CERT, LOC, TSIG, TKEY, ANY
     ] #:nodoc: all
     
-    # ARPA Internet specific RRs
+    # module IN contains ARPA Internet specific RRs
     module IN
       ClassValue = Classes.IN.code
       
@@ -34,7 +34,7 @@ module Dnsruby
         self.const_set(s.name.sub(/.*::/, ''), c)
       }
       
-# RFC 1035, Section 3.4.2 (deprecated)
+      # RFC 1035, Section 3.4.2 (deprecated)
       class WKS < RR
         ClassHash[[TypeValue = Types::WKS, ClassValue = ClassValue]] = self  #:nodoc: all
         

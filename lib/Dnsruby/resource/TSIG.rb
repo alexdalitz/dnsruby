@@ -375,7 +375,7 @@ module Dnsruby
       #    rr.algorithm=(algorithm_name)
       #    print "algorithm = ", rr.algorithm, "\n"
       #
-      attr_accessor :algorithm
+      attr_reader :algorithm
       
       #Gets or sets the signing time as the number of seconds since 1 Jan 1970
       #00:00:00 UTC.
@@ -395,7 +395,7 @@ module Dnsruby
       #    rr.fudge=(60)
       #    print "fudge = ", rr.fudge, "\n"
       #
-      attr_accessor :fudge
+      attr_reader :fudge
       
       #Returns the number of octets in the message authentication code (MAC).
       #The programmer must call a Net::DNS::Packet object's data method
@@ -455,6 +455,8 @@ module Dnsruby
         @error       = 0
         @other_size   = 0
         @other_data  = ""
+        @time_signed = nil
+        @buf = nil
         
         # RFC 2845 Section 2.3
         @klass = "ANY"

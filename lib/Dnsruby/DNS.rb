@@ -17,19 +17,9 @@ require 'Dnsruby/Hosts'
 require 'Dnsruby/Config'
 require "Dnsruby/Resolver"
 module Dnsruby
-  #--
-  #@TODO@ Asynchronous interface. Do we want a callback (in a new thread) or a queue system?
-  #Is there any point in taking a block? May as well...
-  #e.g. getaddresses_async(name, Queue|Proc)
-  #Could we make the final argument optional to all the standard calls? So they are either sync or async?
-  #e.g. getaddresses(name{, Queue|Proc})
-  #Yes to all but each_resource - would have to make a new each_resource_async or something...
-  #@TODO@ BUT - need to pass in an ID as well as a queue to identify correct response
-  #Proc can keep track of query ID itself
-  #++
 
   #== Dnsruby::DNS class
-  #DNS stub resolver.
+  #Resolv::DNS performs DNS queries.
   #
   #=== class methods
   #* Dnsruby::DNS.new(config_info=nil)
@@ -80,10 +70,17 @@ module Dnsruby
   #are tried (if there is no timely answer from the first).
   #
   #This class uses Resolver to perform the queries.
+  #
+  #Information taken from the following places :
+  #* STD0013 
+  #* RFC 1035, etc.
+  #* ftp://ftp.isi.edu/in-notes/iana/assignments/dns-parameters
+  #* etc.
   class DNS
-    # STD0013 (RFC 1035, etc.)
-    # ftp://ftp.isi.edu/in-notes/iana/assignments/dns-parameters
     
+    #Creates a new DNS resolver. See Resolv::DNS.new for argument details.
+    #
+    #Yields the created DNS resolver to the block, if given, otherwise returns it.
     def self.open(*args)
       dns = new(*args)
       return dns unless block_given?
@@ -94,6 +91,7 @@ module Dnsruby
       end
     end
     
+    #Closes the resolver
     def close
       @resolver.close
     end
@@ -103,6 +101,18 @@ module Dnsruby
       return "DNS : " + @config.to_s
     end
     
+    #Creates a new DNS resolver
+    #
+    #+config_info+ can be:
+    #
+    #* nil:: Uses platform default (e.g. /etc/resolv.conf)
+    #* String:: Path to a file using /etc/resolv.conf's format
+    #* Hash:: Must contain :nameserver, :search and :ndots keys
+    #   example :
+    #
+    #    Dnsruby::DNS.new({:nameserver => ['210.251.121.21'],
+    #                      :search => ['ruby-lang.org'],
+    #                      :ndots => 1})
     def initialize(config_info=nil)
       @config = Config.new()
       @config.set_config_info(config_info)
@@ -111,32 +121,56 @@ module Dnsruby
     
     attr_reader :config    
     
+    #Gets the first IP address of +name+ from the DNS resolver
+    #
+    #+name+ can be a Dnsruby::Name or a String. Retrieved address will be a 
+    #Dnsruby::IPv4 or a Dnsruby::IPv6
     def getaddress(name)
       each_address(name) {|address| return address}
       raise ResolvError.new("DNS result has no information for #{name}")
     end
     
+    #Gets all IP addresses of +name+ from the DNS resolver
+    #
+    #+name+ can be a Dnsruby::Name or a String. Retrieved address will be a 
+    #Dnsruby::IPv4 or a Dnsruby::IPv6
     def getaddresses(name)
       ret = []
       each_address(name) {|address| ret << address}
       return ret
     end
     
+    #Iterates over all IP addresses of +name+ retrieved from the DNS resolver
+    #
+    #+name+ can be a Dnsruby::Name or a String. Retrieved address will be a 
+    #Dnsruby::IPv4 or a Dnsruby::IPv6
     def each_address(name)
       each_resource(name) {|resource| yield resource.address}
     end
     
+    #Gets the first hostname for +address+ from the DNS resolver
+    #
+    #+address+ must be a Dnsruby::IPv4, Dnsruby::IPv6 or a String. Retrieved
+    #name will be a Dnsruby::Name.
     def getname(address)
       each_name(address) {|name| return name}
       raise ResolvError.new("DNS result has no information for #{address}")
     end
     
+    #Gets all hostnames for +address+ from the DNS resolver
+    #
+    #+address+ must be a Dnsruby::IPv4, Dnsruby::IPv6 or a String. Retrieved
+    #name will be a Dnsruby::Name.
     def getnames(address)
       ret = []
       each_name(address) {|name| ret << name}
       return ret
     end
     
+    #Iterates over all hostnames for +address+ retrieved from the DNS resolver
+    #
+    #+address+ must be a Dnsruby::IPv4, Dnsruby::IPv6 or a String. Retrieved
+    #name will be a Dnsruby::Name.
     def each_name(address)
       case address
       when Name
@@ -151,34 +185,38 @@ module Dnsruby
       each_resource(ptr, Types.PTR, Classes.IN) {|resource| yield resource.domainname}
     end
     
+    #Look up the first +type+, +klass+ resource for +name+
+    #
+    #+type+ defaults to Dnsruby::Types.A
+    #+klass+ defaults to Dnsruby::Classes.IN
+    #
+    #Returned resource is represented as a Dnsruby::RR instance, e.g. 
+    #Dnsruby::RR::IN::A
     def getresource(name, type=Types.A, klass=Classes.IN)
       each_resource(name, type, klass) {|resource| return resource}
       raise ResolvError.new("DNS result has no information for #{name}")
     end
     
+    #Look up all +type+, +klass+ resources for +name+
+    #
+    #+type+ defaults to Dnsruby::Types.A
+    #+klass+ defaults to Dnsruby::Classes.IN
+    #
+    #Returned resource is represented as a Dnsruby::RR instance, e.g. 
+    #Dnsruby::RR::IN::A
     def getresources(name, type=Types.A, klass=Classes.IN)
       ret = []
       each_resource(name, type, klass) {|resource| ret << resource}
       return ret
     end
     
-    def send_query(name, type=Types.A, klass=Classes.IN)
-      candidates = @config.generate_candidates(name)
-      exception = nil
-      candidates.each do |candidate|
-        q = Queue.new
-        msg = Message.new
-        msg.header.rd = 1
-        msg.add_question(candidate, type, klass)
-        @resolver.send_async(msg, q)
-        id, ret, exception = q.pop
-        if (exception == nil && ret.header.rcode == RCode.NOERROR)
-          return ret, ret.question[0].qname
-        end
-      end
-      raise exception
-    end
-    
+    #Iterates over all +type+, +klass+ resources for +name+
+    #
+    #+type+ defaults to Dnsruby::Types.A
+    #+klass+ defaults to Dnsruby::Classes.IN
+    #
+    #Yielded resource is represented as a Dnsruby::RR instance, e.g. 
+    #Dnsruby::RR::IN::A
     def each_resource(name, type=Types.A, klass=Classes.IN, &proc)
       type = Types.new(type)
       klass = Classes.new(klass)
@@ -193,12 +231,10 @@ module Dnsruby
       else
         TheLog.error("Unexpected rcode : #{reply.header.rcode.string}")
         raise Config::OtherResolvError.new(reply_name.to_s)
-      end
-      
+      end      
     end
     
-    def extract_resources(msg, name, type, klass)
-      #      if type < Types.ANY
+    def extract_resources(msg, name, type, klass) # :nodoc:
       if type == Types.ANY
         n0 = Name.create(name)
         msg.each_answer {|rec|
@@ -232,12 +268,33 @@ module Dnsruby
         end
       }
     end
+
+    def send_query(name, type=Types.A, klass=Classes.IN) # :nodoc:
+      candidates = @config.generate_candidates(name)
+      exception = nil
+      candidates.each do |candidate|
+        q = Queue.new
+        msg = Message.new
+        msg.header.rd = 1
+        msg.add_question(candidate, type, klass)
+        @resolver.send_async(msg, q)
+        id, ret, exception = q.pop
+        if (exception == nil && ret.header.rcode == RCode.NOERROR)
+          return ret, ret.question[0].qname
+        end
+      end
+      raise exception
+    end
     
-    class DecodeError < StandardError
-    end
-
-    class EncodeError < StandardError
-    end
-
   end
 end
+#--
+#@TODO@ Asynchronous interface. Do we want a callback (in a new thread) or a queue system?
+#Is there any point in taking a block? May as well...
+#e.g. getaddresses_async(name, Queue|Proc)
+#Could we make the final argument optional to all the standard calls? So they are either sync or async?
+#e.g. getaddresses(name{, Queue|Proc})
+#Yes to all but each_resource - would have to make a new each_resource_async or something...
+#@TODO@ BUT - need to pass in an ID as well as a queue to identify correct response
+#Proc can keep track of query ID itself
+#++

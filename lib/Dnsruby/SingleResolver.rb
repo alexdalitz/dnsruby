@@ -52,7 +52,7 @@ module Dnsruby
     attr_accessor :use_tcp
     
     # The TSIG record to sign/verify messages with
-    attr_accessor :tsig
+    attr_reader :tsig
     
     # Don't worry if the response is truncated - return it anyway.
     # 
@@ -86,7 +86,7 @@ module Dnsruby
     # The max UDP packet size
     # 
     # Defaults to 512
-    attr_accessor :udp_size
+    attr_reader :udp_size
     
     # The address of the resolver to send queries to
     attr_reader :server
@@ -162,6 +162,7 @@ module Dnsruby
       @recurse = true
       @persistent_udp = false
       @persistent_tcp = false
+      @dnssec = false
       
       if (arg==nil)
         # Get default config

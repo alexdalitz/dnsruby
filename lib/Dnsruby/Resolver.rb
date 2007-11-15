@@ -16,18 +16,19 @@
 require "Dnsruby/SingleResolver"
 module Dnsruby
   #== Description
-  # This class uses a set of SingleResolvers to perform queries with retries across multiple nameservers.
+  #Dnsruby::Resolver is a DNS stub resolver.
+  #This class uses a set of SingleResolvers to perform queries with retries across multiple nameservers.
   #
-  # The retry policy is a combination of the Net::DNS and dnsjava approach, and has the option of :
+  #The retry policy is a combination of the Net::DNS and dnsjava approach, and has the option of :
   #* A total timeout for the query (defaults to 0, meaning "no total timeout")
   #* A retransmission system that targets the namervers concurrently once the first query round is 
   #  complete, but in which the total time per query round is split between the number of nameservers 
   #  targetted for the first round. and total time for query round is doubled for each query round
   #   
-  #  Note that, if a total timeout is specified, then that will apply regardless of the retry policy 
-  #  (i.e. it may cut retries short).
+  # Note that, if a total timeout is specified, then that will apply regardless of the retry policy 
+  #(i.e. it may cut retries short).
   #  
-  #  Note also that these timeouts are distinct from the SingleResolver's packet_timeout
+  # Note also that these timeouts are distinct from the SingleResolver's packet_timeout
   #
   #== Methods
   # 
@@ -306,6 +307,9 @@ module Dnsruby
     # * :retry_times
     # * :retry_delay
     def initialize(*args)
+      @resolver_em = nil
+      @resolver_ruby = nil
+      @src_address = nil
       reset_attributes
       
       # Process args

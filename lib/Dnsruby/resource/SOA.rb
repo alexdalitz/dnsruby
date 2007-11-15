@@ -28,10 +28,16 @@ module Dnsruby
       #The zone's serial number.
       attr_accessor :serial
       #The zone's refresh interval.
+      #How often, in seconds, a secondary nameserver is to check for
+      #updates from the primary nameserver.
       attr_accessor :refresh
       #The zone's retry interval.
+      #How often, in seconds, a secondary nameserver is to retry, after a 
+      #failure to check for a refresh
       attr_accessor :retry
       #The zone's expire interval.
+      #How often, in seconds, a secondary nameserver is to use the data
+      #before refreshing from the primary nameserver
       attr_accessor :expire
       #The minimum (default) TTL for records in this zone.
       attr_accessor :minimum

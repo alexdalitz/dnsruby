@@ -17,6 +17,7 @@ module Dnsruby
   class RR
     #Class to store generic RRs (RFC 3597)
     class Generic < RR # RFC 3597
+      #data for the generic resource record
       attr_reader :data
       
       def from_data(data) #:nodoc: all
@@ -42,7 +43,7 @@ module Dnsruby
         return self.new(msg.get_bytes)
       end
       
-      def self.create(type_value, class_value)
+      def self.create(type_value, class_value) #:nodoc:
         c = Class.new(Generic)
         #          c.type = type_value
         #          c.klass = class_value
@@ -58,6 +59,7 @@ module Dnsruby
     # Standard (class generic) RRs
     #++
     #NS RR
+    #Nameserver resource record
     class NS < DomainName
       ClassValue = nil #:nodoc: all
       TypeValue = Types::NS #:nodoc: all
@@ -67,6 +69,7 @@ module Dnsruby
     end
     
     #CNAME RR
+    #The canonical name for an alias
     class CNAME < DomainName
       ClassValue = nil #:nodoc: all
       TypeValue = Types::CNAME #:nodoc: all
@@ -115,7 +118,7 @@ module Dnsruby
     end
     
     #ANY RR
-#    class ANY < Query
+    # A Query type requesting any RR
     class ANY < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::ANY #:nodoc: all

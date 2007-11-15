@@ -14,19 +14,8 @@
 #limitations under the License.
 #++
 module Dnsruby
-#== Dnsruby::IPv4 class
-#=== class methods
-#* Dnsruby::IPv4.create(address)
-#
-#=== methods
-#* Dnsruby::IPv4#to_s
-#* Dnsruby::IPv4#to_name
-#
-#=== constants
-#* Dnsruby::IPv4::Regex
-#    regular expression for IPv4 address.
-#
   class IPv4
+    # Regular expression IPv4 addresses must match
     Regex = /\A(\d+)\.(\d+)\.(\d+)\.(\d+)\z/
     
     def self.create(arg)
@@ -47,19 +36,21 @@ module Dnsruby
       end
     end
     
-    def initialize(address)
+    def initialize(address) #:nodoc:
       unless address.kind_of?(String) && address.length == 4
         raise ArgumentError.new('IPv4 address must be 4 bytes')
       end
       @address = address
     end
+    
+    # A String representation of thi IPv4 address.
     attr_reader :address
     
-    def to_s
+    def to_s #:nodoc:
       return sprintf("%d.%d.%d.%d", *@address.unpack("CCCC"))
     end
     
-    def inspect
+    def inspect #:nodoc:
       return "#<#{self.class} #{self.to_s}>"
     end
     

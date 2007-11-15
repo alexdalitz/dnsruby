@@ -15,17 +15,13 @@
 #++
 module Dnsruby
   class RR
-    # Superclass for RR's which have an additional domain name in the data section.
+    # Abstract superclass for RR's which have a domain name in the data section.
     class DomainName < RR
       # The domain name in the RR data section.
       attr_reader :domainname
       
       def set_domain_name(newname)
-        #        if (!(newname.kind_of?Name))
         @domainname=Name.create(newname)
-        #       else
-        #        @domainname = newname
-        #     end
       end
       
       alias domainname= set_domain_name

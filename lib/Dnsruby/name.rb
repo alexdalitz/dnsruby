@@ -16,6 +16,7 @@
 module Dnsruby
   #== Dnsruby::Name class
   #
+  #A representation of a DNS name
   #(RFC1035, section 3.1)
   #
   #== methods
@@ -34,6 +35,10 @@ module Dnsruby
     # When a Name is unencoded, each label is unencoded, and added to the Name collection of labels.
     # When a Name is made from a string, the Name is split into Labels.
     #++
+    #Creates a new Dnsruby::Name from +arg+. +arg+ can be :
+    #
+    #* Name:: returns +arg+
+    #* String:: returns a new Name
     def self.create(arg)
       case arg
       when Name
@@ -78,10 +83,11 @@ module Dnsruby
       return Name.create(labels)
     end
     
-    def inspect
+    def inspect # :nodoc:
       "#<#{self.class}: #{self.to_s}#{@absolute ? '.' : ''}>"
     end
     
+    #Returns true if this Name is absolute
     def absolute?
       return @absolute
     end
@@ -94,13 +100,14 @@ module Dnsruby
       return (labels[0].string == '*')
     end
     
-    def ==(other)
+    def ==(other) # :nodoc:
       return false unless Name === other
       return @labels == other.labels && @absolute == other.absolute?
     end
-    alias eql? ==
+    alias eql? == # :nodoc:
     
-    # tests subdomain-of relation.
+    # Tests subdomain-of relation : returns true if this name 
+    # is a subdomain of +other+.
     #
     #   domain = Resolv::Name.create("y.z")
     #   p Resolv::Name.create("w.x.y.z").subdomain_of?(domain) #=> true
@@ -118,7 +125,7 @@ module Dnsruby
       return @labels[-other_len, other_len] == other.to_a
     end
     
-    def hash
+    def hash # :nodoc:
       return @labels.hash ^ @absolute.hash
     end
     
@@ -138,6 +145,8 @@ module Dnsruby
     #
     # The domain name doesn't have a trailing dot even if the name object is
     # absolute.
+    # 
+    # Example : 
     #
     #   p Resolv::Name.create("x.y.z.").to_s #=> "x.y.z"
     #   p Resolv::Name.create("x.y.z").to_s #=> "x.y.z"

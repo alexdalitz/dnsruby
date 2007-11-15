@@ -19,7 +19,7 @@ require 'Dnsruby/ipv4'
 require 'Dnsruby/ipv6'
 require 'timeout'
 #= Dnsruby library
-#Dnsruby is a resolver library written in Ruby.
+#Dnsruby is a thread-aware DNS stub resolver library written in Ruby.
 #
 #It is based on resolv.rb, the standard Ruby DNS implementation, 
 #but gives a complete DNS implementation complying with all relevant 
@@ -37,15 +37,15 @@ require 'timeout'
 #Resolver queries return Dnsruby::Message objects.  Message objects have five
 #sections:
 #
-# * The header section, a Dnsruby::Header object.
+#* The header section, a Dnsruby::Header object.
 #
-# * The question section, a list of Dnsruby::Question objects.
+#* The question section, a list of Dnsruby::Question objects.
 #
-# * The answer section, a list of Dnsruby::Resource objects.
+#* The answer section, a list of Dnsruby::Resource objects.
 #
-# * The authority section, a list of Dnsruby::Resource objects.
+#* The authority section, a list of Dnsruby::Resource objects.
 #
-# * The additional section, a list of Dnsruby::Resource objects.
+#* The additional section, a list of Dnsruby::Resource objects.
 #
 #
 #== example
@@ -59,21 +59,21 @@ require 'timeout'
 #
 #== exceptions
 #
-#  * ResolvError < StandardError
+#* ResolvError < StandardError
 #  
-#  * ResolvTimeout < TimeoutError
+#* ResolvTimeout < TimeoutError
+# 
+#* NXDomain < ResolvError
 #  
-#  * NXDomain < ResolvError
+#* FormErr < ResolvError
 #  
-#  * FormErr < ResolvError
+#* ServFail < ResolvError
 #  
-#  * ServFail < ResolvError
+#* NotImp < ResolvError
 #  
-#  * NotImp < ResolvError
+#* Refused < ResolvError
 #  
-#  * Refused < ResolvError
-#  
-#  * OtherResolvError < ResolvError
+#* OtherResolvError < ResolvError
 #  
 #== I/O
 #Dnsruby implements a pure Ruby event loop to perform I/O.
@@ -336,97 +336,101 @@ module Dnsruby
   end
   
   
+  #An error raised while querying for a resource
   class ResolvError < StandardError
   end
   
+  #A timeout error raised while querying for a resource
   class ResolvTimeout < TimeoutError
   end
   
+  #The requested domain does not exist
   class NXDomain < ResolvError
   end
   
+  #A format error in a received DNS message
   class FormErr < ResolvError
   end
   
+  #Indicates a failure in the remote resolver
   class ServFail < ResolvError
   end
   
+  #The requested operation is not implemented in the remote resolver
   class NotImp < ResolvError
   end
   
+  #The requested operation was refused by the remote resolver
   class Refused < ResolvError
   end
   
+  #Another kind of resolver error has occurred
   class OtherResolvError < ResolvError
   end
   
-#== Dnsruby::Resolv class
-#
-#=== class methods
-#* Dnsruby::Resolv.getaddress(name)
-#* Dnsruby::Resolv.getaddresses(name)
-#* Dnsruby::Resolv.each_address(name) {|address| ...}
-#
-#    They lookups IP addresses of ((|name|)) which represents a hostname
-#    as a string by default resolver.
-#
-#*    getaddress returns first entry of resultant addresses.
-#*    getaddresses returns resultant addresses as an array.
-#*    each_address iterates over resultant addresses.
-#
-#* Dnsruby::Resolv.getname(address)
-#* Dnsruby::Resolv.getnames(address)
-#* Dnsruby::Resolv.each_name(address) {|name| ...}
-#    lookups hostnames of ((|address|)) which represents IP address as a string.
-#
-#*    getname returns first entry of resultant names.
-#*    getnames returns resultant names as an array.
-#*    each_names iterates over resultant names.
-#
-#The DNS class may be used to perform more queries. If greater control over the sending 
-#of packets is required, then the Resolver or SingleResolver classes may be used.
-#
+  #Indicates an error in decoding an incoming DNS message
+  class DecodeError < StandardError
+  end
+
+  #Indicates an error encoding a DNS message for transmission
+  class EncodeError < StandardError
+  end
+
+  #The Resolv class can be used to resolve addresses using /etc/hosts and /etc/resolv.conf, 
+  #
+  #The DNS class may be used to perform more queries. If greater control over the sending 
+  #of packets is required, then the Resolver or SingleResolver classes may be used.
   class Resolv
     
+    #Looks up the first IP address for +name+
     def self.getaddress(name)
       DefaultResolver.getaddress(name)
     end
     
+    #Looks up all IP addresses for +name+
     def self.getaddresses(name)
       DefaultResolver.getaddresses(name)
     end
     
+    #Iterates over all IP addresses for +name+
     def self.each_address(name, &block)
       DefaultResolver.each_address(name, &block)
     end
     
+    #Looks up the first hostname of +address+
     def self.getname(address)
       DefaultResolver.getname(address)
     end
     
+    #Looks up all hostnames of +address+
     def self.getnames(address)
       DefaultResolver.getnames(address)
     end
     
+    #Iterates over all hostnames of +address+
     def self.each_name(address, &proc)
       DefaultResolver.each_name(address, &proc)
     end
     
+    #Creates a new Resolv using +resolvers+
     def initialize(resolvers=[Hosts.new, DNS.new])
       @resolvers = resolvers
     end
     
+    #Looks up the first IP address for +name+
     def getaddress(name)
       each_address(name) {|address| return address}
       raise ResolvError.new("no address for #{name}")
     end
     
+    #Looks up all IP addresses for +name+
     def getaddresses(name)
       ret = []
       each_address(name) {|address| ret << address}
       return ret
     end
     
+    #Iterates over all IP addresses for +name+
     def each_address(name)
       if AddressRegex =~ name
         yield name
@@ -442,17 +446,20 @@ module Dnsruby
       }
     end
     
+    #Looks up the first hostname of +address+
     def getname(address)
       each_name(address) {|name| return name}
       raise ResolvError.new("no name for #{address}")
     end
     
+    #Looks up all hostnames of +address+
     def getnames(address)
       ret = []
       each_name(address) {|name| ret << name}
       return ret
     end
     
+    #Iterates over all hostnames of +address+
     def each_name(address)
       yielded = false
       @resolvers.each {|r|
@@ -471,7 +478,11 @@ module Dnsruby
     require 'Dnsruby/DNSSEC'
     require 'Dnsruby/update'
     require 'Dnsruby/zone_transfer'
+    
+    #Default Resolver to use for Dnsruby class methods
     DefaultResolver = self.new
+    
+    #Address RegExp to use for matching IP addresses
     AddressRegex = /(?:#{IPv4::Regex})|(?:#{IPv6::Regex})/
   end
 end

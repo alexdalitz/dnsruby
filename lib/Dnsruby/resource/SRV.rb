@@ -24,30 +24,34 @@ module Dnsruby
       # The format is:
       #   _Service._Proto.Name TTL Class SRV Priority Weight Port Target
       #
-      # The fields specific to SRV are defined in RFC 2782 as meaning:
-      # - +priority+ The priority of this target host.  A client MUST attempt
-      #   to contact the target host with the lowest-numbered priority it can
-      #   reach; target hosts with the same priority SHOULD be tried in an
-      #   order defined by the weight field.  The range is 0-65535.  Note that
-      #   it is not widely implemented and should be set to zero.
-      # 
-      # - +weight+ A server selection mechanism.  The weight field specifies
-      #   a relative weight for entries with the same priority. Larger weights
-      #   SHOULD be given a proportionately higher probability of being
-      #   selected. The range of this number is 0-65535.  Domain administrators
-      #   SHOULD use Weight 0 when there isn't any server selection to do, to
-      #   make the RR easier to read for humans (less noisy). Note that it is
-      #   not widely implemented and should be set to zero.
-      #
-      # - +port+  The port on this target host of this service.  The range is 0-
-      #   65535.
-      # 
-      # - +target+ The domain name of the target host. A target of "." means
-      #   that the service is decidedly not available at this domain.
+      # The fields specific to SRV are defined in RFC 2782
       class SRV < RR
         ClassHash[[TypeValue = Types::SRV, ClassValue = ClassValue]] = self #:nodoc: all
         
-        attr_accessor :priority, :weight, :port, :target
+        # The priority of this target host.  
+        # A client MUST attempt
+        # to contact the target host with the lowest-numbered priority it can
+        # reach; target hosts with the same priority SHOULD be tried in an
+        # order defined by the weight field.  The range is 0-65535.  Note that
+        # it is not widely implemented and should be set to zero.
+        attr_accessor :priority
+
+        # A server selection mechanism.  
+        # The weight field specifies
+        # a relative weight for entries with the same priority. Larger weights
+        # SHOULD be given a proportionately higher probability of being
+        # selected. The range of this number is 0-65535.  Domain administrators
+        # SHOULD use Weight 0 when there isn't any server selection to do, to
+        # make the RR easier to read for humans (less noisy). Note that it is
+        # not widely implemented and should be set to zero.
+        attr_accessor :weight
+
+        # The port on this target host of this service.  The range is 0-65535.
+        attr_accessor :port
+        
+        # The domain name of the target host. A target of "." means
+        # that the service is decidedly not available at this domain.
+        attr_accessor :target
         
         def from_data(data) #:nodoc: all
           @priority, @weight, @port, @target = data
