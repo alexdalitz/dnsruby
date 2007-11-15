@@ -43,7 +43,7 @@ class TestRrOpt < Test::Unit::TestCase
     # query to it with the UDP size set to 4096. Make sure that it is received
     # correctly.
     socket = UDPSocket.new
-    socket.bind("localhost", 0)
+    socket.bind("127.0.0.1", 0)
     port = socket.addr[1]
     q = Queue.new
     Thread.new {
@@ -56,7 +56,7 @@ class TestRrOpt < Test::Unit::TestCase
     }
     
     # Now send query
-    res = Resolver.new("localhost")
+    res = Resolver.new("127.0.0.1")
     res.port = port
     res.udp_size = 4096
     assert(res.udp_size == 4096)
