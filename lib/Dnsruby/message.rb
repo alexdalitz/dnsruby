@@ -863,6 +863,32 @@ module Dnsruby
       end
     end
     
+    def qtype=(qtype)
+      @qtype = Types.new(qtype)
+    end
+    
+    def qclass=(qclass)
+      @qclass = Classes.new(qclass)
+    end
+    
+    def qname=(qname)
+      case qname
+      when IPv4::Regex
+        @qname = IPv4.create(qname).to_name
+        @qtype = Types.PTR
+      when IPv6::Regex
+        @qname = IPv6.create(qname).to_name
+        @qtype = Types.PTR
+      when Name
+      when IPv6
+        @qtype = Types.PTR
+      when IPv4
+        @qtype = Types.PTR
+      else
+        @qname = Name.create(qname)
+      end
+    end  
+    
     #Returns a string representation of the question record.
     def to_s
       return "#{@qname}.\t#{@qclass.string}\t#{@qtype.string}";

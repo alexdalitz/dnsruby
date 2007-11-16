@@ -141,7 +141,14 @@ module Dnsruby
         if (args==nil)
           return @options
         elsif args.kind_of?Fixnum
-          #@TODO@ return list of options with that code
+          # return list of options with that code
+          ret = []
+          @options.each do |option|
+            if (option.code == args)
+              ret.push(option)
+            end
+          end
+          return ret
         end
       end
       

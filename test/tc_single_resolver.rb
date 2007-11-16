@@ -18,7 +18,6 @@ require 'test/unit'
 require 'dnsruby'
 include Dnsruby
 class TestSingleResolver < Test::Unit::TestCase
-  # @todo@ Test udppacketsize
   Thread::abort_on_exception = true
   #  Dnsruby::TheLog.level=Logger::DEBUG
   

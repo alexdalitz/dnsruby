@@ -29,24 +29,23 @@ class TestQuestion < Test::Unit::TestCase
     assert_equal(type, q.qtype, "qType()")
     assert_equal(klass, q.qclass, "qClass()")
     
-#    #
-#    # Check the aliases
-#    #
-#    assert_equal(q.zname,  domain, 'zName()'  );
-#    assert_equal(q.ztype,  type,   'zType()'  );
-#    assert_equal(q.zclass, klass,  'zClass()' );
-#    @todo@ !!
+    #
+    # Check the aliases
+    #
+    assert_equal(q.zname.to_s,  domain, 'zName()'  );
+    assert_equal(q.ztype,  type,   'zType()'  );
+    assert_equal(q.zclass, klass,  'zClass()' );
     
-#    #
-#    # Check that we can change stuff
-#    #
-#    q.qname=('example.net');
-#    q.qtype=('A');
-#    q.qclass=('CH');
-#    
-#    assert_equal('example.net', q.qname.to_s,  'qName()'  );
-#    assert_equal(q.qtype,  Types.A,           'qType()'  );
-#    assert_equal(q.qclass, Classes.CH,          'qClass()' );
+    #
+    # Check that we can change stuff
+    #
+    q.qname=('example.net');
+    q.qtype=('A');
+    q.qclass=('CH');
+    
+    assert_equal('example.net', q.qname.to_s,  'qName()'  );
+    assert_equal(q.qtype,  Types.A,           'qType()'  );
+    assert_equal(q.qclass, Classes.CH,          'qClass()' );
     
   end
 end

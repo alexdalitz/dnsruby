@@ -43,39 +43,51 @@ if (online)
   require "test/tc_tcp.rb"
   #  require "test/tc_soak.rb"
 
-  # @TODO@ Check if we can contact the server - if we can't, then abort the test 
+  # Check if we can contact the server - if we can't, then abort the test 
   # (but tell user that test has not been run due to connectivity problems)
-
-
-  require "test/tc_single_resolver.rb"
-  require "test/tc_axfr.rb"
-
-  have_openssl = false
+  server_up = false
   begin
-    require "digest/md5"
-    OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
-    have_openssl=true
-  rescue Error => e
+    sock.connect('ns0.validation-test-servers.nominet.org.uk', # k.root-servers.net.
+      25)
+    server_up = true
+  rescue Exception
     puts "----------------------------------------"
-    puts "OpenSSL not present - skipping TSIG test"
+    puts "Cannot connect to test server\n\t"+$!+"\n"
+    puts "\n\nNo tests targetting this server will be run!!\n\n"
     puts "----------------------------------------"
   end
-  if (have_openssl)
-    require "test/tc_tsig.rb"
-  end
+  if (server_up)
 
-  have_em = false
-  begin
-    require 'eventmachine'
-    have_em = true
-  rescue LoadError => e
-    puts "----------------------------------------"
-    puts "EventMachine not installed - skipping test"
-    puts "----------------------------------------"
-  end
-  if (have_em)
-    require 'test/tc_event_machine_single_res.rb'
-    require 'test/tc_event_machine_res.rb'
-    require 'test/tc_event_machine_deferrable.rb'
+    require "test/tc_single_resolver.rb"
+    require "test/tc_axfr.rb"
+
+    have_openssl = false
+    begin
+      require "digest/md5"
+      OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
+      have_openssl=true
+    rescue Error => e
+      puts "----------------------------------------"
+      puts "OpenSSL not present - skipping TSIG test"
+      puts "----------------------------------------"
+    end
+    if (have_openssl)
+      require "test/tc_tsig.rb"
+    end
+
+    have_em = false
+    begin
+      require 'eventmachine'
+      have_em = true
+    rescue LoadError => e
+      puts "----------------------------------------"
+      puts "EventMachine not installed - skipping test"
+      puts "----------------------------------------"
+    end
+    if (have_em)
+      require 'test/tc_event_machine_single_res.rb'
+      require 'test/tc_event_machine_res.rb'
+      require 'test/tc_event_machine_deferrable.rb'
+    end
   end
 end
