@@ -1,7 +1,7 @@
 require 'rubygems'
 SPEC = Gem::Specification.new do |s|
-  s.name = "Dnsruby"
-  s.version = "1.0"
+  s.name = "dnsruby"
+  s.version = "1.0.1"
   s.authors = ["AlexD"]
   s.email = "alexd@nominet.org.uk"
   s.homepage = "http://rubyforge.org/projects/dnsruby/"
@@ -15,7 +15,7 @@ SPEC = Gem::Specification.new do |s|
                       item.include?("CVS") || item.include?("rdoc") ||
                          item.include?("svn")
                 end
-  s.autorequire="Dnsruby"
+  s.autorequire="dnsruby"
   s.test_file = "test/ts_dnsruby.rb"
   s.has_rdoc = true
   s.extra_rdoc_files = ["README", "EVENTMACHINE"]
