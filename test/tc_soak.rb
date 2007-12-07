@@ -110,7 +110,7 @@ class TestSingleResolverSoak < Test::Unit::TestCase
     end        
     num_times.times do |i|
       threads[i] = Thread.new{
-        4.times do |j|
+        40.times do |j|
           TestSoakBase::Rrs.each do |data|
             mutex.synchronize do
               query_count+=1
@@ -169,7 +169,7 @@ class TestSingleResolverSoak < Test::Unit::TestCase
       threads[i] = Thread.new{
         res = SingleResolver.new
         res.packet_timeout=4
-        4.times do |j|
+        40.times do |j|
           TestSoakBase::Rrs.each do |data|
             mutex.synchronize do
               query_count+=1

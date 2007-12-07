@@ -1,0 +1,203 @@
+#--
+#Copyright 2007 Nominet UK
+#
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License. 
+#You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0 
+#
+#Unless required by applicable law or agreed to in writing, software 
+#distributed under the License is distributed on an "AS IS" BASIS, 
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+#See the License for the specific language governing permissions and 
+#limitations under the License.
+#++
+module Dnsruby
+  class RR
+    #RFC4034, section 2
+    class DNSKEY < RR
+      ClassValue = nil #:nodoc: all
+      TypeValue = Types::DNSKEY #:nodoc: all
+      
+      #Key is a zone key
+      ZONE_KEY = 0x100
+
+      #Key is a secure entry point key
+      SEP_KEY = 0x1
+
+      #The flags for the DNSKEY RR
+      attr_reader :flags
+      #The protocol for this DNSKEY RR.
+      #MUST be 3.
+      attr_reader :protocol
+      #The algorithm used for this key
+      #See Dnsruby::Algorithms for permitted values
+      attr_reader :algorithm
+      #The public key
+      attr_accessor :key
+      
+      def protocol=(p)
+        if (p!=3)
+          raise DecodeError.new("DNSKEY protocol field set to #{p}, contrary to RFC4034 section 2.1.2")
+        else @protocol = p
+        end
+      end
+      
+      def algorithm=(a)
+        if (a.instance_of?String)
+          if (a.length == 1)
+            a = a.to_i
+          end
+        end
+        begin
+          alg = Algorithms.new(a)
+          @algorithm = alg
+        rescue ArgumentError => e
+          raise DecodeError.new(e)
+        end        
+      end
+      
+      def zone_key=(on)
+        if (on)
+          @flags |= ZONE_KEY
+        else
+          @flags &= (~ZONE_KEY)
+        end
+      end
+      
+      def zone_key?
+        return @flags & ZONE_KEY
+      end
+      
+      def sep_key=(on)
+        if (on)
+          @flags |= SEP_KEY
+        else
+          @flags &= (~SEP_KEY)
+        end
+      end
+      
+      def sep_key?
+        return @flags & SEP_KEY
+      end
+      
+      def flags=(f)
+        # Only two values allowed - 
+        # Zone Key flag (bit 7)
+        # Secure Entry Point flag (bit 15)
+        if ((f & ~ZONE_KEY & ~SEP_KEY) > 0)
+          raise DecodeError.new("Only zone key and secure entry point flags allowed for DNSKEY" +
+              " (RFC4034 section 2.1.1)")
+        else
+          @flags = f
+        end
+      end
+      
+      def from_data(data) #:nodoc: all
+        flags, protocol, algorithm, @key = data
+        self.flags=(flags)
+        self.protocol=(protocol)
+        self.algorithm=(algorithm)
+      end
+      
+      def from_string(input)
+        if (input.length > 0)
+          data = input.split(" ")
+          self.flags=(data[0].to_i)
+          self.protocol=(data[1].to_i)
+          self.algorithm=(data[2])
+          @key=Base64.decode64(data[4])
+        end
+      end
+      
+      def rdata_to_string #:nodoc: all
+        if (@flags!=nil)
+          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key).gsub(/\n/, "")} )"
+        else
+          return ""
+        end
+      end
+      
+      def encode_rdata(msg, canonical=false) #:nodoc: all
+        # 2 octets, then 2 sets of 1 octet
+        msg.put_pack('ncc', @flags, @protocol, @algorithm.to_i)
+        msg.put_bytes(@key)
+      end
+      
+      def self.decode_rdata(msg) #:nodoc: all
+        # 2 octets, then 2 sets of 1 octet
+        flags, protocol, algorithm = msg.get_unpack('ncc')
+        key = msg.get_bytes
+        return self.new(
+          [flags, protocol, algorithm, key])
+      end
+      
+      def key_tag
+        tag=0
+        rdata = MessageEncoder.new {|msg|
+          encode_rdata(msg)
+        }.to_s
+        if (@algorithm == Algorithms.RSAMD5)
+          #The key tag for algorithm 1 (RSA/MD5) is defined differently from the
+          #key tag for all other algorithms, for historical reasons.
+          d1 = rdata[rdata.length - 3] & 0xFF
+          d2 = rdata[rdata.length - 2] & 0xFF
+          tag = (d1 << 8) + d2
+        else
+          tag = 0
+          last = 0
+          0.step(rdata.length-1, 2) {|i|
+            last = i
+            d1 = rdata[i] & 0xFF
+            d2 = rdata[i + 1] & 0xFF
+            tag += ((d1 << 8) + d2)
+          }
+          last+=2
+          if (last < rdata.length)
+            d1 = rdata[last] & 0xFF
+            tag += (d1 << 8)
+          end
+          tag += ((tag >> 16) & 0xFFFF)
+        end
+        tag=tag&0xFFFF
+        return tag
+      end
+      
+      def public_key
+        if (@algorithm == Algorithms.RSASHA1)
+          return rsa_key
+        end
+        # @TODO@ Support other key encodings!
+      end
+      
+      def rsa_key
+	exponentLength = @key[0]
+        pos = 1
+	if (exponentLength == 0)
+          exponentLength = (@key[1]<<8) + @key[1]
+          pos += 2
+        end
+	exponent = get_num(@key[pos, exponentLength])
+        pos += exponentLength
+
+	modulus = get_num(@key[pos, @key.length])
+
+        key = OpenSSL::PKey::RSA.new
+        key.e = exponent
+        key.n = modulus
+        return key 
+      end
+      
+      def get_num(bytes)
+        ret = 0
+        shift = (bytes.length-1) * 8
+        bytes.each_byte {|byte|
+          ret += byte.to_i << shift
+          shift -= 8
+        }
+        return ret
+      end
+    end 
+  end
+end

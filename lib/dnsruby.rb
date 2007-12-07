@@ -229,13 +229,15 @@ module Dnsruby
     DNAME     = 39      # RFC 2672
     OPT       = 41      # RFC 2671
     DS        = 43      # RFC 4034
-    SSHFP     = 44      # draft-ietf-secsh-dns (No RFC yet at time of coding)
+    SSHFP     = 44      # RFC 4255
     IPSECKEY  = 45      # RFC 4025
     RRSIG     = 46      # RFC 4034
     NSEC      = 47      # RFC 4034
     DNSKEY    = 48      # RFC 4034
     DHCID     = 49      # RFC 4701
-    SPF       = 99      # rfc-schlitt-spf-classic-o2 (No RFC yet at time of coding)
+    NSEC3     = 50      # RFC still pending at time of writing
+    NSEC3PARAM= 51      # RFC still pending at time of writing
+    SPF       = 99      # RFC 4408
     UINFO     = 100     # non-standard
     UID       = 101     # non-standard
     GID       = 102     # non-standard
@@ -335,6 +337,19 @@ module Dnsruby
     OPT         = 41     # RFC 2671
   end
   
+  class Algorithms < CodeMapper
+    RSAMD5     = 1
+    DH         = 2
+    DSA        = 3
+    ECC        = 4
+    RSASHA1    = 5
+    DSANSEC3SHA1 = 131
+    RSASHA1NSEC3SHA1 = 133
+    INDIRECT   = 252
+    PRIVATEDNS = 253
+    PRIVATEOID = 254
+    update()
+  end  
   
   #An error raised while querying for a resource
   class ResolvError < StandardError
@@ -369,11 +384,15 @@ module Dnsruby
   end
   
   #Indicates an error in decoding an incoming DNS message
-  class DecodeError < StandardError
+  class DecodeError < ResolvError
   end
 
   #Indicates an error encoding a DNS message for transmission
-  class EncodeError < StandardError
+  class EncodeError < ResolvError
+  end
+
+  #Indicates an error verifying 
+  class VerifyError < ResolvError
   end
 
   #The Resolv class can be used to resolve addresses using /etc/hosts and /etc/resolv.conf, 
@@ -475,9 +494,9 @@ module Dnsruby
     require 'Dnsruby/DNS'
     require 'Dnsruby/Hosts'
     require 'Dnsruby/message'
-    require 'Dnsruby/DNSSEC'
     require 'Dnsruby/update'
     require 'Dnsruby/zone_transfer'
+    require 'Dnsruby/dnssec_resolver'
     
     #Default Resolver to use for Dnsruby class methods
     DefaultResolver = self.new

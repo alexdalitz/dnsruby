@@ -152,8 +152,7 @@ module Dnsruby
     #   p Resolv::Name.create("x.y.z").to_s #=> "x.y.z"
     #
     def to_s
-      return @labels.collect{|l| (l.kind_of?String) ? l : l.string}.join('.')
-      
+      return @labels.collect{|l| (l.kind_of?String) ? l : l.string}.join('.')    
     end
     
     # Utility function

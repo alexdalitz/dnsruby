@@ -16,9 +16,10 @@
 module Dnsruby
   class RR
     ClassInsensitiveTypes = [
-      NS, CNAME, DNAME, SOA, PTR, HINFO, MINFO, MX, TXT,
+      NS, CNAME, DNAME, DNSKEY, SOA, PTR, HINFO, MINFO, MX, TXT,
       ISDN, MB, MG, MR, NAPTR, NSAP, OPT, RP, RT, X25,
-      SPF, CERT, LOC, TSIG, TKEY, ANY
+      SPF, CERT, LOC, TSIG, TKEY, ANY, RRSIG, NSEC, DS, NSEC3,
+      NSEC3PARAM
     ] #:nodoc: all
     
     # module IN contains ARPA Internet specific RRs
@@ -45,7 +46,7 @@ module Dnsruby
         end
         attr_reader :address, :protocol, :bitmap
         
-        def encode_rdata(msg) #:nodoc: all
+        def encode_rdata(msg, canonical=false) #:nodoc: all
           msg.put_bytes(@address.address)
           msg.put_pack("n", @protocol)
           msg.put_bytes(@bitmap)

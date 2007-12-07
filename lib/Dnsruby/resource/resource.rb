@@ -27,12 +27,13 @@ module Dnsruby
     end
     #Add the RR to this RRSet
     def add(r)
+      r = RR.create(r.to_s) # clone the record
       if @rrs.include?r
         return false
       end
-      if (rrs.size() == 0)
+      if (@rrs.size() == 0)
         @rrs.push(r)
-        return;
+        return true
       end
       # Check the type, klass and ttl are correct
       first = @rrs[0]
@@ -42,8 +43,7 @@ module Dnsruby
       
       if (r.ttl != first.ttl) # RFC2181, section 5.2
         if (r.ttl > first.ttl)
-          #          r = r.cloneRecord();
-          r.ttl=(first.ttl);
+          r.ttl=(first.ttl)
         else
           @rrs.each do |rr|
             rr.ttl = r.ttl
@@ -51,9 +51,39 @@ module Dnsruby
         end
       end
       
-      if (!rrs.contains(r))
+      if (!@rrs.include?(r))
         @rrs.push(r)
       end
+    end
+    
+    #Return a new RRset which contains the RRs from this
+    #RRset into canonical order (RFC 4034 section 6)
+    def sort_canonical
+      #Make a list, for all the RRs, where each RR contributes 
+      #the canonical RDATA encoding
+      canonical_rrs = []
+      @rrs.each do |rr|
+        data = MessageEncoder.new {|msg|
+          msg.put_rr(rr, true)
+        }.to_s
+        canonical_rrs.push(data)
+      end
+      
+      # Check there are no identical records - if there are duplicated entries
+      # then remove them
+      canonical_rrs.uniq!
+      
+      #Sort it (the absence of an octet sorts before a zero octet.)
+      canonical_rrs.sort!
+      
+      return_rrs = RRSet.new
+      canonical_rrs.each {|rr|
+        MessageDecoder.new(rr) {|msg|
+          new_rr = msg.get_rr
+          return_rrs.add(new_rr)
+        }
+      }
+      return return_rrs
     end
     
     #Delete the RR from this RRSet
@@ -64,6 +94,9 @@ module Dnsruby
       @rrs.each do |rr|
         yield rr
       end
+    end
+    def [](index)
+      return @rrs[index]
     end
     #Return the type of this RRSet
     def type
@@ -76,6 +109,16 @@ module Dnsruby
     #Return the ttl of this RRSet
     def ttl
       return @rrs[0].ttl
+    end
+    def name
+      return @rrs[0].name
+    end
+    def to_s
+      ret = ""
+      each {|rec|
+        ret += rec.to_s + "\n"
+      }
+      return ret
     end
   end
   
@@ -96,7 +139,8 @@ module Dnsruby
   class RR
     
     # A regular expression which catches any valid resource record.
-    @@RR_REGEX = Regexp.new("^\\s*(\\S+)\\s*(\\d+)?\\s*(#{Classes.regexp + "|CLASS\\d+"})?\\s*(#{Types.regexp + '|TYPE\\d+'})?\\s*([\\s\\S]*)\$") #:nodoc: all
+    @@RR_REGEX = Regexp.new("^\\s*(\\S+)\\s*(\\d+)?\\s*(#{Classes.regexp + 
+      "|CLASS\\d+"})?\\s*(#{Types.regexp + '|TYPE\\d+'})?\\s*([\\s\\S]*)\$") #:nodoc: all
     
     #The Resource's domain name
     attr_reader :name
@@ -367,7 +411,7 @@ module Dnsruby
       #      raise NotImplementedError.new
     end
     
-    def encode_rdata(msg) #:nodoc: all
+    def encode_rdata(msg, canonical=false) #:nodoc: all
       # to be implemented by subclasses
       raise EncodeError.new("#{self.class} is RR.") 
     end

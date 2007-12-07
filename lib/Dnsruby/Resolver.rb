@@ -118,6 +118,9 @@ module Dnsruby
     # being targetted, and a new nameserver will be queried with the resultant delay.
     attr_accessor :retry_times, :retry_delay
     
+    # Use DNSSEC for this Resolver
+    attr_accessor :dnssec
+    
     @@use_eventmachine=false
     @@start_eventmachine_loop=true
     
@@ -616,6 +619,12 @@ module Dnsruby
       persistent_data.timer_keys_sorted = persistent_data.timer_procs.keys.sort
       EventMachine::add_timer(0) {process_eventmachine_timers(persistent_data)}
       return persistent_data.deferrable
+    end
+    
+    # Close the Resolver. Unfinished queries are terminated with OtherResolvError.
+    def close
+      # @TODO@
+      # We need a list of open deferrables so that we can complete them
     end
     
     def process_eventmachine_timers(persistent_data)

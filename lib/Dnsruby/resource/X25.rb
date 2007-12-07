@@ -40,7 +40,7 @@ module Dnsruby
         end
       end
       
-      def encode_rdata(msg) #:nodoc: all
+      def encode_rdata(msg, canonical=false) #:nodoc: all
         msg.put_string(@address)
       end
       

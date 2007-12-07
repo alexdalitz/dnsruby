@@ -142,6 +142,7 @@ module Dnsruby
         if (has_observer && (timeout > tick_time))
           timeout = tick_time
         end
+#        next if (timeout < 0)
         begin
           ready, write, errors = IO.select(sockets, nil, nil, timeout)
         rescue SelectWakeup
@@ -182,6 +183,7 @@ module Dnsruby
           c_q_id = @@socket_hash[socket][0] # @todo@ If we use persistent sockets then this won't work
           query_settings = @@query_hash[c_q_id]
         }
+        next if !query_settings
         udp_packet_size = query_settings.udp_packet_size
         msg, bytes = get_incoming_data(socket, udp_packet_size)
         if (msg!=nil)

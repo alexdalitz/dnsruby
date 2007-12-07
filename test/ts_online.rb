@@ -34,6 +34,10 @@ rescue Exception
 end
 if (online)
   #   OK - online and ready to go
+  print "Running online tests. These tests send UDP packets - some may be lost.\n"
+  print "If you get the odd timeout error with these tests, try running them again.\n"
+  print "It may just be that some UDP packets got lost the first time...\n"
+  require "test/tc_rr-opt.rb"
   require "test/tc_res_config.rb"
   require "test/tc_resolver.rb"
   require "test/tc_dns.rb"
@@ -63,16 +67,20 @@ if (online)
 
     have_openssl = false
     begin
-      require "digest/md5"
+      require "openssl"
       OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
       have_openssl=true
-    rescue Error => e
+    rescue Exception => e
       puts "----------------------------------------"
       puts "OpenSSL not present - skipping TSIG test"
       puts "----------------------------------------"
     end
     if (have_openssl)
       require "test/tc_tsig.rb"
+      puts "------------------------------------------------------"
+      puts "Running DNSSEC test - may fail if OpenSSL not complete"
+      puts "------------------------------------------------------"      
+      require "test/tc_dnssec.rb"
     end
 
     have_em = false

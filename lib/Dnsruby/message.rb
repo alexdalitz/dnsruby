@@ -255,8 +255,10 @@ module Dnsruby
       
       retval = retval + ";; HEADER SECTION\n";
       retval = retval + @header.to_s;
-      
       retval = retval + "\n";
+      
+      # @TODO@ OPT pseudosection? EDNS flags, udpsize
+            
       section = (@header.opcode == OpCode.UPDATE) ? "ZONE" : "QUESTION";
       retval = retval +  ";; #{section} SECTION (#{@header.qdcount}  record#{@header.qdcount == 1 ? '' : 's'})\n";
       each_question { |qr|
@@ -318,16 +320,8 @@ module Dnsruby
           msg.put_pack('nn', q.qtype.code, q.qclass.code)
         }
         [@answer, @authority, @additional].each {|rr|
-          rr.each {|r|
-            name = r.name
-            ttl = r.ttl
-            if (r.type == Types.TSIG)
-              msg.put_name(name, true)
-            else
-              msg.put_name(name)
-            end
-            msg.put_pack('nnN', r.type.code, r.klass.code, ttl)
-            msg.put_length16 {r.encode_rdata(msg)}
+          rr.each { |r|
+            msg.put_rr(r)
           }
         }
       }.to_s
@@ -412,8 +406,11 @@ module Dnsruby
     #Recursion Desired flag
     attr_accessor :rd
     
-    #The checking disabled flag
+    #The Checking Disabled flag
     attr_accessor :cd
+    
+    #The Authenticated Data flag
+    attr_accessor :ad
     
     #Relevant in DNSSEC context.
     #
@@ -421,9 +418,6 @@ module Dnsruby
     #cryptographically verified or the server is authoritative for the data
     #and is allowed to set the bit by policy.)
     attr_accessor :ad
-    
-    #The DO (dnssec OK) flag
-    attr_accessor :dnssec_ok
     
     #The query response flag
     attr_accessor :qr
@@ -736,8 +730,6 @@ module Dnsruby
       return rec
     end
   end 
-  class DecodeError < StandardError
-  end
   
   class MessageEncoder #:nodoc: all
     def initialize
@@ -778,12 +770,18 @@ module Dnsruby
       }
     end
     
-    def put_name(d, canonical=false)
-      put_labels(d.to_a, canonical)
+    def put_rr(rr, canonical=false)
+      # RFC4034 Section 6.2
+      put_name(rr.name, canonical)
+      put_pack("nnN", rr.type.code, rr.klass.code, rr.ttl)
+      put_length16 {rr.encode_rdata(self, canonical)}
     end
-    
-    def put_name_canonical(d)
-      put_name(d, true)
+
+    def put_name(d, canonical=false)
+      if (canonical)
+        d = d.downcase
+      end
+      put_labels(d.to_a, canonical)
     end
     
     def put_labels(d, do_canonical)
@@ -807,9 +805,6 @@ module Dnsruby
       raise RuntimeError, "length of #{s} is #{s.string.length} (larger than 63 octets)" if s.string.length > 63
       self.put_string(s.string)
     end
-  end
-  
-  class EncodeError < StandardError
   end
   
   #A Dnsruby::Question object represents a record in the

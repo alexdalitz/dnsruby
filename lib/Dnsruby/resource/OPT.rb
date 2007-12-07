@@ -117,11 +117,11 @@ module Dnsruby
         @ttl = (xrcode() << 24) + (version() << 16) + code
       end
       
-      def d_o
+      def dnssec_ok
         return ((flags() & DO_BIT) == DO_BIT)
       end
       
-      def d_o= (on)
+      def dnssec_ok=(on)
         if (on)
           set_flags(flags() | DO_BIT)
         else
@@ -178,7 +178,7 @@ module Dnsruby
         return ret
       end
       
-      def encode_rdata(msg)
+      def encode_rdata(msg, canonical=false)
         if (@options)
           @options.each do |opt|
             msg.pack('n', opt.code)

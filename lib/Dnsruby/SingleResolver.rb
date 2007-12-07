@@ -91,6 +91,9 @@ module Dnsruby
     # The address of the resolver to send queries to
     attr_reader :server
     
+    # Use DNSSEC for this SingleResolver
+    attr_reader :dnssec
+    
     #Sets the TSIG to sign outgoing messages with.
     #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
     #Pass in nil to stop tsig signing.
@@ -102,6 +105,18 @@ module Dnsruby
     #* res.tsig=nil # Stop the resolver from signing
     def tsig=(*args)
       @tsig = SingleResolver.get_tsig(args)
+    end
+    
+    MIN_DNSSEC_UDP_SIZE = 1220
+    
+    def dnssec=(on)
+      @dnssec=on
+      if (on)
+        # Set the UDP size (RFC 4035 section 4.1)
+        if (udp_packet_size < MIN_DNSSEC_UDP_SIZE)
+          self.udp_size = MIN_DNSSEC_UDP_SIZE
+        end
+      end
     end
     
     def SingleResolver.get_tsig(args)
@@ -207,7 +222,7 @@ module Dnsruby
     # SingleResolver.use_tcp
     def send_message(msg, use_tcp=@use_tcp)
       q = Queue.new
-      send_async(msg, q, Time.now + rand(10000), use_tcp)
+      send_async(msg, q, Time.now + rand(1000000), use_tcp)
       id, msg, error = q.pop
       if (error != nil)
         raise error
@@ -430,15 +445,24 @@ module Dnsruby
         packet.header.rd=true
       end
       
+      # @TODO@ Should we always set the DO bit? (RFC 4035 section 4.9.1)
+      # Is there any reason not to?
       if (@dnssec)
-        # RFC 3225
+        # RFC 4035
         TheLog.debug(";; Adding EDNS extention with UDP packetsize #{udp_packet_size} and DNS OK bit set\n")
         optrr = RR::OPT.new(udp_packet_size)   # Decimal UDPpayload
-        optrr.d_o=true
-        
+        optrr.dnssec_ok=true
+              
         packet.add_additional(optrr)
         
+        packet.header.ad = false # RFC 4035 section 4.6
+        
+        # @TODO@ Clients should be able to override this.
+        # RFC 4035 section 4.9.2
+        packet.header.cd = true # We'll check it ourselves
+              
       elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
+        #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
         TheLog.debug(";; Adding EDNS extention with UDP packetsize  #{udp_packet_size}.\n")
         # RFC 3225
         optrr = RR::OPT.new(udp_packet_size)

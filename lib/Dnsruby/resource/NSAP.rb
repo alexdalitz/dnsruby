@@ -119,7 +119,7 @@ module Dnsruby
         return rdatastr
       end
       
-      def encode_rdata(msg) #:nodoc: all
+      def encode_rdata(msg, canonical=false) #:nodoc: all
         if (defined?@afi)
           msg.put_pack("C", @afi.to_i(16))
           

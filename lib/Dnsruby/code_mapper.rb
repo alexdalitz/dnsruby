@@ -33,6 +33,7 @@ module Dnsruby
     
     attr_accessor :string, :code
     alias to_code code
+    alias to_i code
     alias to_string string
     alias to_s string
     

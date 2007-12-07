@@ -49,14 +49,14 @@ module Dnsruby
       def from_data(data) #:nodoc: all
         @certtype = CertificateTypes::new(data[0])
         @keytag = data[1]
-        @alg = DNSSEC::Algorithms.new(data[2])
+        @alg = Dnsruby::Algorithms.new(data[2])
         @cert= data[3]
       end
       
       def from_hash(hash) #:nodoc: all
         @certtype = CertificateTypes::new(hash[:certtype])
         @keytag = hash[:keytag]
-        @alg = DNSSEC::Algorithms.new(hash[:alg])
+        @alg = Dnsruby::Algorithms.new(hash[:alg])
         @cert= hash[:cert]
       end
       
@@ -65,7 +65,7 @@ module Dnsruby
           names = input.split(" ")
           @certtype = CertificateTypes::new(names[0])
           @keytag = names[1]
-          @alg = DNSSEC::Algorithms.new(names[2])
+          @alg = Dnsruby::Algorithms.new(names[2])
           @cert = names[3]
         end
       end
@@ -74,7 +74,7 @@ module Dnsruby
         return "#{@certtype.string} #{@keytag} #{@alg.string} #{@cert}"
       end
       
-      def encode_rdata(msg) #:nodoc: all
+      def encode_rdata(msg, canonical=false) #:nodoc: all
         msg.put_pack('nnn', @certtype.code, @keytag, @alg.code)
         msg.put_string(@cert)
       end

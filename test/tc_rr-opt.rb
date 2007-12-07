@@ -16,7 +16,7 @@
 require 'rubygems'
 require 'test/unit'
 require 'dnsruby'
-require 'socket.so'
+require 'socket'
 include Dnsruby
 class TestRrOpt < Test::Unit::TestCase
   def test_rropt
@@ -25,11 +25,11 @@ class TestRrOpt < Test::Unit::TestCase
     
     optrr = RR::OPT.new(size, ednsflags)
     
-    assert(optrr.d_o,"DO bit set")
-    optrr.d_o=false
+    assert(optrr.dnssec_ok,"DO bit set")
+    optrr.dnssec_ok=false
     assert_equal(optrr.flags,0x1e22,"Clearing do, leaving the other bits ");
-    assert(!optrr.d_o,"DO bit cleared")
-    optrr.d_o=true
+    assert(!optrr.dnssec_ok,"DO bit cleared")
+    optrr.dnssec_ok=true
     assert_equal(optrr.flags,0x9e22,"Clearing do, leaving the other bits ");
     
     

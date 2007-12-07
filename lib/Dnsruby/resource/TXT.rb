@@ -63,7 +63,7 @@ module Dnsruby
         return ''
       end
       
-      def encode_rdata(msg) #:nodoc: all
+      def encode_rdata(msg, canonical=false) #:nodoc: all
         msg.put_string_list(@strings)
       end
       

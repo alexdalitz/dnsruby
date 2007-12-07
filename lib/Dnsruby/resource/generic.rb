@@ -35,7 +35,7 @@ module Dnsruby
         @data = data
       end
       
-      def encode_rdata(msg) #:nodoc: all
+      def encode_rdata(msg, canonical=false) #:nodoc: all
         msg.put_bytes(data)
       end
       
@@ -143,3 +143,9 @@ require 'Dnsruby/resource/LOC'
 require 'Dnsruby/resource/OPT'
 require 'Dnsruby/resource/TSIG'
 require 'Dnsruby/resource/TKEY'
+require 'Dnsruby/resource/DNSKEY'
+require 'Dnsruby/resource/RRSIG'
+require 'Dnsruby/resource/NSEC'
+require 'Dnsruby/resource/DS'
+require 'Dnsruby/resource/NSEC3'
+require 'Dnsruby/resource/NSEC3PARAM'

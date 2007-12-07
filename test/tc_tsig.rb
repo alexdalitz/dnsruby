@@ -42,15 +42,15 @@ class TestTSig < Test::Unit::TestCase
   
   def run_test_client_signs
     tsig = Dnsruby::RR.create({
-      :name        => KEY_NAME,
-      :type        => "TSIG",
-      :ttl         => 0,
-      :klass       => "ANY",
-      :algorithm   => "hmac-md5",
-      :fudge       => 300,
-      :key         => KEY,
-      :error       => 0
-    })
+        :name        => KEY_NAME,
+        :type        => "TSIG",
+        :ttl         => 0,
+        :klass       => "ANY",
+        :algorithm   => "hmac-md5",
+        :fudge       => 300,
+        :key         => KEY,
+        :error       => 0
+      })
     
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
     # Generate update record name, and test it has been made. Then delete it and check it has been deleted
@@ -124,10 +124,10 @@ class TestTSig < Test::Unit::TestCase
     update.present(update_name, 'TXT')
     update.delete(update_name)
     tsig = Dnsruby::RR.create({
-      :type => 'TSIG', :klass => 'ANY',
-      :name        => KEY_NAME,
-      :key         => KEY
-    })
+        :type => 'TSIG', :klass => 'ANY',
+        :name        => KEY_NAME,
+        :key         => KEY
+      })
     tsig.apply(update)
     assert(update.signed?, "Update has not been signed")
     response = res.send_message(update)
@@ -177,20 +177,54 @@ class TestTSig < Test::Unit::TestCase
     assert(zt.last_tsigstate==:Verified)
   end
   
+  # We also test IXFR here - this is because we need to update a record (using
+  # TSIG) before we can test ixfr...  
   def ixfr
+    # Check the SOA serial, do an update, check that the IXFR for that soa serial gives us the update we did,
+    # then delete the updated record
+    start_soa_serial = get_soa_serial("validation-test-servers.nominet.org.uk")
+    
+    # Now do an update
+    res = Dnsruby::Resolver.new("ns0.validation-test-servers.nominet.org.uk")
+    res.query_timeout=10
+    res.tsig=KEY_NAME, KEY
+    
+    update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
+    # Generate update record name, and test it has been made. Then delete it and check it has been deleted
+    update_name = Time.now.to_i.to_s + rand(100).to_s + ".update.validation-test-servers.nominet.org.uk"
+    update.absent(update_name)
+    update.add(update_name, 'TXT', 100, "test zone transfer")
+    assert(!update.signed?, "Update has been signed")
+    
+    response = res.send_message(update)
+    assert(response.header.rcode == Dnsruby::RCode.NOERROR)
+    
+    end_soa_serial = get_soa_serial("validation-test-servers.nominet.org.uk")
+    
     zt = Dnsruby::ZoneTransfer.new
     zt.transfer_type = Dnsruby::Types.IXFR
     zt.server = "ns0.validation-test-servers.nominet.org.uk"
-    zt.tsig = Dnsruby::RR.create({
-      :type => 'TSIG', :klass => 'ANY',
-      :name        => KEY_NAME,
-      :key         => KEY
-    })
-    zt.serial = 2007090401
+    zt.serial = start_soa_serial # 2007090401
     deltas = zt.transfer("validation-test-servers.nominet.org.uk")
     assert(deltas.length > 0)
-    assert(deltas[0].class == Dnsruby::ZoneTransfer::Delta)
-    assert_equal("Should show up in transfer", deltas[0].adds[1].data)
-    assert(zt.last_tsigstate==:Verified)
+    assert(deltas.last.class == Dnsruby::ZoneTransfer::Delta)
+    assert_equal("test zone transfer", deltas.last.adds.last.strings.join(" "))
+    assert(zt.last_tsigstate==nil)
+    
+    # Now delete the updated record
+    update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
+    update.present(update_name, 'TXT')
+    update.delete(update_name)
+    response = res.send_message(update)
+    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+  end
+  
+  def get_soa_serial(name)
+    soa_serial = nil
+    Dnsruby::DNS.open {|dns|
+      soa_rr = dns.getresource(name, 'SOA')
+      soa_serial = soa_rr.serial
+    }
+    return soa_serial    
   end
 end

@@ -145,8 +145,8 @@ module Dnsruby
         return rdatastr
       end
       
-      def encode_rdata(msg) #:nodoc: all
-        msg.put_name(@algorithm)
+      def encode_rdata(msg, canonical=false) #:nodoc: all
+        msg.put_name(@algorithm, canonical)
         msg.put_pack("NNnn", @inception, @expiration, @mode, @error)
         msg.put_pack("n", @key.length)
         msg.put_bytes(@key)

@@ -14,9 +14,7 @@
 #limitations under the License.
 #++
 require 'base64'
-require "digest/md5"
-require "digest/sha1"
-#require "digest/sha256"
+require 'openssl'
 module Dnsruby
   class RR
     #TSIG implements RFC2845.
@@ -68,9 +66,6 @@ module Dnsruby
           time_signed = tsig_rr.time_signed
         end
         
-        key = @key.gsub(" ", "")
-        key = Base64::decode64(key)
-              
         if (original_request)
           #	# Add the request MAC if present (used to validate responses).
           #	  hmac.update(pack("H*", request_mac))
@@ -100,19 +95,8 @@ module Dnsruby
         
         data += sig_data(tsig_rr, time_signed)
         
-        mac=nil
-
-        if (tsig_rr.algorithm == HMAC_MD5)
-          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, key, data)
-        elsif (tsig_rr.algorithm == HMAC_SHA1)
-          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA1.new, key, data)
-        elsif (tsig_rr.algorithm == HMAC_SHA256)
-          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA256.new, key, data)
-        else
-          # Should we allow client to pass in their own signing function?
-          raise RuntimeError.new("Algorithm #{tsig_rr.algorithm} unsupported by TSIG")
-        end
-
+        mac = calculate_mac(tsig_rr.algorithm, data)
+        
         mac_size = mac.length
 
         new_tsig_rr = Dnsruby::RR.create({
@@ -131,6 +115,23 @@ module Dnsruby
           })
         return new_tsig_rr
         
+      end
+      
+      def calculate_mac(algorithm, data)
+        mac=nil
+        key = @key.gsub(" ", "")
+        key = Base64::decode64(key)
+        if (algorithm == HMAC_MD5)
+          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, key, data)
+        elsif (algorithm == HMAC_SHA1)
+          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA1.new, key, data)
+        elsif (algorithm == HMAC_SHA256)
+          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA256.new, key, data)
+        else
+          # Should we allow client to pass in their own signing function?
+          raise VerifyError.new("Algorithm #{algorithm} unsupported by TSIG")
+        end
+        return mac
       end
       
       # Private method to return the TSIG RR data to be signed
@@ -334,19 +335,7 @@ module Dnsruby
         }.to_s
         @buf += timers_data
         
-        mac = nil
-        key = @key.gsub(" ", "")
-        key = Base64::decode64(key)
-        if (tsig.algorithm == HMAC_MD5)
-          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, key, @buf)
-        elsif (tsig.algorithm == HMAC_SHA1)
-          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA1.new, key, @buf)
-        elsif (tsig.algorithm == HMAC_SHA256)
-          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA256.new, key, @buf)
-        else
-          # Should we allow client to pass in their own signing function?
-          raise RuntimeError.new("Algorithm #{tsig.algorithm} unsupported by TSIG")
-        end
+        mac = calculate_mac(tsig.algorithm, @buf)
 
         if (mac != tsig.mac)
           TheLog.error("TSIG Verify error on TSIG TCP session")
@@ -542,7 +531,7 @@ module Dnsruby
         return rdatastr
       end
       
-      def encode_rdata(msg) #:nodoc: all
+      def encode_rdata(msg, canonical=false) #:nodoc: all
         # Name needs to be added with no compression - done in Dnsruby::Message#encode
         msg.put_name(@algorithm.downcase, true)
         time_high = (@time_signed >> 32)
