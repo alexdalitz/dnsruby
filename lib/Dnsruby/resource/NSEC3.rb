@@ -64,6 +64,10 @@ module Dnsruby
         @types = NSEC.get_types(t)
       end
       
+      def add_type(t)
+        self.types=(@types + [t])
+      end
+      
       def flags=(f)
         if (f==0 || f==1)
           @flags=f

@@ -119,7 +119,7 @@ module Dnsruby
     attr_accessor :retry_times, :retry_delay
     
     # Use DNSSEC for this Resolver
-    attr_accessor :dnssec
+    attr_reader :dnssec
     
     @@use_eventmachine=false
     @@start_eventmachine_loop=true
@@ -393,7 +393,7 @@ module Dnsruby
       @single_resolvers.each do |res|
         [:port, :use_tcp, :tsig, :ignore_truncation, :packet_timeout, 
           :src_address, :src_port, :persistent_tcp, :persistent_udp, :recurse, 
-          :udp_size].each do |param|
+          :udp_size, :dnssec].each do |param|
           
           res.send(param.to_s+"=", instance_variable_get("@"+param.to_s))
         end
@@ -473,6 +473,11 @@ module Dnsruby
     
     def recurse=(a)
       @recurse = a
+      update
+    end
+    
+    def dnssec=(d)
+      @dnssec = d
       update
     end
     

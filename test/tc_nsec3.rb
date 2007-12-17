@@ -52,4 +52,12 @@ class Nsec3Test < Test::Unit::TestCase
     end
   end
   
+  def test_nsec_types
+    # Test types in last section to 65536.
+    #Test no zeros
+    nsec = Dnsruby::RR.create(INPUT)
+    nsec.add_type(Types.TYPE65534)
+    assert(nsec.types.include?(Types.TYPE65534))
+    assert(nsec.to_s.include?(Types.TYPE65534.string))
+  end
 end

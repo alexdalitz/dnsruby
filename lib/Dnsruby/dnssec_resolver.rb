@@ -49,6 +49,12 @@ module Dnsruby
     def self.verify_signature(rrset, sigrec, keyrec)
       # RFC 4034
       #3.1.8.1.  Signature Calculation
+      
+      if (keyrec.sep_key? && !keyrec.zone_key?)
+        TheLog.error("DNSKEY with with SEP flag set and Zone Key flag not set was used to verify RRSIG over RRSET - this is not allowed by RFC4034 section 2.1.1")
+        # @TODO@ Raise an exception?
+        return false
+      end
     
       check_rr_data(rrset, sigrec)
 
@@ -79,6 +85,20 @@ module Dnsruby
     
       # And compare the signature with the rrsig signature field
       return verified
+      
+      # @TODO@
+      #If the resolver accepts the RRset as authentic, the validator MUST
+      #set the TTL of the RRSIG RR and each RR in the authenticated RRset to
+      #a value no greater than the minimum of:
+
+      #o  the RRset's TTL as received in the response;
+
+      #o  the RRSIG RR's TTL as received in the response;
+
+      #o  the value in the RRSIG RR's Original TTL field; and
+
+      #o  the difference of the RRSIG RR's Signature Expiration time and the
+      #current time.
     end
   
     # @TODO@ Add methods which look up a cache of trusted keys to sign rrset

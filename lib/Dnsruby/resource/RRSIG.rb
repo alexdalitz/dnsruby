@@ -75,6 +75,18 @@ module Dnsruby
       #Covered field
       attr_accessor :signature
       
+      def init_defaults
+        @algorithm=Algorithms.RSASHA1
+        @type_covered = Types.A
+        @original_ttl = 3600
+        @inception = Time.now.to_i
+        @expiration = Time.now.to_i
+        @key_tag = 0
+        @labels = 0
+        self.signers_name="."
+        @signature = "\0"
+      end
+      
       def algorithm=(a)
         if (a.instance_of?String)
           if (a.length == 1)
@@ -125,13 +137,16 @@ module Dnsruby
           self.original_ttl=data[3].to_i
           self.expiration=get_time(data[4])
           self.inception=get_time(data[6])
-          self.key_tag=data[7]
+          self.key_tag=data[7].to_i
           self.signers_name=(data[8])
           self.signature=Base64.decode64(data[9])
         end
       end
       
       def get_time(input)
+        if (input.kind_of?Fixnum)
+          return input
+        end
         # RFC 4034, section 3.2
         #The Signature Expiration Time and Inception Time field values MUST be
         #   represented either as an unsigned decimal integer indicating seconds
@@ -158,7 +173,7 @@ module Dnsruby
           hour=input[8,2]
           min=input[10,2]
           sec=input[12,2]
-          return Time.mktime(year, mon, day, hour, min, sec)
+          return Time.mktime(year, mon, day, hour, min, sec).to_i
         else
           raise DecodeError.new("RRSIG : Illegal time value #{input} - see RFC 4034 section 3.2")
         end
@@ -168,7 +183,7 @@ module Dnsruby
         if (@type_covered!=nil)
           signature = Base64.encode64(@signature).gsub(/\n/, "")
           return "#{@type_covered.string} #{@algorithm.string} #{@labels} #{@original_ttl} " + 
-            "#{@expiration.to_i} ( #{@inception.to_i} #{@key_tag.to_i} #{@signers_name} #{signature} )"
+            "#{@expiration} ( #{@inception} #{@key_tag} #{@signers_name} #{signature} )"
         else
           return ""
         end

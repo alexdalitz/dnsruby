@@ -7,8 +7,7 @@ class Nsec3ParamTest < Test::Unit::TestCase
   include Dnsruby
   def test_nsec_from_string
     nsec = Dnsruby::RR.create(INPUT)
-    print nsec.to_s + "\n"
-    # @TODO@
+
     assert_equal(Dnsruby::Algorithms.RSAMD5, nsec.hash_alg)
     assert_equal(0, nsec.flags)
     assert_equal(12, nsec.iterations)

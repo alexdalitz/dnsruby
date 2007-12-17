@@ -177,7 +177,7 @@ module Dnsruby
       @recurse = true
       @persistent_udp = false
       @persistent_tcp = false
-      @dnssec = false
+      self.dnssec = true
       
       if (arg==nil)
         # Get default config
@@ -445,8 +445,6 @@ module Dnsruby
         packet.header.rd=true
       end
       
-      # @TODO@ Should we always set the DO bit? (RFC 4035 section 4.9.1)
-      # Is there any reason not to?
       if (@dnssec)
         # RFC 4035
         TheLog.debug(";; Adding EDNS extention with UDP packetsize #{udp_packet_size} and DNS OK bit set\n")
@@ -457,9 +455,7 @@ module Dnsruby
         
         packet.header.ad = false # RFC 4035 section 4.6
         
-        # @TODO@ Clients should be able to override this.
-        # RFC 4035 section 4.9.2
-        packet.header.cd = true # We'll check it ourselves
+        packet.header.cd = false # We trust the upstream resolver and the link to it
               
       elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
         #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)

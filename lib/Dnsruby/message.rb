@@ -59,6 +59,23 @@ module Dnsruby
   #      Dnsruby::Message#encode
   #      Dnsruby::Message::decode(data)
   class Message
+    class Section < Array
+      # Return the rrset of the specified type in this section
+      def rrset(type, klass=Classes::IN)
+        rrs = select{|rr| 
+          (type_ok = rr.type==type)
+          if (rr.type == Types.RRSIG)
+            type_ok = (rr.type_covered == type)
+          end
+          type_ok && rr.klass == klass          
+          }
+        rrset = RRSet.new
+        rrs.each do |rr|
+          rrset.add(rr)
+        end
+        return rrset
+      end
+    end
     #Create a new Message. Takes optional name, type and class
     # 
     #type defaults to A, and klass defaults to IN
@@ -69,10 +86,10 @@ module Dnsruby
     #    
     def initialize(*args)
       @header = Header.new()
-      @question = []
-      @answer = []
-      @authority = []
-      @additional = []
+      @question = Section.new
+      @answer = Section.new
+      @authority = Section.new
+      @additional = Section.new
       @tsigstate = :Unsigned
       @signing = false
       @tsigkey = nil
@@ -136,6 +153,16 @@ module Dnsruby
           @additional == other.additional
       end
       return ret
+    end
+    
+    # Return the rrset of the specified type in any section
+    def rrset(type, klass=Classes::IN)
+      [@answer, @authority, @additional].each do |section|
+        if ((rrset = section.rrset(type, klass)).length > 0)
+          return rrset
+        end
+      end
+      return nil
     end
     
     #Add a new Question to the Message. Takes either a Question, 

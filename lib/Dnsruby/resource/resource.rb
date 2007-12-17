@@ -21,18 +21,38 @@ module Dnsruby
   # with the same label, class and type, but with different data.  Such a
   # group of records is hereby defined to be a Resource Record Set
   # (RRSet)."
+  # This class also stores the RRSIG records which cover the RRSet
   class RRSet
+    # The number of RRSIGs stored in this RRSet
+    attr_reader :num_sigs
     def initialize()
       @rrs = []
+      @num_sigs = 0
+    end
+    # The RRSIGs stored with this RRSet
+    def sigs
+      return @rrs[@rrs.length-@num_sigs, @num_sigs]
+    end
+    # The RRs (not RRSIGs) stored in this RRSet
+    def rrs
+      return @rrs[0, @rrs.length-@num_sigs]
+    end
+    def privateAdd(r) #:nodoc:
+      new_pos = @rrs.length - @num_sigs
+      if (r.type == Types.RRSIG)
+        new_pos = @rrs.length
+        @num_sigs += 1
+      end
+      @rrs.insert(new_pos, r)
     end
     #Add the RR to this RRSet
     def add(r)
       r = RR.create(r.to_s) # clone the record
       if @rrs.include?r
         return false
-      end
-      if (@rrs.size() == 0)
-        @rrs.push(r)
+      end      
+      if (@rrs.size() == 0 && !(r.type == Types.RRSIG))
+        privateAdd(r)
         return true
       end
       # Check the type, klass and ttl are correct
@@ -52,8 +72,9 @@ module Dnsruby
       end
       
       if (!@rrs.include?(r))
-        @rrs.push(r)
+        privateAdd(r)
       end
+      return true
     end
     
     #Return a new RRset which contains the RRs from this
@@ -62,7 +83,7 @@ module Dnsruby
       #Make a list, for all the RRs, where each RR contributes 
       #the canonical RDATA encoding
       canonical_rrs = []
-      @rrs.each do |rr|
+      self.rrs.each do |rr|
         data = MessageEncoder.new {|msg|
           msg.put_rr(rr, true)
         }.to_s
@@ -119,6 +140,9 @@ module Dnsruby
         ret += rec.to_s + "\n"
       }
       return ret
+    end
+    def length
+      return @rrs.length
     end
   end
   
@@ -178,7 +202,15 @@ module Dnsruby
     # This compares the name, type, and class of the Records; the ttl and
     # rdata are not compared.
     def sameRRset(rec)
-      return (@type == rec.type && @klass == rec.klass && @name== rec.name)
+      if (@klass != rec.klass || @name != rec.name)
+        return false
+      end
+      [rec, self].each { |rr|
+        if (rr.type == Types.RRSIG)
+          return ((@type == rr.type_covered) || (rec.type == rr.type_covered))
+        end
+      }
+      return (@type == rec.type)
     end
     
     def init_defaults

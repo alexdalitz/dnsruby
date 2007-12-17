@@ -20,20 +20,14 @@ class DnssecTest < Test::Unit::TestCase
 
     keyrec = nil
     r = res.query("bigzone.uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
-    keys = r.answer.select{|rr| rr.type==Dnsruby::Types.DNSKEY}
+    keys = r.answer.rrset('DNSKEY')
     
     r = res.query("aaa.bigzone.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-    rrset = Dnsruby::RRSet.new
-    sigrec = nil
-    r.each_authority {|rec|
-      if (rec.type.string == 'NSEC')
-        rrset.add(rec)
-      elsif (rec.type.string == 'RRSIG')
-        sigrec = rec
-      end
-    }
+    rrset = r.rrset('NSEC')
+    sigrec = rrset.sigs[0]
     
-    keys.each {|key|
+    # @TODO@ This should be done by the verifier
+    keys.rrs.each {|key|
       if (key.key_tag == sigrec.key_tag)
         keyrec = key
       end
@@ -48,6 +42,13 @@ class DnssecTest < Test::Unit::TestCase
     assert(ret, "Dnssec verification failed")
   end
   
+  def test_se_query
+    # @TODO@ Run some queries on the .se zone
+    res = Dnsruby::SingleResolver.new("a.ns.se")
+    r = res.query("se", Dnsruby::Types.ANY)    
+    print r
+  end
+    
   def test_follow_chain_of_trust
     # Descend from the trusted key for the root of uk-dnssec.nic.uk to ensure
     # that NS record for aaa.bigzone.uk-dnssec.nic.uk is properly signed by a
