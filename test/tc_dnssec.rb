@@ -38,7 +38,7 @@ class DnssecTest < Test::Unit::TestCase
 #    print "keyrec : #{keyrec.to_s}\n"
 #    print "keyrec tag =  : #{keyrec.key_tag.to_s}\n"
     # Now get the DNSKEY and check that the RRSET is signed properly.
-    ret = Dnsruby::DnssecResolver.verify_signature(rrset, sigrec, keyrec)
+    ret = Dnsruby::DnssecVerifier.verify_signature(rrset, sigrec, keyrec)
     assert(ret, "Dnssec verification failed")
   end
   

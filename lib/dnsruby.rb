@@ -496,7 +496,7 @@ module Dnsruby
     require 'Dnsruby/message'
     require 'Dnsruby/update'
     require 'Dnsruby/zone_transfer'
-    require 'Dnsruby/dnssec_resolver'
+    require 'Dnsruby/dnssec'
     
     #Default Resolver to use for Dnsruby class methods
     DefaultResolver = self.new

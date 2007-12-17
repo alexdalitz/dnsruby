@@ -9,7 +9,7 @@
 #   the zone administrators and the stub resolver itself. 
 
 module Dnsruby
-  class DnssecResolver # Maybe DnssecVerifier?
+  class DnssecVerifier
     # @TODO@ Maybe write a recursive validating resolver?
     def initialize
     
