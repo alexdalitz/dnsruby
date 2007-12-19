@@ -68,12 +68,29 @@ module Dnsruby
             type_ok = (rr.type_covered == type)
           end
           type_ok && rr.klass == klass          
-          }
+        }
         rrset = RRSet.new
         rrs.each do |rr|
           rrset.add(rr)
         end
         return rrset
+      end
+      
+      # Return an array of all the rrsets in the section
+      def rrsets
+        ret = []
+        each do |rr|
+          next if (rr.type == Types.OPT)
+          found_rrset = false
+          ret.each do |rrset|
+            found_rrset = rrset.add(rr)
+            break if found_rrset
+          end
+          if (!found_rrset)
+            ret.push(RRSet.new(rr))
+          end
+        end
+        return ret        
       end
     end
     #Create a new Message. Takes optional name, type and class
@@ -155,14 +172,24 @@ module Dnsruby
       return ret
     end
     
-    # Return the rrset of the specified type in any section
-    def rrset(type, klass=Classes::IN)
-      [@answer, @authority, @additional].each do |section|
-        if ((rrset = section.rrset(type, klass)).length > 0)
-          return rrset
-        end
-      end
-      return nil
+    #    # Return the rrset of the specified type in the  section
+    #    def rrset(type, klass=Classes::IN)
+    #      [@answer, @authority, @additional].each do |section|
+    #        if ((rrset = section.rrset(type, klass)).length > 0)
+    #          return rrset
+    #        end
+    #      end
+    #      return nil
+    #    end
+    
+    # Return a hash, with the section as key, and the RRSets in that
+    # section as the data : {section => section_rrs}
+    def section_rrsets
+      ret = {}
+      ["answer", "authority", "additional"].each do |section|
+        ret[section] = self.send(section).rrsets
+      end  
+      return ret      
     end
     
     #Add a new Question to the Message. Takes either a Question, 
@@ -223,6 +250,11 @@ module Dnsruby
       @additional.each {|rec|
         yield rec
       }
+    end
+    
+    #Yields each section (question, answer, authority, additional)
+    def each_section
+      [@answer, @authority, @additional].each {|section| yield section}
     end
     
     #Calls each_answer, each_authority, each_additional

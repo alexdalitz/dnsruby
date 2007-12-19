@@ -40,11 +40,7 @@ class RrsetTest < Test::Unit::TestCase
         :inception => Time.mktime(2003,02,20,17,31,03).to_i,
         :key_tag => 2642
       })
-    begin
-      rrset.add(sig)
-      assert(false)
-    rescue ArgumentError
-    end
+    assert(!rrset.add(sig))
     assert(rrset.sigs.length == 0)
     assert(rrset.num_sigs == 0)
     assert(rrset.rrs.length == 3)
@@ -54,11 +50,7 @@ class RrsetTest < Test::Unit::TestCase
     assert(rrset.num_sigs == 1)
     assert(rrset.rrs.length == 3)
     sig.name="example.co.uk"
-    begin
-      rrset.add(sig)
-      assert(false)
-    rescue ArgumentError
-    end
+    assert(!rrset.add(sig))
     assert(rrset.sigs.length == 1)
     assert(rrset.num_sigs == 1)
     assert(rrset.rrs.length == 3)

@@ -35,7 +35,7 @@ module Dnsruby
       #See Dnsruby::Algorithms for permitted values
       attr_reader :algorithm
       #The public key
-      attr_accessor :key
+      attr_reader :key
       
       def protocol=(p)
         if (p!=3)
@@ -107,13 +107,28 @@ module Dnsruby
           self.flags=(data[0].to_i)
           self.protocol=(data[1].to_i)
           self.algorithm=(data[2])
-          @key=Base64.decode64(data[4])
+          # key can include whitespace - include all text
+          # until we come to " )" at the end, and then gsub
+          # the white space out
+          # Also, brackets may or may not be present
+          buf = ""
+          index = 3
+          end_index = data.length - 1
+          if (data[index]=="(")
+            end_index = data.length - 2
+            index = 4
+          end
+          (index..end_index).each {|i|
+            buf += data[i]
+          }
+          self.key=(buf)
         end
       end
       
       def rdata_to_string #:nodoc: all
         if (@flags!=nil)
-          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key).gsub(/\n/, "")} )"
+#          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s).gsub(/\n/, "")} )"
+          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s)} )"
         else
           return ""
         end
@@ -164,24 +179,33 @@ module Dnsruby
         return tag
       end
       
+      def key=(key_text)
+          key_text.gsub!(/\n/, "")
+          key_text.gsub!(/ /, "")
+          @key=Base64.decode64(key_text)        
+      end
+      
       def public_key
-        if (@algorithm == Algorithms.RSASHA1)
-          return rsa_key
+        if (@public_key==nil)
+          if (@algorithm == Algorithms.RSASHA1)
+            @public_key = rsa_key
+          end
         end
         # @TODO@ Support other key encodings!
+        return @public_key
       end
       
       def rsa_key
-	exponentLength = @key[0]
+        exponentLength = @key[0]
         pos = 1
-	if (exponentLength == 0)
+        if (exponentLength == 0)
           exponentLength = (@key[1]<<8) + @key[1]
           pos += 2
         end
-	exponent = get_num(@key[pos, exponentLength])
+        exponent = get_num(@key[pos, exponentLength])
         pos += exponentLength
 
-	modulus = get_num(@key[pos, @key.length])
+        modulus = get_num(@key[pos, @key.length])
 
         key = OpenSSL::PKey::RSA.new
         key.e = exponent

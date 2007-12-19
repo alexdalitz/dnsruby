@@ -386,6 +386,7 @@ module Dnsruby
       @persistent_udp = false
       @persistent_tcp = false
       @single_resolvers=[]
+      @dnssec = true
     end
     
     def update #:nodoc: all
@@ -674,6 +675,11 @@ module Dnsruby
           elsif (error.kind_of?NXDomain)
             #   - if it was an NXDomain, then return that to the client, and stop all new queries (and clean up)
             TheLog.debug("NXDomain - returning to client")
+            cancel_queries(persistent_data)
+            return_to_client(persistent_data.deferrable, client_queue, client_query_id, response, error)
+          elsif (error.kind_of?FormErr)
+            #   - if it was a FormErr, then return that to the client, and stop all new queries (and clean up)
+            TheLog.debug("FormErr - returning to client")
             cancel_queries(persistent_data)
             return_to_client(persistent_data.deferrable, client_queue, client_query_id, response, error)
           else

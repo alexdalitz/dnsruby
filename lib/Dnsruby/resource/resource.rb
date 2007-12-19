@@ -25,9 +25,13 @@ module Dnsruby
   class RRSet
     # The number of RRSIGs stored in this RRSet
     attr_reader :num_sigs
-    def initialize()
+    def initialize(rrs = [])
+      if (!rrs.instance_of?Array)
+        rrs = [rrs]
+      end
       @rrs = []
       @num_sigs = 0
+      rrs.each {|rr| add(rr)}
     end
     # The RRSIGs stored with this RRSet
     def sigs
@@ -38,42 +42,49 @@ module Dnsruby
       return @rrs[0, @rrs.length-@num_sigs]
     end
     def privateAdd(r) #:nodoc:
+      if @rrs.include?r
+        return true
+      end      
       new_pos = @rrs.length - @num_sigs
+      if ((@num_sigs == @rrs.length)  && @num_sigs > 0) # if we added RRSIG first
+        if (r.type != @rrs.last.type_covered)
+          return false
+        end
+      end
       if (r.type == Types.RRSIG)
         new_pos = @rrs.length
         @num_sigs += 1
       end
       @rrs.insert(new_pos, r)
+      return true
     end
+
     #Add the RR to this RRSet
     def add(r)
       r = RR.create(r.to_s) # clone the record
-      if @rrs.include?r
-        return false
-      end      
-      if (@rrs.size() == 0 && !(r.type == Types.RRSIG))
-        privateAdd(r)
-        return true
+      if (@rrs.size() == 0) #  && !(r.type == Types.RRSIG))
+        return privateAdd(r)
       end
       # Check the type, klass and ttl are correct
       first = @rrs[0]
       if (!r.sameRRset(first))
-        raise ArgumentError.new("record does not match rrset")
+        return false
+#        raise ArgumentError.new("record does not match rrset")
       end
       
-      if (r.ttl != first.ttl) # RFC2181, section 5.2
-        if (r.ttl > first.ttl)
-          r.ttl=(first.ttl)
-        else
-          @rrs.each do |rr|
-            rr.ttl = r.ttl
+      if (!(r.type == Types.RRSIG) && (!(first.type == Types.RRSIG)))
+        if (r.ttl != first.ttl) # RFC2181, section 5.2
+          if (r.ttl > first.ttl)
+            r.ttl=(first.ttl)
+          else
+            @rrs.each do |rr|
+              rr.ttl = r.ttl
+            end
           end
         end
       end
       
-      if (!@rrs.include?(r))
-        privateAdd(r)
-      end
+        return privateAdd(r)
       return true
     end
     
@@ -130,6 +141,13 @@ module Dnsruby
     #Return the ttl of this RRSet
     def ttl
       return @rrs[0].ttl
+    end
+    def ttl=(ttl)
+      [rrs, sigs].each {|rrs|
+        rrs.each {|rr|
+          rr.ttl = ttl
+        }
+      }
     end
     def name
       return @rrs[0].name

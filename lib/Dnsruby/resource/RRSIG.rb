@@ -136,10 +136,26 @@ module Dnsruby
           self.labels=data[2].to_i
           self.original_ttl=data[3].to_i
           self.expiration=get_time(data[4])
-          self.inception=get_time(data[6])
-          self.key_tag=data[7].to_i
-          self.signers_name=(data[8])
-          self.signature=Base64.decode64(data[9])
+          # Brackets may also be present
+          index = 5
+          end_index = data.length - 1
+          if (data[index]=="(")
+            index = 6
+            end_index = data.length - 2
+          end
+          self.inception=get_time(data[index])
+          self.key_tag=data[index+1].to_i
+          self.signers_name=(data[index+2])
+          # signature can include whitespace - include all text
+          # until we come to " )" at the end, and then gsub
+          # the white space out
+          buf=""
+          (index+3..end_index).each {|i|
+            buf += data[i]
+          }
+          buf.gsub!(/\n/, "")
+          buf.gsub!(/ /, "")
+          self.signature=Base64.decode64(buf)
         end
       end
       
@@ -181,7 +197,7 @@ module Dnsruby
       
       def rdata_to_string #:nodoc: all
         if (@type_covered!=nil)
-          signature = Base64.encode64(@signature).gsub(/\n/, "")
+          signature = Base64.encode64(@signature) # .gsub(/\n/, "")
           return "#{@type_covered.string} #{@algorithm.string} #{@labels} #{@original_ttl} " + 
             "#{@expiration} ( #{@inception} #{@key_tag} #{@signers_name} #{signature} )"
         else

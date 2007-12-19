@@ -19,140 +19,161 @@ require 'dnsruby'
 include Dnsruby
 class TestPacket < Test::Unit::TestCase
   def test_packet
-      domain = "example.com"
-      type = "MX"
-      klass = "IN"
+    domain = "example.com"
+    type = "MX"
+    klass = "IN"
       
-        packet = Message.new(domain, type, klass)
+    packet = Message.new(domain, type, klass)
       
-      assert(packet,                                 'new() returned something');         #2
-      assert(packet.header,                         'header() method works');            #3
-      assert_instance_of(Header,packet.header,'header() returns right thing');     #4
-      
-      
-      question = packet.question;
-      assert(question && question.length == 1,             'question() returned right number of items'); #5
-#      assert_instance_of(Net::DNS::Question,question[0], 'question() returned the right thing');       #6
-      
-      answer = packet.answer;
-      assert(answer.length == 0,     'answer() works when empty');     #7
+    assert(packet,                                 'new() returned something');         #2
+    assert(packet.header,                         'header() method works');            #3
+    assert_instance_of(Header,packet.header,'header() returns right thing');     #4
       
       
-      authority = packet.authority;
-      assert(authority.length == 0,  'authority() works when empty');  #8
+    question = packet.question;
+    assert(question && question.length == 1,             'question() returned right number of items'); #5
+    #      assert_instance_of(Net::DNS::Question,question[0], 'question() returned the right thing');       #6
       
-      additional = packet.additional;
-      assert(additional.length == 0, 'additional() works when empty'); #9
-      
-      packet.add_answer(RR.create(   { 
-              :name    => "a1.example.com", 
-		      :type    => Types.A,  
-		      :address => "10.0.0.1"}));
-      assert_equal(1, packet.header.ancount, 'First push into answer section worked');      #10
+    answer = packet.answer;
+    assert(answer.length == 0,     'answer() works when empty');     #7
       
       
-      packet.add_answer(RR.create({:name    => "a2.example.com",
-		      :type    => "A", :address => "10.0.0.2"}));
-      assert_equal(packet.header.ancount, 2, 'Second push into answer section worked');     #11
+    authority = packet.authority;
+    assert(authority.length == 0,  'authority() works when empty');  #8
+      
+    additional = packet.additional;
+    assert(additional.length == 0, 'additional() works when empty'); #9
+      
+    packet.add_answer(RR.create(   { 
+          :name    => "a1.example.com", 
+          :type    => Types.A,  
+          :address => "10.0.0.1"}));
+    assert_equal(1, packet.header.ancount, 'First push into answer section worked');      #10
       
       
-      packet.add_authority(RR.create({:name    => "a3.example.com",
-		      :type    => "A",
-		      :address => "10.0.0.3"}));
-      assert_equal(1, packet.header.nscount, 'First push into authority section worked');   #12
+    packet.add_answer(RR.create({:name    => "a2.example.com",
+          :type    => "A", :address => "10.0.0.2"}));
+    assert_equal(packet.header.ancount, 2, 'Second push into answer section worked');     #11
       
       
-      packet.add_authority(RR.create( {
-		      :name    => "a4.example.com",
-		      :type    => "A",
-		      :address => "10.0.0.4"}));
-      assert_equal(2, packet.header.nscount, 'Second push into authority section worked');  #13
+    packet.add_authority(RR.create({:name    => "a3.example.com",
+          :type    => "A",
+          :address => "10.0.0.3"}));
+    assert_equal(1, packet.header.nscount, 'First push into authority section worked');   #12
       
-      packet.add_additional(RR.create({
-		      :name    => "a5.example.com",
-		      :type    => "A",
-		      :address => "10.0.0.5"}));
-      assert_equal(1, packet.header.adcount, 'First push into additional section worked');  #14
       
-      packet.add_additional(RR.create(  {
-		      :name    => "a6.example.com",
-		      :type    => Types.A,
-		      :address => "10.0.0.6"}));
-      assert_equal(2, packet.header.adcount, 'Second push into additional section worked'); #15
+    packet.add_authority(RR.create( {
+          :name    => "a4.example.com",
+          :type    => "A",
+          :address => "10.0.0.4"}));
+    assert_equal(2, packet.header.nscount, 'Second push into authority section worked');  #13
       
-      data = packet.encode;
+    packet.add_additional(RR.create({
+          :name    => "a5.example.com",
+          :type    => "A",
+          :address => "10.0.0.5"}));
+    assert_equal(1, packet.header.adcount, 'First push into additional section worked');  #14
       
-      packet2 = Message.decode(data);
+    packet.add_additional(RR.create(  {
+          :name    => "a6.example.com",
+          :type    => Types.A,
+          :address => "10.0.0.6"}));
+    assert_equal(2, packet.header.adcount, 'Second push into additional section worked'); #15
       
-      assert(packet2, 'new() from data buffer works');   #16
+    data = packet.encode;
+      
+    packet2 = Message.decode(data);
+      
+    assert(packet2, 'new() from data buffer works');   #16
 
-      assert_equal(packet.to_s, packet2.to_s, 'inspect() works correctly');  #17
+    assert_equal(packet.to_s, packet2.to_s, 'inspect() works correctly');  #17
       
       
-      string = packet2.to_s
-      6.times do |count|
-            	ip = "10.0.0.#{count+1}";
-      	assert(string =~ /#{ip}/,  "Found #{ip} in packet");  # 18 though 23
-      end
+    string = packet2.to_s
+    6.times do |count|
+      ip = "10.0.0.#{count+1}";
+      assert(string =~ /#{ip}/,  "Found #{ip} in packet");  # 18 though 23
+    end
       
-      assert_equal(1, packet2.header.qdcount, 'header question count correct');   #24
-      assert_equal(2, packet2.header.ancount, 'header answer count correct');     #25
-      assert_equal(2, packet2.header.nscount, 'header authority count correct');  #26 
-      assert_equal(2, packet2.header.adcount, 'header additional count correct'); #27
+    assert_equal(1, packet2.header.qdcount, 'header question count correct');   #24
+    assert_equal(2, packet2.header.ancount, 'header answer count correct');     #25
+    assert_equal(2, packet2.header.nscount, 'header authority count correct');  #26 
+    assert_equal(2, packet2.header.adcount, 'header additional count correct'); #27
       
       
       
-      # Test using a predefined answer. This is an answer that was generated by a bind server.
-      #
+    # Test using a predefined answer. This is an answer that was generated by a bind server.
+    #
       
-#      data=["22cc85000001000000010001056461636874036e657400001e0001c00c0006000100000e100025026e730472697065c012046f6c6166c02a7754e1ae0000a8c0000038400005460000001c2000002910000000800000050000000030"].pack("H*");
-uuencodedPacket =%w{
+    #      data=["22cc85000001000000010001056461636874036e657400001e0001c00c0006000100000e100025026e730472697065c012046f6c6166c02a7754e1ae0000a8c0000038400005460000001c2000002910000000800000050000000030"].pack("H*");
+    uuencodedPacket =%w{
 22 cc 85 00 00 01 00 00 00 01 00 01 05 64 61 63 
 68 74 03 6e 65 74 00 00 1e 00 01 c0 0c 00 06 00 
 01 00 00 0e 10 00 25 02 6e 73 04 72 69 70 65 c0 
 12 04 6f 6c 61 66 c0 2a 77 54 e1 ae 00 00 a8 c0 
 00 00 38 40 00 05 46 00 00 00 1c 20 00 00 29 10 
 00 00 00 80 00 00 05 00 00 00 00 30
-}
+    }
     uuencodedPacket.map!{|e| e.hex}
     packetdata = uuencodedPacket.pack('c*')
 
-      packet3 = Message.decode(packetdata)
-      assert(packet3,                                 'new(\data) returned something');         #28
+    packet3 = Message.decode(packetdata)
+    assert(packet3,                                 'new(\data) returned something');         #28
       
-      assert_equal(packet3.header.qdcount, 1, 'header question count in syntetic packet correct');   #29
-      assert_equal(packet3.header.ancount, 0, 'header answer count in syntetic packet correct');     #30
-      assert_equal(packet3.header.nscount, 1, 'header authority count in syntetic packet  correct'); #31 
-      assert_equal(packet3.header.adcount, 1, 'header additional in sytnetic  packet correct');      #32
+    assert_equal(packet3.header.qdcount, 1, 'header question count in syntetic packet correct');   #29
+    assert_equal(packet3.header.ancount, 0, 'header answer count in syntetic packet correct');     #30
+    assert_equal(packet3.header.nscount, 1, 'header authority count in syntetic packet  correct'); #31 
+    assert_equal(packet3.header.adcount, 1, 'header additional in sytnetic  packet correct');      #32
       
-      rr=packet3.additional;
+    rr=packet3.additional;
       
-      assert_equal(Types.OPT, rr[0].type, "Additional section packet is EDNS0 type");                         #33
-      assert_equal(4096, rr[0].klass.code, "EDNS0 packet size correct");                                     #34
+    assert_equal(Types.OPT, rr[0].type, "Additional section packet is EDNS0 type");                         #33
+    assert_equal(4096, rr[0].klass.code, "EDNS0 packet size correct");                                     #34
       
-      # In theory its valid to have multiple questions in the question section.
-      # Not many servers digest it though.
+    # In theory its valid to have multiple questions in the question section.
+    # Not many servers digest it though.
       
-      packet.add_question("bla.foo", Types::TXT, Classes.CH)
-      question = packet.question
-      assert_equal(2, question.length,             'question() returned right number of items poptest:2'); #36            
+    packet.add_question("bla.foo", Types::TXT, Classes.CH)
+    question = packet.question
+    assert_equal(2, question.length,             'question() returned right number of items poptest:2'); #36            
   end    
+  
+  def get_test_packet
+    packet=Message.new("254.9.11.10.in-addr.arpa","PTR","IN")
+      
+    packet.add_answer(RR.create(%q[254.9.11.10.in-addr.arpa 86400 IN PTR host-84-11-9-254.customer.example.com]));
+      
+    packet.add_authority(RR.create("9.11.10.in-addr.arpa 86400 IN NS autons1.example.com"));
+    packet.add_authority(RR.create("9.11.10.in-addr.arpa 86400 IN NS autons2.example.com"));
+    packet.add_authority(RR.create("9.11.10.in-addr.arpa 86400 IN NS autons3.example.com"));
+    return packet
+  end
       
       
-   def test_push
-      packet=Message.new("254.9.11.10.in-addr.arpa","PTR","IN")
+  def test_push
+    packet = get_test_packet
+    data=packet.encode
       
-      packet.add_answer(RR.create(%q[254.9.11.10.in-addr.arpa 86400 IN PTR host-84-11-9-254.customer.example.com]));
+    packet2=Message.decode(data)
       
-      packet.add_authority(RR.create("9.11.10.in-addr.arpa 86400 IN NS autons1.example.com"));
-      packet.add_authority(RR.create("9.11.10.in-addr.arpa 86400 IN NS autons2.example.com"));
-      packet.add_authority(RR.create("9.11.10.in-addr.arpa 86400 IN NS autons3.example.com"));
-
-      data=packet.encode
-      
-      packet2=Message.decode(data)
-      
-      assert_equal(packet.to_s,packet2.to_s,"Packet to data and back (failure indicates brasserten dn_comp)");  #39
-      
+    assert_equal(packet.to_s,packet2.to_s,"Packet to data and back (failure indicates brasserten dn_comp)");  #39      
+  end
+  
+  def test_rrset
+    packet = get_test_packet
+    packet.each_section do |section|
+ #     print "#{section.rrsets}\n"
     end
+    packet.section_rrsets.each do |section, rrsets|
+#      print "section = #{section}, rrsets = #{rrsets.length}\n"
+    end
+    assert(packet.authority.rrsets.length == 1)
+    assert(packet.question.rrsets.length == 1)
+    assert(packet.answer.rrsets.length == 1)
+    assert(packet.additional.rrsets.length == 0)
+    assert(packet.authority.rrsets[0].length == 3)
+#    assert(packet.additional.rrsets[0].length == 0)
+    assert(packet.question.rrsets[0].length == 1)
+    assert(packet.answer.rrsets[0].length == 1)
+  end
 end

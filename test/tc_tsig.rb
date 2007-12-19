@@ -61,6 +61,8 @@ class TestTSig < Test::Unit::TestCase
     assert(update.signed?, "Update has not been signed")
     
     res = Dnsruby::Resolver.new("ns0.validation-test-servers.nominet.org.uk")
+    res.udp_size=512 # Or else we needed to add OPT record already
+    res.dnssec=false
     res.recurse=false
     res.query_timeout = 10
     response = res.send_message(update)
@@ -130,6 +132,8 @@ class TestTSig < Test::Unit::TestCase
       })
     tsig.apply(update)
     assert(update.signed?, "Update has not been signed")
+    res.dnssec=false # Or else we needed to add OPT record already
+    res.udp_size = 512
     response = res.send_message(update)
     assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
     assert(response.verified?, "Response has not been verified")
