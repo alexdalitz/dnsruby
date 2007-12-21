@@ -10,7 +10,7 @@ class DsTest < Test::Unit::TestCase
     assert_equal(60485, ds.key_tag)
     assert_equal(Algorithms.RSASHA1, ds.algorithm)
     assert_equal(1, ds.digest_type)
-    assert_equal("2BB183AF5F22588179A53B0A98631FAD1A292118", ds.digest)
+    assert_equal("2BB183AF5F22588179A53B0A98631FAD1A292118", Base64.encode64(ds.digest).chomp!)
     
     ds2 = Dnsruby::RR.create(ds.to_s)
     assert(ds2.to_s == ds.to_s)

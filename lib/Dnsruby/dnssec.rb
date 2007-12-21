@@ -10,10 +10,53 @@
 
 module Dnsruby
   class DnssecVerifier
-    # @TODO@ Maybe write a recursive validating resolver?
-    def initialize
-    
-    end
+    # A class to cache trusted keys
+    class KeyCache
+      def initialize(keys=[])
+        @keys = []
+        add(keys)
+      end
+      def add(k)
+        if (k == nil)
+          return false
+        elsif (k.instance_of?RRSet)
+          k.rrs.each {|rr| @keys.push(rr)}
+        elsif (k.kind_of?RR)
+          @keys.push(k)
+        elsif (k.kind_of?Array)
+          k.each {|rr| @keys.push(rr)}
+        else 
+          return false
+        end
+        remove_duplicate_keys
+        return true
+      end
+      def remove_duplicate_keys
+        # @TODO@ There must be a better way than this!!
+        @keys.each_index do |index|
+          key = @keys[index]
+          (index+1..@keys.length-1).each do |pos|
+            if (key == @keys[pos])
+              @keys.delete_at(pos)
+            end
+          end
+        end
+      end
+      def each
+        @keys.each {|key| yield key}
+      end
+      def keys
+        return @keys 
+      end
+    end    
+
+    @@trusted_keys = KeyCache.new
+    @@to_be_trusted_keys = []
+
+    #    def initialize
+    #    # @TODO@ Maybe write a recursive validating resolver?
+    #    
+    #    end
   
     def self.check_rr_data(rrset, sigrec)
       #Each RR MUST have the same owner name as the RRSIG RR;
@@ -45,38 +88,81 @@ module Dnsruby
       end
     end
     
-    # Verify all the RRSets in the message have been signed with a key stored in the message
-    # Note that this method does not check that the key is trusted - this is the responsibility
-    # of the application (for now).
-    def self.verify_message(msg)
-      keys = msg.answer.rrset('DNSKEY')
-      msg.each_section do |section|
-        section.rrsets.each do |rrset|
-          next if rrset.type == Types.OPT
-          if (!verify_signature(rrset, keys))
-            # @TODO@ Debug message
-            return false
-          end
-        end
-      end
-      return true
+    # Add the specified key(s) to the trusted key cache.
+    # k can be a DNSKEY, or an Array or RRSet of DNSKEYs.
+    def self.add_trusted_key(k)
+      @@trusted_keys.add(k)
     end
     
-    def self.verify_message_with_trusted_key(msg, keys)
-      # @TODO@ Use the set of trusted keys to check any RRSets we can, ideally
+    # Wipes the cache of trusted keys
+    def self.clear_trusted_keys
+      @@trusted_keys = KeyCache.new
+      @@to_be_trusted_keys = []
+    end
+    
+    def self.check_ds(key, ds)
+      if (ds.check_key(key))
+        @@trusted_keys.add(key)
+      end
+    end
+    
+    def self.verify_message(msg, keys = nil)
+      # Use the set of trusted keys to check any RRSets we can, ideally
       # those of other DNSKEY RRSets first. Then, see if we can use any of the
       # new total set of keys to check the rest of the rrsets.
       # Return true if we can verify the whole message.
-      keys = get_keys(keys)
+            
+      @@trusted_keys.add(keys)
+      
       msg.each_section do |section|
+        ds_rrset = section.rrset(Types.DS)
+        if (ds_rrset && ds_rrset.num_sigs > 0)
+          if (verify_signature(ds_rrset))
+            ds_rrset.rrs.each do |ds|
+              # Work out which key this refers to, and add it to the trusted key store
+              found = false
+              msg.each_section do |section|
+                section.rrset('DNSKEY').rrs.each do |rr|
+                  if (check_ds(rr, ds))
+                    found = true
+                  end
+                end
+              end
+              @@trusted_keys.each {|key|
+                if (check_ds(key, ds))
+                  found = true
+                end
+              }
+              # If we couldn't find the trusted key, then we should store the 
+              # key tag and digest in a @@to_be_trusted_keys.
+              # Each time we see a new key (which has been signed) then we should 
+              # check if it is sitting on the to_be_trusted_keys store. 
+              # If it is, then we should add it to the trusted_keys and remove the
+              # DS from the to_be_trusted store
+              if (!found)
+                @@to_be_trusted_keys.push(ds)
+              end
+            end
+          else 
+          end
+        end
+        
         key_rrset = section.rrset(Types.DNSKEY)
         if (key_rrset && key_rrset.num_sigs > 0)
-          if (verify_signature(key_rrset, keys))
+          if (verify_signature(key_rrset))
             key_rrset.rrs.each do |rr|
-              keys.add(rr)
+              @@trusted_keys.add(rr)
+            end
+          else
+            # See if the keys match any of the to_be_trusted_keys
+            key_rrset.rrs.each do |key|
+              @@to_be_trusted_keys.each do |tbtk|
+                if (check_ds(key, tbtk))
+                  @@to_be_trusted_keys.delete(tbtk)
+                end
+              end
             end
           end
-          
         end
       end
       
@@ -85,7 +171,7 @@ module Dnsruby
           if (section == "additional" && rrset.num_sigs == 0)
             next
           end
-          if (!verify_signature(rrset, keys))
+          if (!verify_signature(rrset))
             return false
           end
         end
@@ -93,38 +179,35 @@ module Dnsruby
       return true
     end
     
-    def self.get_keys(keys)
-      if (keys == nil)
-        keys = []
-        # @TODO@ Operate some sort of key cache, and search in it for keys
+    def self.get_matching_key(keys, sigrecs)
+      if ((keys == nil) || (sigrecs == nil))
+        return nil, nil
       end
-      if (!keys.instance_of?RRSet)
-        keys = RRSet.new(keys)
-      end  
-      return keys      
+      keys.each {|key|
+        sigrecs.each {|sig|
+          if ((key.key_tag == sig.key_tag) && (key.algorithm == sig.algorithm))
+            return key, sig
+          end
+        }
+      }
+      return nil, nil
     end
   
     # Verify the signature of an rrset encoded with the specified dnskey record
     def self.verify_signature(rrset, keys = nil)
       sigrecs = rrset.sigs
-        # @TODO@ Operate some sort of key cache, and search in it for keys
-      print "\n\n    NO RRSIGS!!!\n\n" if (rrset.num_sigs == 0)
+      #      print "\n\n    NO RRSIGS!!!\n\n" if (rrset.num_sigs == 0)
       return true if (rrset.num_sigs == 0)
       sigrecs.each do |sigrec|
         check_rr_data(rrset, sigrec)
       end
 
-      keys = get_keys(keys)
       keyrec = nil
       sigrec = nil
-      keys.rrs.each {|key|
-        sigrecs.each {|sig|
-          if (key.key_tag == sig.key_tag)
-            sigrec = sig
-            keyrec = key
-          end
-        }
-      }
+      keyrec, sigrec = get_matching_key(@@trusted_keys, sigrecs)
+      if (keyrec == nil)
+        keyrec, sigrec = get_matching_key(keys, sigrecs)        
+      end
       
       return false if !keyrec
      
@@ -172,9 +255,6 @@ module Dnsruby
       end
       return false
     end
-  
-    # @TODO@ Add methods which look up a cache of trusted keys to sign rrset
-    
-    # @TODO@ Add methods which search for correct key_tag in DNSKEYs for RRSIG
-  end
+
+  end  
 end

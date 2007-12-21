@@ -148,7 +148,7 @@ module Dnsruby
           self.signers_name=(data[index+2])
           # signature can include whitespace - include all text
           # until we come to " )" at the end, and then gsub
-          # the white space out
+          # the white space out 
           buf=""
           (index+3..end_index).each {|i|
             buf += data[i]

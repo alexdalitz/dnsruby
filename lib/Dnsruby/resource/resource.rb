@@ -61,6 +61,11 @@ module Dnsruby
 
     #Add the RR to this RRSet
     def add(r)
+      if (r.instance_of?RRSet)
+        ret = false
+        [r.rrs, r.sigs].each {|rr| ret = add(rr)}
+        return ret
+      end
       r = RR.create(r.to_s) # clone the record
       if (@rrs.size() == 0) #  && !(r.type == Types.RRSIG))
         return privateAdd(r)

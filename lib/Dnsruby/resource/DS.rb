@@ -70,6 +70,32 @@ module Dnsruby
         end        
       end
       
+      # Return the digest of the specified DNSKEY RR
+      def digest_key(key)
+        data = MessageEncoder.new {|msg|
+          msg.put_rr(key, true)
+        }.to_s
+
+        OpenSSL::Digest::SHA1.new(data)
+        return digest
+
+      end
+      
+      def check_key(key)
+        if (key.key_tag == @key_tag)
+          # @TODO@ If digests match then add key to trusted keys
+          digest = digest_key(key)
+          if (@digest == digest)
+            if (!key.zone_key?)
+            else
+              return true
+            end
+          else
+          end
+        end
+        return false
+      end
+      
 
       def from_data(data) #:nodoc: all
         key_tag, algorithm, digest_type, digest = data
@@ -85,13 +111,24 @@ module Dnsruby
           self.key_tag=(data[0].to_i)
           self.algorithm=(data[1])
           self.digest_type=(data[2])
-          self.digest=(data[4])
+
+          buf = ""
+          index = 3
+          end_index = data.length - 1
+          if (data[index]=="(")
+            end_index = data.length - 2
+            index = 4
+          end
+          (index..end_index).each {|i|
+            buf += data[i]
+          } 
+          self.digest=Base64.decode64(buf)
         end
       end
       
       def rdata_to_string #:nodoc: all
         if (@key_tag != nil)
-          return "#{@key_tag.to_i} #{@algorithm.string} #{@digest_type} ( #{@digest} )"
+          return "#{@key_tag.to_i} #{@algorithm.string} #{@digest_type} ( #{Base64.encode64(@digest)} )"
         else
           return ""
         end
