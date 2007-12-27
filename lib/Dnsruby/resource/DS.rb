@@ -16,6 +16,16 @@
 module Dnsruby
   class RR
     #RFC4034, section 4
+    #The DS Resource Record refers to a DNSKEY RR and is used in the DNS
+    #DNSKEY authentication process.  A DS RR refers to a DNSKEY RR by
+    #storing the key tag, algorithm number, and a digest of the DNSKEY RR.
+    #Note that while the digest should be sufficient to identify the
+    #public key, storing the key tag and key algorithm helps make the
+    #identification process more efficient.  By authenticating the DS
+    #record, a resolver can authenticate the DNSKEY RR to which the DS
+    #record points.  The key authentication process is described in
+    #[RFC4035].
+
     class DS < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::DS #:nodoc: all
@@ -80,10 +90,10 @@ module Dnsruby
         return digest
 
       end
-      
+
+      # Check if the key's digest is the same as that stored in the DS record      
       def check_key(key)
         if (key.key_tag == @key_tag)
-          # @TODO@ If digests match then add key to trusted keys
           digest = digest_key(key)
           if (@digest == digest)
             if (!key.zone_key?)

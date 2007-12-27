@@ -41,6 +41,9 @@ class TestTSig < Test::Unit::TestCase
   end
   
   def run_test_client_signs
+    # NOTE - client signing is only appropriate if DNSSEC and EDNS are switched
+    # off. Otherwise, the resolver will attempt to alter the flags and add an
+    # EDNS OPT psuedo-record to the query message, invalidating the signing.
     tsig = Dnsruby::RR.create({
         :name        => KEY_NAME,
         :type        => "TSIG",

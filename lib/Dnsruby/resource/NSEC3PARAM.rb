@@ -15,7 +15,13 @@
 #++
 module Dnsruby
   class RR
-    #RFC4034, section 4
+    #The NSEC3PARAM RR contains the NSEC3 parameters (hash algorithm,
+    #flags, iterations and salt) needed by authoritative servers to
+    #calculate hashed owner names.  The presence of an NSEC3PARAM RR at a
+    #zone apex indicates that the specified parameters may be used by
+    #authoritative servers to choose an appropriate set of NSEC3 RRs for
+    #negative responses.  The NSEC3PARAM RR is not used by validators or
+    #resolvers.
     class NSEC3PARAM < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::NSEC3PARAM #:nodoc: all

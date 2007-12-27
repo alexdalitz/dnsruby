@@ -47,16 +47,5 @@ class TestResolverEnv < Test::Unit::TestCase
     assert(res.debug,                    'Debug works'         );
     
     
-    
-    
-    # @TODO Get these DNSSEC tests working!!
-#    eval('$Net::DNS::DNSSEC=0;  \
-#	local $SIG{__WARN__}=sub { ok ($_[0]=~/You called the Net::DNS::Resolver::dnssec\(\)/, "Correct warning in absense of Net::DNS::SEC") };	\
-#	res.dnssec(1);')
-#    
-#    eval('$Net::DNS::DNSSEC=1;			\
-#	local $SIG{__WARN__}=sub { diag "We are ignoring that Net::DNS::SEC not installed."	 }; \
-#	res.dnssec(1);	 \
-#	assert_equal(res.udppacketsize(),2048,"dnssec() sets udppacketsize to 2048");')
   end
 end

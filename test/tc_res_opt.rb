@@ -76,8 +76,7 @@ class TestResOpt < Test::Unit::TestCase
       :packet_timeout    => 60, # SingleResolver and Multi-Resolver # Only have one timeout for both UDP and TCP
       :persistent_tcp => true, # SingleResolver and Multi-Resolver
       :persistent_udp => true, # SingleResolver and Multi-Resolver
-      #@todo Add dnssec when dnssec added to Net::DNS
-      #	'dnssec'         => true,
+      :dnssec         => true,
     }
     
     res = SingleResolver.new(test_config)
@@ -104,8 +103,7 @@ class TestResOpt < Test::Unit::TestCase
       :query_timeout    => 60, # Multi-Resolver only
       :persistent_tcp => true, # SingleResolver and Multi-Resolver
       :persistent_udp => true, # SingleResolver and Multi-Resolver
-      #@todo Add dnssec when dnssec added to Net::DNS
-      #	'dnssec'         => true,
+      :dnssec         => true,
     }
     
     res = Resolver.new(test_config)

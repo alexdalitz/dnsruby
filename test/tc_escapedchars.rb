@@ -305,13 +305,6 @@ d0
     
     
     assert_equal( '\\\\\\032.eg.secret-wg.org',(packet.answer)[0].name.to_s,"Correctly dealt escaped backslash from wireformat \\e.eg.secret-wg.org")
-    # @todo Replace when Net::DNS does this!
-    #	if ( had_xs && !Net::HAVE_XS )
-    #		puts("\nContinuing to use the XS based dn_expand()\n") 
-    #		Net::HAVE_XS=1		
-    #	end
-    
-    
     
     #slightly modified \\e.eg.secret-wg.org instead of \\\\.eg.secret-wg.org
     uuencodedPacket=%w{

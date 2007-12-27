@@ -123,14 +123,9 @@ module Dnsruby
       # Create the RR from a standard string
       def from_string(string) #:nodoc: all
         TheLog.error("Dnsruby::RR::TKEY#from_string called, but no text format defined for TKEY")
-        #      # There isn't a standard string for TKEY so the key can be loaded here
-        #        if (string != nil && (string =~ /^(.*)$/))
-        #          @key     = $1;
-        #        end
       end
       
       def rdata_to_string     
-        #@TODO@ Provide more info?     
         rdatastr=""
         
         if (@algorithm!=nil)

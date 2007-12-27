@@ -1,3 +1,4 @@
+#---
 # @TODO@
 # RFC4033, section 7
 #   There is one more step that a security-aware stub resolver can take
@@ -7,11 +8,71 @@
 #   (CD) bit in its query messages.  A validating stub resolver is thus
 #   able to treat the DNSSEC signatures as trust relationships between
 #   the zone administrators and the stub resolver itself. 
-
+#+++
 module Dnsruby
-  class DnssecVerifier
+  # Dnsruby will, by default, request DNSSEC records on each query. It
+  # will also, by default, request that any checking be done by an upstream 
+  # resolver - this assumes a secure link to a trusted resolver. In this case,
+  # the client application need do nothing to enjoy the benefits of DNSSEC.
+  # 
+  # If an insecure link or untrusted resolver is used, then it is possible to
+  # verify messages using the Dnsruby::Dnssec#verify method, once a chain
+  # of trust has been established. In the absence of a signed root, the client 
+  # application must supply Dnsruby
+  # with a (set of) trusted key(s). Dnsruby can then use those keys to verify 
+  # responses, and build up a new set of trusted keys under the apex of the
+  # supplied trusted key. For example : 
+  #
+  #  res = Dnsruby::Resolver.new("dnssec.nominet.org.uk")
+  #
+  #  # Create the trusted key that we know for a parent zone of the zone
+  #  # we are interested in. This is assumed to be a Secure Entry Point
+  #  # (the SEP flag of the key will be set by default)
+  #  trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
+  #      :type => Dnsruby::Types.DNSKEY,
+  #      :key=> "AQPJO6LjrCHhzSF9PIVV7YoQ8iE31FXvghx+14E+jsv4uWJR9jLrxMYm sFOGAKWhiis832ISbPTYtF8sxbNVEotgf9eePruAFPIg6ZixG4yMO9XG LXmcKTQ/cVudqkU00V7M0cUzsYrhc4gPH/NKfQJBC5dbBkbIXJkksPLv Fe8lReKYqocYP6Bng1eBTtkA+N+6mSXzCwSApbNysFnm6yfQwtKlr75p m+pd0/Um+uBkR4nJQGYNt0mPuw4QVBu1TfF5mQYIFoDYASLiDQpvNRN3 US0U5DEG9mARulKSSw448urHvOBwT9Gx5qF2NE4H9ySjOdftjpj62kjb Lmc8/v+z"
+  #    })
+  #  ret = Dnsruby::DnssecVerifier.add_trusted_key(trusted_key)
+  #
+  #  # Now use the trusted key to obtain the other keys for the zone
+  #  r = res.query("uk-dnssec.nic.uk", Dnsruby::Types.ANY)
+  #  if (!Dnsruby::DnssecVerifier.verify(r))
+  #     # handle verification failure
+  #  end
+  #
+  #  r = res.query("www.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
+  #  if (!Dnsruby::DnssecVerifier.verify(r))
+  #     # handle verification failure
+  #  end
+  #
+  #  # Follow the chain of trust
+  #  r = res.query("bigzone.uk-dnssec.nic.uk", Dnsruby::Types.DS)
+  #  if (!Dnsruby::DnssecVerifier.verify(r))
+  #     # handle verification failure
+  #  end
+  #    
+  #  r = res.query("bigzone.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
+  #  if (!Dnsruby::DnssecVerifier.verify(r))
+  #     # handle verification failure
+  #  end
+  #    
+  #  # Now query records in the zone we are interested in. 
+  #  # Dnsruby stores all the keys so we can now verify any record signed by
+  #  # any key in the trusted key store.
+  #  r = res.query("aaa.bigzone.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
+  #  if (!Dnsruby::DnssecVerifier.verify(r))
+  #     # handle verification failure
+  #  end
+  #  
+  #  # Verify an rrset
+  #  rrset = r.answer.rrset('NSEC')
+  #  if (!Dnsruby::DnssecVerifier.verify(rrset))
+  #     # handle verification failure
+  #  end
+
+  class Dnssec
     # A class to cache trusted keys
-    class KeyCache
+    class KeyCache #:nodoc: all
       def initialize(keys=[])
         @keys = []
         add(keys)
@@ -32,7 +93,7 @@ module Dnsruby
         return true
       end
       def remove_duplicate_keys
-        # @TODO@ There must be a better way than this!!
+        # There must be a better way than this!!
         @keys.each_index do |index|
           key = @keys[index]
           (index+1..@keys.length-1).each do |pos|
@@ -50,7 +111,14 @@ module Dnsruby
       end
     end    
 
+    # The set of keys which are trusted. These must be initialised with at least
+    # one trusted key by the client application, if verification is to be performed.
     @@trusted_keys = KeyCache.new
+    
+    # The set of keys which have been indicated by a DS RRSet which has been
+    # signed by a trusted key. Although we have not yet located these keys, we
+    # have the details (tag and digest) which can identify the keys when we 
+    # see them. At that point, they will be added to our trusted keys.
     @@to_be_trusted_keys = []
 
     #    def initialize
@@ -58,7 +126,8 @@ module Dnsruby
     #    
     #    end
   
-    def self.check_rr_data(rrset, sigrec)
+    # Check that the RRSet and RRSIG record are compatible
+    def self.check_rr_data(rrset, sigrec)#:nodoc: all
       #Each RR MUST have the same owner name as the RRSIG RR;
       if (rrset.name.to_s != sigrec.name.to_s)
         raise VerifyError.new("RRSET should have same owner name as RRSIG for verification (rrsert=#{rrset.name}, sigrec=#{sigrec.name}")
@@ -91,6 +160,11 @@ module Dnsruby
     # Add the specified key(s) to the trusted key cache.
     # k can be a DNSKEY, or an Array or RRSet of DNSKEYs.
     def self.add_trusted_key(k)
+      if (k.instance_of?RRSet)
+        k.rrs.each {|key| add_trusted_key(key)}
+        return
+      end
+      k.flags = k.flags | RR::IN::DNSKEY::SEP_KEY
       @@trusted_keys.add(k)
     end
     
@@ -100,13 +174,32 @@ module Dnsruby
       @@to_be_trusted_keys = []
     end
     
-    def self.check_ds(key, ds)
+    # Check that the key fits a signed DS record key details
+    # If so, then add the key to the trusted keys
+    def self.check_ds(key, ds)#:nodoc: all
       if (ds.check_key(key))
         @@trusted_keys.add(key)
       end
     end
     
-    def self.verify_message(msg, keys = nil)
+    # Verify the specified message (or RRSet) using the set of trusted keys.
+    # If keys is a DNSKEY, or an Array or RRSet of DNSKEYs, then keys
+    # is added to the set of trusted keys before the message (or RRSet) is 
+    # verified. 
+    # 
+    # If msg is a Dnsruby::Message, then any signed DNSKEY or DS RRSets are 
+    # processed first, and any new keys are added to the trusted key set 
+    # before the other RRSets are checked.
+    # 
+    # msg can be a Dnsruby::Message or Dnsruby::RRSet.
+    # keys may be nil, or a Dsnruby::RR::DNSKEY or an Array or RRSet of 
+    # Dnsruby::RR::DNSKEY
+    # 
+    # Returns true if the message verifies OK, and false otherwise.
+    def self.verify(msg, keys = nil)
+      if (msg.kind_of?RRSet)
+        return verify_rrset(msg, keys)
+      end
       # Use the set of trusted keys to check any RRSets we can, ideally
       # those of other DNSKEY RRSets first. Then, see if we can use any of the
       # new total set of keys to check the rest of the rrsets.
@@ -117,7 +210,7 @@ module Dnsruby
       msg.each_section do |section|
         ds_rrset = section.rrset(Types.DS)
         if (ds_rrset && ds_rrset.num_sigs > 0)
-          if (verify_signature(ds_rrset))
+          if (verify_rrset(ds_rrset))
             ds_rrset.rrs.each do |ds|
               # Work out which key this refers to, and add it to the trusted key store
               found = false
@@ -149,7 +242,7 @@ module Dnsruby
         
         key_rrset = section.rrset(Types.DNSKEY)
         if (key_rrset && key_rrset.num_sigs > 0)
-          if (verify_signature(key_rrset))
+          if (verify_rrset(key_rrset))
             key_rrset.rrs.each do |rr|
               @@trusted_keys.add(rr)
             end
@@ -171,7 +264,7 @@ module Dnsruby
           if (section == "additional" && rrset.num_sigs == 0)
             next
           end
-          if (!verify_signature(rrset))
+          if (!verify_rrset(rrset))
             return false
           end
         end
@@ -179,7 +272,8 @@ module Dnsruby
       return true
     end
     
-    def self.get_matching_key(keys, sigrecs)
+    # Find the first matching DNSKEY and RRSIG record in the two sets.
+    def self.get_matching_key(keys, sigrecs)#:nodoc: all
       if ((keys == nil) || (sigrecs == nil))
         return nil, nil
       end
@@ -194,7 +288,11 @@ module Dnsruby
     end
   
     # Verify the signature of an rrset encoded with the specified dnskey record
-    def self.verify_signature(rrset, keys = nil)
+    # or the set of trusted keys.
+    #
+    # Returns true if the RRSet verified, false otherwise.
+    def self.verify_rrset(rrset, keys = nil)
+    # @TODO@ Finer-grained reporting than "false". 
       sigrecs = rrset.sigs
       #      print "\n\n    NO RRSIGS!!!\n\n" if (rrset.num_sigs == 0)
       return true if (rrset.num_sigs == 0)
@@ -216,7 +314,6 @@ module Dnsruby
       
       if (keyrec.sep_key? && !keyrec.zone_key?)
         TheLog.error("DNSKEY with with SEP flag set and Zone Key flag not set was used to verify RRSIG over RRSET - this is not allowed by RFC4034 section 2.1.1")
-        # @TODO@ Raise an exception?
         return false
       end          
 

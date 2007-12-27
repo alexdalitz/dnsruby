@@ -16,6 +16,14 @@
 module Dnsruby
   class RR
     #RFC4034, section 4
+    #The NSEC resource record lists two separate things: the next owner
+    #name (in the canonical ordering of the zone) that contains
+    #authoritative data or a delegation point NS RRset, and the set of RR
+    #types present at the NSEC RR's owner name [RFC3845].  The complete
+    #set of NSEC RRs in a zone indicates which authoritative RRsets exist
+    #in a zone and also form a chain of authoritative owner names in the
+    #zone.  This information is used to provide authenticated denial of
+    #existence for DNS data, as described in [RFC4035].    
     class NSEC < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::NSEC #:nodoc: all

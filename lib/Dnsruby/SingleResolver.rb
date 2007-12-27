@@ -202,6 +202,7 @@ module Dnsruby
     
     def close
       # @TODO@ What about closing?
+      # Any queries to complete? Sockets to close?
     end
     
     # Synchronously send a query for the given name. The type will default to A, 
@@ -321,7 +322,7 @@ module Dnsruby
       if (!client_deferrable)
         client_deferrable = EventMachine::DefaultDeferrable.new
       end
-      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>@src_port, :use_tcp=>use_tcp)
+      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>get_next_src_port, :use_tcp=>use_tcp)
       packet_deferrable.callback { |response, response_bytes|
         ret = true
         if (response.header.tc && !use_tcp && !@ignore_truncation)
@@ -356,34 +357,30 @@ module Dnsruby
       st = SelectThread.instance
       socket = nil
       begin
-        #@TODO@ Different OSes have different interpretations of "random port" here.
-        #Apparently, Linux will just give you the same port as last time, unless it is still
-        #open, in which case you get n+1.
-        #We need to determine an actual (random) number here, then ask the OS for it, and
-        #continue until we get one.
+        src_port = get_next_src_port
         if (use_tcp) 
-          socket = TCPSocket.new(@server, @port, @src_addr, @src_port)
+          socket = TCPSocket.new(@server, @port, @src_addr, src_port)
         else
           socket = UDPSocket.new()
-          socket.bind(@src_addr, @src_port)
+          socket.bind(@src_addr, src_port)
           socket.connect(@server, @port)
         end
       rescue Exception => e
         if (socket!=nil)
           socket.close
         end
-        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
+        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
         TheLog.error("#{err}")
         st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
         return
       end
       if (socket==nil)
-        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}")
+        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}")
         TheLog.error("#{err}")
         st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
         return
       end
-      TheLog.debug("Sending packet to #{@server}:#{@port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}")
+      TheLog.debug("Sending packet to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}")
       begin
         if (use_tcp)
           lenmsg = [query_bytes.length].pack('n')
@@ -392,7 +389,7 @@ module Dnsruby
         socket.send(query_bytes, 0)
       rescue Exception => e
         socket.close
-        err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_addr}:#{@src_port}, use_tcp=#{use_tcp}, exception : #{e}")
+        err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
         TheLog.error("#{err}")
         st.push_exception_to_select(client_query_id, client_queue, err, nil)
         return
@@ -403,6 +400,19 @@ module Dnsruby
       # The select thread will now wait for the response and send that or a timeout
       # back to the client_queue.
       st.add_to_select(query_settings)
+    end
+    
+    def get_next_src_port
+        #Different OSes have different interpretations of "random port" here.
+        #Apparently, Linux will just give you the same port as last time, unless it is still
+        #open, in which case you get n+1.
+        #We need to determine an actual (random) number here, then ask the OS for it, and
+        #continue until we get one.
+      if (@src_port > 0 && @src_port < 65535)
+        return @src_port
+      else
+        return (rand(65535-1024) + 1024)
+      end
     end
     
     def check_response(response, response_bytes, query, client_queue, client_query_id, tcp)

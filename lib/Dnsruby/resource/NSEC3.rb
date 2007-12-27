@@ -15,7 +15,21 @@
 #++
 module Dnsruby
   class RR
-    #RFC4034, section 4
+    #The NSEC3 Resource Record (RR) provides authenticated denial of
+    #existence for DNS Resource Record Sets.
+    #
+    #The NSEC3 RR lists RR types present at the original owner name of the
+    #NSEC3 RR.  It includes the next hashed owner name in the hash order
+    #of the zone.  The complete set of NSEC3 RRs in a zone indicates which
+    #RRSets exist for the original owner name of the RR and form a chain
+    #of hashed owner names in the zone.  This information is used to
+    #provide authenticated denial of existence for DNS data.  To provide
+    #protection against zone enumeration, the owner names used in the
+    #NSEC3 RR are cryptographic hashes of the original owner name
+    #prepended as a single label to the name of the zone.  The NSEC3 RR
+    #indicates which hash function is used to construct the hash, which
+    #salt is used, and how many iterations of the hash function are
+    #performed over the original owner name.
     class NSEC3 < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::NSEC3 #:nodoc: all

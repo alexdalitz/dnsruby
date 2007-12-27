@@ -64,7 +64,7 @@ class TestResolver < Test::Unit::TestCase
     assert(error==nil)
   end
 
-  # @TODO@ Implement!!  
+  # @TODO@ Implement!!  But then, why would anyone want to do this?
   #  def test_many_threaded_clients
   #    assert(false, "IMPLEMENT!")
   #  end

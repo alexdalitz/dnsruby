@@ -16,6 +16,14 @@
 module Dnsruby
   class RR
     #RFC4034, section 2
+    #DNSSEC uses public key cryptography to sign and authenticate DNS
+    #resource record sets (RRsets).  The public keys are stored in DNSKEY
+    #resource records and are used in the DNSSEC authentication process
+    #described in [RFC4035]: A zone signs its authoritative RRsets by
+    #using a private key and stores the corresponding public key in a
+    #DNSKEY RR.  A resolver can then use the public key to validate
+    #signatures covering the RRsets in the zone, and thus to authenticate
+    #them.
     class DNSKEY < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::DNSKEY #:nodoc: all
@@ -27,7 +35,7 @@ module Dnsruby
       SEP_KEY = 0x1
 
       #The flags for the DNSKEY RR
-      attr_reader :flags
+      attr_accessor :flags
       #The protocol for this DNSKEY RR.
       #MUST be 3.
       attr_reader :protocol
@@ -36,6 +44,12 @@ module Dnsruby
       attr_reader :algorithm
       #The public key
       attr_reader :key
+      
+      def init_defaults
+        self.protocol=3
+        self.flags=ZONE_KEY
+        @algorithm=Algorithms.RSASHA1
+      end
       
       def protocol=(p)
         if (p!=3)
@@ -127,7 +141,7 @@ module Dnsruby
       
       def rdata_to_string #:nodoc: all
         if (@flags!=nil)
-#          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s).gsub(/\n/, "")} )"
+          #          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s).gsub(/\n/, "")} )"
           return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s)} )"
         else
           return ""
@@ -180,9 +194,9 @@ module Dnsruby
       end
       
       def key=(key_text)
-          key_text.gsub!(/\n/, "")
-          key_text.gsub!(/ /, "")
-          @key=Base64.decode64(key_text)        
+        key_text.gsub!(/\n/, "")
+        key_text.gsub!(/ /, "")
+        @key=Base64.decode64(key_text)        
       end
       
       def public_key

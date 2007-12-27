@@ -15,8 +15,20 @@
 #++
 module Dnsruby
   class RR
-    # Class and TTL values must match those of the RRSet the RRSIG covers
     # (RFC4034, section 3)
+    #DNSSEC uses public key cryptography to sign and authenticate DNS
+    #resource record sets (RRsets).  Digital signatures are stored in
+    #RRSIG resource records and are used in the DNSSEC authentication
+    #process described in [RFC4035].  A validator can use these RRSIG RRs
+    #to authenticate RRsets from the zone.  The RRSIG RR MUST only be used
+    #to carry verification material (digital signatures) used to secure
+    #DNS operations.
+    #
+    #An RRSIG record contains the signature for an RRset with a particular
+    #name, class, and type.  The RRSIG RR specifies a validity interval
+    #for the signature and uses the Algorithm, the Signer's Name, and the
+    #Key Tag to identify the DNSKEY RR containing the public key that a
+    #validator can use to verify the signature.
     class RRSIG < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::RRSIG #:nodoc: all
@@ -225,10 +237,6 @@ module Dnsruby
             inception, key_tag, signers_name, signature])
       end
       
-      def verify(rrset, keyrec)
-        return DnssecResolver.verify(rrset, self, keyrec)
-      end
-        
       def sig_data
         #RRSIG_RDATA is the wire format of the RRSIG RDATA fields
         #with the Signer's Name field in canonical form and

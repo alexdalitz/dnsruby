@@ -18,7 +18,6 @@ require 'test/unit'
 require 'dnsruby'
 include Dnsruby
 class TestRR < Test::Unit::TestCase
-  # @todo Add DNSSEC stuff when DNSSEC exists
   def test_rr
     #------------------------------------------------------------------------------
     # Canned data.

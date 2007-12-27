@@ -436,9 +436,6 @@ module Dnsruby
     #Sets the TSIG to sign outgoing messages with.
     #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
     #Pass in nil to stop tsig signing.
-    #It is possible for client code to sign packets prior to sending - see
-    #Dnsruby::RR::TSIG#apply and Dnsruby::Message#sign
-    #Note that pre-signed packets will not be signed by SingleResolver.
     #* res.tsig=(tsig_rr)
     #* res.tsig=(key_name, key)
     #* res.tsig=nil # Stop the resolver from signing
@@ -560,6 +557,7 @@ module Dnsruby
   end
   
   # This class implements the I/O using EventMachine.
+  # This is the preferred implementation. 
   # NOTE - EM does not work properly on Windows with version 0.8.1 - do not use!
   class ResolverEM #:nodoc: all
     TIMER_PERIOD = 0.1
@@ -629,8 +627,7 @@ module Dnsruby
     
     # Close the Resolver. Unfinished queries are terminated with OtherResolvError.
     def close
-      # @TODO@
-      # We need a list of open deferrables so that we can complete them
+      # @TODO@ We need a list of open deferrables so that we can complete them
     end
     
     def process_eventmachine_timers(persistent_data)

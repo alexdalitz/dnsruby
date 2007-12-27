@@ -34,11 +34,6 @@ include Dnsruby
 # @todo@ A test DNS server running on localhost is really needed here
 class TestSingleResolverSoak < Test::Unit::TestCase
   
-  #  def test_many_queries_single_socket
-  # @todo@ Implement this test?
-  #  end
-  
-  
   def test_many_asynchronous_queries_one_single_resolver
     run_many_asynch_queries_test_single_res(1)
   end

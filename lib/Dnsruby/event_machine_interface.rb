@@ -212,7 +212,6 @@ module Dnsruby
           if (@timeout_time <= Time.now + 1)
             send_timeout
           else
-            #@TODO@ RAISE OTHER NETWORK ERROR!
             TheLog.debug("Sending IOError to client")
             send_to_client(nil, nil, IOError.new("Network error"))
           end

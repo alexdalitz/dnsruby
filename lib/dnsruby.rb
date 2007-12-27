@@ -80,6 +80,12 @@ require 'timeout'
 #Dnsruby can also use EventMachine to perform I/O, if it is available on the 
 #platform - but it must be enabled through the Dnsruby::Resolver class
 #
+#== DNSSEC
+#Dnsruby supports DNSSEC and NSEC3. 
+#DNSSEC support is on by default, but applications which wish to verify
+#responses locally will need to make explicit verification calls.
+#See Dnsruby::Dnssec for more details.
+#
 #== Bugs
 #* NIS is not supported.
 #* /etc/nsswitch.conf is not supported.

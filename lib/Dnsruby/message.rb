@@ -351,7 +351,10 @@ module Dnsruby
     #been set (set_tsig). Otherwise, the arguments can either be a Dnsruby::RR::TSIG
     #object, or a (name, key) tuple, or a hash which takes
     #Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
-    def sign!(*args)
+    #
+    #NOTE that this method should only be called by the resolver, rather than the
+    #client code. To use signing from the client, call Dnsruby::Resolver#tsig=
+    def sign!(*args) #:nodoc: all
       if (args.length > 0)
         set_tsig(*args)
         sign!

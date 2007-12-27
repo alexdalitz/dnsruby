@@ -27,6 +27,25 @@ module Dnsruby
     #A Dnsruby::RR::TSIG can represent the data present in a TSIG RR.
     #However, it can also represent the data (specified in RFC2845) used
     #to sign or verify a DNS message.
+    #
+    #
+    #Example code :
+    #    res = Dnsruby::Resolver.new("ns0.validation-test-servers.nominet.org.uk")
+    #    
+    #    # Now configure the resolver with the TSIG key for signing/verifying
+    #    KEY_NAME="rubytsig"
+    #    KEY = "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw=="
+    #    res.tsig=KEY_NAME, KEY
+    #    
+    #    update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
+    #    # Generate update record name, and test it has been made. Then delete it and check it has been deleted
+    #    update_name = generate_update_name
+    #    update.absent(update_name)
+    #    update.add(update_name, 'TXT', 100, "test signed update")
+    #    
+    #    # Resolver will automatically sign message and verify response
+    #    response = res.send_message(update)
+    #    assert(response.verified?) # Check that the response has been verified
     class TSIG < RR
       HMAC_MD5 = Name.create("HMAC-MD5.SIG-ALG.REG.INT.")
       HMAC_SHA1 = Name.create("hmac-sha1.")

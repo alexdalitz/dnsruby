@@ -289,12 +289,5 @@ module Dnsruby
   end
 end
 #--
-#@TODO@ Asynchronous interface. Do we want a callback (in a new thread) or a queue system?
-#Is there any point in taking a block? May as well...
-#e.g. getaddresses_async(name, Queue|Proc)
-#Could we make the final argument optional to all the standard calls? So they are either sync or async?
-#e.g. getaddresses(name{, Queue|Proc})
-#Yes to all but each_resource - would have to make a new each_resource_async or something...
-#@TODO@ BUT - need to pass in an ID as well as a queue to identify correct response
-#Proc can keep track of query ID itself
+#@TODO@ Asynchronous interface. Some sort of Deferrable?
 #++

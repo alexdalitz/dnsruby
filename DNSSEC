@@ -1,0 +1,11 @@
+DNSSEC support in Dnsruby
+=========================
+
+DNSSEC defines a set of security extensions to DNS which provide a way for a resolver to verify cryptographically the DNS RRSets returned by an upstream resolver. The main standard is defined in RFCs 4033, 4034 and 4035.
+
+Dnsruby provides a non-validating security-aware stub resolver which can maintain a cache of trusted keys and verify RRSIG-signed messages with those keys (adding new trusted keys from signed DNSKEY RRSets and DS records). It is thus possible for a client application to use Dnsruby to provide a validating stub resolver for certain zones for which trusted keys are available.
+
+However, by default, Dnsruby will simply ask for the DNSSEC checking to be performed by an upstream resolver. For DNSSEC to provide any security under these circumstances, it is necessary for the link between Dnsruby and the upstream resolver to be secure, and for the upstream resolver to be trusted. If either of these requirements are not met, then checking should be performed by the client application (using Dnsruby) to verify that the response includes RRSets which have been signed by a trusted key.
+
+DNSSEC is on by default - if desired, you can turn it off with the dnssec flag in Dnsruby::(Single)Resolver if desired. EDNS0 support is also enabled by default - if desired, you can turn this off by setting the Dnsruby::(Single)Resolver#udp_packet_size property to be 512. There should generally be no need to do this.
+
