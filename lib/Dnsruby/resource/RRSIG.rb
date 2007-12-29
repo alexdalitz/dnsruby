@@ -167,7 +167,8 @@ module Dnsruby
           }
           buf.gsub!(/\n/, "")
           buf.gsub!(/ /, "")
-          self.signature=Base64.decode64(buf)
+          #self.signature=Base64.decode64(buf)
+          self.signature=buf.unpack("m*")[0]
         end
       end
       
@@ -209,7 +210,8 @@ module Dnsruby
       
       def rdata_to_string #:nodoc: all
         if (@type_covered!=nil)
-          signature = Base64.encode64(@signature) # .gsub(/\n/, "")
+#          signature = Base64.encode64(@signature) # .gsub(/\n/, "")
+          signature = [@signature].pack("m*") # .gsub(/\n/, "")
           return "#{@type_covered.string} #{@algorithm.string} #{@labels} #{@original_ttl} " + 
             "#{@expiration} ( #{@inception} #{@key_tag} #{@signers_name} #{signature} )"
         else

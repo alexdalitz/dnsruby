@@ -24,7 +24,7 @@ class RrsigTest < Test::Unit::TestCase
     "PYGv07h108dUKGMeDPKijVCHX3DDKdfb+v6o" +
     "B9wfuh3DTJXUAfI/M0zmO/zz8bW0Rznl8O3t" +
     "GNazPwQKkRN20XPXV6nwwfoXmJQbsLNrLfkG" +
-    "J5D6fwFm8nN+6pBzeDQfsS3Ap3o=", (Base64::encode64(rrsig.signature)).gsub(/\n/,"").chomp)
+    "J5D6fwFm8nN+6pBzeDQfsS3Ap3o=", ([rrsig.signature].pack("m*")).gsub(/\n/,"").chomp)
     
     rrsig2 = Dnsruby::RR.create(rrsig.to_s)
     assert(rrsig2.to_s == rrsig.to_s)

@@ -132,13 +132,15 @@ module Dnsruby
           (index..end_index).each {|i|
             buf += data[i]
           } 
-          self.digest=Base64.decode64(buf)
+#          self.digest=Base64.decode64(buf)
+          self.digest=buf.unpack("m*")[0]
         end
       end
       
       def rdata_to_string #:nodoc: all
         if (@key_tag != nil)
-          return "#{@key_tag.to_i} #{@algorithm.string} #{@digest_type} ( #{Base64.encode64(@digest)} )"
+#          return "#{@key_tag.to_i} #{@algorithm.string} #{@digest_type} ( #{Base64.encode64(@digest)} )"
+          return "#{@key_tag.to_i} #{@algorithm.string} #{@digest_type} ( #{[@digest].pack("m*")} )"
         else
           return ""
         end
