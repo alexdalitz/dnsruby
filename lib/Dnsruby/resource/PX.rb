@@ -17,7 +17,7 @@ module Dnsruby
   class RR   
     module IN
       class PX < RR
-        ClassHash[[TypeValue = Types::PX, ClassValue = Classes.IN.code]] = self #:nodoc: all
+        ClassHash[[TypeValue = Types::PX, ClassValue = Classes::IN]] = self #:nodoc: all
         
         #The preference given to this RR.
         attr_accessor :preference

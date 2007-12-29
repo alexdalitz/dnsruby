@@ -13,7 +13,7 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-require 'base64'
+#require 'base64'
 require 'openssl'
 module Dnsruby
   class RR
@@ -139,7 +139,8 @@ module Dnsruby
       def calculate_mac(algorithm, data)
         mac=nil
         key = @key.gsub(" ", "")
-        key = Base64::decode64(key)
+ #       key = Base64::decode64(key)
+        key = key.unpack("m*")
         if (algorithm == HMAC_MD5)
           mac = OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, key, data)
         elsif (algorithm == HMAC_SHA1)
@@ -375,7 +376,7 @@ module Dnsruby
             
       TypeValue = Types::TSIG #:nodoc: all
       ClassValue = nil #:nodoc: all
-      ClassHash[[TypeValue, Classes.ANY.code]] = self #:nodoc: all
+      ClassHash[[TypeValue, Classes::ANY]] = self #:nodoc: all
       
       #Gets or sets the domain name that specifies the name of the algorithm.
       #The only algorithms currently supported are hmac-md5 and hmac-sha1.

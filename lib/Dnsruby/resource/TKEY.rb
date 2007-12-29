@@ -38,7 +38,7 @@ module Dnsruby
     class TKEY < RR
       TypeValue = Types::TKEY #:nodoc: all
       ClassValue = nil #:nodoc: all
-      ClassHash[[TypeValue, Classes.ANY.code]] = self #:nodoc: all
+      ClassHash[[TypeValue, Classes::ANY]] = self #:nodoc: all
       
       attr_reader :key_size
       attr_accessor :key

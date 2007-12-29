@@ -547,14 +547,14 @@ module Dnsruby
     def encode(msg)
       msg.put_pack('nnnnnn',
         @id,
-        (@qr?1:0) << 15 |
+        (@qr ? 1:0) << 15 |
         (@opcode.code & 15) << 11 |
-        (@aa?1:0) << 10 |
-        (@tc?1:0) << 9 |
-        (@rd?1:0) << 8 |
-        (@ra?1:0) << 7 |
-        (@ad?1:0) << 5 | 
-        (@cd?1:0) << 4 |
+        (@aa ? 1:0) << 10 |
+        (@tc ? 1:0) << 9 |
+        (@rd ? 1:0) << 8 |
+        (@ra ? 1:0) << 7 |
+        (@ad ? 1:0) << 5 | 
+        (@cd ? 1:0) << 4 |
         (@rcode.code & 15),
         @qdcount,
         @ancount,

@@ -24,7 +24,7 @@ module Dnsruby
     
     # module IN contains ARPA Internet specific RRs
     module IN
-      ClassValue = Classes.IN.code
+      ClassValue = Classes::IN
       
       ClassInsensitiveTypes::each {|s|
         c = Class.new(s)
