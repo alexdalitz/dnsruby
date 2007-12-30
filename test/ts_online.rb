@@ -25,6 +25,7 @@ begin
   sock.connect('193.0.14.129', # k.root-servers.net.
     25)
   online = true
+  sock.close
 rescue Exception
   puts "----------------------------------------"
   puts "Cannot bind to socket:\n\t"+$!+"\n"
@@ -51,8 +52,10 @@ if (online)
   # (but tell user that test has not been run due to connectivity problems)
   server_up = false
   begin
-    sock.connect('ns0.validation-test-servers.nominet.org.uk', # k.root-servers.net.
+    sock = UDPSocket.new
+    sock.connect('ns0.validation-test-servers.nominet.org.uk',
       25)
+    sock.close
     server_up = true
   rescue Exception
     puts "----------------------------------------"
@@ -69,11 +72,14 @@ if (online)
     begin
       require "openssl"
       OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
+      key = OpenSSL::PKey::RSA.new
+      key.e = 111
+      
       have_openssl=true
     rescue Exception => e
-      puts "----------------------------------------"
-      puts "OpenSSL not present - skipping TSIG test"
-      puts "----------------------------------------"
+      puts "-------------------------------------------------------------------------"
+      puts "OpenSSL not present (with full functionality) - skipping TSIG/DNSSEC test"
+      puts "-------------------------------------------------------------------------"
     end
     if (have_openssl)
       require "test/tc_tsig.rb"

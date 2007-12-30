@@ -39,6 +39,7 @@ class TestRrOpt < Test::Unit::TestCase
   end
   
   def test_resolver_opt_application
+        return if (/java/ =~ RUBY_PLATFORM) # @TODO@ Check if this is fixed with JRuby yet
     # Set up a server running on localhost. Get the resolver to send a
     # query to it with the UDP size set to 4096. Make sure that it is received
     # correctly.

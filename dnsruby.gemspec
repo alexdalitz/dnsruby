@@ -5,6 +5,7 @@ SPEC = Gem::Specification.new do |s|
   s.authors = ["AlexD"]
   s.email = "alexd@nominet.org.uk"
   s.homepage = "http://rubyforge.org/projects/dnsruby/"
+  s.rubyforge_project = "dnsruby"
   s.platform = Gem::Platform::RUBY
   s.summary = "Ruby DNS implementation"
   candidatestest = Dir.glob("test/**/*")

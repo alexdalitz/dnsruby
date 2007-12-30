@@ -22,8 +22,7 @@ require 'timeout'
 #Dnsruby is a thread-aware DNS stub resolver library written in Ruby.
 #
 #It is based on resolv.rb, the standard Ruby DNS implementation, 
-#but gives a complete DNS implementation complying with all relevant 
-#RFCs.
+#but gives a complete DNS implementation, including DNSSEC.
 #
 #The Resolv class can be used to resolve addresses using /etc/hosts and /etc/resolv.conf, 
 #or the DNS class can be used to make DNS queries. These interfaces will attempt to apply 
