@@ -22,6 +22,10 @@ class TestDNS < Test::Unit::TestCase
     Dnsruby::Config.reset
   end
   
+  def test_ipv4_address
+    Dnsruby::DNS.open { |dns| dns.getnames(Dnsruby::IPv4.create("221.186.184.68")) }
+  end
+  
   def test_resolv_rb_api
     DNS.open {|dns|
       dns.getresources("www.ruby-lang.org", Types.A).each  {|r| assert_equal(r.address.to_s, "221.186.184.68")}
