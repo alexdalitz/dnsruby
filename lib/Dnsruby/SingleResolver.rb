@@ -177,7 +177,8 @@ module Dnsruby
       @recurse = true
       @persistent_udp = false
       @persistent_tcp = false
-      self.dnssec = true
+      
+      seen_dnssec = false
       
       if (arg==nil)
         # Get default config
@@ -189,11 +190,17 @@ module Dnsruby
         arg.keys.each do |attr|
           begin
             send(attr.to_s+"=", arg[attr])
+            if (attr.to_s == "dnssec")
+                seen_dnssec = true
+            end
           rescue Exception
             TheLog.error("Argument #{attr} not valid\n")
           end
           #        end
         end
+      end
+      if (!seen_dnssec) 
+        @dnssec = true
       end
       #Check server is IP
       @server=Config.resolve_server(@server)
