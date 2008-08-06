@@ -228,10 +228,10 @@ module Dnsruby
         extract_resources(reply, reply_name, type, klass, &proc)
         return
         #      when RCode::NXDomain
-        #        TheLog.debug("RCode::NXDomain returned - raising error")
+        #        Dnsruby.log.debug("RCode::NXDomain returned - raising error")
         #        raise Config::NXDomain.new(reply_name.to_s)
       else
-        TheLog.error("Unexpected rcode : #{reply.header.rcode.string}")
+        Dnsruby.log.error{"Unexpected rcode : #{reply.header.rcode.string}"}
         raise Config::OtherResolvError.new(reply_name.to_s)
       end      
     end

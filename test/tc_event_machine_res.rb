@@ -11,7 +11,7 @@ class EventMachineTestResolver < Test::Unit::TestCase
   Thread::abort_on_exception = true
   def setup
     Dnsruby::Config.reset
-    #    Dnsruby::TheLog.level=Logger::DEBUG
+    #    Dnsruby.log.level=Logger::DEBUG
     Dnsruby::Resolver.use_eventmachine(true)
     Dnsruby::Resolver.start_eventmachine_loop(true)
   end

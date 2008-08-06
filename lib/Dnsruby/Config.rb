@@ -115,7 +115,7 @@ module Dnsruby
         send("ndots=",nd)
         send("domain=",dom)        
       }
-      TheLog.info(to_s)
+      Dnsruby.log.info{to_s}
     end
     
     # Set the default domain
@@ -195,7 +195,7 @@ module Dnsruby
       #      @nameserver = ['0.0.0.0'] if (@nameserver.class != Array || @nameserver.empty?)
       # Now go through and ensure that all ns point to IP addresses, not domain names
       @nameserver=ns
-      TheLog.debug("Nameservers = #{@nameserver.join(", ")}")
+      Dnsruby.log.debug{"Nameservers = #{@nameserver.join(", ")}"}
     end
     
     def Config.resolve_server(ns) #:nodoc: all
@@ -216,7 +216,7 @@ module Dnsruby
             addr = TCPSocket.gethostbyname(ns)[3] # @TODO@ Replace this with Dnsruby call when lookups work
             server = addr
           rescue Exception => e
-            TheLog.error("Can't make sense of nameserver : #{server}, exception : #{e}")
+            Dnsruby.log.error{"Can't make sense of nameserver : #{server}, exception : #{e}"}
             raise ArgumentError.new("Can't make sense of nameserver : #{server}, exception : #{e}")
           end
         end

@@ -411,7 +411,7 @@ module Dnsruby
           rr = msg.get_rr
           if (rr.type == Types.TSIG)
             if (count!=o.header.arcount-1)
-              TheLog.Error("Incoming message has TSIG record before last record")
+              Dnsruby.log.Error("Incoming message has TSIG record before last record")
               raise DecodeError.new("TSIG record present before last record")
             end
             o.tsigstart = start # needed for TSIG verification

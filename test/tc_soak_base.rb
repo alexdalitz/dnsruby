@@ -69,7 +69,7 @@ class TestSoakBase # < Test::Unit::TestCase
           timed_out+=1
           #        p "Number #{i} timed out!"
         elsif (ret.class != Message)
-          TheLog.debug("tc_single_resolver : Query #{i} ERROR RETURNED : #{error.class}, #{error}")
+          Dnsruby.log.debug("tc_single_resolver : Query #{i} ERROR RETURNED : #{error.class}, #{error}")
         end
       end
     }
@@ -120,7 +120,7 @@ class TestSoakBase # < Test::Unit::TestCase
           #        p "Number #{i} timed out!"
         elsif (ret.class != Message)
           error_count+=1
-          TheLog.error("tc_single_resolver : Query #{i} ERROR RETURNED : #{error.class}, #{error}")
+          Dnsruby.log.error("tc_single_resolver : Query #{i} ERROR RETURNED : #{error.class}, #{error}")
         end
       end
     }

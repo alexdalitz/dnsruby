@@ -32,7 +32,7 @@ class TestTSig < Test::Unit::TestCase
     begin
       Dnsruby::Resolver::use_eventmachine(true)
     rescue RuntimeError
-      Dnsruby::TheLog.error("EventMachine not installed - not running tsig EM tests")
+      Dnsruby.log.error("EventMachine not installed - not running tsig EM tests")
       return 
     end
     run_test_client_signs

@@ -15,7 +15,7 @@
 #++
 require 'rubygems'
 require 'dnsruby'
-Dnsruby::TheLog.level = Logger::FATAL
+Dnsruby.log.level = Logger::FATAL
 require "test/unit"
 # Disable these tests if we're not online
 require 'socket'

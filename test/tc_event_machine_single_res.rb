@@ -8,7 +8,7 @@ require 'dnsruby'
 class EventMachineTestSingleResolver < Test::Unit::TestCase
   Dnsruby::Resolver.use_eventmachine(true)
   def setup
-#    Dnsruby::TheLog.level=Logger::DEBUG
+#    Dnsruby.log.level=Logger::DEBUG
     Dnsruby::Resolver.use_eventmachine(true)
     Dnsruby::Resolver.start_eventmachine_loop(true)
     sleep(0.01)

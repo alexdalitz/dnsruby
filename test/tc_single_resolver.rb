@@ -19,7 +19,7 @@ require 'dnsruby'
 include Dnsruby
 class TestSingleResolver < Test::Unit::TestCase
   Thread::abort_on_exception = true
-  #  Dnsruby::TheLog.level=Logger::DEBUG
+  #  Dnsruby.log.level=Logger::DEBUG
   
   def setup
     Dnsruby::Config.reset

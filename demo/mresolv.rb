@@ -25,7 +25,7 @@ debug = false
 opts.each do |opt, arg|
   case opt
   when '-d'
-    Dnsruby::TheLog.level=Logger::INFO
+    Dnsruby.log.level=Logger::INFO
     debug = true
   when '-n'
     max_outstanding = arg.to_i

@@ -100,7 +100,7 @@ module Dnsruby
     
     def check_select_thread_synchronized
       if (!@@select_thread.alive?)
-        TheLog.debug("Restarting select thread")
+        Dnsruby.log.debug{"Restarting select thread"}
         @@select_thread = Thread.new {
           do_select
         }
@@ -120,7 +120,7 @@ module Dnsruby
       while true do
         send_tick_to_observers
         send_queued_exceptions
-        timeout = tick_time = (Time.now+0.1) - Time.now # We provide a timer service to various Dnsruby classes
+        timeout = tick_time = 0.1 # We provide a timer service to various Dnsruby classes
         sockets=[]
         timeouts=[]
         has_observer = false
@@ -160,7 +160,7 @@ module Dnsruby
         end
         @@mutex.synchronize{
           if (unused_loop_count > 10 && @@query_hash.empty? && @@observers.empty?)
-            TheLog.debug("Stopping select loop")
+            Dnsruby.log.debug{"Stopping select loop"}
             return
           end
         }
@@ -169,7 +169,7 @@ module Dnsruby
     end
     
     def process_error(errors)
-      TheLog.debug("Error! #{errors.inspect}")
+      Dnsruby.log.debug{"Error! #{errors.inspect}"}
       # @todo@ Process errors [can we do this in single socket environment?]
     end
     
@@ -220,7 +220,7 @@ module Dnsruby
           if (res.check_response(msg, bytes, query, client_queue, id, tcp))
             remove_id(id)
             exception = msg.header.get_exception
-            TheLog.debug("Pushing response to client queue")
+            Dnsruby.log.debug{"Pushing response to client queue"}
             client_queue.push([id, msg, exception])
             notify_queue_observers(client_queue, id)
           else
@@ -230,7 +230,7 @@ module Dnsruby
         end
       end
       # If not, then we have an error
-      TheLog.error("Stray packet - " + msg.inspect + "\n from " + socket.inspect)
+      Dnsruby.log.error{"Stray packet - " + msg.inspect + "\n from " + socket.inspect}
     end
     
     def remove_id(id)
@@ -238,10 +238,11 @@ module Dnsruby
       @@mutex.synchronize{
         socket = @@query_hash[id].socket
         @@timeouts.delete(id)
-        @@query_hash.delete(id)      
+        @@query_hash.delete(id)  
+        @@socket_hash.delete(socket)        
         @@sockets.delete(socket) # @TODO@ Not if persistent!
       }
-      TheLog.debug("Closing socket #{socket}")
+      Dnsruby.log.debug{"Closing socket #{socket}"}
       socket.close # @TODO@ Not if persistent!
     end
     
@@ -295,33 +296,33 @@ module Dnsruby
             answersize=(buf.length)
           else
             # recvfrom failed - why?
-            TheLog.error("Error - recvfrom failed from #{socket}")
+            Dnsruby.log.error{"Error - recvfrom failed from #{socket}"}
             handle_recvfrom_failure(socket)          
             return
           end        
         end
       rescue Exception => e
-        TheLog.error("Error - recvfrom failed from #{socket}, exception : #{e}")
+        Dnsruby.log.error{"Error - recvfrom failed from #{socket}, exception : #{e}"}
         handle_recvfrom_failure(socket)          
         return
       end
-      TheLog.debug(";; answer from #{answerfrom} : #{answersize} bytes\n")
+      Dnsruby.log.debug{";; answer from #{answerfrom} : #{answersize} bytes\n"}
       
       begin
         ans = Message.decode(buf)
       rescue Exception => e
-        TheLog.error("Decode error! #{e.class}, #{e}\nfor msg (length=#{buf.length}) : #{buf}")
+        Dnsruby.log.error{"Decode error! #{e.class}, #{e}\nfor msg (length=#{buf.length}) : #{buf}"}
         client_id=get_client_id_from_answerfrom(socket, answerip, answerport)
         if (client_id != nil) 
           send_exception_to_client(e, socket, client_id)
         else
-          TheLog.error("Decode error from #{answerfrom} but can't determine packet id")
+          Dnsruby.log.error{"Decode error from #{answerfrom} but can't determine packet id"}
         end
         return
       end
       
       if (ans!= nil)
-        TheLog.debug("#{ans}")
+        Dnsruby.log.debug{"#{ans}"}
         ans.answerfrom=(answerfrom)
         ans.answersize=(answersize)
       end
@@ -342,7 +343,7 @@ module Dnsruby
         }
         send_exception_to_client(OtherResolvError.new("recvfrom failed from #{answerfrom}"), socket, ids_for_socket[0])
       else
-        TheLog.fatal("Recvfrom failed from #{socket}, no way to tell query id")
+        Dnsruby.log.fatal{"Recvfrom failed from #{socket}, no way to tell query id"}
       end
     end
     
@@ -413,9 +414,10 @@ module Dnsruby
     def remove_observer(client_queue, observer)
       @@mutex.synchronize {
         if (@@observers[client_queue]==observer)
-          @@observers.delete(observer)
+#          @@observers.delete(observer)
+          @@observers.delete(client_queue)
         else
-          TheLog.error("remove_observer called with wrong observer for queue")
+          Dnsruby.log.error{"remove_observer called with wrong observer for queue"}
           raise ArgumentError.new("remove_observer called with wrong observer for queue")
         end
         if (!@@observers.values.include?observer)

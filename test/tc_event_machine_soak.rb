@@ -10,7 +10,7 @@ end
 
 class TestEventMachineSoak < Test::Unit::TestCase
   def setup
-    #    Dnsruby::TheLog.level=Logger::DEBUG
+    #    Dnsruby.log.level=Logger::DEBUG
     Dnsruby::Resolver.use_eventmachine(true)
   end
   def teardown
@@ -23,7 +23,7 @@ class TestEventMachineSoak < Test::Unit::TestCase
     sleep(0.1)
     @@dfs = {}
     @@num_sent = 0
-    #Dnsruby::TheLog.level=Logger::DEBUG
+    #Dnsruby.log.level=Logger::DEBUG
     res = Dnsruby::SingleResolver.new
     Dnsruby::Resolver.use_eventmachine
     Dnsruby::Resolver.start_eventmachine_loop(false)
@@ -39,7 +39,7 @@ class TestEventMachineSoak < Test::Unit::TestCase
   end
   
   def test_sequential
-    #Dnsruby::TheLog.level=Logger::DEBUG
+    #Dnsruby.log.level=Logger::DEBUG
     Dnsruby::Resolver.use_eventmachine(true)
     Dnsruby::Resolver.start_eventmachine_loop(true)
     res = Dnsruby::SingleResolver.new
@@ -62,7 +62,7 @@ class TestEventMachineSoak < Test::Unit::TestCase
     sleep(0.1)
     @@dfs = {}
     @@num_sent = 0
-    #Dnsruby::TheLog.level=Logger::DEBUG
+    #Dnsruby.log.level=Logger::DEBUG
     res = Dnsruby::Resolver.new
     Dnsruby::Resolver.use_eventmachine
     Dnsruby::Resolver.start_eventmachine_loop(false)

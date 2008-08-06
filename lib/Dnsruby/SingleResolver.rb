@@ -129,7 +129,7 @@ module Dnsruby
             tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1]})
           end
         else
-          TheLog.info("TSIG signing switched off")
+          Dnsruby.log.info{"TSIG signing switched off"}
           return nil
         end
       elsif (args.length ==2)
@@ -137,7 +137,7 @@ module Dnsruby
       else
         raise ArgumentError.new("Wrong number of arguments to tsig=")
       end
-      TheLog.info("TSIG signing now using #{tsig.name}, key=#{tsig.key}")
+      Dnsruby.log.info{"TSIG signing now using #{tsig.name}, key=#{tsig.key}"}
       return tsig
     end
     
@@ -146,7 +146,7 @@ module Dnsruby
     end
     
     def server=(server)
-      TheLog.debug("SingleResolver setting server to #{server}")
+      Dnsruby.log.debug{"SingleResolver setting server to #{server}"}
       @server=Config.resolve_server(server)
     end
     
@@ -194,7 +194,7 @@ module Dnsruby
                 seen_dnssec = true
             end
           rescue Exception
-            TheLog.error("Argument #{attr} not valid\n")
+            Dnsruby.log.error{"Argument #{attr} not valid\n"}
           end
           #        end
         end
@@ -231,11 +231,11 @@ module Dnsruby
     def send_message(msg, use_tcp=@use_tcp)
       q = Queue.new
       send_async(msg, q, Time.now + rand(1000000), use_tcp)
-      id, msg, error = q.pop
+      id, reply, error = q.pop
       if (error != nil)
         raise error
       else
-        return msg
+        return reply
       end
     end
     
@@ -294,7 +294,7 @@ module Dnsruby
       end
       query_packet = make_query_packet(msg, use_tcp)
       if (udp_packet_size < query_packet.length)
-        TheLog.debug("Query packet length exceeds max UDP packet size - using TCP")
+        Dnsruby.log.debug{"Query packet length exceeds max UDP packet size - using TCP"}
         use_tcp = true
       end
       if (args.length > 1)
@@ -316,7 +316,7 @@ module Dnsruby
         return send_eventmachine(query_packet, msg, client_query_id, client_queue, use_tcp)
       else
         if (!client_query_id)
-          client_query_id = Time.now + rand(10000)
+          client_query_id = Time.now + rand(10000) # is this safe?!
         end
         send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
         return client_query_id
@@ -334,7 +334,7 @@ module Dnsruby
         ret = true
         if (response.header.tc && !use_tcp && !@ignore_truncation)
           # Try to resend over tcp
-          TheLog.debug("Truncated - resending over TCP")
+          Dnsruby.log.debug{"Truncated - resending over TCP"}
           send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
         else
           if (!check_tsig(msg, response, response_bytes))
@@ -377,17 +377,17 @@ module Dnsruby
           socket.close
         end
         err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
-        TheLog.error("#{err}")
+        Dnsruby.log.error{"#{err}"}
         st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
         return
       end
       if (socket==nil)
         err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}")
-        TheLog.error("#{err}")
+        Dnsruby.log.error{"#{err}"}
         st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
         return
       end
-      TheLog.debug("Sending packet to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}")
+      Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}"}
       begin
         if (use_tcp)
           lenmsg = [query_bytes.length].pack('n')
@@ -397,7 +397,7 @@ module Dnsruby
       rescue Exception => e
         socket.close
         err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
-        TheLog.error("#{err}")
+        Dnsruby.log.error{"#{err}"}
         st.push_exception_to_select(client_query_id, client_queue, err, nil)
         return
       end
@@ -428,7 +428,7 @@ module Dnsruby
       end
       if (response.header.tc && !tcp)
         # Try to resend over tcp
-        TheLog.debug("Truncated - resending over TCP")
+        Dnsruby.log.debug{"Truncated - resending over TCP"}
         send_async(query, client_queue, client_query_id, true)
         return false
       end
@@ -440,17 +440,17 @@ module Dnsruby
         if (response.tsig)
           if !query.tsig.verify(query, response, response_bytes)
             # Discard packet and wait for correctly signed response
-            TheLog.error("TSIG authentication failed!")
+            Dnsruby.log.error{"TSIG authentication failed!"}
             return false
           end
         else
           # Treated as having format error and discarded (RFC2845, 4.6)
-          TheLog.error("Expecting TSIG signed response, but got unsigned response - discarding")
+          Dnsruby.log.error{"Expecting TSIG signed response, but got unsigned response - discarding"}
           return false
         end
       elsif (response.tsig)
         # Error - signed response to unsigned query
-        TheLog.error("Signed response to unsigned query")
+        Dnsruby.log.error{"Signed response to unsigned query"}
         return false
       end      
       return true
@@ -464,7 +464,7 @@ module Dnsruby
       
       if (@dnssec)
         # RFC 4035
-        TheLog.debug(";; Adding EDNS extention with UDP packetsize #{udp_packet_size} and DNS OK bit set\n")
+        Dnsruby.log.debug{";; Adding EDNS extention with UDP packetsize #{udp_packet_size} and DNS OK bit set\n"}
         optrr = RR::OPT.new(udp_packet_size)   # Decimal UDPpayload
         optrr.dnssec_ok=true
               
@@ -476,7 +476,7 @@ module Dnsruby
               
       elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
         #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
-        TheLog.debug(";; Adding EDNS extention with UDP packetsize  #{udp_packet_size}.\n")
+        Dnsruby.log.debug{";; Adding EDNS extention with UDP packetsize  #{udp_packet_size}.\n"}
         # RFC 3225
         optrr = RR::OPT.new(udp_packet_size)
         

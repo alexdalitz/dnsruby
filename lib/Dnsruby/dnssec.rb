@@ -313,7 +313,7 @@ module Dnsruby
       #3.1.8.1.  Signature Calculation
       
       if (keyrec.sep_key? && !keyrec.zone_key?)
-        TheLog.error("DNSKEY with with SEP flag set and Zone Key flag not set was used to verify RRSIG over RRSET - this is not allowed by RFC4034 section 2.1.1")
+        Dnsruby.log.error("DNSKEY with with SEP flag set and Zone Key flag not set was used to verify RRSIG over RRSET - this is not allowed by RFC4034 section 2.1.1")
         return false
       end          
 

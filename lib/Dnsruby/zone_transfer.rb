@@ -106,7 +106,7 @@ module Dnsruby
               if (@transfer_type == Types.IXFR &&
                     rcode == RCode.NOTIMP)
                 # IXFR didn't work - let's try AXFR
-                TheLog.debug("IXFR DID NOT WORK (rcode = NOTIMP) - TRYING AXFR!!")
+                Dnsruby.log.debug("IXFR DID NOT WORK (rcode = NOTIMP) - TRYING AXFR!!")
                 @state = :InitialSoa
                 @transfer_type=Types.AXFR
                 # Send an initial AXFR query
@@ -122,7 +122,7 @@ module Dnsruby
             end
             
             if (response.header.ancount == 0 && @transfer_type == Types.IXFR) 
-              TheLog.debug("IXFR DID NOT WORK (ancount = 0) - TRYING AXFR!!")
+              Dnsruby.log.debug("IXFR DID NOT WORK (ancount = 0) - TRYING AXFR!!")
               # IXFR didn't work - let's try AXFR
               @transfer_type=Types.AXFR
               # Send an initial AXFR query
@@ -213,7 +213,7 @@ module Dnsruby
         # to recognize the end of an IXFR.
         @end_serial = rec.serial
         if (@transfer_type == Types.IXFR && @end_serial <= @serial)
-          TheLog.debug("zone up to date")
+          Dnsruby.log.debug("zone up to date")
           @state = :End
         else
           @state = :FirstData
@@ -223,12 +223,12 @@ module Dnsruby
         # If it begins with 2 SOAs, it's an IXFR.
         if (@transfer_type == Types.IXFR && type == Types.SOA &&
               rec.serial == @serial)
-          TheLog.debug("IXFR response - using IXFR")
+          Dnsruby.log.debug("IXFR response - using IXFR")
           @rtype = Types.IXFR
           @ixfr = []
           @state = :Ixfr_DelSoa
         else
-          TheLog.debug("AXFR response - using AXFR")
+          Dnsruby.log.debug("AXFR response - using AXFR")
           @rtype = Types.AXFR
           @axfr = []
           @axfr << @initialsoa
@@ -322,7 +322,7 @@ module Dnsruby
       msg = Message.decode(buf)
       if (@tsig)
           if !@tsig.verify_envelope(msg, buf)
-            TheLog.error("Bad signature on zone transfer - closing connection")
+            Dnsruby.log.error("Bad signature on zone transfer - closing connection")
             raise ResolvError.new("Bad signature on zone transfer")
           end      
       end

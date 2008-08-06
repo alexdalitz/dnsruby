@@ -13,11 +13,11 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-require 'Dnsruby/TheLog'
 require 'Dnsruby/code_mapper'
 require 'Dnsruby/ipv4'
 require 'Dnsruby/ipv6'
 require 'timeout'
+require 'logger'
 #= Dnsruby library
 #Dnsruby is a thread-aware DNS stub resolver library written in Ruby.
 #
@@ -90,6 +90,12 @@ require 'timeout'
 #* /etc/nsswitch.conf is not supported.
 #* IPv6 is not supported.
 module Dnsruby
+  
+      @@logger = Logger.new(STDOUT)
+      @@logger.level = Logger::FATAL
+      def Dnsruby.log
+        @@logger
+      end
   class OpCode < CodeMapper
     Query = 0        # RFC 1035
     IQuery = 1        # RFC 1035

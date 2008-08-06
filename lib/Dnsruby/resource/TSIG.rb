@@ -238,7 +238,7 @@ module Dnsruby
         end
         
 	if ((tsig_rr.name != @name) || (tsig_rr.algorithm.downcase != @algorithm.downcase))
-          TheLog.error("BADKEY failure")
+          Dnsruby.log.error("BADKEY failure")
           response.tsigstate = :Failed
           response.tsigerror = RCode.BADKEY
           return false          
@@ -247,7 +247,7 @@ module Dnsruby
         # Check time_signed (RFC2845, 4.5.2) - only really necessary for server
         if (Time.now.to_i > tsig_rr.time_signed + tsig_rr.fudge  ||
               Time.now.to_i < tsig_rr.time_signed - tsig_rr.fudge)
-          TheLog.error("TSIG failed with BADTIME")
+          Dnsruby.log.error("TSIG failed with BADTIME")
           response.tsigstate = :Failed
           response.tsigerror = RCode.BADTIME
           return false          
@@ -307,14 +307,14 @@ module Dnsruby
         @num_envelopes += 1
         if (!response.tsig)
           if ((@num_envelopes > 1) && (@num_envelopes - @last_signed < 100))
-            TheLog.debug("Receiving intermediate envelope in TSIG TCP session")
+            Dnsruby.log.debug("Receiving intermediate envelope in TSIG TCP session")
             response.tsigstate = :Intermediate
             response.tsigerror = RCode.NOERROR
             @buf = @buf + response_bytes
             return
           else
             response.tsigstate = :Failed
-            TheLog.error("Expecting signed packet")
+            Dnsruby.log.error("Expecting signed packet")
             return false
           end
         end
@@ -323,7 +323,7 @@ module Dnsruby
         # We have a TSIG - process it!
         tsig = response.tsig
         if (@num_envelopes == 1)
-          TheLog.debug("First response in TSIG TCP session - verifying normally")
+          Dnsruby.log.debug("First response in TSIG TCP session - verifying normally")
           # Process it as a standard answer
           ok = verify(@query, response, response_bytes)
           if (ok)
@@ -336,7 +336,7 @@ module Dnsruby
           end
           return ok
         end
-        TheLog.debug("Processing TSIG on TSIG TCP session")
+        Dnsruby.log.debug("Processing TSIG on TSIG TCP session")
 
         if (!verify_common(response))
           return false
@@ -358,7 +358,7 @@ module Dnsruby
         mac = calculate_mac(tsig.algorithm, @buf)
 
         if (mac != tsig.mac)
-          TheLog.error("TSIG Verify error on TSIG TCP session")
+          Dnsruby.log.error("TSIG Verify error on TSIG TCP session")
           response.tsigstate = :Failed
           return false
         end
@@ -525,7 +525,7 @@ module Dnsruby
         else
           raise ArgumentError.new("#{alg.class} not valid type for Dnsruby::RR::TSIG#algorithm=  - use String or Name")
         end
-        TheLog.debug("Using #{@algorithm.to_s} algorithm")
+        Dnsruby.log.debug{"Using #{@algorithm.to_s} algorithm"}
       end
       
       def fudge=(f)

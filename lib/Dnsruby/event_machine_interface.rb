@@ -23,9 +23,9 @@ module Dnsruby
           break
         end
         c, proc = @@timer_procs[timeout]
-        proc.call
         @@timer_procs.delete(timeout)
         @@timer_keys_sorted.delete(timeout)
+        proc.call
       end
         
       if (!@@outstanding_sends.empty?)
@@ -71,21 +71,22 @@ module Dnsruby
     def EventMachineInterface::start_eventmachine
       if (!eventmachine_running?)
         if Resolver.start_eventmachine_loop?
-          TheLog.debug("Starting EventMachine")
+          Dnsruby.log.debug("Starting EventMachine")
           @@started_em_here = true
           @@em_thread = Thread.new {
             EM.run {
-              EventMachine::add_periodic_timer(0.1) {EventMachineInterface::process_timers}
+#              EventMachine::add_periodic_timer(0.1) {EventMachineInterface::process_timers}
+              EventMachine::add_timer(0.1) {EventMachineInterface::process_timers}
               @@df = EventMachine::DefaultDeferrable.new
               @@df.callback{
-                TheLog.debug("Stopping EventMachine")
+                Dnsruby.log.debug("Stopping EventMachine")
                 EM.stop              
                 @@em_thread=nil
               }
             }
           }
         else
-          TheLog.debug("Not trying to start event loop")
+          Dnsruby.log.debug("Not trying to start event loop")
         end
       end
     end
@@ -130,12 +131,12 @@ module Dnsruby
         end
       rescue Exception
         #@TODO@ EM::reactor_running? only introduced in EM v0.9.0 - if it's not there, we simply don't know what to do...
-        TheLog.error("EventMachine::reactor_running? not available.")
+        Dnsruby.log.error("EventMachine::reactor_running? not available.")
         #        if Resolver.start_eventmachine_loop?
-        #          TheLog.debug("Trying to start event loop - may prove fatal...")
+        #          Dnsruby.log.debug("Trying to start event loop - may prove fatal...")
         start_eventmachine
         #        else
-        #          TheLog.debug("Not trying to start event loop.")
+        #          Dnsruby.log.debug("Not trying to start event loop.")
         #        end
       end
       df = nil
@@ -157,8 +158,8 @@ module Dnsruby
         lenmsg = [args[:msg].length].pack('n')
         c.send_data(lenmsg)
         c.send_data args[:msg] # , args[:server], args[:port]
-        TheLog.debug"EventMachine : Sent TCP packet to #{args[:server]}:#{args[:port]}" + # from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
-        ", timeout=#{args[:timeout]}"
+        Dnsruby.log.debug {"EventMachine : Sent TCP packet to #{args[:server]}:#{args[:port]}" + # from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
+        ", timeout=#{args[:timeout]}"}
       }
       return connection # allows clients to set callback, errback, etc., if desired
     end
@@ -168,7 +169,7 @@ module Dnsruby
         c.timeout_time=Time.now + args[:timeout]
         c.instance_eval {@args = args}
         c.send_datagram args[:msg], args[:server], args[:port]
-        TheLog.debug"EventMachine : Sent datagram to #{args[:server]}:#{args[:port]} from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
+        Dnsruby.log.debug{"EventMachine : Sent datagram to #{args[:server]}:#{args[:port]} from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"}
       }
       return connection # allows clients to set callback, errback, etc., if desired
     end
@@ -181,23 +182,23 @@ module Dnsruby
         @closing=false
       end
       def receive_data(dgm)
-        TheLog.debug("UDP receive_data called")
+        Dnsruby.log.debug{"UDP receive_data called"}
         process_incoming_message(dgm)
       end
       
       def process_incoming_message(data)
-        TheLog.debug("Processing incoming message, #{data.length} bytes")
+        Dnsruby.log.debug{"Processing incoming message, #{data.length} bytes"}
         ans=nil
         begin
           ans = Message.decode(data)
         rescue Exception => e
-          TheLog.error("Decode error! #{e.class}, #{e}\nfor msg (length=#{data.length}) : #{data}")
+          Dnsruby.log.error{"Decode error! #{e.class}, #{e}\nfor msg (length=#{data.length}) : #{data}"}
           @closing=true
           close_connection
           send_to_client(nil, nil, e)
           return
         end
-        TheLog.debug("#{ans}")
+        Dnsruby.log.debug{"#{ans}"}
         ans.answerfrom=(@args[:server])
         ans.answersize=(data.length)
         exception = ans.header.get_exception
@@ -207,12 +208,12 @@ module Dnsruby
       end
         
       def unbind
-        TheLog.debug("Unbind called")
+        Dnsruby.log.debug{"Unbind called"}
         if (!@closing)
           if (@timeout_time <= Time.now + 1)
             send_timeout
           else
-            TheLog.debug("Sending IOError to client")
+            Dnsruby.log.debug{"Sending IOError to client"}
             send_to_client(nil, nil, IOError.new("Network error"))
           end
         end
@@ -221,7 +222,7 @@ module Dnsruby
         EventMachineInterface.remove_from_outstanding(self)
       end
       def send_timeout
-        TheLog.debug("Sending timeout to client")
+        Dnsruby.log.debug{"Sending timeout to client"}
         send_to_client(nil, nil, ResolvTimeout.new("Query timed out"))
       end
       def send_to_client(msg, bytes, err)
@@ -242,19 +243,19 @@ module Dnsruby
         @answersize = 0
       end
       def receive_data(data)
-        TheLog.debug("TCP receive_data called")
+        Dnsruby.log.debug{"TCP receive_data called"}
         #Buffer up the incoming data until we have a complete packet
         @data << data
         if (@data.length >= 2)
           if (@answersize == 0)
             @answersize = @data[0..1].unpack('n')[0]
-            TheLog.debug("TCP - expecting #{@answersize} bytes")
+            Dnsruby.log.debug{"TCP - expecting #{@answersize} bytes"}
           end
           if (@answersize == @data.length - 2)
-            TheLog.debug("TCP - got all #{@answersize} bytes ")
+            Dnsruby.log.debug{"TCP - got all #{@answersize} bytes "}
             process_incoming_message(@data[2..@data.length])
           else
-            TheLog.debug("TCP - got #{@data.length-2} message bytes")
+            Dnsruby.log.debug{"TCP - got #{@data.length-2} message bytes"}
           end
         end
       end      
