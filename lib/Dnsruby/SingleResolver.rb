@@ -177,6 +177,7 @@ module Dnsruby
       @recurse = true
       @persistent_udp = false
       @persistent_tcp = false
+      @dnssec = true
       
       seen_dnssec = false
       
@@ -196,7 +197,7 @@ module Dnsruby
           rescue Exception
             Dnsruby.log.error{"Argument #{attr} not valid\n"}
           end
-          #        end
+        #        end
         end
       end
       if (!seen_dnssec) 

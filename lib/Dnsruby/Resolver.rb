@@ -349,7 +349,11 @@ module Dnsruby
     def add_config_nameservers
       # Add the Config nameservers
       @config.nameserver.each do |ns|
-        @single_resolvers.push(SingleResolver.new({:server=>ns}))
+        @single_resolvers.push(SingleResolver.new({:server=>ns, :dnssec=>@dnssec,
+            :use_tcp=>@use_tcp, :packet_timeout=>@packet_timeout,
+          :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
+         :src_address=>@src_address, :src_port=>@src_port, 
+         :recurse=>@recurse, :udp_size=>@udp_size}))
       end
     end
     
