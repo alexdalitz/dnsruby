@@ -17,7 +17,7 @@ require 'Dnsruby/code_mapper'
 require 'Dnsruby/ipv4'
 require 'Dnsruby/ipv6'
 require 'timeout'
-require 'logger'
+require 'Dnsruby/TheLog'
 #= Dnsruby library
 #Dnsruby is a thread-aware DNS stub resolver library written in Ruby.
 #
@@ -93,6 +93,9 @@ module Dnsruby
   
       @@logger = Logger.new(STDOUT)
       @@logger.level = Logger::FATAL
+      #Get the log for Dnsruby
+      #Use this to set the log level
+      #e.g. Dnsruby.log.level = Logger::INFO
       def Dnsruby.log
         @@logger
       end
