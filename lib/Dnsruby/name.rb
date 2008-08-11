@@ -45,8 +45,8 @@ module Dnsruby
         return arg
       when String
 #        arg.gsub!(/\.$/o, "")
-#        return Name.new(split_escaped(arg), /\.\z/ =~ arg ? true : false)
-        return Name.new(Label.split(arg), /\.\z/ =~ arg ? true : false)
+        return Name.new(split_escaped(arg), /\.\z/ =~ arg ? true : false)
+#        return Name.new(Label.split(arg), /\.\z/ =~ arg ? true : false)
       when Array
         return Name.new(arg, /\.\z/ =~ ((arg.last.kind_of?String)?arg.last : arg.last.string) ? true : false)
       else        
@@ -54,10 +54,10 @@ module Dnsruby
       end
     end
     
-#    def self.split_escaped(arg) #:nodoc: all
-#      encodedlabels = name2encodedlabels(arg)
-#      return encodedlabels2name(encodedlabels).labels
-#    end
+    def self.split_escaped(arg) #:nodoc: all
+      encodedlabels = name2encodedlabels(arg)
+      return encodedlabels2name(encodedlabels).labels
+    end
     
     attr_reader :labels
     
