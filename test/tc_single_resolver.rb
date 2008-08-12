@@ -141,11 +141,6 @@ class TestSingleResolver < Test::Unit::TestCase
   #    assert(Dnsruby::SelectThread.instance.select_thread_alive?)
   #  end
   
-  def test_persistent_socket
-    #@TODO@ Really need a test server for this one!
-    p "Implement persistent sockets!"
-  end
-  
   def test_res_config
     res = Dnsruby::SingleResolver.new
     
