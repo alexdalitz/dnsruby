@@ -67,7 +67,7 @@ class TestTSig < Test::Unit::TestCase
     res.udp_size=512 # Or else we needed to add OPT record already
     res.dnssec=false
     res.recurse=false
-    res.query_timeout = 10
+    res.query_timeout = 20
     response = res.send_message(update)
     
     assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
@@ -105,7 +105,7 @@ class TestTSig < Test::Unit::TestCase
   
   def run_test_resolver_signs
     res = Dnsruby::Resolver.new("ns0.validation-test-servers.nominet.org.uk")
-    res.query_timeout=10
+    res.query_timeout=20
     res.tsig=KEY_NAME, KEY
     
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
