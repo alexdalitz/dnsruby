@@ -297,13 +297,13 @@ module Dnsruby
           else
             # recvfrom failed - why?
             Dnsruby.log.error{"Error - recvfrom failed from #{socket}"}
-            handle_recvfrom_failure(socket)          
+            handle_recvfrom_failure(socket, "")          
             return
           end        
         end
       rescue Exception => e
         Dnsruby.log.error{"Error - recvfrom failed from #{socket}, exception : #{e}"}
-        handle_recvfrom_failure(socket)          
+        handle_recvfrom_failure(socket, e)          
         return
       end
       Dnsruby.log.debug{";; answer from #{answerfrom} : #{answersize} bytes\n"}
@@ -329,8 +329,9 @@ module Dnsruby
       return ans, buf
     end
     
-    def handle_recvfrom_failure(socket)
-      #  @TODO@ No way to notify the client about this error, unless there was only one connection on the socket
+    def handle_recvfrom_failure(socket, exception)
+      #  No way to notify the client about this error, unless there was only one connection on the socket
+      # Not a problem, as there only will ever be one connection on the socket (Kaminsky attack mitigation)
       ids_for_socket = []
       @@mutex.synchronize{
         ids_for_socket = @@socket_hash[socket]
@@ -341,7 +342,7 @@ module Dnsruby
           query_settings = @@query_hash[ids_for_socket[0]]
           answerfrom=query_settings.dest_server
         }
-        send_exception_to_client(OtherResolvError.new("recvfrom failed from #{answerfrom}"), socket, ids_for_socket[0])
+        send_exception_to_client(OtherResolvError.new("recvfrom failed from #{answerfrom}; #{exception}"), socket, ids_for_socket[0])
       else
         Dnsruby.log.fatal{"Recvfrom failed from #{socket}, no way to tell query id"}
       end
