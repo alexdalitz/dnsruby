@@ -427,7 +427,7 @@ module Dnsruby
       if (!check_tsig(query, response, response_bytes))
         return false
       end
-      if (response.header.tc && !tcp)
+      if (response.header.tc && !tcp && !@ignore_truncation)
         # Try to resend over tcp
         Dnsruby.log.debug{"Truncated - resending over TCP"}
         send_async(query, client_queue, client_query_id, true)
@@ -460,7 +460,7 @@ module Dnsruby
     # Prepare the packet for sending
     def make_query_packet(packet, use_tcp) #:nodoc: all
       if (packet.header.opcode == OpCode.QUERY || @recurse)
-        packet.header.rd=true
+        packet.header.rd=@recurse
       end
       
       if (@dnssec)

@@ -1,7 +1,7 @@
 require 'rubygems'
 SPEC = Gem::Specification.new do |s|
   s.name = "dnsruby"
-  s.version = "1.2"
+  s.version = "1.21"
   s.authors = ["AlexD"]
   s.email = "alexd@nominet.org.uk"
   s.homepage = "http://rubyforge.org/projects/dnsruby/"
@@ -11,7 +11,8 @@ SPEC = Gem::Specification.new do |s|
   candidatestest = Dir.glob("test/**/*")
   candidateslib = Dir.glob("lib/**/*")
   candidatesdoc = Dir.glob("doc/**/*")
-   candidates = candidatestest + candidateslib + candidatesdoc
+  candidatesdemo = Dir.glob("demo/**/*")
+   candidates = candidatestest + candidateslib + candidatesdoc + candidatesdemo
   s.files = candidates.delete_if do |item|
                       item.include?("CVS") || item.include?("rdoc") ||
                          item.include?("svn")
