@@ -187,7 +187,13 @@ module Dnsruby
         udp_packet_size = query_settings.udp_packet_size
         msg, bytes = get_incoming_data(socket, udp_packet_size)
         if (msg!=nil)
-          send_response_to_client(msg, bytes, socket)
+          # Check that the IP we received from was the IP we sent to!
+          if ((msg.answerip != query_settings.dest_server) && 
+                (msg.answerfrom != query_settings.dest_server))
+            Dnsruby.log.warn("Unsolicited response received from #{answerip}")
+          else 
+            send_response_to_client(msg, bytes, socket)
+          end
         end
         ready.delete(socket)
       end
@@ -325,6 +331,7 @@ module Dnsruby
         Dnsruby.log.debug{"#{ans}"}
         ans.answerfrom=(answerfrom)
         ans.answersize=(answersize)
+        ans.answerip =(answerip)
       end
       return ans, buf
     end

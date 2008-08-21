@@ -111,6 +111,7 @@ module Dnsruby
       @signing = false
       @tsigkey = nil
       @answerfrom = nil
+      @answerip = nil
       type = Types.A
       klass = Classes.IN
       if (args.length > 0)
@@ -139,6 +140,9 @@ module Dnsruby
     
     #If this Message is a response from a server, then answerfrom contains the address of the server
     attr_accessor :answerfrom
+    
+    #If this Message is a response from a server, then answerfrom contains the IP address of the server
+    attr_accessor :answerip
     
     #If this Message is a response from a server, then answersize contains the size of the response
     attr_accessor :answersize

@@ -651,7 +651,11 @@ module Dnsruby
     end
     
     def send_new_em_query(single_resolver, msg, client_queue, client_query_id, persistent_data)
-      df = single_resolver.send_async(msg) # client_queue, client_query_id)
+      # Pick a new QID here
+      new_msg = msg.dup();
+      new_msg.header = msg.header.dup();
+      new_msg.header.id = rand(65535);
+      df = single_resolver.send_async(new_msg) # client_queue, client_query_id)
       persistent_data.to_send-=1
       df.callback { |answer|
         Dnsruby.log.debug{"Response returned"}
@@ -879,7 +883,12 @@ module Dnsruby
               outstanding.push(id)
               timeouts_done.push(timeout)
               timeouts.delete(timeout)
-              res.send_async(msg, select_queue, id)
+
+              # Pick a new QID here
+              new_msg = msg.dup();
+              new_msg.header = msg.header.dup();
+              new_msg.header.id = rand(65535);
+              res.send_async(new_msg, select_queue, id)
             else
               break
             end
