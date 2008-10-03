@@ -80,7 +80,7 @@ class TestDNS < Test::Unit::TestCase
     #
     Dnsruby.log.level=Logger::FATAL
     [:nameserver].each do |test|
-      [{}, 'string',1,'\1',nil].each do |input|
+      [{}, 'kjghdfkjhase',1,'\1',nil].each do |input|
         res=nil
         begin
           res = Dnsruby::DNS.new({test => input})
