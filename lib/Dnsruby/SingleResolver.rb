@@ -364,23 +364,31 @@ module Dnsruby
       # @TODO@ persisent sockets
       st = SelectThread.instance
       socket = nil
-      begin
-        src_port = get_next_src_port
-        if (use_tcp) 
-          socket = TCPSocket.new(@server, @port, @src_addr, src_port)
-        else
-          socket = UDPSocket.new()
-          socket.bind(@src_addr, src_port)
-          socket.connect(@server, @port)
+      runnextportloop = true
+      while (runnextportloop)do
+        begin
+          src_port = get_next_src_port
+          if (use_tcp) 
+            socket = TCPSocket.new(@server, @port, @src_addr, src_port)
+          else
+            socket = UDPSocket.new()
+            socket.bind(@src_addr, src_port)
+            socket.connect(@server, @port)
+          end
+          runnextportloop = false
+        rescue Exception => e
+          if (socket!=nil)
+            socket.close
+          end          
+          # Try again if the error was EADDRINUSE and a random source port is used
+          if ((e.class != Errno::EADDRINUSE) || 
+                ((e.class == Errno::EADDRINUSE) && (src_port == get_next_src_port)))
+            err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
+            Dnsruby.log.error{"#{err}"}
+            st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
+            return
+          end
         end
-      rescue Exception => e
-        if (socket!=nil)
-          socket.close
-        end
-        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
-        Dnsruby.log.error{"#{err}"}
-        st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
-        return
       end
       if (socket==nil)
         err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}")
