@@ -120,7 +120,7 @@ module Dnsruby
       while true do
         send_tick_to_observers
         send_queued_exceptions
-        timeout = tick_time = 0.1 # We provide a timer service to various Dnsruby classes
+        timeout = tick_time = 0.5 # We provide a timer service to various Dnsruby classes
         sockets=[]
         timeouts=[]
         has_observer = false

@@ -46,6 +46,7 @@ if (online)
   #  require "test/tc_inet6.rb"
   #  require "test/tc_recurse.rb"
   require "test/tc_tcp.rb"
+  require "test/tc_queue.rb"
   #  require "test/tc_soak.rb"
 
   # Check if we can contact the server - if we can't, then abort the test 
