@@ -11,7 +11,7 @@ class TestQueue < Test::Unit::TestCase
     num_queries.times do |i| 
       r.send_async(Dnsruby::Message.new("example#{i}.com"), q, i)
     end
-    sleep(timeout + 1)
-    assert(q.size == num_queries)
+    sleep(timeout * 1.5)
+    assert(q.size == num_queries, "#{num_queries} expected, but got #{q.size}")
   end
 end
