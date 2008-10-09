@@ -114,21 +114,35 @@ class TestPacket < Test::Unit::TestCase
 00 00 38 40 00 05 46 00 00 00 1c 20 00 00 29 10 
 00 00 00 80 00 00 05 00 00 00 00 30
     }
+    
+    uuencodedPacket = %w{
+ba 91 81 80 00 01 
+00 04 00 00 00 01 07 65 78 61 6d 70 6c 65 03 63 
+6f 6d 00 00 ff 00 01 c0 0c 00 02 00 01 00 02 9f  
+f4 00 14 01 61 0c 69 61 6e 61 2d 73 65 72 76 65 
+72 73 03 6e 65 74 00 c0 0c 00 02 00 01 00 02 9f 
+f4 00 04 01 62 c0 2b c0 0c 00 01 00 01 00 02 9f  
+7e 00 04 d0 4d bc a6 c0 0c 00 06 00 01 00 02 9f 
+f4 00 31 04 64 6e 73 31 05 69 63 61 6e 6e 03 6f  
+72 67 00 0a 68 6f 73 74 6d 61 73 74 65 72 c0 6e 
+77 a1 2d b7 00 00 1c 20 00 00 0e 10 00 12 75 00
+00 01 51 80 00 00 29 05 00 00 00 00 00 00 00        
+    }
     uuencodedPacket.map!{|e| e.hex}
     packetdata = uuencodedPacket.pack('c*')
 
     packet3 = Message.decode(packetdata)
-    assert(packet3,                                 'new(\data) returned something');         #28
+    assert(packet3,                                 'new data returned something');         #28
       
     assert_equal(packet3.header.qdcount, 1, 'header question count in syntetic packet correct');   #29
-    assert_equal(packet3.header.ancount, 0, 'header answer count in syntetic packet correct');     #30
-    assert_equal(packet3.header.nscount, 1, 'header authority count in syntetic packet  correct'); #31 
+    assert_equal(packet3.header.ancount, 4, 'header answer count in syntetic packet correct');     #30
+    assert_equal(packet3.header.nscount, 0, 'header authority count in syntetic packet  correct'); #31 
     assert_equal(packet3.header.adcount, 1, 'header additional in sytnetic  packet correct');      #32
       
     rr=packet3.additional;
       
     assert_equal(Types.OPT, rr[0].type, "Additional section packet is EDNS0 type");                         #33
-    assert_equal(4096, rr[0].klass.code, "EDNS0 packet size correct");                                     #34
+    assert_equal(1280, rr[0].klass.code, "EDNS0 packet size correct");                                     #34
       
     # In theory its valid to have multiple questions in the question section.
     # Not many servers digest it though.

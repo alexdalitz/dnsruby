@@ -77,6 +77,26 @@ class TestRrOpt < Test::Unit::TestCase
     res = SingleResolver.new
     res.udp_size = 4096
     ret = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
-    assert(ret.header.rcode == RCode.NoError)
+    assert(ret.rcode == RCode.NoError)
+  end
+  
+  def test_decode_opt
+    # Create an OPT RR
+    size=2048;
+    ednsflags=0x9e22;
+    optrr = RR::OPT.new(size, ednsflags)
+    
+    # Add it to a message
+    m = Message.new
+    m.add_additional(optrr)
+    
+    # Encode the message
+    data = m.encode
+   
+    # Decode it
+    m2 = Message.decode(data)
+    
+    # Make sure there is an OPT RR there
+    assert(m2.rcode == RCode.NOERROR  )
   end
 end

@@ -105,7 +105,7 @@ class TestResolver < Test::Unit::TestCase
     res.send_async(Message.new("dklfjhdFHFHDVVUIEWRFDSAJKVCNASDLFJHN.com", Types.A), q, 1)
     id, m, err = q.pop
     assert(id==1)
-    assert(m.header.rcode == RCode.NXDOMAIN)
+    assert(m.rcode == RCode.NXDOMAIN)
     assert(err.kind_of?(NXDomain))
   end
   

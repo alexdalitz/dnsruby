@@ -223,7 +223,7 @@ module Dnsruby
       type = Types.new(type)
       klass = Classes.new(klass)
       reply, reply_name = send_query(name, type, klass)
-      case reply.header.rcode.code
+      case reply.rcode.code
       when RCode::NOERROR
         extract_resources(reply, reply_name, type, klass, &proc)
         return
@@ -231,7 +231,7 @@ module Dnsruby
         #        Dnsruby.log.debug("RCode::NXDomain returned - raising error")
         #        raise Config::NXDomain.new(reply_name.to_s)
       else
-        Dnsruby.log.error{"Unexpected rcode : #{reply.header.rcode.string}"}
+        Dnsruby.log.error{"Unexpected rcode : #{reply.rcode.string}"}
         raise Config::OtherResolvError.new(reply_name.to_s)
       end      
     end
@@ -281,7 +281,7 @@ module Dnsruby
         msg.add_question(candidate, type, klass)
         @resolver.send_async(msg, q)
         id, ret, exception = q.pop
-        if (exception == nil && ret.header.rcode == RCode.NOERROR)
+        if (exception == nil && ret.rcode == RCode.NOERROR)
           return ret, ret.question[0].qname
         end
       end

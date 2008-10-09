@@ -58,9 +58,9 @@ class TestHeader < Test::Unit::TestCase
     assert_equal(header.qr, true, "qr() works")
     
     header.rcode="NOERROR"
-    assert_equal(header.rcode, RCode::NOERROR, "rcode() works")
+    assert_equal(header.get_header_rcode, RCode::NOERROR, "rcode() works")
     header.rcode=RCode.NOERROR
-    assert_equal(header.rcode.string, "NOERROR", "rcode() works")
+    assert_equal(header.get_header_rcode.string, "NOERROR", "rcode() works")
     
     header.qdcount=1
     header.ancount=2

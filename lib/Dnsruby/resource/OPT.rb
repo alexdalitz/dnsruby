@@ -130,7 +130,7 @@ module Dnsruby
       end
       
       def payloadsize
-        return @klass
+        return @klass.code
       end
       
       def payloadsize=(size)
@@ -161,28 +161,25 @@ module Dnsruby
       end
       
       def from_string(input)
-        if input
-          @options = input.split(" ")
-        end
+        raise NotImplementedError
       end
       
       def to_s
-        ret = "OPT pseudo-record : #{klass.code} max UDP packet size, "
-        ret = ""
+        ret = "OPT pseudo-record : payloadsize #{payloadsize}, xrcode #{xrcode}, version #{version}, flags #{flags}"
         if @options
           @options.each do |opt|
-            ret = ret + opt.to_s + " "
+            ret = ret + " " + opt.to_s
           end
-          ret.chomp!
         end
+        ret = ret + "\n"
         return ret
       end
       
       def encode_rdata(msg, canonical=false)
         if (@options)
           @options.each do |opt|
-            msg.pack('n', opt.code)
-            msg.pack('n', opt.data.length)
+            msg.put_pack('n', opt.code)
+            msg.put_pack('n', opt.data.length)
             msg.put_bytes(opt.data)
           end
           msg.put_array(@options)
@@ -193,10 +190,10 @@ module Dnsruby
         if (msg.has_remaining)
           options = []
           while (msg.has_remaining) do
-            code = msg.unpack('n')
-            len = msg.unpack('n')
+            code  = msg.get_unpack('n')[0]
+            len = msg.get_unpack('n')[0]
             data = msg.get_bytes(len)
-            options.add(Option.new(code, data))
+            options.push(Option.new(code, data))
           end
         end
         return self.new([options])
@@ -204,6 +201,10 @@ module Dnsruby
       
       class Option
         attr_accessor :code, :data
+        def initialize(code, data)
+          @code = code
+          @data = data
+        end
       end
     end
   end

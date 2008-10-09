@@ -101,7 +101,7 @@ module Dnsruby
           response = receive_message(socket)
           
           if (@state == :InitialSoa)
-            rcode = response.header.rcode
+            rcode = response.rcode
             if (rcode != RCode.NOERROR)
               if (@transfer_type == Types.IXFR &&
                     rcode == RCode.NOTIMP)

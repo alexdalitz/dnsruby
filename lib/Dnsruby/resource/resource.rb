@@ -218,7 +218,11 @@ module Dnsruby
     alias :rr_type :type
     
     def klass=(klass)
-      @klass= Classes.new(klass)
+      if (@type != Types.OPT) 
+        @klass= Classes.new(klass)
+      else
+        @klass = Classes.new("CLASS#{klass}")
+      end
     end
     
     # Determines if two Records could be part of the same RRset.
@@ -507,9 +511,9 @@ module Dnsruby
     
     #Get an RR of the specified type and class
     def self.get_class(type_value, class_value) #:nodoc: all
-      #      if (type_value == Types.OPT)
-      #        return Class.new(OPT)
-      #      end
+      if (type_value == Types.OPT)
+         return Class.new(OPT)
+      end
       if (type_value.class == Class)
         type_value = type_value.const_get(:TypeValue)
         return ClassHash[[type_value, Classes.to_code(class_value)]] ||
@@ -526,7 +530,7 @@ module Dnsruby
           class_value = Classes.new(class_value).code
         end
         return ClassHash[[type_value, class_value]] ||
-          Generic.create(type_value, class_value)
+           Generic.create(type_value, class_value)
       end
       return ret
     end  

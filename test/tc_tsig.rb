@@ -70,7 +70,7 @@ class TestTSig < Test::Unit::TestCase
     res.query_timeout = 20
     response = res.send_message(update)
     
-    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+    assert_equal( Dnsruby::RCode.NOERROR, response.rcode)
     assert(response.verified?, "Response has not been verified")
     
     # Now check the record exists
@@ -84,7 +84,7 @@ class TestTSig < Test::Unit::TestCase
     tsig.apply(update)
     assert(update.signed?, "Update has not been signed")
     response = res.send_message(update)
-    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+    assert_equal( Dnsruby::RCode.NOERROR, response.rcode)
     assert(response.verified?, "Response has not been verified")
     
     # Now check the record does not exist
@@ -117,7 +117,7 @@ class TestTSig < Test::Unit::TestCase
     
     response = res.send_message(update)
     
-    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+    assert_equal( Dnsruby::RCode.NOERROR, response.rcode)
     assert(response.verified?, "Response has not been verified")
     
     # Now check the record exists
@@ -138,7 +138,7 @@ class TestTSig < Test::Unit::TestCase
     res.dnssec=false # Or else we needed to add OPT record already
     res.udp_size = 512
     response = res.send_message(update)
-    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+    assert_equal( Dnsruby::RCode.NOERROR, response.rcode)
     assert(response.verified?, "Response has not been verified")
     
     # Now check the record does not exist
@@ -204,7 +204,7 @@ class TestTSig < Test::Unit::TestCase
     assert(!update.signed?, "Update has been signed")
     
     response = res.send_message(update)
-    assert(response.header.rcode == Dnsruby::RCode.NOERROR)
+    assert(response.rcode == Dnsruby::RCode.NOERROR)
     
     end_soa_serial = get_soa_serial("validation-test-servers.nominet.org.uk")
     
@@ -223,7 +223,7 @@ class TestTSig < Test::Unit::TestCase
     update.present(update_name, 'TXT')
     update.delete(update_name)
     response = res.send_message(update)
-    assert_equal( Dnsruby::RCode.NOERROR, response.header.rcode)
+    assert_equal( Dnsruby::RCode.NOERROR, response.rcode)
   end
   
   def get_soa_serial(name)

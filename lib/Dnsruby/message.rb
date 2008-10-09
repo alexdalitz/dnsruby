@@ -309,6 +309,25 @@ module Dnsruby
       return (@tsigstate == :Verified)
     end
     
+    def get_opt
+      each_additional do |r|
+        if (r.type == Types.OPT)
+          return r
+        end
+      end
+      return nil
+    end
+    
+    def rcode
+	rcode = @header.get_header_rcode
+	opt = get_opt
+	if (opt != nil)
+            rcode = rcode.code + (opt.xrcode << 4)
+            rcode = RCode.new(rcode)
+        end
+	return rcode;
+    end    
+
     def to_s
       retval = "";
       
@@ -316,11 +335,20 @@ module Dnsruby
         retval = retval + ";; Answer received from #{@answerfrom} (#{@answersize} bytes)\n;;\n";
       end
       
-      retval = retval + ";; HEADER SECTION\n";
-      retval = retval + @header.to_s;
-      retval = retval + "\n";
+      retval = retval + ";; HEADER SECTION\n"
+      # OPT pseudosection? EDNS flags, udpsize
+      opt = get_opt
+      if (!opt)
+        retval = retval + @header.to_s
+      else
+        retval = retval + @header.to_s_with_rcode(rcode())
+      end
+      retval = retval + "\n"
       
-      # @TODO@ OPT pseudosection? EDNS flags, udpsize
+      if (opt)
+        retval = retval + opt.to_s
+        retval = retval + "\n"
+      end
             
       section = (@header.opcode == OpCode.UPDATE) ? "ZONE" : "QUESTION";
       retval = retval +  ";; #{section} SECTION (#{@header.qdcount}  record#{@header.qdcount == 1 ? '' : 's'})\n";
@@ -328,25 +356,33 @@ module Dnsruby
         retval = retval + ";; #{qr.to_s}\n";
       }
       
-      retval = retval + "\n";
-      section = (@header.opcode == OpCode.UPDATE) ? "PREREQUISITE" : "ANSWER";
-      retval = retval + ";; #{section} SECTION (#{@header.ancount}  record#{@header.ancount == 1 ? '' : 's'})\n";
-      each_answer { |rr|
-        retval = retval + rr.to_s + "\n";
-      }
+      if (@answer.size > 0)
+        retval = retval + "\n";
+        section = (@header.opcode == OpCode.UPDATE) ? "PREREQUISITE" : "ANSWER";
+        retval = retval + ";; #{section} SECTION (#{@header.ancount}  record#{@header.ancount == 1 ? '' : 's'})\n";
+        each_answer { |rr|
+          retval = retval + rr.to_s + "\n";
+        }
+      end
       
-      retval = retval + "\n";
-      section = (@header.opcode == OpCode.UPDATE) ? "UPDATE" : "AUTHORITY";
-      retval = retval + ";; #{section} SECTION (#{@header.nscount}  record#{@header.nscount == 1 ? '' : 's'})\n";
-      each_authority { |rr|
-        retval = retval + rr.to_s + "\n";
-      }
+      if (@authority.size > 0)
+        retval = retval + "\n";
+        section = (@header.opcode == OpCode.UPDATE) ? "UPDATE" : "AUTHORITY";
+        retval = retval + ";; #{section} SECTION (#{@header.nscount}  record#{@header.nscount == 1 ? '' : 's'})\n";
+        each_authority { |rr|
+          retval = retval + rr.to_s + "\n";
+        }
+      end
       
-      retval = retval + "\n";
-      retval = retval + ";; ADDITIONAL SECTION (#{@header.arcount}  record#{@header.arcount == 1 ? '' : 's'})\n";
-      each_additional { |rr|
-        retval = retval + rr.to_s+ "\n";
-      }
+      if ((@additional.size > 0 && !opt) || (@additional.size > 1))
+        retval = retval + "\n";
+        retval = retval + ";; ADDITIONAL SECTION (#{@header.arcount}  record#{@header.arcount == 1 ? '' : 's'})\n";
+        each_additional { |rr|
+          if (rr.type != Types.OPT)
+            retval = retval + rr.to_s+ "\n"
+          end
+        }
+      end
       
       return retval;
     end
@@ -492,7 +528,12 @@ module Dnsruby
     attr_accessor :ra
     
     #Query response code
-    attr_reader :rcode
+    #deprecated - use Message#rcode
+#    attr_reader :rcode
+# This new get_header_rcode method is intended for use only by the Message class
+    def get_header_rcode
+      @rcode
+    end
     
     # The header opcode
     attr_reader :opcode
@@ -588,10 +629,14 @@ module Dnsruby
         @ra == other.ra &&
         @cd == other.cd &&
         @ad == other.ad &&
-        @rcode == other.rcode
+        @rcode == other.get_header_rcode
     end
     
     def to_s
+      to_s_with_rcode(@rcode)
+    end
+      
+    def to_s_with_rcode(rcode)
       retval = ";; id = #{@id}\n";
       
       if (@opcode == OpCode::Update)
@@ -613,7 +658,7 @@ module Dnsruby
         retval += ";; ra = #{@ra}    " +\
           "ad = #{@ad}    "  +\
           "cd = #{@cd}    "  +\
-          "rcode  = #{@rcode.string}\n";
+          "rcode  = #{rcode.string}\n";
         
         retval += ";; qdcount = #{@qdcount}  " +\
           "ancount = #{@ancount}  " +\
