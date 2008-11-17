@@ -86,19 +86,19 @@ class TestResolver < Test::Unit::TestCase
     assert(!no_pointer)
   end
   
-  def test_bad_host
-    res = Resolver.new({:nameserver => "localhost"})
-    res.retry_times=1
-    res.retry_delay=0
-    res.query_timeout = 1
-    q = Queue.new
-    res.send_async(Message.new("example.com", Types.A), q, q)
-    id, m, err = q.pop
-    assert(id==q)
-    assert(m == nil)
-    assert(err.kind_of?(OtherResolvError) || err.kind_of?(IOError), "OtherResolvError or IOError expected : got #{err.class}")
-  end
-  
+#  def test_bad_host
+#    res = Resolver.new({:nameserver => "localhost"})
+#    res.retry_times=1
+#    res.retry_delay=0
+#    res.query_timeout = 1
+#    q = Queue.new
+#    res.send_async(Message.new("example.com", Types.A), q, q)
+#    id, m, err = q.pop
+#    assert(id==q)
+#    assert(m == nil)
+#    assert(err.kind_of?(OtherResolvError) || err.kind_of?(IOError), "OtherResolvError or IOError expected : got #{err.class}")
+#  end
+#  
   def test_nxdomain
     res=Resolver.new
     q = Queue.new

@@ -151,7 +151,7 @@ module Dnsruby
       end
     
       # Now check that we are in the validity period for the RRSIG
-      now = Time.now.to_i
+      now = Time.now
       if ((sigrec.expiration < now) || (sigrec.inception > now))
         raise VerifyError.new("Signature record not in validity period")
       end
@@ -344,7 +344,7 @@ module Dnsruby
     
       if (verified)
         # Sort out the TTLs - set it to the minimum valid ttl
-        expiration_diff = (sigrec.expiration - Time.now.to_i).abs
+        expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
         rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl, 
             expiration_diff].sort)[0]
 

@@ -91,8 +91,8 @@ module Dnsruby
         @algorithm=Algorithms.RSASHA1
         @type_covered = Types.A
         @original_ttl = 3600
-        @inception = Time.now.to_i
-        @expiration = Time.now.to_i
+        @inception = Time.now
+        @expiration = Time.now
         @key_tag = 0
         @labels = 0
         self.signers_name="."
@@ -133,8 +133,10 @@ module Dnsruby
       
 
       def from_data(data) #:nodoc: all
-        type_covered, algorithm, @labels, @original_ttl, @expiration, @inception, 
+        type_covered, algorithm, @labels, @original_ttl, expiration, inception, 
           @key_tag, signers_name, @signature = data
+        @expiration = Time.at(expiration)
+        @inception = Time.at(inception)
         self.type_covered=(type_covered)
         self.signers_name=(signers_name)
         self.algorithm=(algorithm)
@@ -194,7 +196,7 @@ module Dnsruby
         #   digits, while the decimal representation of a 32-bit unsigned integer
         #   can never be longer than 10 digits.
         if (input.length == 10)
-          return input.to_i
+          return input
         elsif (input.length == 14)
           year = input[0,4]
           mon=input[4,2]
@@ -202,18 +204,24 @@ module Dnsruby
           hour=input[8,2]
           min=input[10,2]
           sec=input[12,2]
-          return Time.mktime(year, mon, day, hour, min, sec).to_i
+          return Time.mktime(year, mon, day, hour, min, sec)
         else
           raise DecodeError.new("RRSIG : Illegal time value #{input} - see RFC 4034 section 3.2")
         end
+      end
+      
+      def format_time(time)
+        return time.strftime("%Y%m%d%H%M%S")
       end
       
       def rdata_to_string #:nodoc: all
         if (@type_covered!=nil)
 #          signature = Base64.encode64(@signature) # .gsub(/\n/, "")
           signature = [@signature].pack("m*") # .gsub(/\n/, "")
+          # @TODO@ Display the expiration and inception as 
           return "#{@type_covered.string} #{@algorithm.string} #{@labels} #{@original_ttl} " + 
-            "#{@expiration} ( #{@inception} #{@key_tag} #{@signers_name} #{signature} )"
+            "#{format_time(@expiration)} ( #{format_time(@inception)} " + 
+            "#{@key_tag} #{@signers_name} #{signature} )"
         else
           return ""
         end
@@ -235,8 +243,8 @@ module Dnsruby
         signers_name = msg.get_name
         signature  = msg.get_bytes
         return self.new(
-          [type_covered, algorithm, labels, original_ttl, expiration,
-            inception, key_tag, signers_name, signature])
+          [type_covered, algorithm, labels, original_ttl, Time.at(expiration),
+            Time.at(inception), key_tag, signers_name, signature])
       end
       
       def sig_data
@@ -245,7 +253,7 @@ module Dnsruby
         #the Signature field excluded;
         data = MessageEncoder.new { |msg|
           msg.put_pack('ncc', @type_covered.to_i, @algorithm.to_i, @labels)
-          msg.put_pack("NNN", @original_ttl, @expiration, @inception)
+          msg.put_pack("NNN", @original_ttl, @expiration.to_i, @inception.to_i)
           msg.put_pack("n", @key_tag)
           msg.put_name(@signers_name, true)
         }.to_s

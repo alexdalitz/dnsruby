@@ -36,8 +36,8 @@ class RrsetTest < Test::Unit::TestCase
         :original_ttl => 3600,
         :algorithm => Dnsruby::Algorithms::RSASHA1,
         :labels => 3,
-        :expiration => Time.mktime(2003,03,22,17,31, 03).to_i,
-        :inception => Time.mktime(2003,02,20,17,31,03).to_i,
+        :expiration => Time.mktime(2003,03,22,17,31, 03),
+        :inception => Time.mktime(2003,02,20,17,31,03),
         :key_tag => 2642
       })
     assert(!rrset.add(sig))
