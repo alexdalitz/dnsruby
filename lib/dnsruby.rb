@@ -351,18 +351,19 @@ module Dnsruby
     OPT         = 41     # RFC 2671
   end
   
+  # http://www.iana.org/assignments/dns-sec-alg-numbers/
   class Algorithms < CodeMapper
     RSAMD5     = 1
     DH         = 2
     DSA        = 3
     ECC        = 4
     RSASHA1    = 5
-    DSANSEC3SHA1 = 131
-    RSASHA1NSEC3SHA1 = 133
     INDIRECT   = 252
     PRIVATEDNS = 253
     PRIVATEOID = 254
     update()
+    add_pair("DSA-NSEC3-SHA1", 131)
+    add_pair("RSASHA1-NSEC3-SHA1", 133)
   end  
   
   #An error raised while querying for a resource

@@ -142,7 +142,7 @@ module Dnsruby
       def rdata_to_string #:nodoc: all
         if (@flags!=nil)
 #          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s)} )"
-          return "#{@flags} #{@protocol} #{@algorithm.code} ( #{[@key.to_s].pack("m*")} )"
+          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{[@key.to_s].pack("m*")} )"
         else
           return ""
         end
