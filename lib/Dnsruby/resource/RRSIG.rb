@@ -219,7 +219,7 @@ module Dnsruby
 #          signature = Base64.encode64(@signature) # .gsub(/\n/, "")
           signature = [@signature].pack("m*") # .gsub(/\n/, "")
           # @TODO@ Display the expiration and inception as 
-          return "#{@type_covered.string} #{@algorithm.string} #{@labels} #{@original_ttl} " + 
+          return "#{@type_covered.string} #{@algorithm.code} #{@labels} #{@original_ttl} " + 
             "#{format_time(@expiration)} ( #{format_time(@inception)} " + 
             "#{@key_tag} #{@signers_name} #{signature} )"
         else

@@ -339,7 +339,7 @@ module Dnsruby
       elsif (sigrec.algorithm == HMAC_SHA256)
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA256.new, sigrec.signature, sig_data)
       else
-        raise RuntimeError.new("Algorithm #{sigrec.algorithm.string} unsupported by Dnsruby")
+        raise RuntimeError.new("Algorithm #{sigrec.algorithm.code} unsupported by Dnsruby")
       end
     
       if (verified)
