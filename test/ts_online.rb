@@ -13,7 +13,10 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
+begin
 require 'rubygems'
+rescue Exception
+end
 require 'dnsruby'
 Dnsruby.log.level = Logger::FATAL
 require "test/unit"

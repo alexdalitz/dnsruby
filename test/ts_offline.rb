@@ -36,7 +36,22 @@ require "test/tc_update.rb"
 require "test/tc_escapedchars.rb"
 require "test/tc_dnskey.rb"
 require "test/tc_rrsig.rb"
-require "test/tc_ds.rb"
 require "test/tc_nsec.rb"
 require "test/tc_nsec3.rb"
 require "test/tc_nsec3param.rb"
+
+begin
+  require "openssl"
+  OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
+  key = OpenSSL::PKey::RSA.new
+  key.e = 111
+      
+  have_openssl=true
+rescue Exception => e
+    puts "-----------------------------------------------------------------------"
+    puts "OpenSSL not present (with full functionality) - skipping DS digest test"
+    puts "-----------------------------------------------------------------------"
+end
+if (have_openssl)
+    require "test/tc_ds.rb"
+end
