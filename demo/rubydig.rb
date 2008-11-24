@@ -17,7 +17,7 @@
 #Michael Fuhr <mike@fuhr.org>
 #
 
-require 'Dnsruby'
+require 'dnsruby'
 
 res = Dnsruby::Resolver.new
 zt=Dnsruby::ZoneTransfer.new

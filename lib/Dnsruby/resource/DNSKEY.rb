@@ -142,7 +142,7 @@ module Dnsruby
       def rdata_to_string #:nodoc: all
         if (@flags!=nil)
 #          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s)} )"
-          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{[@key.to_s].pack("m*")} )"
+          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{[@key.to_s].pack("m*").gsub("\n", "")} )"
         else
           return ""
         end
@@ -150,7 +150,7 @@ module Dnsruby
       
       def encode_rdata(msg, canonical=false) #:nodoc: all
         # 2 octets, then 2 sets of 1 octet
-        msg.put_pack('ncc', @flags, @protocol, @algorithm.to_i)
+        msg.put_pack('ncc', @flags, @protocol, @algorithm.code)
         msg.put_bytes(@key)
       end
       

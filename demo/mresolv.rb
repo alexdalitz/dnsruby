@@ -12,7 +12,7 @@
 #
 #*-t timeout : Set the query timeout for each name in seconds.
 
-require 'Dnsruby'
+require 'dnsruby'
 require 'GetoptLong'
 
 opts = GetoptLong.new(["-d", GetoptLong::NO_ARGUMENT],
