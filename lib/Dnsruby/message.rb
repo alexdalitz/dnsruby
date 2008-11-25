@@ -748,17 +748,34 @@ module Dnsruby
     
     def get_unpack(template)
       len = 0
+        littlec = ?c
+        bigc = ?C
+        littleh = ?h
+        bigh = ?H
+        littlen = ?n
+        bign = ?N
+        star = ?*
+      if (littlec.class != Fixnum)
+        # We're using Ruby 1.9 - convert the codes
+        littlec = littlec.getbyte(0)
+        bigc = bigc.getbyte(0)
+        littleh = littleh.getbyte(0)
+        bigh = bigh.getbyte(0)
+        littlen = littlen.getbyte(0)
+        bign = bign.getbyte(0)
+        star = star.getbyte(0)
+      end
       template.each_byte {|byte|
         case byte
-        when ?c, ?C
+        when littlec, bigc
           len += 1
-        when ?h, ?H
+        when littleh, bigh
           len += 1          
-        when ?n
+        when littlen
           len += 2
-        when ?N
+        when bign
           len += 4
-        when ?*
+        when star
           len = @limit-@index
         else
           raise StandardError.new("unsupported template: '#{byte.chr}' in '#{template}'")
@@ -772,7 +789,10 @@ module Dnsruby
     
     def get_string
       len = @data[@index]
-      raise DecodeError.new("limit exceeded") if @limit < @index + 1 + len
+      if (len.class == String)
+        len = len.getbyte(0)
+      end
+      raise DecodeError.new("limit exceeded\nlimit = #{@limit}, index = #{@index}, len = #{len}\n") if @limit < @index + 1 + len
       d = @data[@index + 1, len]
       @index += 1 + len
       return d
@@ -794,7 +814,11 @@ module Dnsruby
       limit = @index if !limit || @index < limit
       d = []
       while true
-        case @data[@index]
+        temp = @data[@index]
+        if (temp.class == String) 
+          temp = (temp.getbyte(0))
+        end
+        case temp # @data[@index]
         when 0
           @index += 1
           return d
@@ -816,7 +840,8 @@ module Dnsruby
     end
     
     def get_label
-      return Name::Label.new(Name::decode(self.get_string))
+      label = Name::Label.new(Name::decode(self.get_string))
+      return label
     end
     
     def get_question
@@ -1006,5 +1031,7 @@ module Dnsruby
     alias ztype qtype
     # For Updates, the qclass field is redefined to zclass (RFC2136, section 2.3)
     alias zclass qclass
+    
+    alias type qtype
   end
 end

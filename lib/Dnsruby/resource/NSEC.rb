@@ -95,6 +95,10 @@ module Dnsruby
           end
           window_number = bytes[pos]
           bitmap_length = bytes[pos+1]
+          if (window_number.class == String) # Ruby 1.9
+            window_number = window_number.getbyte(0)
+            bitmap_length = bitmap_length.getbyte(0)
+          end
           pos += 2
           bitmap = bytes[pos,bitmap_length]
           pos += bitmap_length
@@ -170,7 +174,11 @@ module Dnsruby
                 break if (types_to_go.empty?)
               end
               bitmap += " "
-              bitmap[bitmap_pos]=byte
+              if (bitmap[bitmap_pos].class == String)
+                bitmap.setbyte(bitmap_pos, byte) # Ruby 1.9
+              else
+                bitmap[bitmap_pos]=byte              
+              end
               bitmap_pos+=1
             end
             
@@ -180,11 +188,19 @@ module Dnsruby
               output += " "
             end
           
-            output[start] = window
-            output[start+1] = bitmap.length
-            bitmap.length.times do |i|
-              output[start+2+i] = bitmap[i]
-            end
+            if (output[start].class == String)
+              output.setbyte(start, window)
+              output.setbyte(start+1, bitmap.length)
+              bitmap.length.times do |i|
+                output.setbyte(start+2+i, bitmap[i].getbyte(0))
+              end
+            else
+              output[start] = window
+              output[start+1] = bitmap.length
+              bitmap.length.times do |i|
+                output[start+2+i] = bitmap[i]
+              end
+           end
           end
           window += 1
           
