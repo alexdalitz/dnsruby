@@ -51,7 +51,7 @@ module Dnsruby
       
       constants = self.constants - CodeMapper.constants
       constants.each do |i|
-        @@strings[self].store(i, const_get(i))
+        @@strings[self].store(i.to_s, const_get(i))
       end 
       @@maxcode[self] = constants.length
       @@values[self] = @@strings[self].invert

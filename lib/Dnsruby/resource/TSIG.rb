@@ -14,7 +14,11 @@
 #limitations under the License.
 #++
 #require 'base64'
+begin
 require 'openssl'
+rescue LoadError
+  print "OpenSSL not found - ignoring\n"
+end
 module Dnsruby
   class RR
     #TSIG implements RFC2845.
