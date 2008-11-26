@@ -215,6 +215,8 @@ class TestRR < Test::Unit::TestCase
         x = ret_rr.send(key)
         if (ret_rr.kind_of?RR::CERT and (key == :alg or key == :certtype))
           assert_equal(value.to_s, x.code.to_s.downcase, "Packet returned wrong answer section for #{ret_rr.to_s}, #{key}")
+        elsif (ret_rr.kind_of?RR::TXT and (key == :strings)) 
+          assert_equal(value.to_s.downcase, x[0].to_s.downcase, "TXT strings wrong")
         else
           if (key == :type)
             assert_equal(Types.new(value).to_s.downcase, x.to_s.downcase, "Packet returned wrong answer section for #{ret_rr.to_s}, #{key}")
@@ -242,6 +244,8 @@ class TestRR < Test::Unit::TestCase
         ret = rr.send(meth)
         if (rr.kind_of?RR::CERT and (meth == :alg or meth == :certtype))
           assert_equal(data[meth].to_s, ret.code.to_s.downcase, "#{type} - #{meth}() correct")
+        elsif (rr.kind_of?RR::TXT and (meth == :strings)) 
+          assert_equal(data[meth].to_s, ret[0].to_s.downcase, "TXT strings wrong")
         else
           if (meth == :type)
             assert_equal(Types.new(data[meth]).to_s.downcase, ret.to_s.downcase, "#{type} - #{meth}() correct");
