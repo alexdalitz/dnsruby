@@ -136,7 +136,7 @@ module Dnsruby
     #           update.present(name)
     def present(*args)
       ttl = 0
-      rdata = []
+      rdata = ""
       klass = Classes.ANY
       if (args.length>=1) # domain (RFC2136, Section 2.4.4)
         name = args[0]
@@ -172,7 +172,7 @@ module Dnsruby
     #
     def absent(*args)
       ttl = 0
-      rdata = []
+      rdata = ""
       klass = Classes.NONE
       if (args.length>=1) # domain (RFC2136, Section 2.4.5)
         name = args[0]
@@ -242,7 +242,7 @@ module Dnsruby
     def delete(*args)
       ttl = 0
       klass = Classes.ANY
-      rdata=[]
+      rdata=""
       resource = nil
       case args.length
       when 1 # name
