@@ -10,7 +10,7 @@
 #Unless required by applicable law or agreed to in writing, software 
 #distributed under the License is distributed on an "AS IS" BASIS, 
 #WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#See the License f181or the specific language governing permissions and 
 #limitations under the License.
 #++
 module Dnsruby
@@ -178,13 +178,28 @@ module Dnsruby
           last = 0
           0.step(rdata.length-1, 2) {|i|
             last = i
-            d1 = rdata[i] & 0xFF
-            d2 = rdata[i + 1] & 0xFF
+            d1 = rdata[i]
+            d2 = rdata[i + 1]
+
+          if (d1.class == String) # Ruby 1.9
+            d1 = d1.getbyte(0)
+            d2 = d2.getbyte(0)
+          end
+          
+            d1 = d1  & 0xFF
+            d2 = d2  & 0xFF
+
             tag += ((d1 << 8) + d2)
           }
           last+=2
           if (last < rdata.length)
-            d1 = rdata[last] & 0xFF
+            d1 = rdata[last] 
+            
+            if (d1.class == String) # Ruby 1.9
+              d1 = d1.getbyte(0)
+            end
+            
+            d1 = d1 & 0xFF
             tag += (d1 << 8)
           end
           tag += ((tag >> 16) & 0xFFFF)

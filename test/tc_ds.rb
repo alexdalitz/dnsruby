@@ -1,4 +1,5 @@
 require 'test/unit'
+require 'openssl'
 require 'dnsruby'
 
 class DsTest < Test::Unit::TestCase
@@ -60,6 +61,13 @@ class DsTest < Test::Unit::TestCase
   end
   
   def test_sha2
+    begin
+      s = OpenSSL::Digest::SHA256
+    rescue Exception
+      print "SHA256 not available - skipping that test\n"
+      return
+    end
+      
      # Create a new DS from the DNSKEY, 
      key = Dnsruby::RR.create(DNSKEY)
      

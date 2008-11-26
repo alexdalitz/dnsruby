@@ -86,12 +86,14 @@ module Dnsruby
       if (arg.kind_of?String)
         if (@@stringsdown[self.class][arg.downcase] != nil)
           set_string(arg)
-        else unknown_string(arg)
+        else 
+          unknown_string(arg)
         end
       elsif (arg.kind_of?Fixnum)
         if (@@values[self.class][arg] != nil)
           set_code(arg)
-        else unknown_code(arg)
+        else 
+          unknown_code(arg)
         end
       elsif (arg.kind_of?self.class)
         set_code(arg.code)

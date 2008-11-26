@@ -221,7 +221,11 @@ module Dnsruby
       if (@type != Types.OPT) 
         @klass= Classes.new(klass)
       else
-        @klass = Classes.new("CLASS#{klass}")
+         if (klass.class == Classes)
+            @klass = klass
+        else
+            @klass = Classes.new("CLASS#{klass}")
+        end
       end
     end
     
