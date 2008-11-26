@@ -415,7 +415,10 @@ module Dnsruby
       rdlength = args[4]
       data = args[5]
       offset = args[6]
-      rdata = data[offset, rdlength]
+      rdata = []
+      if (data != nil)
+         rdata = data[offset, rdlength]
+      end
       
       record = nil
       MessageDecoder.new(rdata) {|msg|
@@ -482,11 +485,15 @@ module Dnsruby
     
     def ==(other)
       return false unless self.class == other.class
-      s_ivars = self.instance_variables
+      ivars = self.instance_variables
+      s_ivars = []
+      ivars.each {|i| s_ivars << i.to_s} # Ruby 1.9
       s_ivars.sort!
       s_ivars.delete "@ttl" # RFC 2136 section 1.1
       
-      o_ivars = other.instance_variables
+      ivars = other.instance_variables
+      o_ivars = []
+      ivars.each {|i| o_ivars << i.to_s} # Ruby 1.9
       o_ivars.sort!
       o_ivars.delete "@ttl" # RFC 2136 section 1.1
       
