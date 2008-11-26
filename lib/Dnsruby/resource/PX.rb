@@ -60,7 +60,7 @@ module Dnsruby
         end
         
         def self.decode_rdata(msg) #:nodoc: all
-          preference = msg.get_unpack('n')
+          preference, = msg.get_unpack('n')
           map822 = msg.get_name
           mapx400 = msg.get_name
           return self.new([preference, map822, mapx400])
