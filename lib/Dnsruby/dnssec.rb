@@ -329,6 +329,9 @@ module Dnsruby
         data = MessageEncoder.new { |msg|
           msg.put_rr(rec, true)
         }.to_s # @TODO@ worry about wildcards here?
+        if (RUBY_VERSION >= "1.9")
+          data.force_encoding("ASCII-8BIT")
+        end
         sig_data += data
       end
       

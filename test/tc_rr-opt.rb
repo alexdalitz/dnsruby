@@ -49,7 +49,6 @@ class TestRrOpt < Test::Unit::TestCase
     q = Queue.new
     Thread.new {
       s = socket.recvfrom(65536)
-      print s.length
       received_query = s[0]
       socket.connect(s[1][2], s[1][1])
       q.push(Message.decode(received_query))

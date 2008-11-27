@@ -227,9 +227,16 @@ module Dnsruby
       
       def rsa_key
         exponentLength = @key[0]
+        if (exponentLength.class == String)
+          exponentLength = exponentLength.getbyte(0) # Ruby 1.9
+        end
         pos = 1
         if (exponentLength == 0)
-          exponentLength = (@key[1]<<8) + @key[1]
+          key1 = @key[1]
+          if (key1.class == String) # Ruby 1.9
+            key1 = key1.getbyte(0)
+          end
+          exponentLength = (key1<<8) + key1
           pos += 2
         end
         exponent = get_num(@key[pos, exponentLength])
