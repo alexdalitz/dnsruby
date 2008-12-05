@@ -40,11 +40,12 @@ class Nsec3Test < Test::Unit::TestCase
       fail
     rescue DecodeError
     end
-    begin
-      nsec.hash_alg = 8
-      fail
-    rescue DecodeError
-    end
+    # Be liberal in what you accept...
+#    begin
+#      nsec.hash_alg = 8
+#      fail
+#    rescue DecodeError
+#    end
     begin
       nsec.flags = 2
       fail

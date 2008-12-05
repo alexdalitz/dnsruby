@@ -74,7 +74,10 @@ module Dnsruby
     end
     
     def unknown_code(arg) #:nodoc: all
-      raise ArgumentError.new("Code #{arg} not a member of #{self.class}")
+      # Be liberal in what you accept...
+#      raise ArgumentError.new("Code #{arg} not a member of #{self.class}")
+      Classes.add_pair(arg.to_s, arg)
+      set_code(arg)
     end
     
     def self.method_missing(methId) #:nodoc: all

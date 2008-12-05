@@ -43,12 +43,13 @@ class DsTest < Test::Unit::TestCase
   def test_ds_values
     ds = Dnsruby::RR.create(INPUT)
     ds.digest_type = 2
-    begin
-      ds.digest_type = 3
-      fail
-      
-    rescue DecodeError
-    end
+    # Be liberal in what you accept...
+#    begin
+#      ds.digest_type = 3
+#      fail
+#      
+#    rescue DecodeError
+#    end
   end
   
   def test_ds_digest
