@@ -3,6 +3,8 @@ require 'openssl'
 require 'dnsruby'
 
 class DsTest < Test::Unit::TestCase
+  DLVINPUT = "dskey.example.com. 86400 IN DLV 60485 5 1 ( 2BB183AF5F22588179A53B0A" + 
+    "98631FAD1A292118 )"
   INPUT = "dskey.example.com. 86400 IN DS 60485 5 1 ( 2BB183AF5F22588179A53B0A" + 
     "98631FAD1A292118 )"
      DNSKEY = "dskey.example.com. 86400 IN DNSKEY 256 3 5 ( AQOeiiR0GOMYkDshWoSKz9Xz" +
@@ -76,6 +78,17 @@ class DsTest < Test::Unit::TestCase
      right_ds = Dnsruby::RR.create(DS2)
      ds = Dnsruby::RR::DS.from_key(key, 2);
      assert_equal(ds.to_s, right_ds.to_s)
+  end
+  
+  def test_dlv_from_string
+    dlv = Dnsruby::RR.create(DLVINPUT)
+    assert_equal(60485, dlv.key_tag)
+    assert_equal(Algorithms.RSASHA1, dlv.algorithm)
+    assert_equal(1, dlv.digest_type)
+    assert_equal("2BB183AF5F22588179A53B0A98631FAD1A292118", dlv.digest)
+    
+    dlv2 = Dnsruby::RR.create(dlv.to_s)
+    assert(dlv2.to_s == dlv.to_s)    
   end
   
 end
