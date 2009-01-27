@@ -384,7 +384,7 @@ module Dnsruby
       @tsig = nil
       @ignore_truncation = false
       @config = Config.new()
-      @src_addr        = '0.0.0.0'
+      @src_address        = '0.0.0.0'
       @src_port        = 0
       @recurse = true
       @persistent_udp = false

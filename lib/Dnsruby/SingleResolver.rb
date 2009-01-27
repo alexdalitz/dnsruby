@@ -156,7 +156,7 @@ module Dnsruby
     # * :port
     # * :use_tcp
     # * :ignore_truncation
-    # * :src_addr
+    # * :src_address
     # * :src_port
     # * :udp_size
     # * :persistent_tcp
@@ -172,7 +172,7 @@ module Dnsruby
       @use_tcp = false
       @tsig = nil
       @ignore_truncation = false
-      @src_addr        = '0.0.0.0'
+      @src_address        = '0.0.0.0'
       @src_port        = 0
       @recurse = true
       @persistent_udp = false
@@ -330,7 +330,7 @@ module Dnsruby
       if (!client_deferrable)
         client_deferrable = EventMachine::DefaultDeferrable.new
       end
-      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_addr=>@src_addr, :src_port=>get_next_src_port, :use_tcp=>use_tcp)
+      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_address=>@src_address, :src_port=>get_next_src_port, :use_tcp=>use_tcp)
       packet_deferrable.callback { |response, response_bytes|
         ret = true
         if (response.header.tc && !use_tcp && !@ignore_truncation)
@@ -369,10 +369,10 @@ module Dnsruby
         begin
           src_port = get_next_src_port
           if (use_tcp) 
-            socket = TCPSocket.new(@server, @port, @src_addr, src_port)
+            socket = TCPSocket.new(@server, @port, @src_address, src_port)
           else
             socket = UDPSocket.new()
-            socket.bind(@src_addr, src_port)
+            socket.bind(@src_address, src_port)
             socket.connect(@server, @port)
           end
           runnextportloop = false
@@ -382,8 +382,8 @@ module Dnsruby
           end          
           # Try again if the error was EADDRINUSE and a random source port is used
           if ((e.class != Errno::EADDRINUSE) || 
-                ((e.class == Errno::EADDRINUSE) && (src_port == get_next_src_port)))
-            err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
+                ((e.class == Errno::EADDRINUSE) && (src_port == @src_port)))
+            err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
             Dnsruby.log.error{"#{err}"}
             st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
             return
@@ -391,12 +391,12 @@ module Dnsruby
         end
       end
       if (socket==nil)
-        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}")
+        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}")
         Dnsruby.log.error{"#{err}"}
         st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
         return
       end
-      Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}"}
+      Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}"}
       begin
         if (use_tcp)
           lenmsg = [query_bytes.length].pack('n')
@@ -405,7 +405,7 @@ module Dnsruby
         socket.send(query_bytes, 0)
       rescue Exception => e
         socket.close
-        err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_addr}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
+        err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
         Dnsruby.log.error{"#{err}"}
         st.push_exception_to_select(client_query_id, client_queue, err, nil)
         return

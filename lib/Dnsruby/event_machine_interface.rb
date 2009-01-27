@@ -158,18 +158,18 @@ module Dnsruby
         lenmsg = [args[:msg].length].pack('n')
         c.send_data(lenmsg)
         c.send_data args[:msg] # , args[:server], args[:port]
-        Dnsruby.log.debug {"EventMachine : Sent TCP packet to #{args[:server]}:#{args[:port]}" + # from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
+        Dnsruby.log.debug {"EventMachine : Sent TCP packet to #{args[:server]}:#{args[:port]}" + # from #{args[:src_address]}:#{args[:src_port]}, timeout=#{args[:timeout]}"
         ", timeout=#{args[:timeout]}"}
       }
       return connection # allows clients to set callback, errback, etc., if desired
     end
     
     def EventMachineInterface::send_udp(args={})# msg, timeout, server, port, src_add, src_port, use_tcp)
-      connection = EventMachine::open_datagram_socket(args[:src_addr], args[:src_port], EmUdpHandler) { |c|
+      connection = EventMachine::open_datagram_socket(args[:src_address], args[:src_port], EmUdpHandler) { |c|
         c.timeout_time=Time.now + args[:timeout]
         c.instance_eval {@args = args}
         c.send_datagram args[:msg], args[:server], args[:port]
-        Dnsruby.log.debug{"EventMachine : Sent datagram to #{args[:server]}:#{args[:port]} from #{args[:src_addr]}:#{args[:src_port]}, timeout=#{args[:timeout]}"}
+        Dnsruby.log.debug{"EventMachine : Sent datagram to #{args[:server]}:#{args[:port]} from #{args[:src_address]}:#{args[:src_port]}, timeout=#{args[:timeout]}"}
       }
       return connection # allows clients to set callback, errback, etc., if desired
     end
