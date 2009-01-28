@@ -24,7 +24,7 @@ class TestResolverConfig < Test::Unit::TestCase
   GoodInput = {
 	"port"		  => 54,
 	"src_address"        => '10.1.0.1',
-	"src_port"        => 53,
+	"src_port"        => 56453,
 	"use_tcp"		   => true,
     #	"stayopen"       => 1,
 	"ignore_truncation"          => true,

@@ -83,8 +83,6 @@ module Dnsruby
     
     # The source address to send queries from
     attr_reader :src_address
-    # The source port to send queries from
-    attr_reader :src_port
     
     # Should TCP queries be sent on a persistent socket?
     attr_reader :persistent_tcp
@@ -385,7 +383,7 @@ module Dnsruby
       @ignore_truncation = false
       @config = Config.new()
       @src_address        = '0.0.0.0'
-      @src_port        = 0
+      @src_port        = [0]
       @recurse = true
       @persistent_udp = false
       @persistent_tcp = false
@@ -427,11 +425,58 @@ module Dnsruby
       update
     end
     
-    def port=(p)
-      @port = p
-      update
+    # The source port to send queries from
+    # Returns either a single Fixnum or an Array
+    # e.g. "0", or "[60001, 60002, 60007]"
+    # 
+    # Defaults to 0 - random port
+    def src_port
+      if (@src_port.length == 1) 
+        return @src_port[0]
+      end
+      return @src_port
+    end
+
+    # Can be a single Fixnum or a Range or an Array
+    # If an invalid port is selected (one reserved by
+    # IANA), then an ArgumentError will be raised.
+    # 
+    #        res.src_port=0
+    #        res.src_port=[60001,60005,60010]
+    #        res.src_port=60015..60115
+    #
+    def src_port=(p)
+      if (SingleResolver.check_port(p))
+        @src_port = SingleResolver.get_ports_from(p)
+        update
+      end
     end
     
+    # Can be a single Fixnum or a Range or an Array
+    # If an invalid port is selected (one reserved by
+    # IANA), then an ArgumentError will be raised.
+    # "0" means "any valid port" - this is only a viable
+    # option if it is the only port in the list.
+    # An ArgumentError will be raised if "0" is added to
+    # an existing set of source ports.
+    # 
+    #        res.add_src_port(60000)
+    #        res.add_src_port([60001,60005,60010])
+    #        res.add_src_port(60015..60115)
+    #
+    def add_src_port(p)
+      if (SingleResolver.check_port(p, @src_port))
+        a = SingleResolver.get_ports_from(p)
+        a.each do |x|
+          if ((@src_port.length > 0) && (x == 0))
+            raise ArgumentError.new("src_port of 0 only allowed as only src_port value (currently #{@src_port.length} values")
+          end
+          @src_port.push(x)
+        end
+      end
+      update
+    end
+
     def use_tcp=(on)
       @use_tcp = on
       update
@@ -458,8 +503,8 @@ module Dnsruby
       update
     end
     
-    def src_port=(a)
-      @src_port = a
+    def port=(a)
+      @port = a
       update
     end
     

@@ -14,6 +14,7 @@
 #limitations under the License.
 #++
 require 'Dnsruby/select_thread'
+require 'Dnsruby/iana_ports'
 module Dnsruby
   #== Dnsruby::SingleResolver
   #
@@ -63,10 +64,6 @@ module Dnsruby
     # 
     # Defaults to localhost
     attr_accessor :src_address
-    # The source port to send queries from
-    # 
-    # Defaults to 0 - random port
-    attr_accessor :src_port
     
     # Should the TCP socket persist between queries?
     # 
@@ -173,7 +170,7 @@ module Dnsruby
       @tsig = nil
       @ignore_truncation = false
       @src_address        = '0.0.0.0'
-      @src_port        = 0
+      @src_port        = [0]
       @recurse = true
       @persistent_udp = false
       @persistent_tcp = false
@@ -192,12 +189,12 @@ module Dnsruby
           begin
             send(attr.to_s+"=", arg[attr])
             if (attr.to_s == "dnssec")
-                seen_dnssec = true
+              seen_dnssec = true
             end
           rescue Exception
             Dnsruby.log.error{"Argument #{attr} not valid\n"}
           end
-        #        end
+          #        end
         end
       end
       if (!seen_dnssec) 
@@ -418,17 +415,111 @@ module Dnsruby
       st.add_to_select(query_settings)
     end
     
-    def get_next_src_port
-        #Different OSes have different interpretations of "random port" here.
-        #Apparently, Linux will just give you the same port as last time, unless it is still
-        #open, in which case you get n+1.
-        #We need to determine an actual (random) number here, then ask the OS for it, and
-        #continue until we get one.
-      if (@src_port > 0 && @src_port < 65535)
-        return @src_port
-      else
-        return (rand(65535-1024) + 1024)
+    # The source port to send queries from
+    # Returns either a single Fixnum or an Array
+    # e.g. "0", or "[60001, 60002, 60007]"
+    # 
+    # Defaults to 0 - random port
+    def src_port
+      if (@src_port.length == 1) 
+        return @src_port[0]
       end
+      return @src_port
+    end
+
+    # Can be a single Fixnum or a Range or an Array
+    # If an invalid port is selected (one reserved by
+    # IANA), then an ArgumentError will be raised.
+    # 
+    #        res.src_port=0
+    #        res.src_port=[60001,60005,60010]
+    #        res.src_port=60015..60115
+    #
+    def src_port=(p)
+      @src_port=[]
+      add_src_port(p)
+    end
+    
+    def SingleResolver.get_ports_from(p) 
+      a = []
+      if (p.class == Fixnum)
+        a = [p]
+      else
+        p.each do |x|
+          a.push(x)
+        end
+      end
+      return a      
+    end
+    
+    # Can be a single Fixnum or a Range or an Array
+    # If an invalid port is selected (one reserved by
+    # IANA), then an ArgumentError will be raised.
+    # "0" means "any valid port" - this is only a viable
+    # option if it is the only port in the list.
+    # An ArgumentError will be raised if "0" is added to
+    # an existing set of source ports.
+    # 
+    #        res.add_src_port(60000)
+    #        res.add_src_port([60001,60005,60010])
+    #        res.add_src_port(60015..60115)
+    #
+    def add_src_port(p)
+      if (SingleResolver.check_port(p, @src_port))
+        a = SingleResolver.get_ports_from(p)
+        a.each do |x|
+          if ((@src_port.length > 0) && (x == 0))
+            raise ArgumentError.new("src_port of 0 only allowed as only src_port value (currently #{@src_port.length} values")
+          end
+          @src_port.push(x)
+        end
+      end
+    end
+    
+    def SingleResolver.check_port(p, src_port=[])
+      if (p.class != Fixnum)
+        tmp_src_ports = Array.new(src_port)
+        p.each do |x|
+          if (!SingleResolver.check_port(x, tmp_src_ports))
+            return false
+          end
+          tmp_src_ports.push(x)
+        end
+        return true
+      end
+      if (SingleResolver.port_in_range(p))
+        if ((p == 0) && (src_port.length > 0))
+          return false
+        end
+        return true
+      else
+        Dnsruby.log.error("Illegal port (#{p})")
+        raise ArgumentError.new("Illegal port #{p}")
+      end
+    end
+    
+    def SingleResolver.port_in_range(p) 
+      if ((p == 0) || ((IANA_PORTS.index(p)) == nil && (p > 1024) && (p < 65535))) 
+        return true
+      end
+      return false
+    end
+    
+    def get_next_src_port
+      #Different OSes have different interpretations of "random port" here.
+      #Apparently, Linux will just give you the same port as last time, unless it is still
+      #open, in which case you get n+1.
+      #We need to determine an actual (random) number here, then ask the OS for it, and
+      #continue until we get one.
+      if (@src_port[0] == 0)
+        candidate = -1
+        while (!(SingleResolver.port_in_range(candidate)))
+          candidate = (rand(65535-1024) + 1024)
+        end
+        return candidate        
+      end
+      pos = rand(@src_port.length)
+      return @src_port[pos]
     end
     
     def check_response(response, response_bytes, query, client_queue, client_query_id, tcp)

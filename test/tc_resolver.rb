@@ -181,4 +181,46 @@ class TestResolver < Test::Unit::TestCase
     end
   end
   
+  def test_illegal_src_port
+    # Also test all singleresolver ports ok
+    # Try to set src_port to an illegal value - make sure error raised, and port OK
+    res = Resolver.new
+    res.port = 56789
+    tests = [53, 387, 1265, 3210, 48619]
+    tests.each do |bad_port|
+      begin
+        res.src_port = bad_port
+        fail("bad port #{bad_port}")
+      rescue
+      end
+    end
+    assert(res.single_resolvers[0].src_port = 56789)
+  end
+  
+  def test_add_src_port
+    # Try setting and adding port ranges, and invalid ports, and 0.
+    # Also test all singleresolver ports ok
+    res = Resolver.new
+    res.src_port = [56789,56790, 56793]
+    assert(res.src_port == [56789,56790, 56793])
+    res.src_port = 56889..56891
+    assert(res.src_port == [56889,56890,56891])
+    res.add_src_port(60000..60002)
+    assert(res.src_port == [56889,56890,56891,60000,60001,60002])
+    res.add_src_port([60004,60005])
+    assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005])
+    res.add_src_port(60006)
+    assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])
+    # Now test invalid src_ports
+    tests = [0, 53, [60007, 53], [60008, 0], 55..100]
+    tests.each do |x|
+      begin
+        res.add_src_port(x)
+        fail()
+      rescue
+      end
+    end
+    assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])
+    assert(res.single_resolvers[0].src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])    
+  end
 end
