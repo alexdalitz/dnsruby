@@ -526,6 +526,19 @@ module Dnsruby
       if (!check_tsig(query, response, response_bytes))
         return false
       end
+      # Should check that question section is same as question that was sent! RFC 5452
+      # If it's not an update...
+      if (query.class == Update)
+        # @TODO@!!
+      else
+        if ((response.question[0].qname.labels != query.question[0].qname.labels) || 
+              (response.question[0].qtype != query.question[0].qtype) ||
+              (response.question[0].qclass != query.question[0].qclass) ||
+              (response.question.length != query.question.length) ||
+              (response.header.id != query.header.id))
+          return false
+        end
+      end
       if (response.header.tc && !tcp && !@ignore_truncation)
         # Try to resend over tcp
         Dnsruby.log.debug{"Truncated - resending over TCP"}
