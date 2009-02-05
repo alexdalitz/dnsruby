@@ -51,11 +51,17 @@ class TestPacket < Test::Unit::TestCase
     assert_equal(1, packet.header.ancount, 'First push into answer section worked');      #10
       
       
+    ret = packet.answer.rrset('NSEC')
+    assert_equal(ret.rrs.length, 0, "#{ret.rrs.length}")
+    ret = packet.answer.rrset('A')
+    assert_equal(ret.rrs.length, 1, "#{ret.rrs.length}")
+    ret = packet.answer.rrsets()
+    assert_equal(ret.length, 1, "#{ret.length}")
+    
     packet.add_answer(RR.create({:name    => "a2.example.com",
           :type    => "A", :address => "10.0.0.2"}));
     assert_equal(packet.header.ancount, 2, 'Second push into answer section worked');     #11
-      
-      
+          
     packet.add_authority(RR.create({:name    => "a3.example.com",
           :type    => "A",
           :address => "10.0.0.3"}));

@@ -359,6 +359,7 @@ module Dnsruby
     DSA        = 3
     ECC        = 4
     RSASHA1    = 5
+#    RSASHA256  = 
     INDIRECT   = 252
     PRIVATEDNS = 253
     PRIVATEOID = 254

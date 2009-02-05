@@ -91,8 +91,8 @@ module Dnsruby
         @algorithm=Algorithms.RSASHA1
         @type_covered = Types.A
         @original_ttl = 3600
-        @inception = Time.now
-        @expiration = Time.now
+        @inception = Time.now.to_i
+        @expiration = Time.now.to_i
         @key_tag = 0
         @labels = 0
         self.signers_name="."
@@ -135,8 +135,8 @@ module Dnsruby
       def from_data(data) #:nodoc: all
         type_covered, algorithm, @labels, @original_ttl, expiration, inception, 
           @key_tag, signers_name, @signature = data
-        @expiration = Time.at(expiration)
-        @inception = Time.at(inception)
+        @expiration = expiration
+        @inception = inception
         self.type_covered=(type_covered)
         self.signers_name=(signers_name)
         self.algorithm=(algorithm)
@@ -204,14 +204,14 @@ module Dnsruby
           hour=input[8,2]
           min=input[10,2]
           sec=input[12,2]
-          return Time.mktime(year, mon, day, hour, min, sec)
+          return Time.mktime(year, mon, day, hour, min, sec).to_i
         else
           raise DecodeError.new("RRSIG : Illegal time value #{input} - see RFC 4034 section 3.2")
         end
       end
       
       def format_time(time)
-        return time.strftime("%Y%m%d%H%M%S")
+        return Time.at(time).strftime("%Y%m%d%H%M%S")
       end
       
       def rdata_to_string #:nodoc: all
@@ -243,8 +243,8 @@ module Dnsruby
         signers_name = msg.get_name
         signature  = msg.get_bytes
         return self.new(
-          [type_covered, algorithm, labels, original_ttl, Time.at(expiration),
-            Time.at(inception), key_tag, signers_name, signature])
+          [type_covered, algorithm, labels, original_ttl, expiration,
+            inception, key_tag, signers_name, signature])
       end
       
       def sig_data

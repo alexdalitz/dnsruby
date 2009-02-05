@@ -176,15 +176,15 @@ module Dnsruby
       return ret
     end
     
-    #    # Return the rrset of the specified type in the  section
-    #    def rrset(type, klass=Classes::IN)
-    #      [@answer, @authority, @additional].each do |section|
-    #        if ((rrset = section.rrset(type, klass)).length > 0)
-    #          return rrset
-    #        end
-    #      end
-    #      return nil
-    #    end
+        # Return the rrset of the specified type in the  section
+        def rrset(type, klass=Classes::IN)
+          [@answer, @authority, @additional].each do |section|
+            if ((rrset = section.rrset(type, klass)).length > 0)
+              return rrset
+            end
+          end
+          return nil
+        end
     
     # Return a hash, with the section as key, and the RRSets in that
     # section as the data : {section => section_rrs}

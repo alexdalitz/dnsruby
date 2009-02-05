@@ -27,7 +27,7 @@ class TestTcp < Test::Unit::TestCase
     #@TODO@ Need a test server so we can tell what port this message was actually sent on!
     res = Dnsruby::Resolver.new()
     res.use_tcp = true
-    res.src_port=rand(65535-1024) + 1024
+    res.src_port=60123
     ret=res.query("example.com")
     assert(ret.is_a?(Dnsruby::Message))
   end

@@ -90,6 +90,7 @@ module Dnsruby
     
     # Use DNSSEC for this SingleResolver
     attr_reader :dnssec
+    DEFAULT_DNSSEC = false # @TODO@
     
     #Sets the TSIG to sign outgoing messages with.
     #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
@@ -174,7 +175,7 @@ module Dnsruby
       @recurse = true
       @persistent_udp = false
       @persistent_tcp = false
-      @dnssec = true
+      @dnssec = DEFAULT_DNSSEC
       
       seen_dnssec = false
       
@@ -198,7 +199,7 @@ module Dnsruby
         end
       end
       if (!seen_dnssec) 
-        @dnssec = true
+        @dnssec = DEFAULT_DNSSEC
       end
       #Check server is IP
       @server=Config.resolve_server(@server)
@@ -212,10 +213,13 @@ module Dnsruby
     
     # Synchronously send a query for the given name. The type will default to A, 
     # and the class to IN.
-    def query(name, type=Types.A, klass=Classes.IN)
+    def query(name, type=Types.A, klass=Classes.IN, set_cd=@dnssec)
       msg = Message.new
       msg.header.rd = 1
       msg.add_question(name, type, klass)
+      if (@dnssec)
+        msg.header.cd = set_cd # We do our own validation by default
+      end
       return send_message(msg)
     end
     
@@ -289,6 +293,9 @@ module Dnsruby
       use_tcp = @use_tcp
       if (msg.kind_of?String)
         msg = Message.new(msg)
+        if (@dnssec)
+          msg.header.cd = @dnssec # we'll do our own validation by default
+        end
       end
       query_packet = make_query_packet(msg, use_tcp)
       if (udp_packet_size < query_packet.length)
@@ -526,6 +533,9 @@ module Dnsruby
       if (!check_tsig(query, response, response_bytes))
         return false
       end
+      if (@dnssec && (!Dnssec.validate_with_query(query,response)))
+        return false
+      end
       # Should check that question section is same as question that was sent! RFC 5452
       # If it's not an update...
       if (query.class == Update)
@@ -585,8 +595,6 @@ module Dnsruby
         
         packet.header.ad = false # RFC 4035 section 4.6
         
-        packet.header.cd = false # We trust the upstream resolver and the link to it
-              
       elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
         #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
         Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}.\n"}

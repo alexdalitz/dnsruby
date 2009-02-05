@@ -135,10 +135,13 @@ module Dnsruby
     #   response = res.query("example.com", Types.MX)
     #   response = res.query("208.77.188.166") # IPv4 address so PTR query will be made
     #   response = res.query("208.77.188.166", Types.PTR)
-    def query(name, type=Types.A, klass=Classes.IN)
+    def query(name, type=Types.A, klass=Classes.IN, set_cd=@dnssec)
       msg = Message.new
       msg.header.rd = 1
       msg.add_question(name, type, klass)
+      if (@dnssec)
+        msg.header.cd = set_cd # We do our own validation by default
+      end
       return send_message(msg)
     end
     
@@ -388,7 +391,7 @@ module Dnsruby
       @persistent_udp = false
       @persistent_tcp = false
       @single_resolvers=[]
-      @dnssec = true
+      @dnssec = SingleResolver::DEFAULT_DNSSEC
     end
     
     def update #:nodoc: all

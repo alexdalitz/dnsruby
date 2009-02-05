@@ -73,59 +73,149 @@ module Dnsruby
   class Dnssec
     # A class to cache trusted keys
     class KeyCache #:nodoc: all
-      def initialize(keys=[])
-        @keys = []
+      # Cache includes expiration time for keys
+      # Cache removes expired records
+      def initialize(keys = nil)
+        @keys = {}
         add(keys)
+      end
+      def add_key_with_expiration(k, expiration)
+        priv_add_key(k, expiration)
       end
       def add(k)
         if (k == nil)
           return false
         elsif (k.instance_of?RRSet)
-          k.rrs.each {|rr| @keys.push(rr)}
-        elsif (k.kind_of?RR)
-          @keys.push(k)
-        elsif (k.kind_of?Array)
-          k.each {|rr| @keys.push(rr)}
+          add_rrset(k)
+        elsif (k.kind_of?KeyCache)
+          kaes = k.keys_and_expirations
+          kaes.keys.each { |keykey|
+            priv_add_key(keykey, kaes[keykey])
+          }
         else 
-          return false
+          raise ArgumentError.new("Expected an RRSet or KeyCache! Got #{k.class}")
         end
-        remove_duplicate_keys
         return true
       end
-      def remove_duplicate_keys
-        # There must be a better way than this!!
-        @keys.each_index do |index|
-          key = @keys[index]
-          (index+1..@keys.length-1).each do |pos|
-            if (key == @keys[pos])
-              @keys.delete_at(pos)
+      
+      def add_rrset(k)
+        # Get expiration from the RRSIG
+        # There can be several RRSIGs here, one for each key which has signed the RRSet
+        # We want to choose the one with the most secure signing algorithm, key length, 
+        # and the longest expiration time - not easy!
+        # for now, we simply accept all signed keys
+        k.sigs.each { |sig|
+          if (sig.type_covered = Types.DNSKEY)
+            if (sig.inception <= Time.now.to_i)
+              # Check sig.expiration, sig.algorithm
+              if (sig.expiration > Time.now.to_i) 
+                # add the keys to the store
+                k.rrs.each {|rr| priv_add_key(rr, sig.expiration)}
+              end
             end
           end
+        }
+      end
+      
+      def priv_add_key(k, exp) 
+        # Check that the key does not already exist with a longer expiration!
+        if (@keys[k] == nil) 
+          @keys[k] = exp
+        elsif (@keys[k] < exp)
+          @keys[k] = exp
         end
       end
+      
       def each
-        @keys.each {|key| yield key}
+        # Only offer currently-valid keys here
+        remove_expired_keys
+        @keys.keys.each {|key| yield key}
       end
       def keys
-        return @keys 
+        # Only offer currently-valid keys here
+        remove_expired_keys
+        return @keys.keys
       end
-    end    
+      def keys_and_expirations
+        remove_expired_keys
+        return @keys
+      end
+      def remove_expired_keys
+        @keys.delete_if {|k,v|
+          v < Time.now.to_i
+        }
+      end
+    end  
 
-    # The set of keys which are trusted. These must be initialised with at least
+    class ValidationPolicy
+      # Note that any DLV registries which have been configured will only be tried
+      # after both the root and any local trust anchors (RFC 5074 section 5)
+      
+      #* Always use the root and ignore local trust anchors.
+      ALWAYS_ROOT_ONLY = 1
+      #* Use the root if successful, otherwise try local anchors.
+      ROOT_THEN_LOCAL_ANCHORS = 2
+      #* Use local trust anchors if available, otherwise use root.
+      LOCAL_ANCHORS_THEN_ROOT = 3
+      #* Always use local trust anchors and ignore the root.
+      ALWAYS_LOCAL_ANCHORS_ONLY = 4
+    end
+    @@validation_policy = ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT
+    
+    def Dnssec.validation_policy=(p)
+      if ((p >= ALWAYS_ROOT_ONY) && (p <= ALWAYS_LOCAL_ANCHORS))
+        @@validation_policy = p
+        # @TODO@ Should we be clearing the trusted keys now?
+      end
+    end
+    def Dnssec.validation_policy
+      @@validation_policy
+    end
+    
+    # The DNSKEY RRs for the signed root (when it exists)
+    @@root_anchors = KeyCache.new
+    # @TODO@ Add methods for interacting with root anchors
+    
+    # The set of trust anchors. 
+    # If the root is unsigned, then these must be initialised with at least
     # one trusted key by the client application, if verification is to be performed.
+    @@trust_anchors = KeyCache.new
+    
+    @@dlv_registries = []
+
+    def Dnssec.add_trust_anchor(t)
+      self.add_trust_anchor_with_expiration(t, Time.utc(2035,"jan",1,20,15,1).to_i)
+    end
+    # Add the 
+    def self.add_trust_anchor_with_expiration(k, expiration)
+      k.flags = k.flags | RR::IN::DNSKEY::SEP_KEY
+      @@trust_anchors.add_key_with_expiration(k, expiration)
+    end
+    
+    def Dnssec.remove_trust_anchor(t)
+      @@trust_anchors.delete(t)
+    end
+    # Wipes the cache of trusted keys
+    def self.clear_trust_anchors
+      @@trust_anchors = KeyCache.new
+    end
+    
+    def self.trust_anchors
+      return @@trust_anchors.keys
+    end
+    
+    
+    # The set of keys which are trusted. 
     @@trusted_keys = KeyCache.new
     
     # The set of keys which have been indicated by a DS RRSet which has been
     # signed by a trusted key. Although we have not yet located these keys, we
     # have the details (tag and digest) which can identify the keys when we 
     # see them. At that point, they will be added to our trusted keys.
+    # @TODO@ Should add TTL to this!
+    # @TODO@ Should we just use the (TBD) general cache for these?
     @@to_be_trusted_keys = []
 
-    #    def initialize
-    #    # @TODO@ Maybe write a recursive validating resolver?
-    #    
-    #    end
-  
     # Check that the RRSet and RRSIG record are compatible
     def self.check_rr_data(rrset, sigrec)#:nodoc: all
       #Each RR MUST have the same owner name as the RRSIG RR;
@@ -151,20 +241,15 @@ module Dnsruby
       end
     
       # Now check that we are in the validity period for the RRSIG
-      now = Time.now
+      now = Time.now.to_i
       if ((sigrec.expiration < now) || (sigrec.inception > now))
         raise VerifyError.new("Signature record not in validity period")
       end
     end
     
-    # Add the specified key(s) to the trusted key cache.
-    # k can be a DNSKEY, or an Array or RRSet of DNSKEYs.
+    # Add the specified keys to the trusted key cache.
+    # k can be a KeyCache, or an RRSet of DNSKEYs.
     def self.add_trusted_key(k)
-      if (k.instance_of?RRSet)
-        k.rrs.each {|key| add_trusted_key(key)}
-        return
-      end
-      k.flags = k.flags | RR::IN::DNSKEY::SEP_KEY
       @@trusted_keys.add(k)
     end
     
@@ -174,12 +259,102 @@ module Dnsruby
       @@to_be_trusted_keys = []
     end
     
+    def self.trusted_keys
+      return @@trusted_keys.keys
+    end
+
+    def self.validate(msg)
+      query = Message.new()
+      query.header.cd=true
+      return self.validate_with_query(query, msg)
+    end
+    
+    def self.validate_with_query(query, msg)
+      # SHOULD ALWAYS VERIFY DNSSEC-SIGNED RESPONSES?
+      # Yes - if a trust anchor is configured. Otherwise, act on CD bit (in query)
+      if (((@@validation_policy > ValidationPolicy::ALWAYS_ROOT_ONLY) && (self.trust_anchors().length > 0)) ||
+            # Check query here, and validate if CD is true
+          (query.header.cd == true))
+        # Validate!
+        # Remember we may have to update any expired trusted keys
+        validated = false
+        if (@@validation_policy == ValidationPolicy::ALWAYS_LOCAL_ANCHORS_ONLY)
+          validated = validate_with_achors(msg)
+        elsif (@@validation_policy == ValidationPolicy::ALWAYS_ROOT_ONLY)
+          validated = validate_with_root(msg)
+        elsif (@@validation_policy == ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT)
+          validated = validate_with_anchors(msg)
+          if (!validated)
+            validated = validate_with_root(msg)
+          end
+        elsif (@@validation_policy == ValidationPolicy::ROOT_THEN_LOCAL_ANCHORS)
+          validated = validate_with_root(msg)
+          if (!validated)
+            validated = validate_with_anchors(msg)
+          end
+        end
+        if (!validated)
+          validated = validate_with_dlv(msg)
+        end
+        return validated
+      end
+      return true
+    end
+    
+    
+    # @TODO@ It sounds like we need to maintain several sets of trusted keys :
+    #   : one for signed root, one for local anchors, and one from dlv
+    # Might it be simpler to write a GenericValidator, and then create three
+    # instances - one with root anchors, one with trust anchors, and one for dlv?
+    # @TODO@ Each validator should have its own cache!
+    def self.validate_with_anchors(msg)
+      # @TODO@ What do we do here?
+      # See if it is a child of any of our trust anchors.
+      # If it is, then see if we have a trusted key for it
+      # If we don't, then see if we can get to it from the closest
+      # trust anchor
+      return true
+    end
+
+    def self.validate_with_root(msg)
+      # @TODO@ What do we do here?
+      # See if we have a trusted key for it
+      # If we don't, then see if we can get to it from the closest trusted key
+      # If not, then see if we can get there from the root
+      return true
+    end
+
+    def self.validate_with_dlv(msg)
+      # @TODO@ Check 
+      return true
+    end
+
     # Check that the key fits a signed DS record key details
     # If so, then add the key to the trusted keys
-    def self.check_ds(key, ds)#:nodoc: all
-      if (ds.check_key(key))
-        @@trusted_keys.add(key)
+    def self.check_ds(key, ds_rrset)#:nodoc: all
+      expiration = 0
+      found = false
+      ds_rrset.sigs.each { |sig|
+        if (sig.type_covered = Types.DS)
+          if (sig.inception <= Time.now.to_i)
+            # Check sig.expiration, sig.algorithm
+            if (sig.expiration > expiration) 
+              expiration = sig.expiration
+            end
+          end
+        end
+      }
+      if (expiration > 0)
+        ds_rrset.each { |ds|
+          if (ds.class == RR::IN::DS)
+            if (ds.check_key(key))
+              @@trusted_keys.add_key_with_expiration(key, expiration)
+              found = true
+            end
+          end
+        }
       end
+      return found
     end
     
     # Verify the specified message (or RRSet) using the set of trusted keys.
@@ -192,50 +367,48 @@ module Dnsruby
     # before the other RRSets are checked.
     # 
     # msg can be a Dnsruby::Message or Dnsruby::RRSet.
-    # keys may be nil, or a Dsnruby::RR::DNSKEY or an Array or RRSet of 
-    # Dnsruby::RR::DNSKEY
+    # keys may be nil, or a KeyCache or an RRSet of Dnsruby::RR::DNSKEY
     # 
     # Returns true if the message verifies OK, and false otherwise.
-    def self.verify(msg, keys = nil)
+    def self.verify(msg) # , keys = nil)
       if (msg.kind_of?RRSet)
-        return verify_rrset(msg, keys)
+        return verify_rrset(msg) # , keys)
       end
       # Use the set of trusted keys to check any RRSets we can, ideally
       # those of other DNSKEY RRSets first. Then, see if we can use any of the
       # new total set of keys to check the rest of the rrsets.
       # Return true if we can verify the whole message.
             
-      @@trusted_keys.add(keys)
-      
       msg.each_section do |section|
         ds_rrset = section.rrset(Types.DS)
         if (ds_rrset && ds_rrset.num_sigs > 0)
           if (verify_rrset(ds_rrset))
-            ds_rrset.rrs.each do |ds|
-              # Work out which key this refers to, and add it to the trusted key store
-              found = false
-              msg.each_section do |section|
-                section.rrset('DNSKEY').rrs.each do |rr|
-                  if (check_ds(rr, ds))
-                    found = true
-                  end
-                end
-              end
-              @@trusted_keys.each {|key|
-                if (check_ds(key, ds))
+            # Need to handle DS RRSets (with RRSIGs) not just DS records.
+            #            ds_rrset.rrs.each do |ds|
+            # Work out which key this refers to, and add it to the trusted key store
+            found = false
+            msg.each_section do |section|
+              section.rrset('DNSKEY').rrs.each do |rr|
+                if (check_ds(rr, ds_rrset))
                   found = true
                 end
-              }
-              # If we couldn't find the trusted key, then we should store the 
-              # key tag and digest in a @@to_be_trusted_keys.
-              # Each time we see a new key (which has been signed) then we should 
-              # check if it is sitting on the to_be_trusted_keys store. 
-              # If it is, then we should add it to the trusted_keys and remove the
-              # DS from the to_be_trusted store
-              if (!found)
-                @@to_be_trusted_keys.push(ds)
               end
             end
+            (get_keys_to_check()).each {|key|
+              if (check_ds(key, ds_rrset))
+                found = true
+              end
+            }
+            # If we couldn't find the trusted key, then we should store the 
+            # key tag and digest in a @@to_be_trusted_keys.
+            # Each time we see a new key (which has been signed) then we should 
+            # check if it is sitting on the to_be_trusted_keys store. 
+            # If it is, then we should add it to the trusted_keys and remove the
+            # DS from the to_be_trusted store
+            if (!found)
+              @@to_be_trusted_keys.push(ds_rrset)
+            end
+            #            end
           else 
           end
         end
@@ -243,13 +416,15 @@ module Dnsruby
         key_rrset = section.rrset(Types.DNSKEY)
         if (key_rrset && key_rrset.num_sigs > 0)
           if (verify_rrset(key_rrset))
-            key_rrset.rrs.each do |rr|
-              @@trusted_keys.add(rr)
-            end
+            #            key_rrset.rrs.each do |rr|
+            @@trusted_keys.add(key_rrset) # rr)
+            #            end
           else
             # See if the keys match any of the to_be_trusted_keys
             key_rrset.rrs.each do |key|
               @@to_be_trusted_keys.each do |tbtk|
+                # @TODO@ Check that the RRSet is still valid!!
+                # Should we get it out of the main cache?
                 if (check_ds(key, tbtk))
                   @@to_be_trusted_keys.delete(tbtk)
                 end
@@ -261,15 +436,65 @@ module Dnsruby
       
       msg.section_rrsets.each do |section, rrsets|
         rrsets.each do |rrset|
-          if (section == "additional" && rrset.num_sigs == 0)
+          # If delegation NS or glue AAAA/A, then don't expect RRSIG. 
+          # Otherwise, expect RRSIG and fail verification if RRSIG is not present
+          
+          # Check for delegation
+          dsrrset = msg.rrset('DS')
+          nsrrset = msg.authority.rrset('NS')
+          if ((msg.answer.size == 0) && (!dsrrset) && nsrrset) # && (nsrrset.length > 0))# (isDelegation)
+            # Now check NSEC(3) records for absence of DS and SOA
+            nsec = msg.authority.rrset('NSEC')
+            if (nsec.length == 0) 
+              nsec = msg.authority.rrset('NSEC3')
+            end
+            if (nsec.rrs.length > 0) 
+              if (!(nsec.rrs[0].types.include?'DS') || !(nsec.rrset.rrs[0].types.include?'SOA'))
+                next
+              end
+            end
+          end
+          
+          # check for glue
+          # if the ownername (in the addtional section) of the glue address is the same or longer as the ownername of the NS record, it is glue 
+          if (msg.additional.size > 0)
+            arec = msg.additional.rrset('A')
+            if (arec.rrs.length == 0)
+              arec = msg.additional.rrset('AAAA')
+            end
+            nsname = msg.rrset('NS').rrs()[0].name
+            if (arec.rrs().length > 0)
+              aname = arec.rrs()[0].name
+              if (nsname.subdomain_of?aname)
+                next
+              end
+            end
+          end
+          # @TODO@ If records are in additional, and no RRSIG, that's Ok - just don't use them!
+          if (section == "additional")
             next
           end
+          # else verify RRSet
           if (!verify_rrset(rrset))
             return false
           end
         end
       end
       return true
+    end
+    
+    def self.get_keys_to_check
+      keys_to_check = []
+      if (@@validation_policy == ValidationPolicy::ALWAYS_ROOT_ONLY)
+        keys_to_check = @@trusted_keys.keys
+      elsif (@@validation_policy == ValidationPolicy::ALWAYS_LOCAL_ANCHORS_ONLY)
+        keys_to_check = @@trust_anchors.keys
+      elsif (@@validation_policy == ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT)
+        keys_to_check = @@trust_anchors.keys + @@trusted_keys.keys
+      elsif (@@validation_policy == ValidationPolicy::ROOT_THEN_LOCAL_ANCHORS)
+        keys_to_check = @@trusted_keys.keys + @@trust_anchors.keys
+      end
+      return keys_to_check      
     end
     
     # Find the first matching DNSKEY and RRSIG record in the two sets.
@@ -287,25 +512,21 @@ module Dnsruby
       return nil, nil
     end
   
-    # Verify the signature of an rrset encoded with the specified dnskey record
-    # or the set of trusted keys.
+    # Verify the signature of an rrset encoded with the specified KeyCache
+    # or RRSet. If no signature is included, false is returned.
     #
     # Returns true if the RRSet verified, false otherwise.
-    def self.verify_rrset(rrset, keys = nil)
-    # @TODO@ Finer-grained reporting than "false". 
+    def self.verify_rrset(rrset) # , keys = nil)
+      # @TODO@ Finer-grained reporting than "false". 
       sigrecs = rrset.sigs
-      #      print "\n\n    NO RRSIGS!!!\n\n" if (rrset.num_sigs == 0)
-      return true if (rrset.num_sigs == 0)
+      return false if (rrset.num_sigs == 0)
       sigrecs.each do |sigrec|
         check_rr_data(rrset, sigrec)
       end
 
       keyrec = nil
       sigrec = nil
-      keyrec, sigrec = get_matching_key(@@trusted_keys, sigrecs)
-      if (keyrec == nil)
-        keyrec, sigrec = get_matching_key(keys, sigrecs)        
-      end
+      keyrec, sigrec = get_matching_key(get_keys_to_check, sigrecs)
       
       return false if !keyrec
      
@@ -339,7 +560,7 @@ module Dnsruby
       verified = false
       if (sigrec.algorithm == Algorithms.RSASHA1)
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA1.new, sigrec.signature, sig_data)
-      elsif (sigrec.algorithm == HMAC_SHA256)
+      elsif (sigrec.algorithm == Algorithms.RSASHA256)
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA256.new, sigrec.signature, sig_data)
       else
         raise RuntimeError.new("Algorithm #{sigrec.algorithm.code} unsupported by Dnsruby")
