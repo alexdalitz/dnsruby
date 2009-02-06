@@ -470,8 +470,8 @@ module Dnsruby
               end
             end
           end
-          # @TODO@ If records are in additional, and no RRSIG, that's Ok - just don't use them!
-          if (section == "additional")
+          # If records are in additional, and no RRSIG, that's Ok - just don't use them!
+          if ((section == "additional") && (rrset.sigs.length == 0))
             next
           end
           # else verify RRSet
