@@ -127,7 +127,7 @@ module Dnsruby
             tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1]})
           end
         else
-          Dnsruby.log.info{"TSIG signing switched off"}
+#          Dnsruby.log.debug{"TSIG signing switched off"}
           return nil
         end
       elsif (args.length ==2)
@@ -214,12 +214,7 @@ module Dnsruby
     # Synchronously send a query for the given name. The type will default to A, 
     # and the class to IN.
     def query(name, type=Types.A, klass=Classes.IN, set_cd=@dnssec)
-      msg = Message.new
-      msg.header.rd = 1
-      msg.add_question(name, type, klass)
-      if (@dnssec)
-        msg.header.cd = set_cd # We do our own validation by default
-      end
+      msg = make_query(name, type, klass, set_cd)
       return send_message(msg)
     end
     
@@ -533,8 +528,12 @@ module Dnsruby
       if (!check_tsig(query, response, response_bytes))
         return false
       end
-      if (@dnssec && (!Dnssec.validate_with_query(query,response)))
-        return false
+      if (@dnssec)
+        begin 
+          Dnssec.validate_with_query(query,response)
+        rescue (VerifyError)
+          return false # Send this info back to the client somehow?
+        end
       end
       # Should check that question section is same as question that was sent! RFC 5452
       # If it's not an update...
@@ -579,8 +578,18 @@ module Dnsruby
       return true
     end
     
+    def make_query(name, type = Types.A, klass = Classes.IN, set_cd=@set_cd)
+      msg = Message.new
+      msg.header.rd = 1
+      msg.add_question(name, type, klass)
+      if (@dnssec)
+        msg.header.cd = set_cd # We do our own validation by default
+      end
+      return msg
+    end
+    
     # Prepare the packet for sending
-    def make_query_packet(packet, use_tcp) #:nodoc: all
+    def make_query_packet(packet, use_tcp = @use_tcp) #:nodoc: all
       if (packet.header.opcode == OpCode.QUERY || @recurse)
         packet.header.rd=@recurse
       end

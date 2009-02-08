@@ -14,6 +14,7 @@
 #limitations under the License.
 #++
 require "Dnsruby/SingleResolver"
+require "Dnsruby/Recursor"
 module Dnsruby
   #== Description
   #Dnsruby::Resolver is a DNS stub resolver.
@@ -212,7 +213,7 @@ module Dnsruby
     #=== Example code :
     #
     #   require 'Dnsruby'
-    #   res = Dnsruby::Resolver.new
+    #   res = Dnsruby::Resolver.newsend
     #   query_id = 10 # can be any object you like
     #   query_queue = Queue.new
     #   res.send_async(Message.new("example.com", Types.MX),  query_queue, query_id)
@@ -288,7 +289,15 @@ module Dnsruby
     def close
       [@resolver_em, @resolver_ruby].each do |r| r.close if r end
     end
-
+    
+#    def make_query(*args)
+#      return @single_resolvers[0].make_query(*args)
+#    end
+#
+#    def make_query_packet(args)
+#      return @single_resolvers[0].make_query_packet(args)
+#    end
+#
     # Create a new Resolver object. If no parameters are passed in, then the default 
     # system configuration will be used. Otherwise, a Hash may be passed in with the 
     # following optional elements : 

@@ -80,8 +80,12 @@ class DnssecTest < Test::Unit::TestCase
     res = Dnsruby::Resolver.new("a.ns.se")
     r = res.query("se", Dnsruby::Types.ANY)    
     # Haven't configured key for this, so should fail
-    ret = Dnsruby::Dnssec.verify(r)
-    assert(!ret, "Dnssec message verification failed")    
+    begin
+      ret = Dnsruby::Dnssec.verify(r)
+      fail
+    rescue (Dnsruby::VerifyError)
+    end
+    #    assert(!ret, "Dnssec message verification failed")    
   end
   
   def test_validation
@@ -107,7 +111,7 @@ class DnssecTest < Test::Unit::TestCase
     res = Dnsruby::Resolver.new("a.ns.se")
     r = res.query("se", Dnsruby::Types.ANY)
     # @TODO@ Check the response here
-#    fail("Implement Resolver validation checking!")
+    #    fail("Implement Resolver validation checking!")
     print("Implement Resolver validation checking!")
     # We wanna check with CD on and off, and make sure it fails/works
     # need to remember to get resolver to validate iff cd on query is true
@@ -124,8 +128,12 @@ class DnssecTest < Test::Unit::TestCase
     ret = Dnsruby::Dnssec.add_trust_anchor(bad_key)
     r = res.query("uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
     
-    ret = Dnsruby::Dnssec.verify(r)
-    assert(!ret, "Dnssec trusted key message verification should have failed with bad key")    
+    begin
+      ret = Dnsruby::Dnssec.verify(r)
+      fail("Dnssec trusted key message verification should have failed with bad key")    
+    rescue (Dnsruby::VerifyError)
+      #    assert(!ret, "Dnssec trusted key message verification should have failed with bad key")    
+    end
     trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
         :type => Dnsruby::Types.DNSKEY,
         :flags => 257,
@@ -137,9 +145,9 @@ class DnssecTest < Test::Unit::TestCase
     ret = Dnsruby::Dnssec.verify(r)
     assert(ret, "Dnssec trusted key message verification failed")    
 
-#    # Check that keys have been added to trusted key cache
-#    ret = Dnsruby::Dnssec.verify(r)
-#    assert(ret, "Dnssec trusted key cache failed")    
+    #    # Check that keys have been added to trusted key cache
+    #    ret = Dnsruby::Dnssec.verify(r)
+    #    assert(ret, "Dnssec trusted key cache failed")    
   end
   
   def test_expired_keys
@@ -156,5 +164,5 @@ class DnssecTest < Test::Unit::TestCase
     assert(Dnsruby::Dnssec.trust_anchors.length==1)
     sleep(2)
     assert(Dnsruby::Dnssec.trust_anchors.length==0)
-end
+  end
 end

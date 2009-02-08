@@ -76,6 +76,7 @@ module Dnsruby
       # Cache includes expiration time for keys
       # Cache removes expired records
       def initialize(keys = nil)
+        # Store key tag against [expiry, key]
         @keys = {}
         add(keys)
       end
@@ -90,7 +91,8 @@ module Dnsruby
         elsif (k.kind_of?KeyCache)
           kaes = k.keys_and_expirations
           kaes.keys.each { |keykey|
-            priv_add_key(keykey, kaes[keykey])
+            #            priv_add_key(keykey, kaes[keykey])
+            priv_add_key(keykey[1], keykey[0])
           }
         else 
           raise ArgumentError.new("Expected an RRSet or KeyCache! Got #{k.class}")
@@ -120,32 +122,36 @@ module Dnsruby
       def priv_add_key(k, exp) 
         # Check that the key does not already exist with a longer expiration!
         if (@keys[k] == nil) 
-          @keys[k] = exp
-        elsif (@keys[k] < exp)
-          @keys[k] = exp
+          @keys[k.key_tag] = [exp,k]
+        elsif ((@keys[k])[0] < exp)
+          @keys[k.key_tag] = [exp,k]
         end
       end
       
       def each
         # Only offer currently-valid keys here
         remove_expired_keys
-        @keys.keys.each {|key| yield key}
+        @keys.values.each {|v| yield v[1]}
       end
       def keys
         # Only offer currently-valid keys here
         remove_expired_keys
-        return @keys.keys
+        ks = []
+        @keys.values.each {|a| ks.push(a[1])}
+        return ks
+        #        return @keys.keys
       end
       def keys_and_expirations
         remove_expired_keys
-        return @keys
+        return keys()
       end
       def remove_expired_keys
         @keys.delete_if {|k,v|
-          v < Time.now.to_i
+          v[0] < Time.now.to_i
         }
       end
     end  
+
 
     class ValidationPolicy
       # Note that any DLV registries which have been configured will only be tried
@@ -301,6 +307,9 @@ module Dnsruby
       return true
     end
     
+    # @TODO@ Need to be able to verify RRSet with a provided set of keys ONLY
+    # None of these keys should be added to the cache
+    
     
     # @TODO@ It sounds like we need to maintain several sets of trusted keys :
     #   : one for signed root, one for local anchors, and one from dlv
@@ -418,19 +427,8 @@ module Dnsruby
           if (verify_rrset(key_rrset))
             #            key_rrset.rrs.each do |rr|
             @@trusted_keys.add(key_rrset) # rr)
-            #            end
-          else
-            # See if the keys match any of the to_be_trusted_keys
-            key_rrset.rrs.each do |key|
-              @@to_be_trusted_keys.each do |tbtk|
-                # @TODO@ Check that the RRSet is still valid!!
-                # Should we get it out of the main cache?
-                if (check_ds(key, tbtk))
-                  @@to_be_trusted_keys.delete(tbtk)
-                end
-              end
-            end
           end
+          check_to_be_trusted(key_rrset)
         end
       end
       
@@ -483,6 +481,25 @@ module Dnsruby
       return true
     end
     
+    def self.check_to_be_trusted(key_rrset)
+      # See if the keys match any of the to_be_trusted_keys
+      key_rrset.rrs.each do |key|
+        @@to_be_trusted_keys.each do |tbtk|
+          # @TODO@ Check that the RRSet is still valid!!
+          # Should we get it out of the main cache?
+          #                if (check_ds(key, tbtk))
+          tbtk.rrs.each {|ds|
+            if (ds.check_key(key))
+              @@trusted_keys.add_key_with_expiration(key, tbtk.sigs()[0].expiration)
+              @@to_be_trusted_keys.delete(tbtk)
+            end
+          }
+        end
+        #            end
+      end
+      
+    end
+    
     def self.get_keys_to_check
       keys_to_check = []
       if (@@validation_policy == ValidationPolicy::ALWAYS_ROOT_ONLY)
@@ -494,7 +511,7 @@ module Dnsruby
       elsif (@@validation_policy == ValidationPolicy::ROOT_THEN_LOCAL_ANCHORS)
         keys_to_check = @@trusted_keys.keys + @@trust_anchors.keys
       end
-      return keys_to_check      
+      return keys_to_check
     end
     
     # Find the first matching DNSKEY and RRSIG record in the two sets.
@@ -519,31 +536,41 @@ module Dnsruby
     def self.verify_rrset(rrset) # , keys = nil)
       # @TODO@ Finer-grained reporting than "false". 
       sigrecs = rrset.sigs
-      return false if (rrset.num_sigs == 0)
+      #      return false if (rrset.num_sigs == 0)
+      if (rrset.num_sigs == 0)
+        raise VerifyError.new("No signatures in the RRSet") 
+      end
       sigrecs.each do |sigrec|
         check_rr_data(rrset, sigrec)
       end
 
       keyrec = nil
       sigrec = nil
+      if (rrset.rrs()[0].type == Types.DNSKEY)
+        check_to_be_trusted(rrset)
+      end
       keyrec, sigrec = get_matching_key(get_keys_to_check, sigrecs)
       
-      return false if !keyrec
+      #      return false if !keyrec
+      if (!keyrec)
+        raise VerifyError.new("Signing key not found")
+      end
      
       # RFC 4034
       #3.1.8.1.  Signature Calculation
       
       if (keyrec.sep_key? && !keyrec.zone_key?)
         Dnsruby.log.error("DNSKEY with with SEP flag set and Zone Key flag not set was used to verify RRSIG over RRSET - this is not allowed by RFC4034 section 2.1.1")
-        return false
+        #        return false
+        raise VerifyError.new("DNSKEY with SEP flag set and Zone Key flag not set")
       end          
-
+      
       #Any DNS names in the RDATA field of each RR MUST be in
       #canonical form; and
       #The RRset MUST be sorted in canonical order.
       rrset = rrset.sort_canonical
 
-      sig_data =sigrec.sig_data
+      sig_data = sigrec.sig_data
 
       #RR(i) = owner | type | class | TTL | RDATA length | RDATA
       rrset.each do |rec|
@@ -566,15 +593,15 @@ module Dnsruby
         raise RuntimeError.new("Algorithm #{sigrec.algorithm.code} unsupported by Dnsruby")
       end
     
-      if (verified)
-        # Sort out the TTLs - set it to the minimum valid ttl
-        expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
-        rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl, 
-            expiration_diff].sort)[0]
-
-        return true
+      if (!verified)
+        raise VerifyError.new("Signature failed to cryptographically verify")
       end
-      return false
+      # Sort out the TTLs - set it to the minimum valid ttl
+      expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
+      rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl, 
+          expiration_diff].sort)[0]
+
+      return true
     end
 
   end  
