@@ -45,6 +45,12 @@ module Dnsruby
         return arg
       when String
 #        arg.gsub!(/\.$/o, "")
+        if (arg==".")
+          return Name.new([],true)
+        end
+        if (arg=="")
+          return Name.new([],false)
+        end
         return Name.new(split_escaped(arg), /\.\z/ =~ arg ? true : false)
 #        return Name.new(Label.split(arg), /\.\z/ =~ arg ? true : false)
       when Array

@@ -176,15 +176,15 @@ module Dnsruby
       return ret
     end
     
-        # Return the rrset of the specified type in the  section
-        def rrset(type, klass=Classes::IN)
-          [@answer, @authority, @additional].each do |section|
-            if ((rrset = section.rrset(type, klass)).length > 0)
-              return rrset
-            end
-          end
-          return nil
+    # Return the rrset of the specified type in the  section
+    def rrset(type, klass=Classes::IN)
+      [@answer, @authority, @additional].each do |section|
+        if ((rrset = section.rrset(type, klass)).length > 0)
+          return rrset
         end
+      end
+      return nil
+    end
     
     # Return a hash, with the section as key, and the RRSets in that
     # section as the data : {section => section_rrs}
@@ -319,13 +319,13 @@ module Dnsruby
     end
     
     def rcode
-	rcode = @header.get_header_rcode
-	opt = get_opt
-	if (opt != nil)
-            rcode = rcode.code + (opt.xrcode << 4)
-            rcode = RCode.new(rcode)
-        end
-	return rcode;
+      rcode = @header.get_header_rcode
+      opt = get_opt
+      if (opt != nil)
+        rcode = rcode.code + (opt.xrcode << 4)
+        rcode = RCode.new(rcode)
+      end
+      return rcode;
     end    
 
     def to_s
@@ -529,8 +529,8 @@ module Dnsruby
     
     #Query response code
     #deprecated - use Message#rcode
-#    attr_reader :rcode
-# This new get_header_rcode method is intended for use only by the Message class
+    #    attr_reader :rcode
+    # This new get_header_rcode method is intended for use only by the Message class
     def get_header_rcode
       @rcode
     end
@@ -748,13 +748,13 @@ module Dnsruby
     
     def get_unpack(template)
       len = 0
-        littlec = ?c
-        bigc = ?C
-        littleh = ?h
-        bigh = ?H
-        littlen = ?n
-        bign = ?N
-        star = ?*
+      littlec = ?c
+      bigc = ?C
+      littleh = ?h
+      bigh = ?H
+      littlen = ?n
+      bign = ?N
+      star = ?*
       if (littlec.class != Fixnum)
         # We're using Ruby 1.9 - convert the codes
         littlec = littlec.getbyte(0)
@@ -842,7 +842,8 @@ module Dnsruby
     def get_label
       label = Name::Label.new(Name::decode(self.get_string))
       return label
-    end
+#         return Name::Label::Str.new(self.get_string)
+     end
     
     def get_question
       name = self.get_name
@@ -928,8 +929,7 @@ module Dnsruby
           return
         else
           @names[domain] = @data.length
-          first = d[i]
-          self.put_label(first)
+          self.put_label(d[i])
         end
       }
       @data << "\0"

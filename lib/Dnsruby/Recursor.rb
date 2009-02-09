@@ -22,9 +22,8 @@ module Dnsruby
     #= SYNOPSIS
     #
     #  require 'Dnsruby'
-    #  res = Dnsruby::Resolver.new
-    #  rec = Dnsruby::Recursor.new(res)
-    #  rec.recurse("rob.com.au")
+    #  rec = Dnsruby::Recursor.new()
+    #  answer = rec.recurse("rob.com.au")
     #
     #= DESCRIPTION
     #
@@ -153,37 +152,36 @@ module Dnsruby
           
       @resolver.recurse=(1)
       packet=@resolver.query(".", "NS", "IN")
-          
       hints = Hash.new
       if (packet)
         if (ans = packet.answer)
-          #      foreach my $rr (@ans)
           ans.each do |rr|
-            if (rr.name =~ /^\.?$/ and
-                  rr.type == "NS")
+            if (rr.name.to_s =~ /^\.?$/ and
+                  rr.type == Types.NS)
               # Found root authority
-              server = rr.rdatastr.downcase
+              server = rr.nsdname.to_s.downcase
               server.sub!(/\.$/,"")
               TheLog.debug(";; FOUND HINT: #{server}\n")
               hints[server] = []
             end
           end
-          #              foreach my $rr ($packet->additional) {
           packet.additional.each do |rr|
-            TheLog.debug(";; ADDITIONAL: ",rr.inspect,"\n")
-            if (server = rr.name.downcase)
-              if ( rr.type == "A")
+            TheLog.debug(";; ADDITIONAL: "+rr.inspect+"\n")
+            server = rr.name.to_s.downcase
+            server.sub!(/\.$/,"")
+            if (server)
+              if ( rr.type == Types.A)
                 #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
                 if (hints[server]!=nil)
-                  TheLog.debug(";; STORING IP: #{server} IN A ",rr.rdatastr,"\n")
-                  hints[server]=rr.rdatastr
+                  TheLog.debug(";; STORING IP: #{server} IN A "+rr.address.to_s+"\n")
+                  hints[server]=[rr.address.to_s]
                 end
               end
-              if ( rr.type == "AAAA")
+              if ( rr.type == Types.AAAA)
                 #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
                 if (hints[server])
-                  TheLog.debug(";; STORING IP6: #{server} IN AAAA ",rr.rdatastr,"\n")
-                  hints[server]=rr.rdatastr
+                  TheLog.debug(";; STORING IP6: #{server} IN AAAA "+rr.address.to_s+"\n")
+                  hints[server]=[rr.address.to_s]
                 end
               end
                   
@@ -204,16 +202,14 @@ module Dnsruby
       if (@hints.size > 0)
         if (@debug)
           TheLog.info(";; USING THE FOLLOWING HINT IPS:\n")
-          #      foreach my $ips (values %{ $self->{'hints'} }) {
           @hints.values.each do |ips|
-            #	foreach my $server (@{ $ips }) {
             ips.each do |server|
               TheLog.info(";;  #{server}\n")
             end
           end
         end
       else
-        warn "Server ["+(@nameservers)[0]+"] did not give answers"
+        warn "Server ["+(@nameservers)[0].to_s+"] did not give answers"
       end
           
       # Disable recursion flag.
@@ -247,14 +243,6 @@ module Dnsruby
       return @callback
     end
         
-#    def make_query(name, type=Types.A, klass=Classes.IN)
-#      msg = @resolver.make_query(name, type, klass)
-#      # Obtain real question Net::DNS::Packet
-#      query_packet = @resolver.make_query_packet(msg)      
-#      return query_packet
-#    end
-#        
-    #
     #This method is much like the normal query() method except it disables
     #the recurse flag in the packet and explicitly performs the recursion.
     #
@@ -264,24 +252,24 @@ module Dnsruby
     def query_dorecursion(name, type=Types.A, klass=Classes.IN)
           
       # Make sure the hint servers are initialized.
-#      @hints=Hash.new unless @hints
+      #      @hints=Hash.new unless @hints
       self.hints=(Hash.new) unless @hints
       @resolver.recurse=(0)
       # Make sure the authority cache is clean.
       # It is only used to store A and AAAA records of
       # the suposedly authoritative name servers.
+      # @TODO@ Use a proper cache, which respects TTL!!!
+      # @TODO@ Also, keep cache across queries
       @authority_cache = Hash.new
                     
-#      query_packet = make_query(name, type, klass)
-          
       # Seed name servers with hints
       return _dorecursion( name, type, klass, ".", @hints, 0)
     end
         
     def _dorecursion(name, type, klass, known_zone, known_authorities, depth)
+      # @TODO@ cache and known_authorities need to have ttls in place - use a proper cache!
       cache = @authority_cache
           
-      # die "Recursion too deep, aborting..." if $depth > 255;
       if ( depth > 255 )
         TheLog.debug(";; _dorecursion() Recursion too deep, aborting...\n")
         @errorstring="Recursion too deep, aborted"
@@ -292,9 +280,9 @@ module Dnsruby
           
       # Get IPs from authorities
       ns = []
-      #  foreach my $ns (keys %{ $known_authorities }) {
       known_authorities.keys.each do |ns_rec|
         if (known_authorities[ns_rec] != nil  && known_authorities[ns_rec] != [] )
+          # @TODO@ Deal with TTLs here! Use a proper cache...
           cache[ns_rec] = known_authorities[ns_rec]
           ns.push(cache[ns_rec])
         elsif (cache[ns_rec]!=nil && cache[ns_rec]!=[])
@@ -307,7 +295,6 @@ module Dnsruby
         found_auth = 0
         TheLog.debug(";; _dorecursion() Failed to extract nameserver IPs:\n")
         TheLog.debug(known_authorities.inspect + cache.inspect + "\n")
-        #    foreach my $ns (keys %{ $known_authorities }) {
         known_authorities.keys.each do |ns_rec|
           if (known_authorities[ns_rec]==nil || known_authorities[ns_rec]==[])
             TheLog.debug(";; _dorecursion() Manual lookup for authority [#{ns_rec}]\n")
@@ -316,13 +303,13 @@ module Dnsruby
             ans=[]
                 
             # Don't query for V6 if its not there.
-            if (! @force_v4)
-              auth_packet = _dorecursion(ns_rec,"AAAA", klass,  # packet
-                ".",               # known_zone
-                @hints,  # known_authorities
-                depth+1);         # depth
-              ans = auth_packet.answer if auth_packet
-            end
+            #            if (! @force_v4)
+            auth_packet = _dorecursion(ns_rec,"AAAA", klass,  # packet
+              ".",               # known_zone
+              @hints,  # known_authorities
+              depth+1);         # depth
+            ans = auth_packet.answer if auth_packet
+            #            end
                 
             auth_packet = _dorecursion(ns_rec,"A",klass,  # packet
               ".",               # known_zone
@@ -339,25 +326,28 @@ module Dnsruby
                   TheLog.debug(";; RR:" + rr.inspect + "\n")
                   if (rr.type == Types.CNAME)
                     # Follow CNAME
-                    server = rr.name.downcase
+                    server = rr.name.to_s.downcase
                     if (server)
                       server.sub!(/\.*$/, ".")
                       if (server == ns_rec)
-                        cname = rr.rdatastr.downcase
+                        cname = rr.cname.downcase
                         cname.sub!(/\.*$/, ".")
                         TheLog.debug(";; _dorecursion() Following CNAME ns [#{ns_rec}] -> [#{cname}]\n")
-                        known_authorities[cname] ||= []
-                        known_authorities.delete[ns_rec]
+                        if (!(known_authorities[cname]))
+                          known_authorities[cname] = []
+                        end
+                        known_authorities.delete(ns_rec)
                         next
                       end
                     end
                   elsif (rr.type == Types.A || rr.type == Types.AAAA )
-                    server = rr.name.downcase
+                    server = rr.name.to_s.downcase
                     if (server)
                       server.sub!(/\.*$/, ".")
                       if (known_authorities[server]!=nil)
-                        ip = rr.rdatastr
+                        ip = rr.address.to_s
                         TheLog.debug(";; _dorecursion() Found ns: #{server} IN A #{ip}\n")
+                        # @TODO@ Worry about TTLs here - use a proper cache!
                         cache[server] = known_authorities[server]
                         cache[ns_rec].push(ip)
                         found_auth+=1
@@ -389,92 +379,101 @@ module Dnsruby
       ns = endarr + start
           
           
-      ns.each do |levelns|
-        TheLog.debug(";; _dorecursion() Trying nameserver [#{levelns}]\n")
-        @nameservers=(levelns)
-            
-        packet = @resolver.query( name, type, klass )
-        if (packet)
-              
-          if (@callback)
-            @callback.call(packet)
+      ns.each do |nss|
+        nss.each do |levelns|
+          TheLog.debug(";; _dorecursion() Trying nameserver [#{levelns}]\n")
+          #        @nameservers=(levelns)
+          #            
+          #        packet = @resolver.query( name, type, klass )
+          resolver = SingleResolver.new(levelns.to_s)
+          begin
+            packet = resolver.query(name, type, klass)
+          rescue ResolvTimeout=> e
+            TheLog.debug(";; nameserver #{levelns.to_s} didn't respond\n")
+            next
           end
+          if (packet)
               
-          of = nil
-          TheLog.debug(";; _dorecursion() Response received from [" + @answerfrom + "]\n")
-          status = packet.header.rcode
-          authority = packet.authority
-          if (status)
-            if (status == "NXDOMAIN")
-              # I guess NXDOMAIN is the best we'll ever get
-              TheLog.debug(";; _dorecursion() returning NXDOMAIN\n")
-              return packet
-            elsif (packet.answer.length > 0)
-              TheLog.debug(";; _dorecursion() Answers were found.\n")
-              return packet
-            elsif (authority.length > 0)
-              auth = Hash.new
-              #	 foreach my $rr (@authority) {
-              authority.each do |rr|
-                if (rr.type =~ /^(NS|SOA)$/)
-                  server = (rr.type == "NS" ? rr.nsdname : rr.mname).downcase
-                  server.sub!(/\.*$/, ".")
-                  of = rr.name.downcase
-                  of.sub!(/\.*$/, ".")
-                  TheLog.debug(";; _dorecursion() Received authority [#{of}] [" + rr.type() + "] [#{server}]\n")
-                  if (of.length <= known_zone.length)
-                    TheLog.debug(";; _dorecursion() Deadbeat name server did not provide new information.\n")
-                    next
-                  elsif (of =~ /#{known_zone}/)
-                    TheLog.debug(";; _dorecursion() FOUND closer authority for [#{of}] at [#{server}].\n")
-                    auth[server] ||= []
+            if (@callback)
+              @callback.call(packet)
+            end
+              
+            of = nil
+            TheLog.debug(";; _dorecursion() Response received from [" + @answerfrom.to_s + "]\n")
+            status = packet.rcode
+            authority = packet.authority
+            if (status)
+              if (status == "NXDOMAIN")
+                # I guess NXDOMAIN is the best we'll ever get
+                TheLog.debug(";; _dorecursion() returning NXDOMAIN\n")
+                return packet
+              elsif (packet.answer.length > 0)
+                TheLog.debug(";; _dorecursion() Answers were found.\n")
+                return packet
+              elsif (authority.length > 0)
+                auth = Hash.new
+                #	 foreach my $rr (@authority) {
+                authority.each do |rr|
+                  if (rr.type.to_s =~ /^(NS|SOA)$/)
+                    server = (rr.type == Types.NS ? rr.nsdname : rr.mname).to_s.downcase
+                    server.sub!(/\.*$/, ".")
+                    of = rr.name.to_s.downcase
+                    of.sub!(/\.*$/, ".")
+                    TheLog.debug(";; _dorecursion() Received authority [#{of}] [" + rr.type().to_s + "] [#{server}]\n")
+                    if (of.length <= known_zone.length)
+                      TheLog.debug(";; _dorecursion() Deadbeat name server did not provide new information.\n")
+                      next
+                    elsif (of =~ /#{known_zone}/)
+                      TheLog.debug(";; _dorecursion() FOUND closer authority for [#{of}] at [#{server}].\n")
+                      auth[server] ||= []
+                    else
+                      TheLog.debug(";; _dorecursion() Confused name server [" + @answerfrom + "] thinks [#{of}] is closer than [#{known_zone}]?\n")
+                      last
+                    end
                   else
-                    TheLog.debug(";; _dorecursion() Confused name server [" + @answerfrom + "] thinks [#{of}] is closer than [#{known_zone}]?\n")
-                    last
+                    TheLog.debug(";; _dorecursion() Ignoring NON NS entry found in authority section: " + rr.inspect + "\n")
                   end
-                else
-                  TheLog.debug(";; _dorecursion() Ignoring NON NS entry found in authority section: " + rr.inspect + "\n")
                 end
-              end
-              #	 foreach my $rr ($packet->additional)
-              packet.additional.each do |rr|
-                if (rr.type == "CNAME")
-                  # Store this CNAME into %auth too
-                  server = rr.name.downcase
-                  if (server)
-                    server.sub!(/\.*$/, ".")
-                    if (auth[server]!=nil && auth[server]!=[])
-                      cname = rr.rdatastr.downcase
-                      cname.sub!(/\.*$/, ".")
-                      TheLog.debug(";; _dorecursion() FOUND CNAME authority: " + rr.string + "\n")
-                      auth[cname] ||= []
-                      auth[server] = auth[cname]
-                      next
-                    end
+                #	 foreach my $rr ($packet->additional)
+                packet.additional.each do |rr|
+                  if (rr.type == Types.CNAME)
+                    # Store this CNAME into %auth too
+                    server = rr.name.to_s.downcase
+                    if (server)
+                      server.sub!(/\.*$/, ".")
+                      if (auth[server]!=nil && auth[server]!=[])
+                        cname = rr.cname.to_s.downcase
+                        cname.sub!(/\.*$/, ".")
+                        TheLog.debug(";; _dorecursion() FOUND CNAME authority: " + rr.string + "\n")
+                        auth[cname] ||= []
+                        auth[server] = auth[cname]
+                        next
+                      end
                         
-                  end
-                elsif (rr.type == "A" || rr.type == "AAAA")
-                  server = rr.name.downcase
-                  if (server)
-                    server.sub!(/\.*$/, ".")
-                    if (auth[server]!=nil)
-                      if (rr.type = Types.A)
-                        TheLog.debug(";; _dorecursion() STORING: #{server} IN A    " + rr.rdatastr + "\n")
+                    end
+                  elsif (rr.type == Types.A || rr.type == Types.AAAA)
+                    server = rr.name.to_s.downcase
+                    if (server)
+                      server.sub!(/\.*$/, ".")
+                      if (auth[server]!=nil)
+                        if (rr.type = Types.A)
+                          TheLog.debug(";; _dorecursion() STORING: #{server} IN A    " + rr.address.to_s + "\n")
+                        end
+                        if (rr.type = Types.AAAA)
+                          TheLog.debug(";; _dorecursion() STORING: #{server} IN AAAA " + rr.address.to_s + "\n")
+                        end
+                        auth[server].push(rr.address.to_s)
+                        next
                       end
-                      if (rr.type = Types.AAAA)
-                        TheLog.debug(";; _dorecursion() STORING: #{server} IN AAAA " + rr.rdatastr + "\n")
-                      end
-                      auth[server].push(rr.rdatastr)
-                      next
                     end
                   end
+                  TheLog.debug(";; _dorecursion() Ignoring useless: " + rr.inspect + "\n")
                 end
-                TheLog.debug(";; _dorecursion() Ignoring useless: " + rr.inspect + "\n")
-              end
-              if (of =~ /#{known_zone}/)
-                return _dorecursion( query_packet, of, auth, depth+1 )
-              else
-                return _dorecursion( query_packet, known_zone, known_authorities, depth+1 )
+                if (of =~ /#{known_zone}/)
+                  return _dorecursion( name, type, klass, of, auth, depth+1 )
+                else
+                  return _dorecursion( name, type, klass, known_zone, known_authorities, depth+1 )
+                end
               end
             end
           end
