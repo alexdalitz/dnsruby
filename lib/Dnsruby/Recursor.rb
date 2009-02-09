@@ -117,13 +117,14 @@ module Dnsruby
     #rob.com.au.             7200    IN      NS      sy-dns02.tmns.net.au.
     #;; Received 135 bytes from 139.134.2.18#53(sy-dns02.tmns.net.au) in 525 ms
     #  ;;; FINALLY, THE ANSWER!
-    attr_accessor :nameservers, :callback, :recurse
+    attr_accessor :nameservers, :callback, :recurse, :ipv6_ok
     attr_reader :hints
     # The resolver to use for the queries
     attr_accessor :resolver
         
     def initialize(res = Resolver.new)
       @resolver = res
+      @ipv6_ok = false
     end
     #Initialize the hint servers.  Recursive queries need a starting name
     #server to work off of. This method takes a list of IP addresses to use
@@ -303,13 +304,13 @@ module Dnsruby
             ans=[]
                 
             # Don't query for V6 if its not there.
-            #            if (! @force_v4)
+            if ( @ipv6_ok)
             auth_packet = _dorecursion(ns_rec,"AAAA", klass,  # packet
               ".",               # known_zone
               @hints,  # known_authorities
               depth+1);         # depth
             ans = auth_packet.answer if auth_packet
-            #            end
+            end
                 
             auth_packet = _dorecursion(ns_rec,"A",klass,  # packet
               ".",               # known_zone
