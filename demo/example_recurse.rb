@@ -1,7 +1,7 @@
 # Example usage for Net::DNS::Resolver::Recurse
 # Performs recursion for a query.
 
-require 'Dnsruby'
+require 'dnsruby'
 
 res = Dnsruby::Recursor.new
 Dnsruby::TheLog.level = Logger::DEBUG

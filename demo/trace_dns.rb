@@ -1,4 +1,4 @@
-require 'Dnsruby'
+require 'dnsruby'
 
 # e.g. ruby trace_dns.rb example.com
 
