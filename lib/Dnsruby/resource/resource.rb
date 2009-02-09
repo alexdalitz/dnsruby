@@ -93,35 +93,53 @@ module Dnsruby
       return true
     end
     
-    #Return a new RRset which contains the RRs from this
-    #RRset into canonical order (RFC 4034 section 6)
     def sort_canonical
-      #Make a list, for all the RRs, where each RR contributes 
+      #Make a list, for all the RRs, where each RR contributes
       #the canonical RDATA encoding
-      canonical_rrs = []
+      canonical_rrs = {}
       self.rrs.each do |rr|
         data = MessageEncoder.new {|msg|
-          msg.put_rr(rr, true)
+          rr.encode_rdata(msg, true)
         }.to_s
-        canonical_rrs.push(data)
+        canonical_rrs[data] = rr
       end
-      
-      # Check there are no identical records - if there are duplicated entries
-      # then remove them
-      canonical_rrs.uniq!
-      
-      #Sort it (the absence of an octet sorts before a zero octet.)
-      canonical_rrs.sort!
-      
+
       return_rrs = RRSet.new
-      canonical_rrs.each {|rr|
-        MessageDecoder.new(rr) {|msg|
-          new_rr = msg.get_rr
-          return_rrs.add(new_rr)
-        }
+      canonical_rrs.keys.sort.each { |rdata|
+        return_rrs.add(canonical_rrs[rdata])
       }
       return return_rrs
     end
+
+#    #Return a new RRset which contains the RRs from this
+#    #RRset into canonical order (RFC 4034 section 6)
+#    def sort_canonical
+#      #Make a list, for all the RRs, where each RR contributes 
+#      #the canonical RDATA encoding
+#      canonical_rrs = []
+#      self.rrs.each do |rr|
+#        data = MessageEncoder.new {|msg|
+#          msg.put_rr(rr, true)
+#        }.to_s
+#        canonical_rrs.push(data)
+#      end
+#      
+#      # Check there are no identical records - if there are duplicated entries
+#      # then remove them
+#      canonical_rrs.uniq!
+#      
+#      #Sort it (the absence of an octet sorts before a zero octet.)
+#      canonical_rrs.sort!
+#      
+#      return_rrs = RRSet.new
+#      canonical_rrs.each {|rr|
+#        MessageDecoder.new(rr) {|msg|
+#          new_rr = msg.get_rr
+#          return_rrs.add(new_rr)
+#        }
+#      }
+#      return return_rrs
+#    end
     
     #Delete the RR from this RRSet
     def delete(rr)

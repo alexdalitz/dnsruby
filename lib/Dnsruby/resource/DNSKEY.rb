@@ -141,7 +141,7 @@ module Dnsruby
       
       def rdata_to_string #:nodoc: all
         if (@flags!=nil)
-#          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s)} )"
+          #          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s)} )"
           return "#{@flags} #{@protocol} #{@algorithm.string} ( #{[@key.to_s].pack("m*").gsub("\n", "")} )"
         else
           return ""
@@ -176,15 +176,15 @@ module Dnsruby
         else
           tag = 0
           last = 0
-          0.step(rdata.length-1, 2) {|i|
+          0.step(rdata.length - 1, 2) {|i|
             last = i
             d1 = rdata[i]
-            d2 = rdata[i + 1]
+            d2 = rdata[i + 1] || 0 # odd number of bytes possible
 
-          if (d1.class == String) # Ruby 1.9
-            d1 = d1.getbyte(0)
-            d2 = d2.getbyte(0)
-          end
+            if (d1.class == String) # Ruby 1.9
+              d1 = d1.getbyte(0)
+              d2 = d2.getbyte(0)
+            end
           
             d1 = d1  & 0xFF
             d2 = d2  & 0xFF
@@ -211,7 +211,7 @@ module Dnsruby
       def key=(key_text)
         key_text.gsub!(/\n/, "")
         key_text.gsub!(/ /, "")
-#        @key=Base64.decode64(key_text)        
+        #        @key=Base64.decode64(key_text)        
         @key=key_text.unpack("m*")[0]
       end
       

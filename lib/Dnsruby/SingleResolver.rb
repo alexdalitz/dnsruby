@@ -582,7 +582,7 @@ module Dnsruby
       msg = Message.new
       msg.header.rd = 1
       msg.add_question(name, type, klass)
-      if (@dnssec)
+      if (@set_cd)
         msg.header.cd = set_cd # We do our own validation by default
       end
       return msg

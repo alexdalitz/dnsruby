@@ -533,7 +533,7 @@ module Dnsruby
     # or RRSet. If no signature is included, false is returned.
     #
     # Returns true if the RRSet verified, false otherwise.
-    def self.verify_rrset(rrset) # , keys = nil)
+    def self.verify_rrset(rrset, keys = nil)
       # @TODO@ Finer-grained reporting than "false". 
       sigrecs = rrset.sigs
       #      return false if (rrset.num_sigs == 0)
@@ -546,10 +546,14 @@ module Dnsruby
 
       keyrec = nil
       sigrec = nil
-      if (rrset.rrs()[0].type == Types.DNSKEY)
-        check_to_be_trusted(rrset)
+      if keys.nil?
+        if (rrset.rrs()[0].type == Types.DNSKEY)
+          check_to_be_trusted(rrset)
+        end
+        keyrec, sigrec = get_matching_key(get_keys_to_check, sigrecs)
+      else
+        keyrec, sigrec = get_matching_key(keys, sigrecs)
       end
-      keyrec, sigrec = get_matching_key(get_keys_to_check, sigrecs)
       
       #      return false if !keyrec
       if (!keyrec)
@@ -574,9 +578,12 @@ module Dnsruby
 
       #RR(i) = owner | type | class | TTL | RDATA length | RDATA
       rrset.each do |rec|
+        old_ttl = rec.ttl
+        rec.ttl = sigrec.original_ttl
         data = MessageEncoder.new { |msg|
           msg.put_rr(rec, true)
         }.to_s # @TODO@ worry about wildcards here?
+        rec.ttl = old_ttl
         if (RUBY_VERSION >= "1.9")
           data.force_encoding("ASCII-8BIT")
         end
