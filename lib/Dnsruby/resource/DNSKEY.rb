@@ -181,10 +181,8 @@ module Dnsruby
             d1 = rdata[i]
             d2 = rdata[i + 1] || 0 # odd number of bytes possible
 
-            if (d1.class == String) # Ruby 1.9
-              d1 = d1.getbyte(0)
-              d2 = d2.getbyte(0)
-            end
+            d1 = d1.getbyte(0) if d1.class == String # Ruby 1.9
+            d2 = d2.getbyte(0) if d2.class == String # Ruby 1.9
           
             d1 = d1  & 0xFF
             d2 = d2  & 0xFF
