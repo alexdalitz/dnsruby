@@ -35,7 +35,7 @@ module Dnsruby
       SEP_KEY = 0x1
 
       #The flags for the DNSKEY RR
-      attr_accessor :flags
+      attr_reader :flags
       #The protocol for this DNSKEY RR.
       #MUST be 3.
       attr_reader :protocol
@@ -101,11 +101,20 @@ module Dnsruby
         # Zone Key flag (bit 7)
         # Secure Entry Point flag (bit 15)
         if ((f & ~ZONE_KEY & ~SEP_KEY) > 0)
-          raise DecodeError.new("Only zone key and secure entry point flags allowed for DNSKEY" +
-              " (RFC4034 section 2.1.1)")
-        else
-          @flags = f
+          TheLog.info("DNSKEY: Only zone key and secure entry point flags allowed for DNSKEY" +
+              " (RFC4034 section 2.1.1) : #{f} entered as input")
         end
+
+#        # Only look at bits 7 and 15
+#        @flags = ((f & ZONE_KEY) | (f & SEP_KEY))
+@flags = f
+      end
+      
+      def bad_flags?
+        if ((@flags & ~ZONE_KEY & ~SEP_KEY) > 0)
+           return true
+        end
+        return false
       end
       
       def from_data(data) #:nodoc: all

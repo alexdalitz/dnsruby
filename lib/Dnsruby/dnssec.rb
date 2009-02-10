@@ -520,6 +520,10 @@ module Dnsruby
         return nil, nil
       end
       keys.each {|key|
+        if (key.bad_flags?)      
+          next
+        end
+      
         sigrecs.each {|sig|
           if ((key.key_tag == sig.key_tag) && (key.algorithm == sig.algorithm))
             return key, sig
@@ -567,8 +571,8 @@ module Dnsruby
         Dnsruby.log.error("DNSKEY with with SEP flag set and Zone Key flag not set was used to verify RRSIG over RRSET - this is not allowed by RFC4034 section 2.1.1")
         #        return false
         raise VerifyError.new("DNSKEY with SEP flag set and Zone Key flag not set")
-      end          
-      
+      end       
+
       #Any DNS names in the RDATA field of each RR MUST be in
       #canonical form; and
       #The RRset MUST be sorted in canonical order.

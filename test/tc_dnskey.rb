@@ -9,8 +9,21 @@ class DnskeyTest < Test::Unit::TestCase
     "Mv1LyBUgia7za6ZEzOJBOztyvhjL" + 
     "742iU/TpPSEDhm2SNKLijfUppn1U" +
     "aNvv4w==  )"
+  BADINPUT = "example.com. 86400 IN DNSKEY 384 3 5 ( AQPSKmynfzW4kyBv015MUG2DeIQ3" + 
+    "Cbl+BBZH4b/0PY1kxkmvHjcZc8no" + 
+    "kfzj31GajIQKY+5CptLr3buXA10h" +
+    "WqTkF7H6RfoRqXQeogmMHfpftf6z" +
+    "Mv1LyBUgia7za6ZEzOJBOztyvhjL" + 
+    "742iU/TpPSEDhm2SNKLijfUppn1U" +
+    "aNvv4w==  )"
+  def test_bad_flag
+    dnskey = Dnsruby::RR.create(BADINPUT)    
+    assert_equal(384, dnskey.flags)
+    assert(dnskey.bad_flags?)
+  end
   def test_dnskey_from_string
     dnskey = Dnsruby::RR.create(INPUT)
+    assert(!dnskey.bad_flags?)
     assert_equal(3, dnskey.protocol)
     assert_equal(256, dnskey.flags)
     assert_equal(Dnsruby::Algorithms::RSASHA1, dnskey.algorithm)
@@ -38,14 +51,17 @@ class DnskeyTest < Test::Unit::TestCase
       fail()
     rescue Dnsruby::DecodeError
     end
-    begin
       dnskey.flags=4
-      fail()
-    rescue Dnsruby::DecodeError
-    end
+      assert_equal(4, dnskey.flags)
+      assert(dnskey.bad_flags?)
     dnskey.flags=256
+      assert_equal(256, dnskey.flags)
+      assert(!dnskey.bad_flags?)
     dnskey.flags=257
+      assert_equal(257, dnskey.flags)
+      assert(!dnskey.bad_flags?)
     dnskey.flags=1
+      assert_equal(1, dnskey.flags)
     dnskey.protocol=3
      
   end
