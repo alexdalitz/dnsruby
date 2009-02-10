@@ -13,6 +13,7 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
+require 'dnsruby/cache'
 module Dnsruby
   class Recursor
     #= NAME
@@ -305,11 +306,11 @@ module Dnsruby
                 
             # Don't query for V6 if its not there.
             if ( @ipv6_ok)
-            auth_packet = _dorecursion(ns_rec,"AAAA", klass,  # packet
-              ".",               # known_zone
-              @hints,  # known_authorities
-              depth+1);         # depth
-            ans = auth_packet.answer if auth_packet
+              auth_packet = _dorecursion(ns_rec,"AAAA", klass,  # packet
+                ".",               # known_zone
+                @hints,  # known_authorities
+                depth+1);         # depth
+              ans = auth_packet.answer if auth_packet
             end
                 
             auth_packet = _dorecursion(ns_rec,"A",klass,  # packet
@@ -389,7 +390,7 @@ module Dnsruby
           resolver = SingleResolver.new(levelns.to_s)
           begin
             packet = resolver.query(name, type, klass)
-          rescue ResolvTimeout=> e
+          rescue ResolvTimeout, IOError => e
             TheLog.debug(";; nameserver #{levelns.to_s} didn't respond\n")
             next
           end

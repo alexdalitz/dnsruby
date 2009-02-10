@@ -175,28 +175,44 @@ class DnssecTest < Test::Unit::TestCase
     #This one does not
     #
     #		 dig @194.0.1.13 isoc.lu dnskey +dnssec +tcp
-    r = Dnsruby::Resolver.new()# "194.0.1.13")
-        r.dnssec = true    
-        r.use_tcp = true
+    r = Dnsruby::SingleResolver.new()# "194.0.1.13")
+    r.dnssec = true    
+    r.use_tcp = true
     ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
-#    print ret.to_s+"\n"
+    #    print ret.to_s+"\n"
 
-    r = Dnsruby::Resolver.new("194.0.1.13")
+    r = Dnsruby::SingleResolver.new("194.0.1.13")
     r.dnssec = true
     #r.use_tcp = true
     ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
-#    print ret.to_s+"\n"
+    #    print ret.to_s+"\n"
 
     r.use_tcp = true
     r.dnssec = false
     ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
-#    print ret.to_s+"\n"
+    #    print ret.to_s+"\n"
 
     r.dnssec = true    
     begin
-    ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
+      ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
     rescue (Dnsruby::OtherResolvError)
     end
     
+  end
+  
+  def test_sendraw
+    Dnsruby::Dnssec.clear_trusted_keys
+    Dnsruby::Dnssec.clear_trust_anchors
+    res = Dnsruby::Resolver.new("a.ns.se")
+    res.dnssec = true
+    message = Dnsruby::Message.new("se", Dnsruby::Types.ANY)
+    begin
+      res.send_message(message)
+      fail()
+    rescue (Exception)
+    end
+    
+    message.send_raw = true
+    res.send_message(message)
   end
 end

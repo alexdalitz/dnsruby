@@ -268,6 +268,11 @@ module Dnsruby
     #    id = res.send_async(msg, queue, id)
     #    id = res.send_async(msg, queue, id, use_tcp)
     #
+    #Note that, if you wish to send packets with no additional checks being performed,
+    #then set the Message#send_raw option to true. Dnsruby will then leave the header 
+    #of the outgoing packet alone, and will not attempt to verify or validate any 
+    #DNSSEC-signed responses. TSIG will still be applied, if configured.
+    #Note that this option should not normally be used!
     def send_async(*args) # msg, client_queue, client_query_id, use_tcp=@use_tcp)
       # @TODO@ Need to select a good Header ID here - see forgery-resilience RFC draft for details
       msg = args[0]
@@ -299,56 +304,55 @@ module Dnsruby
         end
       end
       # Need to keep track of the request mac (if using tsig) so we can validate the response (RFC2845 4.1)
-#      #Are we using EventMachine or native Dnsruby?
-#      if (Resolver.eventmachine?)
-#        return send_eventmachine(query_packet, msg, client_query_id, client_queue, use_tcp)
-#      else
-        if (!client_query_id)
-          client_query_id = Time.now + rand(10000) # is this safe?!
-        end
-        send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
-        return client_query_id
-#      end
+      #      #Are we using EventMachine or native Dnsruby?
+      #      if (Resolver.eventmachine?)
+      #        return send_eventmachine(query_packet, msg, client_query_id, client_queue, use_tcp)
+      #      else
+      if (!client_query_id)
+        client_query_id = Time.now + rand(10000) # is this safe?!
+      end
+      send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
+      return client_query_id
+      #      end
     end
 
-#    # This method sends the packet using EventMachine
-#    def send_eventmachine(msg_bytes, msg, client_query_id, client_queue, use_tcp, client_deferrable=nil, packet_timeout = @packet_timeout) #:nodoc: all
-#      start_time = Time.now
-#      if (!client_deferrable)
-#        client_deferrable = EventMachine::DefaultDeferrable.new
-#      end
-#      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_address=>@src_address, :src_port=>get_next_src_port, :use_tcp=>use_tcp)
-#      packet_deferrable.callback { |response, response_bytes|
-#        ret = true
-#        if (response.header.tc && !use_tcp && !@ignore_truncation)
-#          # Try to resend over tcp
-#          Dnsruby.log.debug{"Truncated - resending over TCP"}
-#          send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
-#        else
-#          if (!check_tsig(msg, response, response_bytes))
-#            send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
-#            return
-#          end
-#          client_deferrable.set_deferred_status :succeeded, response
-#          if (client_queue)
-#            client_queue.push([client_query_id, response, nil])
-#          end
-#        end
-#      }
-#      packet_deferrable.errback { |response, error|
-#        client_deferrable.set_deferred_status :failed, response, error
-#        if (client_queue)
-#          client_queue.push([client_query_id, response, error])
-#        end
-#      }
-#      return client_deferrable
-#    end
+    #    # This method sends the packet using EventMachine
+    #    def send_eventmachine(msg_bytes, msg, client_query_id, client_queue, use_tcp, client_deferrable=nil, packet_timeout = @packet_timeout) #:nodoc: all
+    #      start_time = Time.now
+    #      if (!client_deferrable)
+    #        client_deferrable = EventMachine::DefaultDeferrable.new
+    #      end
+    #      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_address=>@src_address, :src_port=>get_next_src_port, :use_tcp=>use_tcp)
+    #      packet_deferrable.callback { |response, response_bytes|
+    #        ret = true
+    #        if (response.header.tc && !use_tcp && !@ignore_truncation)
+    #          # Try to resend over tcp
+    #          Dnsruby.log.debug{"Truncated - resending over TCP"}
+    #          send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
+    #        else
+    #          if (!check_tsig(msg, response, response_bytes))
+    #            send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
+    #            return
+    #          end
+    #          client_deferrable.set_deferred_status :succeeded, response
+    #          if (client_queue)
+    #            client_queue.push([client_query_id, response, nil])
+    #          end
+    #        end
+    #      }
+    #      packet_deferrable.errback { |response, error|
+    #        client_deferrable.set_deferred_status :failed, response, error
+    #        if (client_queue)
+    #          client_queue.push([client_query_id, response, error])
+    #        end
+    #      }
+    #      return client_deferrable
+    #    end
 
     # This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
     def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp) #:nodoc: all
       endtime = Time.now + @packet_timeout
       # First send the query (synchronously)
-      # @TODO@ persisent sockets
       st = SelectThread.instance
       socket = nil
       runnextportloop = true
@@ -356,7 +360,15 @@ module Dnsruby
         begin
           src_port = get_next_src_port
           if (use_tcp) 
-            socket = TCPSocket.new(@server, @port, @src_address, src_port)
+            begin
+              socket = TCPSocket.new(@server, @port, @src_address, src_port)
+            rescue Errno::EBADF=> e
+              # Can't create a connection
+              err=IOError.new("TCP connection error to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
+              Dnsruby.log.error{"#{err}"}
+              st.push_exception_to_select(client_query_id, client_queue, err, nil)
+              return
+            end
           else
             socket = nil
             # JRuby UDPSocket only takes 0 parameters - no IPv6 support in JRuby...
@@ -523,11 +535,13 @@ module Dnsruby
       if (!check_tsig(query, response, response_bytes))
         return false
       end
-      if (@dnssec)
-        begin 
-          Dnssec.validate_with_query(query,response)
-        rescue (VerifyError)
-          return false # Send this info back to the client somehow?
+      if (!query.send_raw)
+        if (@dnssec)
+          begin 
+            Dnssec.validate_with_query(query,response)
+          rescue (VerifyError)
+            return false # Send this info back to the client somehow?
+          end
         end
       end
       # Should check that question section is same as question that was sent! RFC 5452
@@ -585,27 +599,29 @@ module Dnsruby
     
     # Prepare the packet for sending
     def make_query_packet(packet, use_tcp = @use_tcp) #:nodoc: all
-      if (packet.header.opcode == OpCode.QUERY || @recurse)
-        packet.header.rd=@recurse
-      end
+      if (!packet.send_raw) # Don't mess with this packet!
+        if (packet.header.opcode == OpCode.QUERY || @recurse)
+          packet.header.rd=@recurse
+        end
       
-      if (@dnssec)
-        # RFC 4035
-        Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize #{udp_packet_size} and DNS OK bit set\n"}
-        optrr = RR::OPT.new(udp_packet_size)   # Decimal UDPpayload
-        optrr.dnssec_ok=true
+        if (@dnssec)
+          # RFC 4035
+          Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize #{udp_packet_size} and DNS OK bit set\n"}
+          optrr = RR::OPT.new(udp_packet_size)   # Decimal UDPpayload
+          optrr.dnssec_ok=true
               
-        packet.add_additional(optrr)
+          packet.add_additional(optrr)
         
-        packet.header.ad = false # RFC 4035 section 4.6
+          packet.header.ad = false # RFC 4035 section 4.6
         
-      elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
-        #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
-        Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}.\n"}
-        # RFC 3225
-        optrr = RR::OPT.new(udp_packet_size)
+        elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
+          #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
+          Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}.\n"}
+          # RFC 3225
+          optrr = RR::OPT.new(udp_packet_size)
         
-        packet.add_additional(optrr)
+          packet.add_additional(optrr)
+        end
       end
       
       if (@tsig && !packet.signed?)

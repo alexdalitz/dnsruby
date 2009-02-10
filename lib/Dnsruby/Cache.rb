@@ -6,29 +6,32 @@
 
 class Cache 
   # How do we store the records?
-  # How about an array of hashes?
-  # Each hash is a domain name -> hash2
+  # How about a hash of domain name -> hash2
   # Each hash2 is type -> [expiration, data] where data is either RRSet or nil
   class Negative
     attr_accessor :type, :name, :soa
   end
   def initialize()
-    @rrsets = []    
-    @negatives = [] # Store.new # Do these have a ttl? Yes - the SOA minimum field (RFC 2308)
+    @rrsets = Hash.new
+    @negatives = Hash.new # Store.new # Do these have a ttl? Yes - the SOA minimum field (RFC 2308)
   end
   
   def rrsets_for_domain(domain)
-    return @rrsets[domain.to_s.lowercase]
+    print "Domain : #{domain}\n"
+    return @rrsets[domain.to_s.downcase]
   end
   def get_rrs_and_exps(domain, type)
-    rrsets = rrsets_for_domain(domain)
-    type_rrs = rrsets[Types.new(type)]
-    # Check expiry
-    if (type_rrs[0]) < Time.now.to_i
-      delete_rrset(domain, type)
+    if (rrsets = rrsets_for_domain(domain))
+      type_rrs = rrsets[Types.new(type)]
+      # Check expiry
+      if (type_rrs[0]) < Time.now.to_i
+        delete_rrset(domain, type)
+        return nil
+      end
+      return type_rrs
+    else
       return nil
     end
-    return type_rrs
   end
   def rrsets(domain, type)
     type_rrs = get_rrs_and_exps(domain, type)
@@ -50,11 +53,17 @@ class Cache
   def add_rrset(r)
     # Are we updating an existing entry? If so, then replace it if the expiration
     # is later
+    print "r.name=#{r.name}, r.type=#{r.type}\n"
     rrs = rrsets(r.name, r.type)
     r_expiration = Time.now.to_i + r.ttl
     if (rrs && (rrset_expiration(r.name, r.type) < r_expiration))
-      # Add it
+      # Overwrite it
       rrsets_for_domain()[r.type] = [r_expiration, r]
+    elsif (!rrs)
+      # Create it
+      hash = Hash.new
+      hash[r.type] = [r_expiration, r]
+      @rrsets[r.name]=hash
     end
   end
   
@@ -62,6 +71,9 @@ class Cache
   end
   def add_negative()
     
+  end
+  def negatives(name, type)
+    return []
   end
   
   
@@ -77,5 +89,9 @@ class Cache
       return negative
     end
     return nil
+  end
+  
+  def inspect
+    return "RRSets : #{@rrsets},\nNegatives #{@negatives}\n"
   end
 end

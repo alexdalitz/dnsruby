@@ -242,14 +242,6 @@ module Dnsruby
       @resolver_ruby.close if @resolver_ruby
     end
     
-#    def make_query(*args)
-#      return @single_resolvers[0].make_query(*args)
-#    end
-#
-#    def make_query_packet(args)
-#      return @single_resolvers[0].make_query_packet(args)
-#    end
-#
     # Create a new Resolver object. If no parameters are passed in, then the default 
     # system configuration will be used. Otherwise, a Hash may be passed in with the 
     # following optional elements : 
@@ -521,6 +513,7 @@ module Dnsruby
 #    def Resolver.start_eventmachine_loop?
 #      return @@start_eventmachine_loop
 #    end
+
     def generate_timeouts(base=0) #:nodoc: all
       #These should be be pegged to the single_resolver they are targetting :
       #  e.g. timeouts[timeout1]=nameserver

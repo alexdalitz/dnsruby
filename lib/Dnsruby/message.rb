@@ -112,6 +112,7 @@ module Dnsruby
       @tsigkey = nil
       @answerfrom = nil
       @answerip = nil
+      @send_raw = false
       type = Types.A
       klass = Classes.IN
       if (args.length > 0)
@@ -163,6 +164,14 @@ module Dnsruby
     #--
     attr_accessor :tsigstart
     #++
+    
+    #Set send_raw if you wish to send and receive the response to this Message 
+    #with no additional processing. In other words, if set, then Dnsruby will 
+    #not touch the Header of the outgoing Message, nor will it attempt any
+    #verification/validation of incoming DNSSEC-signed messages. 
+    #
+    #This option should not normally be set.
+    attr_accessor :send_raw
 
     def ==(other)
       ret = false

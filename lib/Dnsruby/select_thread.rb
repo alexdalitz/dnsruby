@@ -403,6 +403,13 @@ module Dnsruby
       @@mutex.synchronize{
         @@queued_exceptions.push([client_id, client_queue, err, msg])
       }
+      # Make sure select loop is running!
+      if (@@select_thread && @@select_thread.alive?)
+      else
+        @@select_thread = Thread.new {
+          do_select
+        }      
+      end
     end
     
     def send_queued_exceptions
