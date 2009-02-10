@@ -127,7 +127,7 @@ module Dnsruby
             tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1]})
           end
         else
-#          Dnsruby.log.debug{"TSIG signing switched off"}
+          #          Dnsruby.log.debug{"TSIG signing switched off"}
           return nil
         end
       elsif (args.length ==2)
@@ -370,8 +370,14 @@ module Dnsruby
           if (use_tcp) 
             socket = TCPSocket.new(@server, @port, @src_address, src_port)
           else
-            ipv6 = @src_address =~ /:/
-            socket = UDPSocket.new(ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
+            socket = nil
+            # JRuby UDPSocket only takes 0 parameters - no IPv6 support in JRuby...
+            if (/java/ =~ RUBY_PLATFORM )
+              socket = UDPSocket.new()
+            else
+              ipv6 = @src_address =~ /:/
+              socket = UDPSocket.new(ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
+            end
             socket.bind(@src_address, src_port)
             socket.connect(@server, @port)
           end
