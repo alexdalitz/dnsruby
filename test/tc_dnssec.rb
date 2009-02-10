@@ -197,8 +197,6 @@ class DnssecTest < Test::Unit::TestCase
     ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
     rescue (Dnsruby::OtherResolvError)
     end
-    print ret.to_s+"\n"
-
     
   end
 end
