@@ -1,3 +1,19 @@
+#--
+#Copyright 2007 Nominet UK
+#
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License. 
+#You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0 
+#
+#Unless required by applicable law or agreed to in writing, software 
+#distributed under the License is distributed on an "AS IS" BASIS, 
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+#See the License f181or the specific language governing permissions and 
+#limitations under the License.
+#++
+require 'digest/sha2'
 #---
 # @TODO@
 # RFC4033, section 7
@@ -599,7 +615,7 @@ module Dnsruby
       if (sigrec.algorithm == Algorithms.RSASHA1)
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA1.new, sigrec.signature, sig_data)
       elsif (sigrec.algorithm == Algorithms.RSASHA256)
-        verified = keyrec.public_key.verify(OpenSSL::Digest::SHA256.new, sigrec.signature, sig_data)
+        verified = keyrec.public_key.verify(Digest::SHA256.new, sigrec.signature, sig_data)
       else
         raise RuntimeError.new("Algorithm #{sigrec.algorithm.code} unsupported by Dnsruby")
       end

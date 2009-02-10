@@ -14,6 +14,7 @@
 #limitations under the License.
 #++
 require 'base64'
+require 'digest/sha2'
 module Dnsruby
   class RR
     #RFC4034, section 4
@@ -118,7 +119,7 @@ module Dnsruby
             digestbin = OpenSSL::Digest::SHA1.digest(data)
             return digestbin
         elsif (digest_type.code == 2) 
-            digestbin = OpenSSL::Digest::SHA256.digest(data)
+            digestbin = Digest::SHA256.digest(data)
             return digestbin
         end
 
