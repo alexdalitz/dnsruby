@@ -188,8 +188,10 @@ module Dnsruby
         msg, bytes = get_incoming_data(socket, udp_packet_size)
         if (msg!=nil)
           # Check that the IP we received from was the IP we sent to!
-          if ((msg.answerip != query_settings.dest_server) && 
-                (msg.answerfrom != query_settings.dest_server))
+          answerip = msg.answerip.downcase
+          answerfrom = msg.answerfrom.downcase
+          if ((answerip != query_settings.dest_server.downcase) && 
+                (answerfrom != query_settings.dest_server.downcase))
             Dnsruby.log.warn("Unsolicited response received from #{answerip}")
           else 
             send_response_to_client(msg, bytes, socket)

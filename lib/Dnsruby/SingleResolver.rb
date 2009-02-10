@@ -370,7 +370,8 @@ module Dnsruby
           if (use_tcp) 
             socket = TCPSocket.new(@server, @port, @src_address, src_port)
           else
-            socket = UDPSocket.new()
+            ipv6 = @src_address =~ /:/
+            socket = UDPSocket.new(ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
             socket.bind(@src_address, src_port)
             socket.connect(@server, @port)
           end
