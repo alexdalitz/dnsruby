@@ -142,7 +142,7 @@ module Dnsruby
         if (has_observer && (timeout > tick_time))
           timeout = tick_time
         end
-#        next if (timeout < 0)
+        #        next if (timeout < 0)
         begin
           ready, write, errors = IO.select(sockets, nil, nil, timeout)
         rescue SelectWakeup
@@ -173,8 +173,8 @@ module Dnsruby
       # @todo@ Process errors [can we do this in single socket environment?]
     end
     
-#        @@query_hash[query_settings.client_query_id]=query_settings
-#        @@socket_hash[query_settings.socket]=[query_settings.client_query_id] # @todo@ If we use persistent sockets then we need to update this array
+    #        @@query_hash[query_settings.client_query_id]=query_settings
+    #        @@socket_hash[query_settings.socket]=[query_settings.client_query_id] # @todo@ If we use persistent sockets then we need to update this array
     def process_ready(ready)
       ready.each do |socket|
         query_settings = nil
@@ -270,7 +270,12 @@ module Dnsruby
     def tcp_read(socket, len)
       buf=""
       while (buf.length < len) do
-        buf += socket.recv(len-buf.length)
+        input = socket.recv(len-buf.length) 
+        if (input=="")
+          TheLog.info("Bad response from server - no bytes read - ignoring")
+          return false
+        end
+        buf += input
       end
       return buf
     end
@@ -293,8 +298,16 @@ module Dnsruby
             answerport = @@query_hash[client_id].dest_port
           }
           buf = tcp_read(socket, 2)
+          if (!buf)
+            handle_recvfrom_failure(socket, "")          
+            return
+          end
           answersize = buf.unpack('n')[0]
           buf = tcp_read(socket,answersize)
+          if (!buf)
+            handle_recvfrom_failure(socket, "")          
+            return
+          end
         else
           if (ret = socket.recvfrom(packet_size))
             buf = ret[0]
@@ -424,7 +437,7 @@ module Dnsruby
     def remove_observer(client_queue, observer)
       @@mutex.synchronize {
         if (@@observers[client_queue]==observer)
-#          @@observers.delete(observer)
+          #          @@observers.delete(observer)
           @@observers.delete(client_queue)
         else
           Dnsruby.log.error{"remove_observer called with wrong observer for queue"}

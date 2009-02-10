@@ -165,4 +165,40 @@ class DnssecTest < Test::Unit::TestCase
     sleep(2)
     assert(Dnsruby::Dnssec.trust_anchors.length==0)
   end
+  
+  def test_tcp
+    #These queries work:
+    #		 dig @194.0.1.13 isoc.lu dnskey
+    #		 dig @194.0.1.13 isoc.lu dnskey +dnssec
+    #		 dig @194.0.1.13 isoc.lu dnskey +tcp
+    
+    #This one does not
+    #
+    #		 dig @194.0.1.13 isoc.lu dnskey +dnssec +tcp
+    r = Dnsruby::Resolver.new()# "194.0.1.13")
+        r.dnssec = true    
+        r.use_tcp = true
+    ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
+#    print ret.to_s+"\n"
+
+    r = Dnsruby::Resolver.new("194.0.1.13")
+    r.dnssec = true
+    #r.use_tcp = true
+    ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
+#    print ret.to_s+"\n"
+
+    r.use_tcp = true
+    r.dnssec = false
+    ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
+#    print ret.to_s+"\n"
+
+    r.dnssec = true    
+    begin
+    ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
+    rescue (Dnsruby::OtherResolvError)
+    end
+    print ret.to_s+"\n"
+
+    
+  end
 end
