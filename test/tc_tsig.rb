@@ -24,21 +24,21 @@ class TestTSig < Test::Unit::TestCase
     return (string == "; no data" || string == "; rdlength = 0")
   end
   def test_signed_update
-    Dnsruby::Resolver::use_eventmachine(false)
+#    Dnsruby::Resolver::use_eventmachine(false)
     run_test_client_signs
     run_test_resolver_signs
   end
-  def test_signed_update_em
-    begin
-      Dnsruby::Resolver::use_eventmachine(true)
-    rescue RuntimeError
-      Dnsruby.log.error("EventMachine not installed - not running tsig EM tests")
-      return 
-    end
-    run_test_client_signs
-    run_test_resolver_signs
-    Dnsruby::Resolver::use_eventmachine(false)
-  end
+#  def test_signed_update_em
+#    begin
+#      Dnsruby::Resolver::use_eventmachine(true)
+#    rescue RuntimeError
+#      Dnsruby.log.error("EventMachine not installed - not running tsig EM tests")
+#      return 
+#    end
+#    run_test_client_signs
+#    run_test_resolver_signs
+#    Dnsruby::Resolver::use_eventmachine(false)
+#  end
   
   def run_test_client_signs
     # NOTE - client signing is only appropriate if DNSSEC and EDNS are switched

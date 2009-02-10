@@ -31,11 +31,8 @@ module Dnsruby
   #*  Dnsruby::SingleResolver#query(name [, type [, klass]])
   #
   #=== Asynchronous
-  #These methods use a response queue, or an EventMachine::Deferrable
-  #to return the response and the error to the client. See Dnsruby::Resolver for 
-  #details of how to enable the EventMachine implementation.
-  #More information about the EventMachine implementation is available in the 
-  #EVENTMACHINE file in the Dnsruby distribution
+  #These methods use a response queue to return the response and the error to the client.
+  #Support for EventMachine has been deprecated
   #
   #*  Dnsruby::SingleResolver#send_async(...)
   #
@@ -238,7 +235,7 @@ module Dnsruby
     
     
     #Asynchronously send a Message to the server. The send can be done using just
-    #Dnsruby, or using EventMachine.
+    #Dnsruby. Support for EventMachine has been deprecated.
     # 
     #== Dnsruby pure Ruby event loop :
     # 
@@ -271,15 +268,6 @@ module Dnsruby
     #    id = res.send_async(msg, queue, id)
     #    id = res.send_async(msg, queue, id, use_tcp)
     #
-    #== If EventMachine is being used :
-    # 
-    #If EventMachine is being used (see Dnsruby::Resolver::use_eventmachine),then this method returns
-    #an EM::Deferrable object. If a queue (and ID) is passed in, then the response will also be 
-    #pushed to the Queue (as well as the deferrable completing).
-    #
-    #    deferrable = res.send_async(msg)
-    #    deferrable = res.send_async(msg, use_tcp)
-    #    deferrable = res.send_async(msg, q, id, use_tcp)
     def send_async(*args) # msg, client_queue, client_query_id, use_tcp=@use_tcp)
       # @TODO@ Need to select a good Header ID here - see forgery-resilience RFC draft for details
       msg = args[0]
@@ -311,50 +299,50 @@ module Dnsruby
         end
       end
       # Need to keep track of the request mac (if using tsig) so we can validate the response (RFC2845 4.1)
-      #Are we using EventMachine or native Dnsruby?
-      if (Resolver.eventmachine?)
-        return send_eventmachine(query_packet, msg, client_query_id, client_queue, use_tcp)
-      else
+#      #Are we using EventMachine or native Dnsruby?
+#      if (Resolver.eventmachine?)
+#        return send_eventmachine(query_packet, msg, client_query_id, client_queue, use_tcp)
+#      else
         if (!client_query_id)
           client_query_id = Time.now + rand(10000) # is this safe?!
         end
         send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
         return client_query_id
-      end
+#      end
     end
 
-    # This method sends the packet using EventMachine
-    def send_eventmachine(msg_bytes, msg, client_query_id, client_queue, use_tcp, client_deferrable=nil, packet_timeout = @packet_timeout) #:nodoc: all
-      start_time = Time.now
-      if (!client_deferrable)
-        client_deferrable = EventMachine::DefaultDeferrable.new
-      end
-      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_address=>@src_address, :src_port=>get_next_src_port, :use_tcp=>use_tcp)
-      packet_deferrable.callback { |response, response_bytes|
-        ret = true
-        if (response.header.tc && !use_tcp && !@ignore_truncation)
-          # Try to resend over tcp
-          Dnsruby.log.debug{"Truncated - resending over TCP"}
-          send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
-        else
-          if (!check_tsig(msg, response, response_bytes))
-            send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
-            return
-          end
-          client_deferrable.set_deferred_status :succeeded, response
-          if (client_queue)
-            client_queue.push([client_query_id, response, nil])
-          end
-        end
-      }
-      packet_deferrable.errback { |response, error|
-        client_deferrable.set_deferred_status :failed, response, error
-        if (client_queue)
-          client_queue.push([client_query_id, response, error])
-        end
-      }
-      return client_deferrable
-    end
+#    # This method sends the packet using EventMachine
+#    def send_eventmachine(msg_bytes, msg, client_query_id, client_queue, use_tcp, client_deferrable=nil, packet_timeout = @packet_timeout) #:nodoc: all
+#      start_time = Time.now
+#      if (!client_deferrable)
+#        client_deferrable = EventMachine::DefaultDeferrable.new
+#      end
+#      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_address=>@src_address, :src_port=>get_next_src_port, :use_tcp=>use_tcp)
+#      packet_deferrable.callback { |response, response_bytes|
+#        ret = true
+#        if (response.header.tc && !use_tcp && !@ignore_truncation)
+#          # Try to resend over tcp
+#          Dnsruby.log.debug{"Truncated - resending over TCP"}
+#          send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
+#        else
+#          if (!check_tsig(msg, response, response_bytes))
+#            send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
+#            return
+#          end
+#          client_deferrable.set_deferred_status :succeeded, response
+#          if (client_queue)
+#            client_queue.push([client_query_id, response, nil])
+#          end
+#        end
+#      }
+#      packet_deferrable.errback { |response, error|
+#        client_deferrable.set_deferred_status :failed, response, error
+#        if (client_queue)
+#          client_queue.push([client_query_id, response, error])
+#        end
+#      }
+#      return client_deferrable
+#    end
 
     # This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
     def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp) #:nodoc: all

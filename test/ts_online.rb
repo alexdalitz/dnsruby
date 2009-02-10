@@ -94,19 +94,19 @@ if (online)
       require "test/tc_dnssec.rb"
     end
 
-    have_em = false
-    begin
-      require 'eventmachine'
-      have_em = true
-    rescue LoadError => e
-      puts "----------------------------------------"
-      puts "EventMachine not installed - skipping test"
-      puts "----------------------------------------"
-    end
-    if (have_em)
-      require 'test/tc_event_machine_single_res.rb'
-      require 'test/tc_event_machine_res.rb'
-      require 'test/tc_event_machine_deferrable.rb'
-    end
+#    have_em = false
+#    begin
+#      require 'eventmachine'
+#      have_em = true
+#    rescue LoadError => e
+#      puts "----------------------------------------"
+#      puts "EventMachine not installed - skipping test"
+#      puts "----------------------------------------"
+#    end
+#    if (have_em)
+#      require 'test/tc_event_machine_single_res.rb'
+#      require 'test/tc_event_machine_res.rb'
+#      require 'test/tc_event_machine_deferrable.rb'
+#    end
   end
 end
