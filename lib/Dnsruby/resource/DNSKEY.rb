@@ -28,6 +28,9 @@ module Dnsruby
       ClassValue = nil #:nodoc: all
       TypeValue = Types::DNSKEY #:nodoc: all
       
+      #Key is revoked
+      REVOKED_KEY = 0x80
+      
       #Key is a zone key
       ZONE_KEY = 0x100
 
@@ -72,6 +75,19 @@ module Dnsruby
         end        
       end
       
+      def revoked=(on)
+        print "setting revoke"
+        if (on)
+          @flags |= REVOKED_KEY
+        else
+          @flags &= (~REVOKED_KEY)
+        end
+      end
+      
+      def revoked?
+        return ((@flags & REVOKED_KEY) > 0)
+      end
+
       def zone_key=(on)
         if (on)
           @flags |= ZONE_KEY
@@ -81,7 +97,7 @@ module Dnsruby
       end
       
       def zone_key?
-        return @flags & ZONE_KEY
+        return ((@flags & ZONE_KEY) > 0)
       end
       
       def sep_key=(on)
@@ -93,30 +109,29 @@ module Dnsruby
       end
       
       def sep_key?
-        return @flags & SEP_KEY
+        return ((@flags & SEP_KEY) > 0)
       end
       
       def flags=(f)
-        # Only two values allowed - 
+        # Only three values allowed - 
         # Zone Key flag (bit 7)
         # Secure Entry Point flag (bit 15)
-        if ((f & ~ZONE_KEY & ~SEP_KEY) > 0)
+        # Revoked but (bit 8) - RFC 5011
+        if ((f & ~ZONE_KEY & ~SEP_KEY && ~REVOKED_KEY) > 0)
           TheLog.info("DNSKEY: Only zone key and secure entry point flags allowed for DNSKEY" +
               " (RFC4034 section 2.1.1) : #{f} entered as input")
         end
 
-        #        # Only look at bits 7 and 15
-        #        @flags = ((f & ZONE_KEY) | (f & SEP_KEY))
         @flags = f
       end
       
-      def bad_flags?
-        if ((@flags & ~ZONE_KEY & ~SEP_KEY) > 0)
-          return true
-        end
-        return false
-      end
-      
+#      def bad_flags?
+#        if ((@flags & ~ZONE_KEY & ~SEP_KEY) > 0)
+#          return true
+#        end
+#        return false
+#      end
+#      
       def from_data(data) #:nodoc: all
         flags, protocol, algorithm, @key = data
         self.flags=(flags)

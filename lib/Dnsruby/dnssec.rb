@@ -536,7 +536,7 @@ module Dnsruby
         return nil, nil
       end
       keys.each {|key|
-        if (key.bad_flags?)      
+        if ((key.revoked?)) # || (key.bad_flags?))
           next
         end
       
