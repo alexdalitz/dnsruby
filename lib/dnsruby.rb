@@ -90,14 +90,15 @@ require 'Dnsruby/TheLog'
 #* IPv6 is not supported.
 module Dnsruby
   
-      @@logger = Logger.new(STDOUT)
-      @@logger.level = Logger::FATAL
-      #Get the log for Dnsruby
-      #Use this to set the log level
-      #e.g. Dnsruby.log.level = Logger::INFO
-      def Dnsruby.log
-        @@logger
-      end
+  @@logger = Logger.new(STDOUT)
+  @@logger.level = Logger::FATAL
+  #Get the log for Dnsruby
+  #Use this to set the log level
+  #e.g. Dnsruby.log.level = Logger::INFO
+  def Dnsruby.log
+    @@logger
+  end
+      
   class OpCode < CodeMapper
     Query = 0        # RFC 1035
     IQuery = 1        # RFC 1035
@@ -358,7 +359,7 @@ module Dnsruby
     DSA        = 3
     ECC        = 4
     RSASHA1    = 5
-#    RSASHA256  = 
+    #    RSASHA256  = 
     INDIRECT   = 252
     PRIVATEDNS = 253
     PRIVATEOID = 254
@@ -513,7 +514,13 @@ module Dnsruby
     require 'Dnsruby/update'
     require 'Dnsruby/zone_transfer'
     require 'Dnsruby/dnssec'
+    require 'Dnsruby/Cache'
     
+    @@cache = Cache.new
+    def Dnsruby.cache # :nodoc:
+      return @@cache
+    end
+
     #Default Resolver to use for Dnsruby class methods
     DefaultResolver = self.new
     

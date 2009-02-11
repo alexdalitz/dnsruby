@@ -105,14 +105,14 @@ module Dnsruby
               " (RFC4034 section 2.1.1) : #{f} entered as input")
         end
 
-#        # Only look at bits 7 and 15
-#        @flags = ((f & ZONE_KEY) | (f & SEP_KEY))
-@flags = f
+        #        # Only look at bits 7 and 15
+        #        @flags = ((f & ZONE_KEY) | (f & SEP_KEY))
+        @flags = f
       end
       
       def bad_flags?
         if ((@flags & ~ZONE_KEY & ~SEP_KEY) > 0)
-           return true
+          return true
         end
         return false
       end
@@ -224,8 +224,10 @@ module Dnsruby
       
       def public_key
         if (@public_key==nil)
-          if (@algorithm == Algorithms.RSASHA1)
+          if @algorithm == Algorithms.RSASHA1
             @public_key = rsa_key
+          elsif @algorithm == Algorithms.DSA
+            @public_key = dsa_key
           end
         end
         # @TODO@ Support other key encodings!
@@ -246,25 +248,38 @@ module Dnsruby
           exponentLength = (key1<<8) + key1
           pos += 2
         end
-        exponent = get_num(@key[pos, exponentLength])
+        exponent = RR::get_num(@key[pos, exponentLength])
         pos += exponentLength
 
-        modulus = get_num(@key[pos, @key.length])
+        modulus = RR::get_num(@key[pos, @key.length])
 
-        key = OpenSSL::PKey::RSA.new
-        key.e = exponent
-        key.n = modulus
-        return key 
+        pkey = OpenSSL::PKey::RSA.new
+        pkey.e = exponent
+        pkey.n = modulus
+        return pkey 
       end
       
-      def get_num(bytes)
-        ret = 0
-        shift = (bytes.length-1) * 8
-        bytes.each_byte {|byte|
-          ret += byte.to_i << shift
-          shift -= 8
-        }
-        return ret
+      def dsa_key
+        t = @key[0]
+        t = t.getbyte(0) if t.class == String
+        pgy_len = t * 8 + 64
+        pos = 1
+        q = RR::get_num(@key[pos, 20])
+        pos += 20
+        p = RR::get_num(@key[pos, pgy_len])
+        pos += pgy_len
+        g = RR::get_num(@key[pos, pgy_len])
+        pos += pgy_len
+        y = RR::get_num(@key[pos, pgy_len])
+        pos += pgy_len
+        
+        pkey = OpenSSL::PKey::DSA.new
+        pkey.p = p
+        pkey.q = q
+        pkey.g = g
+        pkey.pub_key = y
+        
+        pkey
       end
     end 
   end

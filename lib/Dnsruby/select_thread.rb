@@ -412,6 +412,9 @@ module Dnsruby
       end
     end
     
+    def push_response_to_select(client_id, client_queue, msg)
+    end
+    
     def send_queued_exceptions
       exceptions = []
       @@mutex.synchronize{

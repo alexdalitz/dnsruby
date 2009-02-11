@@ -215,4 +215,39 @@ class DnssecTest < Test::Unit::TestCase
     message.send_raw = true
     res.send_message(message)
   end
+  
+  def test_dsa
+    # Let's check sources.org for DSA keys
+    Dnsruby::Dnssec.clear_trusted_keys
+    Dnsruby::Dnssec.clear_trust_anchors
+    res = Dnsruby::Resolver.new()
+    res.dnssec = true
+    message = Dnsruby::Message.new("sources.org", Dnsruby::Types.DNSKEY)
+    ret = res.send_message(message)
+    keys = ret.rrset("DNSKEY")
+    assert(keys && keys.length > 0)
+    dsa = nil
+    keys.each {|key|
+      if (key.algorithm == Dnsruby::Algorithms.DSA)
+        dsa = key
+      end
+    }
+    assert(dsa)
+    # Now do something with it
+    
+    message = Dnsruby::Message.new("sources.org", Dnsruby::Types.ANY)
+    response = res.send_message(message)
+    verified = 0
+    response.each_section {|sec|
+      sec.rrsets.each {|rs|
+        if (rs.sigs()[0].algorithm == Dnsruby::Algorithms.DSA &&
+            rs.sigs()[0].key_tag == dsa.key_tag)
+          ret = Dnsruby::Dnssec.verify_rrset(rs, keys)
+          assert(ret)
+          verified+=1
+        end
+      }
+    }
+    assert(verified > 0)
+  end
 end

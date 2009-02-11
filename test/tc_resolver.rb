@@ -9,7 +9,7 @@
 #
 #Unless required by applicable law or agreed to in writing, software 
 #distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either tmexpress or implied. 
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
@@ -142,7 +142,7 @@ class TestResolver < Test::Unit::TestCase
       res = Resolver.new({:nameserver => "10.0.1.128"})
       start=stop=0
       retry_times = retry_delay = packet_timeout= 10
-      query_timeout=1
+      query_timeout=2
       begin
         res.packet_timeout=packet_timeout
         res.retry_times=retry_times
@@ -166,7 +166,7 @@ class TestResolver < Test::Unit::TestCase
       res = Resolver.new({:nameserver => "10.0.1.128"})
       bad = SingleResolver.new("localhost")
       res.add_resolver(bad)
-      expected = 1
+      expected = 2
       res.query_timeout=expected    
       q = Queue.new
       start = Time.now

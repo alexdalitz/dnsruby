@@ -614,8 +614,19 @@ module Dnsruby
       verified = false
       if (sigrec.algorithm == Algorithms.RSASHA1)
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA1.new, sigrec.signature, sig_data)
-      elsif (sigrec.algorithm == Algorithms.RSASHA256)
-        verified = keyrec.public_key.verify(Digest::SHA256.new, sigrec.signature, sig_data)
+#      elsif (sigrec.algorithm == Algorithms.RSASHA256)
+#        verified = keyrec.public_key.verify(Digest::SHA256.new, sigrec.signature, sig_data)
+      elsif sigrec.algorithm == Algorithms.DSA
+        # we are ignoring T for now
+        # t = sigrec.signature[0]
+        # t = t.getbyte(0) if t.class == String
+        r = RR::get_num(sigrec.signature[1, 20])
+        s = RR::get_num(sigrec.signature[21, 20])
+        r_asn1 = OpenSSL::ASN1::Integer.new(r)
+        s_asn1 = OpenSSL::ASN1::Integer.new(s)
+
+        asn1 = OpenSSL::ASN1::Sequence.new([r_asn1, s_asn1]).to_der
+        verified = keyrec.public_key.verify(OpenSSL::Digest::DSS1.new, asn1, sig_data)
       else
         raise RuntimeError.new("Algorithm #{sigrec.algorithm.code} unsupported by Dnsruby")
       end

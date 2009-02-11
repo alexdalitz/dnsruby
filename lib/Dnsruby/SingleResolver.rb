@@ -285,11 +285,6 @@ module Dnsruby
           msg.header.cd = @dnssec # we'll do our own validation by default
         end
       end
-      query_packet = make_query_packet(msg, use_tcp)
-      if (udp_packet_size < query_packet.length)
-        Dnsruby.log.debug{"Query packet length exceeds max UDP packet size - using TCP"}
-        use_tcp = true
-      end
       if (args.length > 1)
         if (args[1].class==Queue)
           client_queue = args[1]
@@ -310,6 +305,25 @@ module Dnsruby
       #      else
       if (!client_query_id)
         client_query_id = Time.now + rand(10000) # is this safe?!
+      end
+      
+      # Only check the cache if it is not send_raw
+      if (!(msg.send_raw))
+        # Check the cache!!
+        c = Dnsruby.cache
+        lookup = c.lookup(msg.question()[0].qname, msg.question()[0].type)
+        if (lookup.length > 0)
+          # If we can find the answer, send it to the client straight away
+          # @TODO@ Post the result to the client using SelectThread
+          send_response_to_client_through_select(client_query_id, client_queue, answer, nil)
+          return client_query_id
+        end
+      end
+      # Otherwise, run the query
+      query_packet = make_query_packet(msg, use_tcp)
+      if (udp_packet_size < query_packet.length)
+        Dnsruby.log.debug{"Query packet length exceeds max UDP packet size - using TCP"}
+        use_tcp = true
       end
       send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
       return client_query_id
@@ -563,6 +577,9 @@ module Dnsruby
         send_async(query, client_queue, client_query_id, true)
         return false
       end
+      # @TODO@ Now cache response RRSets, if they are in bailiwick
+      # i.e. if it is a subdomain of the server it was served by
+      # @TODO@ ONLY cache the response if it is not send_raw
       return true
     end
     

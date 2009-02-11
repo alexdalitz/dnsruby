@@ -159,7 +159,8 @@ module Dnsruby
       end
       return false
     end
-    
+    alias eql? == # :nodoc:
+
     # Return a regular expression which matches any codes or strings from the CodeMapper.
     def self.regexp
       # Longest ones go first, so the regex engine will match AAAA before A, etc.

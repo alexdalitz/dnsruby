@@ -111,36 +111,6 @@ module Dnsruby
       return return_rrs
     end
 
-#    #Return a new RRset which contains the RRs from this
-#    #RRset into canonical order (RFC 4034 section 6)
-#    def sort_canonical
-#      #Make a list, for all the RRs, where each RR contributes 
-#      #the canonical RDATA encoding
-#      canonical_rrs = []
-#      self.rrs.each do |rr|
-#        data = MessageEncoder.new {|msg|
-#          msg.put_rr(rr, true)
-#        }.to_s
-#        canonical_rrs.push(data)
-#      end
-#      
-#      # Check there are no identical records - if there are duplicated entries
-#      # then remove them
-#      canonical_rrs.uniq!
-#      
-#      #Sort it (the absence of an octet sorts before a zero octet.)
-#      canonical_rrs.sort!
-#      
-#      return_rrs = RRSet.new
-#      canonical_rrs.each {|rr|
-#        MessageDecoder.new(rr) {|msg|
-#          new_rr = msg.get_rr
-#          return_rrs.add(new_rr)
-#        }
-#      }
-#      return return_rrs
-#    end
-    
     #Delete the RR from this RRSet
     def delete(rr)
       @rrs.delete(rr)
@@ -587,6 +557,15 @@ module Dnsruby
       end
     end
     
+    def self.get_num(bytes)
+      ret = 0
+      shift = (bytes.length-1) * 8
+      bytes.each_byte {|byte|
+        ret += byte.to_i << shift
+        shift -= 8
+      }
+      return ret
+    end
   end
 end  
 require 'Dnsruby/resource/domain_name'
