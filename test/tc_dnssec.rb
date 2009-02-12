@@ -238,8 +238,8 @@ class DnssecTest < Test::Unit::TestCase
     message = Dnsruby::Message.new("sources.org", Dnsruby::Types.ANY)
     response = res.send_message(message)
     verified = 0
-    response.each_section {|sec|
-      sec.rrsets.each {|rs|
+#    response.each_section {|sec|
+      response.answer.rrsets.each {|rs|
         if (rs.sigs()[0].algorithm == Dnsruby::Algorithms.DSA &&
             rs.sigs()[0].key_tag == dsa.key_tag)
           ret = Dnsruby::Dnssec.verify_rrset(rs, keys)
@@ -247,7 +247,7 @@ class DnssecTest < Test::Unit::TestCase
           verified+=1
         end
       }
-    }
+ #   }
     assert(verified > 0)
   end
 end
