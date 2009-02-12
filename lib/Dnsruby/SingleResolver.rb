@@ -563,11 +563,13 @@ module Dnsruby
       if (query.class == Update)
         # @TODO@!!
       else
-        if ((response.question[0].qname.labels != query.question[0].qname.labels) || 
+        if ((response.question.size == 0) ||
+            (response.question[0].qname.labels != query.question[0].qname.labels) || 
               (response.question[0].qtype != query.question[0].qtype) ||
               (response.question[0].qclass != query.question[0].qclass) ||
               (response.question.length != query.question.length) ||
               (response.header.id != query.header.id))
+          TheLog.info("Incorrect packet returned : #{response.to_s}")
           return false
         end
       end
