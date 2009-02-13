@@ -75,9 +75,9 @@ module Dnsruby
         def from_string(input)
           if (input.length > 0)
             names = input.split(" ")
-            @priority = names[0]
-            @weight = names[1]
-            @port = names[2]
+            @priority = names[0].to_i
+            @weight = names[1].to_i
+            @port = names[2].to_i
             if (names[3])
               @target = Name.create(names[3])
             end
