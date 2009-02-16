@@ -370,8 +370,10 @@ module Dnsruby
       st = SelectThread.instance
       socket = nil
       runnextportloop = true
+      numtries = 0
       while (runnextportloop)do
         begin
+          numtries += 1
           src_port = get_next_src_port
           if (use_tcp) 
             begin
@@ -401,8 +403,9 @@ module Dnsruby
             socket.close
           end          
           # Try again if the error was EADDRINUSE and a random source port is used
-          if ((e.class != Errno::EADDRINUSE) || 
-                ((e.class == Errno::EADDRINUSE) && (src_port == @src_port)))
+          # Maybe try a max number of times?
+          if ((e.class != Errno::EADDRINUSE) || (numtries > 50) ||
+                ((e.class == Errno::EADDRINUSE) && (src_port == @src_port[0])))
             err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
             Dnsruby.log.error{"#{err}"}
             st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
@@ -582,6 +585,7 @@ module Dnsruby
       # @TODO@ Now cache response RRSets, if they are in bailiwick
       # i.e. if it is a subdomain of the server it was served by
       # @TODO@ ONLY cache the response if it is not send_raw
+	  # @TODO@ Don't cache any packets with "*" in the query name! (RFC1034 sec 4.3.3)
       return true
     end
     
