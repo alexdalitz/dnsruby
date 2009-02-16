@@ -39,7 +39,7 @@ module Dnsruby
       def from_string(input) #:nodoc: all
         if (input.length > 0)
           names = input.split(" ")
-          @preference = names[0]
+          @preference = names[0].to_i
           @intermediate = Name.create(names[1])
         end
       end

@@ -801,7 +801,7 @@ module Dnsruby
       if (len.class == String)
         len = len.getbyte(0)
       end
-      raise DecodeError.new("limit exceeded\nlimit = #{@limit}, index = #{@index}, len = #{len}\n") if @limit < @index + 1 + len
+      raise DecodeError.new("limit exceeded\nlimit = #{@limit}, index = #{@index}, len = #{len}\n") if @limit < @index + 1 + (len ? len:0)
       d = @data[@index + 1, len]
       @index += 1 + len
       return d

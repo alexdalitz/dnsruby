@@ -50,8 +50,8 @@ module Dnsruby
       def from_string(input) #:nodoc: all
         if (input.length > 0)
           values = input.split(" ")
-          @order = values [0]
-          @preference = values [1]
+          @order = values [0].to_i
+          @preference = values [1].to_i
           @flags = values [2]
           @service = values [3]
           @regexp = values [4]

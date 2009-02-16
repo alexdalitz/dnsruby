@@ -259,4 +259,10 @@ class TestRR < Test::Unit::TestCase
       assert_equal(rr.to_s,   rr2.to_s, "#{type} - Parsing from string works")
     end
   end
+
+  def test_naptr
+    update = Update.new
+    update.add('example.com.','NAPTR', 3600, '1 0 "s" "SIP+D2T" "" _sip._tcp.example.com.')
+    update.encode
+  end
 end
