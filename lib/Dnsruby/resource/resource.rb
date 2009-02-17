@@ -111,6 +111,21 @@ module Dnsruby
       return return_rrs
     end
 
+    def ==(other)
+      return false unless other.instance_of?RRSet
+      return false if (other.sigs.length != self.sigs.length)
+      return false if (other.rrs.length != self.rrs.length)
+      return false if (other.ttl != self.ttl)
+      otherrrs = other.rrs
+      self.rrs.each {|rr|
+        return false if (!otherrrs.include?rr)
+      }
+      othersigs= other.sigs
+      self.sigs.each {|sigs|
+        return false if (!othersigs.include?sig)
+      }
+      return true
+    end
     #Delete the RR from this RRSet
     def delete(rr)
       @rrs.delete(rr)

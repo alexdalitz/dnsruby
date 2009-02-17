@@ -77,10 +77,10 @@ module Dnsruby
       end
       
       # Return an array of all the rrsets in the section
-      def rrsets
+      def rrsets(include_opt = false)
         ret = []
         each do |rr|
-          next if (rr.type == Types.OPT)
+          next if (!include_opt && rr.type == Types.OPT)
           found_rrset = false
           ret.each do |rrset|
             found_rrset = rrset.add(rr)
@@ -91,6 +91,15 @@ module Dnsruby
           end
         end
         return ret        
+      end
+      def ==(other)
+        return false unless (other.instance_of?Message::Section)
+        return false if (other.rrsets(true).length != self.rrsets(true).length)
+        otherrrsets = other.rrsets(true)
+        self.rrsets(true).each {|rrset|
+          return false unless otherrrsets.include?rrset
+        }
+        return true
       end
     end
     #Create a new Message. Takes optional name, type and class
@@ -197,10 +206,10 @@ module Dnsruby
     
     # Return a hash, with the section as key, and the RRSets in that
     # section as the data : {section => section_rrs}
-    def section_rrsets
+    def section_rrsets(include_opt = false)
       ret = {}
       ["answer", "authority", "additional"].each do |section|
-        ret[section] = self.send(section).rrsets
+        ret[section] = self.send(section).rrsets(include_opt)
       end  
       return ret      
     end

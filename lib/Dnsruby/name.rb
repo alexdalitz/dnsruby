@@ -98,6 +98,10 @@ module Dnsruby
     def absolute?
       return @absolute
     end
+
+    def absolute=(on) # :nodoc:
+      @absolute = on
+    end
     
     #Is this name a wildcard?
     def wild?

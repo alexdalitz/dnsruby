@@ -1,111 +1,113 @@
-#@TODO@ Max size for cache?
+# This class implements a cache.
+# It stores data under qname-qclass-qtype tuples.
+# Each tuple indexes a CacheData object (which
+# stores a Message, and an expiration).
+# If a new Message is stored to a tuple, it will
+# overwrite the previous Message.
+# When a Message is retrieved from the cache, the header
+# and ttls will be "fixed" - i.e. AA cleared, etc.
 
-#This class implements a cache, which stores both RRSets and negative responses. 
-#It respects ttl expiration - records are deleted from the cache after they expire
+
+
+#@TODO@ Max size for cache?
 require 'singleton'
 module Dnsruby
-  class Cache 
-    # How do we store the records?
-    # How about a hash of domain name -> hash2
-    # Each hash2 is type -> [expiration, data] where data is either RRSet or nil
-    class Negative
-      attr_accessor :type, :name, :soa
+  class Cache
+    @@cache = Hash.new
+    def Cache.cache
+      @@cache
     end
-    def initialize()
-      clear_cache
+    def Cache.add(message)
+      q = message.question[0]
+      key = CacheKey.new(q.qname, q.qtype, q.qclass).to_s
+      data = CacheData.new(message)
+      @@cache[key] = data
     end
-  
-    def clear_cache()
-      @rrsets = Hash.new
-      @negatives = Hash.new # Store.new # Do these have a ttl? Yes - the SOA minimum field (RFC 2308)
-    end
-  
-    def rrsets_for_domain(d)
-      domain = d.to_s.downcase
-      return @rrsets[domain]
-    end
-    def get_rrs_and_exps(domain, type_in)
-      type = Types.new(type_in).code
-      if (rrsets = rrsets_for_domain(domain))
-        if (type_rrs = rrsets[type])
-          # Check expiry
-          if (type_rrs[0]) < Time.now.to_i
-            delete_rrset(domain, type)
-            return nil
-          end
-          return type_rrs
-        else
-          return nil
-        end
-      else
+    # This method "fixes up" the response, so that the header and ttls are OK
+    # The resolver will still need to copy the flags and ID across from the query
+    def Cache.find(qname, qtype, qclass = Classes.IN)
+      qn = Name.create(qname)
+      qn.absolute = true
+      key = CacheKey.new(qn, qtype, qclass).to_s
+      data = @@cache[key]
+      if (!data)
         return nil
       end
+      if (data.expiration <= Time.now.to_i)
+        @@cache.delete(key)
+        return nil
+      end
+      return data.message
     end
-    def rrsets(domain, type)
-      type_rrs = get_rrs_and_exps(domain, type)
-      if (type_rrs)
-        return type_rrs[1]
-      else return nil
+    def Cache.delete(qname, qtype, qclass = Classes.IN)
+      key = CacheKey.new(qname, qtype, qclass)
+      @@cache.delete(key)
+    end
+    class CacheKey
+      attr_accessor :qname, :qtype, :qclass
+      def initialize(*args)
+        self.qclass = Classes.IN
+        if (args.length > 0)
+          self.qname = Name.create(args[0])
+          self.qname.absolute = true
+          if (args.length > 1)
+            self.qtype = Types.new(args[1])
+            if (args.length > 2)
+              self.qclass = Classes.new(args[2])
+            end
+          end
+        end
+      end
+      def to_s
+        return "#{qname.inspect} #{qclass} #{qtype}"
       end
     end
-    def rrset_expiration(domain, type)
-      type_rrs = get_rrs_and_exps(domain, type)
-      if (type_rrs)
-        return type_rrs[0]
-      else return nil
+    class CacheData
+      attr_reader :expiration
+      def message=(m)
+        @expiration = get_expiration(m)
+        @message = m
       end
-    end
-    def delete_rrset(domain, type)
-      (rrsets_for_domain(domain)).delete(type)
-    end
-    def add_rrset(r)
-      # Are we updating an existing entry? If so, then replace it if the expiration
-      # is later
-      rrs = rrsets(r.name, r.type)
-      r_expiration = Time.now.to_i + r.ttl
-      if (rrs && (rrset_expiration(r.name, r.type) < r_expiration))
-        # Overwrite it
-        rrsets_for_domain(r.name)[r.type.code] = [r_expiration, r]
-      elsif (!rrs)
-        # Create it
-        # See if we can get a hash for the name
-        rrsets_for_dom = rrsets_for_domain(r.name)
-        if (!rrsets_for_dom || !(rrsets_for_dom.instance_of?Hash))
-          @rrsets[r.name.to_s.downcase] = Hash.new
-          rrsets_for_dom = rrsets_for_domain(r.name)
-        end      
-        rrsets_for_dom[r.type.code] = [r_expiration, r]
+      def message
+        q = @message.question()[0]
+        m = Message.new(q.qname, q.qtype, q.qclass)
+        m.header.aa = false # Anything else to do here?
+        # Fix up TTLs!!
+        offset = (Time.now - @time_stored).to_i
+        sec_hash = @message.section_rrsets(true) # include the OPT record
+        sec_hash.each {|section, rrsets|
+          rrsets.each {|rrset|
+            rrset.ttl = rrset.ttl - offset
+            rrset.each { |rr|
+              m.send("add_"+section.to_s, rr)
+            }
+          }
+        }
+        return m
       end
-    end
-  
-    def neg_sets_for_domain
-    end
-    def add_negative()
-    
-    end
-    def negatives(name, type)
-      return []
-    end
-  
-  
-    # The main public lookup method.
-    # Either returns the valid RRSet, or a Negative
-    def lookup(n, t)
-      name = Name.create(n)
-      type = Types.new(t)
-      # Look up in the valid RRSets
-      if (rrsets = rrsets(name, type))
-        return rrsets
+      def get_expiration(m)
+        # Find the minimum ttl of any of the rrsets
+        min_ttl = 9999999
+        m.each_section {|section|
+          section.rrsets.each {|rrset|
+            if (rrset.ttl < min_ttl)
+              min_ttl = rrset.ttl
+            end
+          }
+        }
+        if (min_ttl == 9999999)
+          return 0
+        end
+        return (Time.now.to_i + min_ttl)
       end
-      # If no luck, then look up in the Negatives
-      if (negative = negatives(name, type))
-        return negative
+      def initialize(*args)
+        @expiration = 0
+        @time_stored = Time.now.to_i
+        self.message=(args[0])
       end
-      return nil
-    end
-  
-    def inspect
-      return "RRSets : #{@rrsets},\nNegatives #{@negatives}\n"
+      def to_s
+        return "#{self.message}"
+      end
     end
   end
 end
