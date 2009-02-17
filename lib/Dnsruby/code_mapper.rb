@@ -87,6 +87,7 @@ module Dnsruby
     
     def initialize(arg) #:nodoc: all
       if (arg.kind_of?String)
+        arg.gsub!("_", "-")
         if (@@stringsdown[self.class][arg.downcase] != nil)
           set_string(arg)
         else 

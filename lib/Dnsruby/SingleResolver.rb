@@ -310,9 +310,9 @@ module Dnsruby
       # Only check the cache if it is not send_raw
       if (!(msg.send_raw))
         # Check the cache!!
-        c = Dnsruby.cache
-        lookup = c.lookup(msg.question()[0].qname, msg.question()[0].type)
-        if (lookup.length > 0)
+        lookup = Cache.find(msg.question()[0].qname, msg.question()[0].type)
+        if (lookup)
+          # @TODO@ Fix up the header - ID and flags
           # If we can find the answer, send it to the client straight away
           # @TODO@ Post the result to the client using SelectThread
           send_response_to_client_through_select(client_query_id, client_queue, answer, nil)
