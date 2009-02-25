@@ -56,6 +56,7 @@ module Dnsruby
         @@observers = Hash.new
         @@tick_observers = []
         @@queued_exceptions=[]
+        @@queued_responses=[]
         #    end
         # Now start the select thread
         @@select_thread = Thread.new {
@@ -120,6 +121,7 @@ module Dnsruby
       while true do
         send_tick_to_observers
         send_queued_exceptions
+        send_queued_responses
         timeout = tick_time = 0.5 # We provide a timer service to various Dnsruby classes
         sockets=[]
         timeouts=[]
@@ -229,8 +231,9 @@ module Dnsruby
             remove_id(id)
             exception = msg.header.get_exception
             Dnsruby.log.debug{"Pushing response to client queue"}
-            client_queue.push([id, msg, exception])
-            notify_queue_observers(client_queue, id)
+            push_to_client(id, client_queue, msg, exception)
+            #            client_queue.push([id, msg, exception])
+            #            notify_queue_observers(client_queue, id)
           else
             # Sending query again - don't return response
           end
@@ -396,7 +399,7 @@ module Dnsruby
         client_queue = @@query_hash[client_id].client_queue
       }
       remove_id(client_id)
-      push_exception_to_client(client_id, client_queue, err, msg)
+      push_to_client(client_id, client_queue, msg, err)
     end
     
     def push_exception_to_select(client_id, client_queue, err, msg)
@@ -413,6 +416,19 @@ module Dnsruby
     end
     
     def push_response_to_select(client_id, client_queue, msg)
+      # This needs to queue the response TO THE SELECT THREAD, which then needs
+      # to send it out from its normal loop.
+      Dnsruby.log.debug{"Pushing response to client queue direct from resolver"}
+      @@mutex.synchronize{
+        @@queued_responses.push([client_id, client_queue, msg, nil])
+      }
+      # Make sure select loop is running!
+      if (@@select_thread && @@select_thread.alive?)
+      else
+        @@select_thread = Thread.new {
+          do_select
+        }
+      end
     end
     
     def send_queued_exceptions
@@ -424,16 +440,29 @@ module Dnsruby
       
       exceptions.each do |item|
         client_id, client_queue, err, msg = item
-        push_exception_to_client(client_id, client_queue, err, msg)
+        push_to_client(client_id, client_queue, msg, err)
       end
     end
     
-    def push_exception_to_client(client_id, client_queue, err, msg)
-      # Now push the exception on the queue
+    def send_queued_responses
+      responses = []
+      @@mutex.synchronize{
+        responses = @@queued_responses
+        @@queued_responses = []
+      }
+
+      responses.each do |item|
+        client_id, client_queue, msg, err = item
+        push_to_client(client_id, client_queue, msg, err)
+      end
+    end
+
+    def push_to_client(client_id, client_queue, msg, err)
+      # Now push the response/exception on the queue
       client_queue.push([client_id, msg, err])
       notify_queue_observers(client_queue, client_id)
     end
-    
+
     def add_observer(client_queue, observer)
       @@mutex.synchronize {
         @@observers[client_queue]=observer

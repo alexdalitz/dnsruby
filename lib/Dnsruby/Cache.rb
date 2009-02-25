@@ -14,34 +14,56 @@ require 'singleton'
 module Dnsruby
   class Cache
     @@cache = Hash.new
+    @@mutex = Mutex.new
     def Cache.cache
       @@cache
+    end
+    def Cache.clear()
+      @@mutex.synchronize {
+        @@cache = Hash.new
+      }
     end
     def Cache.add(message)
       q = message.question[0]
       key = CacheKey.new(q.qname, q.qtype, q.qclass).to_s
       data = CacheData.new(message)
-      @@cache[key] = data
+      @@mutex.synchronize {
+        if (@@cache[key])
+          TheLog.debug("CACHE REPLACE : #{q.qname}, #{q.qtype}\n")
+        else
+          TheLog.debug("CACHE ADD : #{q.qname}, #{q.qtype}\n")
+        end
+        @@cache[key] = data
+      }
     end
     # This method "fixes up" the response, so that the header and ttls are OK
     # The resolver will still need to copy the flags and ID across from the query
     def Cache.find(qname, qtype, qclass = Classes.IN)
+#      print "CACHE find : #{qname}, #{qtype}\n"
       qn = Name.create(qname)
       qn.absolute = true
       key = CacheKey.new(qn, qtype, qclass).to_s
-      data = @@cache[key]
-      if (!data)
-        return nil
-      end
-      if (data.expiration <= Time.now.to_i)
-        @@cache.delete(key)
-        return nil
-      end
-      return data.message
+      @@mutex.synchronize {
+        data = @@cache[key]
+        if (!data)
+#          print "CACHE lookup failed\n"
+          return nil
+        end
+        if (data.expiration <= Time.now.to_i)
+          @@cache.delete(key)
+          TheLog.debug("CACHE lookup stale\n")
+          return nil
+        end
+        m = data.message
+        TheLog.debug("CACHE found\n")
+        return m
+      }
     end
     def Cache.delete(qname, qtype, qclass = Classes.IN)
       key = CacheKey.new(qname, qtype, qclass)
-      @@cache.delete(key)
+      @@mutex.synchronize {
+        @@cache.delete(key)
+      }
     end
     class CacheKey
       attr_accessor :qname, :qtype, :qclass
@@ -66,22 +88,16 @@ module Dnsruby
       attr_reader :expiration
       def message=(m)
         @expiration = get_expiration(m)
-        @message = m
+        @message = Message.decode(m.encode)
       end
       def message
-        q = @message.question()[0]
-        m = Message.new(q.qname, q.qtype, q.qclass)
+        m = Message.decode(@message.encode)
         m.header.aa = false # Anything else to do here?
         # Fix up TTLs!!
         offset = (Time.now - @time_stored).to_i
-        sec_hash = @message.section_rrsets(true) # include the OPT record
-        sec_hash.each {|section, rrsets|
-          rrsets.each {|rrset|
-            rrset.ttl = rrset.ttl - offset
-            rrset.each { |rr|
-              m.send("add_"+section.to_s, rr)
-            }
-          }
+        m.each_resource {|rr|
+          next if rr.type == Types.OPT
+          rr.ttl = rr.ttl - offset
         }
         return m
       end

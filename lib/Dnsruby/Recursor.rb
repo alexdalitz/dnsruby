@@ -388,7 +388,10 @@ module Dnsruby
           #        packet = @resolver.query( name, type, klass )
           resolver = SingleResolver.new(levelns.to_s)
           begin
-            packet = resolver.query(name, type, klass)
+            # Should construct packet ourselves and clear RD bit
+            query = Message.new(name, type, klass)
+            query.header.rd = false
+            packet = resolver.send_message(query)
           rescue ResolvTimeout, IOError => e
             TheLog.debug(";; nameserver #{levelns.to_s} didn't respond\n")
             next

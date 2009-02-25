@@ -127,7 +127,6 @@ module Dnsruby
     #   p Resolv::Name.create("z").subdomain_of?(domain) #=> false
     #   p Resolv::Name.create("x.y.z.").subdomain_of?(domain) #=> false
     #   p Resolv::Name.create("w.z").subdomain_of?(domain) #=> false
-    #
     def subdomain_of?(other)
       raise ArgumentError, "not a domain name: #{other.inspect}" unless Name === other
       return false if @absolute != other.absolute?

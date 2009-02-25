@@ -55,4 +55,64 @@ class RrsetTest < Test::Unit::TestCase
     assert(rrset.num_sigs == 1)
     assert(rrset.rrs.length == 3)
   end
+
+  def test_real_rrset
+        uuencodedPacket = %w{
+7c 7d 81 80 00 01 00 02  00 0b 00 0d 03 6e 73 31
+03 6e 69 63 02 75 6b 00  00 ff 00 01 c0 0c 00 01
+00 01 00 02 a2 cc 00 04  c3 42 f0 82 c0 0c 00 1c
+00 01 00 02 88 93 00 10  2a 01 00 40 10 01 00 35
+00 00 00 00 00 00 00 02  c0 10 00 02 00 01 00 02
+a2 cc 00 06 03 6e 73 33  c0 10 c0 10 00 02 00 01
+00 02 a2 cc 00 06 03 6e  73 35 c0 10 c0 10 00 02
+00 01 00 02 a2 cc 00 02  c0 0c c0 10 00 02 00 01
+00 02 a2 cc 00 06 03 6e  73 32 c0 10 c0 10 00 02
+00 01 00 02 a2 cc 00 06  03 6e 73 62 c0 10 c0 10
+00 02 00 01 00 02 a2 cc  00 06 03 6e 73 64 c0 10
+c0 10 00 02 00 01 00 02  a2 cc 00 06 03 6e 73 34
+c0 10 c0 10 00 02 00 01  00 02 a2 cc 00 06 03 6e
+73 36 c0 10 c0 10 00 02  00 01 00 02 a2 cc 00 06
+03 6e 73 61 c0 10 c0 10  00 02 00 01 00 02 a2 cc
+00 06 03 6e 73 37 c0 10  c0 10 00 02 00 01 00 02
+a2 cc 00 06 03 6e 73 63  c0 10 c0 86 00 01 00 01
+00 02 96 62 00 04 d9 4f  a4 83 c0 54 00 01 00 01
+00 02 96 8e 00 04 d5 db  0d 83 c0 bc 00 01 00 01
+00 02 97 08 00 04 c2 53  f4 83 c0 bc 00 1c 00 01
+00 02 96 62 00 10 20 01  06 30 01 81 00 35 00 00
+00 00 00 00 00 83 c0 66  00 01 00 01 00 02 96 85
+00 04 d5 f6 a7 83 c0 ce  00 01 00 01 00 02 96 85
+00 04 d5 f8 fe 82 c0 f2  00 01 00 01 00 02 96 85
+00 04 d4 79 28 82 c0 e0  00 01 00 01 00 02 97 08
+00 04 cc 4a 70 2c c0 e0  00 1c 00 01 00 02 96 62
+00 10 20 01 05 02 d3 99  00 00 00 00 00 00 00 00
+00 44 c0 98 00 01 00 01  00 02 96 8e 00 04 cc 4a
+71 2c c1 04 00 01 00 01  00 02 96 9b 00 04 c7 07
+42 2c c0 aa 00 01 00 01  00 02 96 71 00 04 c7 07
+43 2c c0 aa 00 1c 00 01  00 02 96 62 00 10 20 01
+05 02 10 0e 00 00 00 00  00 00 00 00 00 44
+    }
+    uuencodedPacket.map!{|e| e.hex}
+    packetdata = uuencodedPacket.pack('c*')
+
+    message = Dnsruby::Message.decode(packetdata)
+#      message.additional.rrsets.each {|rr| print "RRSet : #{rr}\n"}
+        sec_hash = message.section_rrsets(true) # include the OPT record
+        sec_hash.each {|section, rrsets|
+          rrsets.each {|rrset|
+#              print "#{section} rrset : #{rrset}\n"
+            rrset.each { |rr|
+            }
+          }
+        }
+
+
+        sec_hash = message.section_rrsets(true) # include the OPT record
+        sec_hash.each {|section, rrsets|
+          rrsets.each {|rrset|
+#              print "#{section} rrset : #{rrset}\n"
+            rrset.each { |rr|
+            }
+          }
+        }
+  end
 end

@@ -63,11 +63,11 @@ module Dnsruby
       # Return the rrset of the specified type in this section
       def rrset(type, klass=Classes::IN)
         rrs = select{|rr| 
-          (type_ok = rr.type==type)
+          type_ok = (rr.type==type)
           if (rr.type == Types.RRSIG)
             type_ok = (rr.type_covered == type)
           end
-          type_ok && rr.klass == klass          
+          type_ok && (rr.klass == klass)
         }
         rrset = RRSet.new
         rrs.each do |rr|
@@ -80,7 +80,7 @@ module Dnsruby
       def rrsets(include_opt = false)
         ret = []
         each do |rr|
-          next if (!include_opt && rr.type == Types.OPT)
+          next if (!include_opt && (rr.type == Types.OPT))
           found_rrset = false
           ret.each do |rrset|
             found_rrset = rrset.add(rr)

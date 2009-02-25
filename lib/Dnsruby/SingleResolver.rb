@@ -307,20 +307,24 @@ module Dnsruby
         client_query_id = Time.now + rand(10000) # is this safe?!
       end
       
+      query_packet = make_query_packet(msg, use_tcp)
+
       # Only check the cache if it is not send_raw
-      if (!(msg.send_raw))
+      if (!(msg.send_raw) && (msg.class != Update))
         # Check the cache!!
-        lookup = Cache.find(msg.question()[0].qname, msg.question()[0].type)
-        if (lookup)
+        cachedanswer = Cache.find(msg.question()[0].qname, msg.question()[0].type)
+        if (cachedanswer)
+          TheLog.debug("Sending cached answer to client\n")
           # @TODO@ Fix up the header - ID and flags
+          cachedanswer.header.id = msg.header.id
           # If we can find the answer, send it to the client straight away
-          # @TODO@ Post the result to the client using SelectThread
-          send_response_to_client_through_select(client_query_id, client_queue, answer, nil)
+          # Post the result to the client using SelectThread
+          st = SelectThread.instance
+          st.push_response_to_select(client_query_id, client_queue, cachedanswer)
           return client_query_id
         end
       end
       # Otherwise, run the query
-      query_packet = make_query_packet(msg, use_tcp)
       if (udp_packet_size < query_packet.length)
         Dnsruby.log.debug{"Query packet length exceeds max UDP packet size - using TCP"}
         use_tcp = true
@@ -567,7 +571,7 @@ module Dnsruby
         # @TODO@!!
       else
         if ((response.question.size == 0) ||
-            (response.question[0].qname.labels != query.question[0].qname.labels) || 
+              (response.question[0].qname.labels != query.question[0].qname.labels) ||
               (response.question[0].qtype != query.question[0].qtype) ||
               (response.question[0].qclass != query.question[0].qclass) ||
               (response.question.length != query.question.length) ||
@@ -582,10 +586,20 @@ module Dnsruby
         send_async(query, client_queue, client_query_id, true)
         return false
       end
-      # @TODO@ Now cache response RRSets, if they are in bailiwick
-      # i.e. if it is a subdomain of the server it was served by
-      # @TODO@ ONLY cache the response if it is not send_raw
-	  # @TODO@ Don't cache any packets with "*" in the query name! (RFC1034 sec 4.3.3)
+      # ONLY cache the response if it is not send_raw (or an update response)
+      question = query.question()[0]
+      if ((!query.send_raw) && (query.class != Update) &&
+            (question.qtype != Types.AXFR) && (question.qtype != Types.IXFR) &&
+            (response.rcode == RCode.NOERROR) &&(!response.tsig) &&
+          (query.class != Update) &&
+           (response.header.ancount > 0))
+        ## @TODO@ What about TSIG-signed responses?
+        # Don't cache any packets with "*" in the query name! (RFC1034 sec 4.3.3)
+        if (!question.qname.to_s.include?"*")
+          # Now cache response RRSets
+          Cache.add(response);
+        end
+      end
       return true
     end
     

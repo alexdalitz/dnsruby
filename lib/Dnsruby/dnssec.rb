@@ -88,6 +88,8 @@ module Dnsruby
 
   class Dnssec
     # A class to cache trusted keys
+    # @TODO@ We also need to cache DS records! - use @@to_be_trusted_keys?
+    # @TODO@ Would then need some mechanism to mark TAR DS records as "permanent"
     class KeyCache #:nodoc: all
       # Cache includes expiration time for keys
       # Cache removes expired records
@@ -507,6 +509,7 @@ module Dnsruby
           tbtk.rrs.each {|ds|
             if (ds.check_key(key))
               @@trusted_keys.add_key_with_expiration(key, tbtk.sigs()[0].expiration)
+              # @TODO@ We might not want to delete the DS record if it is from a TAR
               @@to_be_trusted_keys.delete(tbtk)
             end
           }
