@@ -125,13 +125,13 @@ module Dnsruby
         @flags = f
       end
       
-#      def bad_flags?
-#        if ((@flags & ~ZONE_KEY & ~SEP_KEY) > 0)
-#          return true
-#        end
-#        return false
-#      end
-#      
+      #      def bad_flags?
+      #        if ((@flags & ~ZONE_KEY & ~SEP_KEY) > 0)
+      #          return true
+      #        end
+      #        return false
+      #      end
+      #
       def from_data(data) #:nodoc: all
         flags, protocol, algorithm, @key = data
         self.flags=(flags)
@@ -238,10 +238,12 @@ module Dnsruby
       end
       
       def public_key
-        if (@public_key==nil)
-          if @algorithm == Algorithms.RSASHA1
+        if (@public_key.nil?)
+          if [Algorithms.RSASHA1,
+              Algorithms.RSASHA1_NSEC3_SHA1].include?(@algorithm)
             @public_key = rsa_key
-          elsif @algorithm == Algorithms.DSA
+          elsif [Algorithms.DSA,
+              Algorithms.DSA_NSEC3_SHA1].include?(@algorithm)
             @public_key = dsa_key
           end
         end

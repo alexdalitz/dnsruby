@@ -615,11 +615,13 @@ module Dnsruby
       
       # Now calculate the signature
       verified = false
-      if (sigrec.algorithm == Algorithms.RSASHA1)
+      if [Algorithms.RSASHA1,
+          Algorithms.RSASHA1_NSEC3_SHA1].include?(sigrec.algorithm)
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA1.new, sigrec.signature, sig_data)
 #      elsif (sigrec.algorithm == Algorithms.RSASHA256)
 #        verified = keyrec.public_key.verify(Digest::SHA256.new, sigrec.signature, sig_data)
-      elsif sigrec.algorithm == Algorithms.DSA
+      elsif [Algorithms.DSA,
+          Algorithms.DSA_NSEC3_SHA1].include?(sigrec.algorithm)
         # we are ignoring T for now
         # t = sigrec.signature[0]
         # t = t.getbyte(0) if t.class == String

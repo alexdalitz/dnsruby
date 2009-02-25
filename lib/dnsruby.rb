@@ -365,9 +365,9 @@ module Dnsruby
     PRIVATEOID = 254
     update()
     # Referred to as Algoriths.DSA_NSEC3_SHA1
-    add_pair("DSA-NSEC3-SHA1", 131)
+    add_pair("DSA-NSEC3-SHA1", 6)
     # Referred to as Algoriths.RSASHA1_NSEC3_SHA1
-    add_pair("RSASHA1-NSEC3-SHA1", 133)
+    add_pair("RSASHA1-NSEC3-SHA1", 7)
   end  
   
   #An error raised while querying for a resource
