@@ -200,7 +200,7 @@ module Dnsruby
               bitmap.length.times do |i|
                 output[start+2+i] = bitmap[i]
               end
-           end
+            end
           end
           window += 1
           
@@ -210,6 +210,9 @@ module Dnsruby
             break
           end
         }
+        if (output[0].class == String)
+          output = output.force_encoding("ascii-8bit")
+        end
         return output
       end
 
