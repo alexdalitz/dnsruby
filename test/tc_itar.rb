@@ -7,7 +7,7 @@ class TestItar < Test::Unit::TestCase
   def test_itar
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
-    test_se(true)
+    run_test_se(true)
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
 
@@ -15,10 +15,10 @@ class TestItar < Test::Unit::TestCase
     load_itar()
 
     # Then try to validate some records in the published zones
-    test_se(false)
+    run_test_se(false)
   end
 
-  def test_se(should_fail)
+  def run_test_se(should_fail)
     res = Dnsruby::Resolver.new("a.ns.se")
     r = res.query("se", Dnsruby::Types.ANY)
     # Haven't configured key for this, so should fail
