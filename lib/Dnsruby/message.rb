@@ -59,6 +59,23 @@ module Dnsruby
   #      Dnsruby::Message#encode
   #      Dnsruby::Message::decode(data)
   class Message
+    # The security level (see RFC 4035 section 4.3)
+    class SecurityLevel
+       BOGUS = -2
+       INDETERMINATE = -1
+       UNCHECKED = 0
+       INSECURE = 1
+       SECURE = 2
+    end
+    # If dnssec is set on, then each message will have the security level set
+    # To find the precise error (if any), call Dnsruby::Dnssec::validate(msg) -
+    # the resultant exception will define the error.
+    attr_accessor :security_level
+    # If there was a problem verifying this message with DNSSEC, then securiy_error
+    # will hold a description of the problem. It defaults to ""
+    attr_accessor :security_error
+
+
     class Section < Array
       # Return the rrset of the specified type in this section
       def rrset(type, klass=Classes::IN)
@@ -122,6 +139,8 @@ module Dnsruby
       @answerfrom = nil
       @answerip = nil
       @send_raw = false
+      @security_level = SecurityLevel::UNCHECKED
+      @security_error = ""
       type = Types.A
       klass = Classes.IN
       if (args.length > 0)

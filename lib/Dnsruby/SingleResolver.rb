@@ -560,8 +560,10 @@ module Dnsruby
         if (@dnssec)
           begin 
             Dnssec.validate_with_query(query,response)
-          rescue (VerifyError)
-            return false # Send this info back to the client somehow?
+          rescue VerifyError => e
+            response.security_error = e.to_s
+            # Response security_level should already be set
+            return false
           end
         end
       end

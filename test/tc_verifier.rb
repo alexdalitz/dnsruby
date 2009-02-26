@@ -1,7 +1,7 @@
 require 'test/unit'
 require 'dnsruby'
 
-class DnssecTest < Test::Unit::TestCase
+class VerifierTest < Test::Unit::TestCase
   def test_follow_chain_of_trust
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
@@ -54,7 +54,7 @@ class DnssecTest < Test::Unit::TestCase
     res.dnssec = true
     r = res.query("se", Dnsruby::Types.ANY)    
     # See comment below
-    Dnsruby::Dnssec.add_trusted_key(r.answer.rrset('DNSKEY'))
+    Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset('DNSKEY'))
     nss = r.answer.rrset('NS')
     ret = Dnsruby::Dnssec.verify_rrset(nss)
     assert(ret, "Dnssec verification failed")    
@@ -69,7 +69,7 @@ class DnssecTest < Test::Unit::TestCase
     # This shouldn't be in the code - but the key is rotated by the .se registry
     # so we can't keep up with it in the test code.
     # Oh, for a signed root...
-    Dnsruby::Dnssec.add_trusted_key(r.answer.rrset('DNSKEY'))
+    Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset('DNSKEY'))
     ret = Dnsruby::Dnssec.verify(r)
     assert(ret, "Dnssec message verification failed")    
   end
@@ -107,16 +107,6 @@ class DnssecTest < Test::Unit::TestCase
     # @TODO@ Test other validation policies!!
   end
 
-  def test_resolver_cd_validation_fails
-    res = Dnsruby::Resolver.new("a.ns.se")
-    r = res.query("se", Dnsruby::Types.ANY)
-    # @TODO@ Check the response here
-    #    fail("Implement Resolver validation checking!")
-    print("Implement Resolver validation checking!")
-    # We wanna check with CD on and off, and make sure it fails/works
-    # need to remember to get resolver to validate iff cd on query is true
-  end
-  
   def test_trusted_key
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
@@ -155,7 +145,7 @@ class DnssecTest < Test::Unit::TestCase
     # Then wait a second or two, and check they are not available any more.
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
-    assert(Dnsruby::Dnssec.trusted_keys.length==0)
+    assert(Dnsruby::Dnssec.anchor_verifier.trusted_keys.length==0)
     trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
         :type => Dnsruby::Types.DNSKEY,
         :key=> "AQPJO6LjrCHhzSF9PIVV7YoQ8iE31FXvghx+14E+jsv4uWJR9jLrxMYm sFOGAKWhiis832ISbPTYtF8sxbNVEotgf9eePruAFPIg6ZixG4yMO9XG LXmcKTQ/cVudqkU00V7M0cUzsYrhc4gPH/NKfQJBC5dbBkbIXJkksPLv Fe8lReKYqocYP6Bng1eBTtkA+N+6mSXzCwSApbNysFnm6yfQwtKlr75p m+pd0/Um+uBkR4nJQGYNt0mPuw4QVBu1TfF5mQYIFoDYASLiDQpvNRN3 US0U5DEG9mARulKSSw448urHvOBwT9Gx5qF2NE4H9ySjOdftjpj62kjb Lmc8/v+z"
