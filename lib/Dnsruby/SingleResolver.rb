@@ -2,28 +2,28 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
-require 'Dnsruby/select_thread'
-require 'Dnsruby/iana_ports'
 module Dnsruby
+
   #== Dnsruby::SingleResolver
   #
-  # The SingleResolver class targets a single resolver, and controls the sending of a single 
-  # packet with a packet timeout. It performs no retries. Only two threads are used - the client 
+  # This class exists for legacy clients. New clients should use the Dnsruby::Resolver class.
+  # The SingleResolver class targets a single resolver, and controls the sending of a single
+  # packet with a packet timeout. It performs no retries. Only two threads are used - the client
   # thread and a select thread (which is reused across all queries).
-  # 
+  #
   #== Methods
-  # 
+  #
   #=== Synchronous
   #These methods raise an exception or return a response message with rcode==NOERROR
   #
@@ -36,117 +36,9 @@ module Dnsruby
   #
   #*  Dnsruby::SingleResolver#send_async(...)
   #
-  class SingleResolver
-    attr_accessor :packet_timeout
-    
-    # The port on the resolver to send queries to.
-    # 
-    # Defaults to 53
-    attr_accessor :port
-    
-    # Use TCP rather than UDP as the transport.
-    # 
-    # Defaults to false
-    attr_accessor :use_tcp
-    
-    # The TSIG record to sign/verify messages with
-    attr_reader :tsig
-    
-    # Don't worry if the response is truncated - return it anyway.
-    # 
-    # Defaults to false
-    attr_accessor :ignore_truncation
-    
-    # The source address to send queries from
-    # 
-    # Defaults to localhost
-    attr_accessor :src_address
-    
-    # Should the TCP socket persist between queries?
-    # 
-    # Defaults to false
-    attr_accessor :persistent_tcp
-    
-    # Should the UDP socket persist between queries?
-    # 
-    # Defaults to false
-    attr_accessor :persistent_udp
-    
-    # should the Recursion Desired bit be set on queries?
-    # 
-    # Defaults to true
-    attr_accessor :recurse
-    
-    # The max UDP packet size
-    # 
-    # Defaults to 512
-    attr_reader :udp_size
-    
-    # The address of the resolver to send queries to
-    attr_reader :server
-    
-    # Use DNSSEC for this SingleResolver
-    attr_reader :dnssec
-    DEFAULT_DNSSEC = false # @TODO@
-    
-    #Sets the TSIG to sign outgoing messages with.
-    #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
-    #Pass in nil to stop tsig signing.
-    #It is possible for client code to sign packets prior to sending - see
-    #Dnsruby::RR::TSIG#apply and Dnsruby::Message#sign
-    #Note that pre-signed packets will not be signed by SingleResolver.
-    #* res.tsig=(tsig_rr)
-    #* res.tsig=(key_name, key)
-    #* res.tsig=nil # Stop the resolver from signing
-    def tsig=(*args)
-      @tsig = SingleResolver.get_tsig(args)
-    end
-    
-    MIN_DNSSEC_UDP_SIZE = 1220
-    
-    def dnssec=(on)
-      @dnssec=on
-      if (on)
-        # Set the UDP size (RFC 4035 section 4.1)
-        if (udp_packet_size < MIN_DNSSEC_UDP_SIZE)
-          self.udp_size = MIN_DNSSEC_UDP_SIZE
-        end
-      end
-    end
-    
-    def SingleResolver.get_tsig(args)
-      tsig = nil
-      if (args.length == 1)
-        if (args[0])
-          if (args[0].instance_of?RR::TSIG)
-            tsig = args[0]
-          elsif (args[0].instance_of?Array)
-            tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1]})
-          end
-        else
-          #          Dnsruby.log.debug{"TSIG signing switched off"}
-          return nil
-        end
-      elsif (args.length ==2)
-        tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0], :key => args[1]})
-      else
-        raise ArgumentError.new("Wrong number of arguments to tsig=")
-      end
-      Dnsruby.log.info{"TSIG signing now using #{tsig.name}, key=#{tsig.key}"}
-      return tsig
-    end
-    
-    def udp_size=(size)
-      @udp_size = size
-    end
-    
-    def server=(server)
-      Dnsruby.log.debug{"SingleResolver setting server to #{server}"}
-      @server=Config.resolve_server(server)
-    end
-    
-    # Can take a hash with the following optional keys : 
-    # 
+  class SingleResolver < Resolver
+    # Can take a hash with the following optional keys :
+    #
     # * :server
     # * :port
     # * :use_tcp
@@ -162,8 +54,10 @@ module Dnsruby
     def initialize(*args)
       arg=args[0]
       @packet_timeout = Resolver::DefaultPacketTimeout
+      @query_timeout = @packet_timeout
       @port = Resolver::DefaultPort
       @udp_size = Resolver::DefaultUDPSize
+      @dnssec = Resolver::DefaultDnssec
       @use_tcp = false
       @tsig = nil
       @ignore_truncation = false
@@ -172,509 +66,59 @@ module Dnsruby
       @recurse = true
       @persistent_udp = false
       @persistent_tcp = false
-      @dnssec = DEFAULT_DNSSEC
-      
-      seen_dnssec = false
-      
+      @retry_times = 1
+      @retry_delay = 0
+      @single_resolvers = []
+
       if (arg==nil)
         # Get default config
         config = Config.new
         @server = config.nameserver[0]
       elsif (arg.kind_of?String)
         @server=arg
+      elsif (arg.kind_of?Name)
+        @server=arg
       elsif (arg.kind_of?Hash)
         arg.keys.each do |attr|
           begin
             send(attr.to_s+"=", arg[attr])
-            if (attr.to_s == "dnssec")
-              seen_dnssec = true
-            end
           rescue Exception
             Dnsruby.log.error{"Argument #{attr} not valid\n"}
           end
           #        end
         end
       end
-      if (!seen_dnssec) 
-        @dnssec = DEFAULT_DNSSEC
-      end
-      #Check server is IP
-      @server=Config.resolve_server(@server)
-      
-    end
-    
-    def close
-      # @TODO@ What about closing?
-      # Any queries to complete? Sockets to close?
-    end
-    
-    # Synchronously send a query for the given name. The type will default to A, 
-    # and the class to IN.
-    def query(name, type=Types.A, klass=Classes.IN, set_cd=@dnssec)
-      msg = make_query(name, type, klass, set_cd)
-      return send_message(msg)
-    end
-    
-    
-    # Synchronously send a Message to the server. If a valid response is returned, 
-    # then that is returned to the client. Otherwise a ResolvError or ResolvTimeout 
-    # will be thrown. 
-    # 
-    # Takes the message to send, and an optional use_tcp parameter which defaults to
-    # SingleResolver.use_tcp
-    def send_message(msg, use_tcp=@use_tcp)
-      q = Queue.new
-      send_async(msg, q, Time.now + rand(1000000), use_tcp)
-      id, reply, error = q.pop
-      if (error != nil)
-        raise error
-      else
-        return reply
-      end
-    end
-    
-    
-    #Asynchronously send a Message to the server. The send can be done using just
-    #Dnsruby. Support for EventMachine has been deprecated.
-    # 
-    #== Dnsruby pure Ruby event loop :
-    # 
-    #A client_queue is supplied by the client, 
-    #along with an optional client_query_id to identify the response. The client_query_id
-    #is generated, if not supplied, and returned to the client.
-    #When the response is known, the tuple
-    #(query_id, response_message, response_exception) is put in the queue for the client to process. 
-    # 
-    #The query is sent synchronously in the caller's thread. The select thread is then used to 
-    #listen for and process the response (up to pushing it to the client_queue). The client thread 
-    #is then used to retrieve the response and deal with it.
-    # 
-    #Takes :
-    # 
-    #* msg - the message to send
-    #* client_queue - a Queue to push the response to, when it arrives
-    #* client_query_id - an optional ID to identify the query to the client
-    #* use_tcp - whether to use TCP (defaults to SingleResolver.use_tcp)
-    # 
-    #Returns :
-    # 
-    #* client_query_id - to identify the query response to the client. This ID is
-    #generated if it is not passed in by the client
-    #
-    #If the native Dsnruby networking layer is being used, then this method returns the client_query_id
-    # 
-    #    id = res.send_async(msg, queue)
-    #    NOT SUPPORTED : id = res.send_async(msg, queue, use_tcp)
-    #    id = res.send_async(msg, queue, id)
-    #    id = res.send_async(msg, queue, id, use_tcp)
-    #
-    #Note that, if you wish to send packets with no additional checks being performed,
-    #then set the Message#send_raw option to true. Dnsruby will then leave the header 
-    #of the outgoing packet alone, and will not attempt to verify or validate any 
-    #DNSSEC-signed responses. TSIG will still be applied, if configured.
-    #Note that this option should not normally be used!
-    def send_async(*args) # msg, client_queue, client_query_id, use_tcp=@use_tcp)
-      # @TODO@ Need to select a good Header ID here - see forgery-resilience RFC draft for details
-      msg = args[0]
-      client_query_id = nil
-      client_queue = nil
-      use_tcp = @use_tcp
-      if (msg.kind_of?String)
-        msg = Message.new(msg)
-        if (@dnssec)
-          msg.header.cd = @dnssec # we'll do our own validation by default
-        end
-      end
-      if (args.length > 1)
-        if (args[1].class==Queue)
-          client_queue = args[1]
-        elsif (args.length == 2)
-          use_tcp = args[1]
-        end
-        if (args.length > 2)
-          client_query_id = args[2]
-          if (args.length > 3)
-            use_tcp = args[3]
-          end
-        end
-      end
-      # Need to keep track of the request mac (if using tsig) so we can validate the response (RFC2845 4.1)
-      #      #Are we using EventMachine or native Dnsruby?
-      #      if (Resolver.eventmachine?)
-      #        return send_eventmachine(query_packet, msg, client_query_id, client_queue, use_tcp)
-      #      else
-      if (!client_query_id)
-        client_query_id = Time.now + rand(10000) # is this safe?!
-      end
-      
-      query_packet = make_query_packet(msg, use_tcp)
+            #Check server is IP
+#            @server=Config.resolve_server(@server)
+      isr = InternalResolver.new(*args)
+#      isr.server = @server
+      @single_resolvers = [isr]
 
-      # Only check the cache if it is not send_raw
-      if (!(msg.send_raw) && (msg.class != Update))
-        # Check the cache!!
-        cachedanswer = Cache.find(msg.question()[0].qname, msg.question()[0].type)
-        if (cachedanswer)
-          TheLog.debug("Sending cached answer to client\n")
-          # @TODO@ Fix up the header - ID and flags
-          cachedanswer.header.id = msg.header.id
-          # If we can find the answer, send it to the client straight away
-          # Post the result to the client using SelectThread
-          st = SelectThread.instance
-          st.push_response_to_select(client_query_id, client_queue, cachedanswer)
-          return client_query_id
-        end
-      end
-      # Otherwise, run the query
-      if (udp_packet_size < query_packet.length)
-        Dnsruby.log.debug{"Query packet length exceeds max UDP packet size - using TCP"}
-        use_tcp = true
-      end
-      send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
-      return client_query_id
-      #      end
+      #      ResolverRegister::register_single_resolver(self)
     end
 
-    #    # This method sends the packet using EventMachine
-    #    def send_eventmachine(msg_bytes, msg, client_query_id, client_queue, use_tcp, client_deferrable=nil, packet_timeout = @packet_timeout) #:nodoc: all
-    #      start_time = Time.now
-    #      if (!client_deferrable)
-    #        client_deferrable = EventMachine::DefaultDeferrable.new
-    #      end
-    #      packet_deferrable = EventMachineInterface.send(:msg=>msg_bytes, :timeout=>packet_timeout, :server=>@server, :port=>@port, :src_address=>@src_address, :src_port=>get_next_src_port, :use_tcp=>use_tcp)
-    #      packet_deferrable.callback { |response, response_bytes|
-    #        ret = true
-    #        if (response.header.tc && !use_tcp && !@ignore_truncation)
-    #          # Try to resend over tcp
-    #          Dnsruby.log.debug{"Truncated - resending over TCP"}
-    #          send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
-    #        else
-    #          if (!check_tsig(msg, response, response_bytes))
-    #            send_eventmachine(msg_bytes, msg, client_query_id, client_queue, true, client_deferrable, packet_timeout - (Time.now-start_time))
-    #            return
-    #          end
-    #          client_deferrable.set_deferred_status :succeeded, response
-    #          if (client_queue)
-    #            client_queue.push([client_query_id, response, nil])
-    #          end
-    #        end
-    #      }
-    #      packet_deferrable.errback { |response, error|
-    #        client_deferrable.set_deferred_status :failed, response, error
-    #        if (client_queue)
-    #          client_queue.push([client_query_id, response, error])
-    #        end
-    #      }
-    #      return client_deferrable
-    #    end
-
-    # This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
-    def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp) #:nodoc: all
-      endtime = Time.now + @packet_timeout
-      # First send the query (synchronously)
-      st = SelectThread.instance
-      socket = nil
-      runnextportloop = true
-      numtries = 0
-      while (runnextportloop)do
-        begin
-          numtries += 1
-          src_port = get_next_src_port
-          if (use_tcp) 
-            begin
-              socket = TCPSocket.new(@server, @port, @src_address, src_port)
-            rescue Errno::EBADF=> e
-              # Can't create a connection
-              err=IOError.new("TCP connection error to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
-              Dnsruby.log.error{"#{err}"}
-              st.push_exception_to_select(client_query_id, client_queue, err, nil)
-              return
-            end
-          else
-            socket = nil
-            # JRuby UDPSocket only takes 0 parameters - no IPv6 support in JRuby...
-            if (/java/ =~ RUBY_PLATFORM )
-              socket = UDPSocket.new()
-            else
-              ipv6 = @src_address =~ /:/
-              socket = UDPSocket.new(ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
-            end
-            socket.bind(@src_address, src_port)
-            socket.connect(@server, @port)
-          end
-          runnextportloop = false
-        rescue Exception => e
-          if (socket!=nil)
-            socket.close
-          end          
-          # Try again if the error was EADDRINUSE and a random source port is used
-          # Maybe try a max number of times?
-          if ((e.class != Errno::EADDRINUSE) || (numtries > 50) ||
-                ((e.class == Errno::EADDRINUSE) && (src_port == @src_port[0])))
-            err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
-            Dnsruby.log.error{"#{err}"}
-            st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
-            return
-          end
-        end
-      end
-      if (socket==nil)
-        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}")
-        Dnsruby.log.error{"#{err}"}
-        st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
-        return
-      end
-      Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}"}
-      begin
-        if (use_tcp)
-          lenmsg = [query_bytes.length].pack('n')
-          socket.send(lenmsg, 0)
-        end
-        socket.send(query_bytes, 0)
-      rescue Exception => e
-        socket.close
-        err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
-        Dnsruby.log.error{"#{err}"}
-        st.push_exception_to_select(client_query_id, client_queue, err, nil)
-        return
-      end
-      
-      # Then listen for the response
-      query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
-      # The select thread will now wait for the response and send that or a timeout
-      # back to the client_queue.
-      st.add_to_select(query_settings)
-    end
-    
-    # The source port to send queries from
-    # Returns either a single Fixnum or an Array
-    # e.g. "0", or "[60001, 60002, 60007]"
-    # 
-    # Defaults to 0 - random port
-    def src_port
-      if (@src_port.length == 1) 
-        return @src_port[0]
-      end
-      return @src_port
+    def server=(s)
+      isr = InternalResolver.new(s)
+      @single_resolvers = [isr]
     end
 
-    # Can be a single Fixnum or a Range or an Array
-    # If an invalid port is selected (one reserved by
-    # IANA), then an ArgumentError will be raised.
-    # 
-    #        res.src_port=0
-    #        res.src_port=[60001,60005,60010]
-    #        res.src_port=60015..60115
-    #
-    def src_port=(p)
-      @src_port=[]
-      add_src_port(p)
+    def server
+        return @single_resolvers[0].server
     end
-    
-    def SingleResolver.get_ports_from(p) 
-      a = []
-      if (p.class == Fixnum)
-        a = [p]
-      else
-        p.each do |x|
-          a.push(x)
-        end
-      end
-      return a      
+
+    def retry_times=(n) # :nodoc:
+      raise NoMethodError.new("SingleResolver does not have retry_times")
     end
-    
-    # Can be a single Fixnum or a Range or an Array
-    # If an invalid port is selected (one reserved by
-    # IANA), then an ArgumentError will be raised.
-    # "0" means "any valid port" - this is only a viable
-    # option if it is the only port in the list.
-    # An ArgumentError will be raised if "0" is added to
-    # an existing set of source ports.
-    # 
-    #        res.add_src_port(60000)
-    #        res.add_src_port([60001,60005,60010])
-    #        res.add_src_port(60015..60115)
-    #
-    def add_src_port(p)
-      if (SingleResolver.check_port(p, @src_port))
-        a = SingleResolver.get_ports_from(p)
-        a.each do |x|
-          if ((@src_port.length > 0) && (x == 0))
-            raise ArgumentError.new("src_port of 0 only allowed as only src_port value (currently #{@src_port.length} values")
-          end
-          @src_port.push(x)
-        end
-      end
+    def retry_delay=(n) # :nodoc:
+      raise NoMethodError.new("SingleResolver does not have retry_delay")
     end
-    
-    def SingleResolver.check_port(p, src_port=[])
-      if (p.class != Fixnum)
-        tmp_src_ports = Array.new(src_port)
-        p.each do |x|
-          if (!SingleResolver.check_port(x, tmp_src_ports))
-            return false
-          end
-          tmp_src_ports.push(x)
-        end
-        return true
-      end
-      if (SingleResolver.port_in_range(p))
-        if ((p == 0) && (src_port.length > 0))
-          return false
-        end
-        return true
-      else
-        Dnsruby.log.error("Illegal port (#{p})")
-        raise ArgumentError.new("Illegal port #{p}")
-      end
+
+    def packet_timeout=(t)
+      @packet_timeout = t
+      @query_timeout = t
     end
-    
-    def SingleResolver.port_in_range(p) 
-      if ((p == 0) || ((IANA_PORTS.index(p)) == nil && (p > 1024) && (p < 65535))) 
-        return true
+
+    alias :query_timeout :packet_timeout
+    alias :query_timeout= :packet_timeout=
       end
-      return false
-    end
-    
-    def get_next_src_port
-      #Different OSes have different interpretations of "random port" here.
-      #Apparently, Linux will just give you the same port as last time, unless it is still
-      #open, in which case you get n+1.
-      #We need to determine an actual (random) number here, then ask the OS for it, and
-      #continue until we get one.
-      if (@src_port[0] == 0)
-        candidate = -1
-        while (!(SingleResolver.port_in_range(candidate)))
-          candidate = (rand(65535-1024) + 1024)
-        end
-        return candidate        
-      end
-      pos = rand(@src_port.length)
-      return @src_port[pos]
-    end
-    
-    def check_response(response, response_bytes, query, client_queue, client_query_id, tcp)
-      if (!check_tsig(query, response, response_bytes))
-        return false
-      end
-      if (!query.send_raw)
-        if (@dnssec)
-          begin 
-            Dnssec.validate_with_query(query,response)
-          rescue VerifyError => e
-            response.security_error = e.to_s
-            # Response security_level should already be set
-            return false
-          end
-        end
-      end
-      # Should check that question section is same as question that was sent! RFC 5452
-      # If it's not an update...
-      if (query.class == Update)
-        # @TODO@!!
-      else
-        if ((response.question.size == 0) ||
-              (response.question[0].qname.labels != query.question[0].qname.labels) ||
-              (response.question[0].qtype != query.question[0].qtype) ||
-              (response.question[0].qclass != query.question[0].qclass) ||
-              (response.question.length != query.question.length) ||
-              (response.header.id != query.header.id))
-          TheLog.info("Incorrect packet returned : #{response.to_s}")
-          return false
-        end
-      end
-      if (response.header.tc && !tcp && !@ignore_truncation)
-        # Try to resend over tcp
-        Dnsruby.log.debug{"Truncated - resending over TCP"}
-        send_async(query, client_queue, client_query_id, true)
-        return false
-      end
-      # ONLY cache the response if it is not send_raw (or an update response)
-      question = query.question()[0]
-      if ((!query.send_raw) && (query.class != Update) &&
-            (question.qtype != Types.AXFR) && (question.qtype != Types.IXFR) &&
-            (response.rcode == RCode.NOERROR) &&(!response.tsig) &&
-          (query.class != Update) &&
-           (response.header.ancount > 0))
-        ## @TODO@ What about TSIG-signed responses?
-        # Don't cache any packets with "*" in the query name! (RFC1034 sec 4.3.3)
-        if (!question.qname.to_s.include?"*")
-          # Now cache response RRSets
-          Cache.add(response);
-        end
-      end
-      return true
-    end
-    
-    def check_tsig(query, response, response_bytes)
-      if (query.tsig)
-        if (response.tsig)
-          if !query.tsig.verify(query, response, response_bytes)
-            # Discard packet and wait for correctly signed response
-            Dnsruby.log.error{"TSIG authentication failed!"}
-            return false
-          end
-        else
-          # Treated as having format error and discarded (RFC2845, 4.6)
-          Dnsruby.log.error{"Expecting TSIG signed response, but got unsigned response - discarding"}
-          return false
-        end
-      elsif (response.tsig)
-        # Error - signed response to unsigned query
-        Dnsruby.log.error{"Signed response to unsigned query"}
-        return false
-      end      
-      return true
-    end
-    
-    def make_query(name, type = Types.A, klass = Classes.IN, set_cd=@set_cd)
-      msg = Message.new
-      msg.header.rd = 1
-      msg.add_question(name, type, klass)
-      if (@set_cd)
-        msg.header.cd = set_cd # We do our own validation by default
-      end
-      return msg
-    end
-    
-    # Prepare the packet for sending
-    def make_query_packet(packet, use_tcp = @use_tcp) #:nodoc: all
-      if (!packet.send_raw) # Don't mess with this packet!
-        if (packet.header.opcode == OpCode.QUERY || @recurse)
-          packet.header.rd=@recurse
-        end
-      
-        if (@dnssec)
-          # RFC 4035
-          Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize #{udp_packet_size} and DNS OK bit set\n"}
-          optrr = RR::OPT.new(udp_packet_size)   # Decimal UDPpayload
-          optrr.dnssec_ok=true
-              
-          packet.add_additional(optrr)
-        
-          packet.header.ad = false # RFC 4035 section 4.6
-        
-        elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
-          #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
-          Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}.\n"}
-          # RFC 3225
-          optrr = RR::OPT.new(udp_packet_size)
-        
-          packet.add_additional(optrr)
-        end
-      end
-      
-      if (@tsig && !packet.signed?)
-        @tsig.apply(packet)
-      end
-      return packet.encode
-    end
-    
-    # Return the packet size to use for UDP
-    def udp_packet_size
-      # if @udp_size > DefaultUDPSize then we use EDNS and 
-      # @udp_size should be taken as the maximum packet_data length
-      ret = (@udp_size > Resolver::DefaultUDPSize ? @udp_size : Resolver::DefaultUDPSize) 
-      return ret
-    end
-  end
 end

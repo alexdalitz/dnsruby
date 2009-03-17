@@ -42,7 +42,7 @@ module Dnsruby
     def self.create(arg)
       case arg
       when Name
-        return arg
+        return Name.new(arg.labels, arg.absolute?)
       when String
 #        arg.gsub!(/\.$/o, "")
         if (arg==".")
@@ -101,6 +101,11 @@ module Dnsruby
 
     def absolute=(on) # :nodoc:
       @absolute = on
+    end
+
+    def strip_label # :nodoc:
+        n = Name.new(self.labels()[1, self.labels.length-1], self.absolute?)
+        return n
     end
     
     #Is this name a wildcard?

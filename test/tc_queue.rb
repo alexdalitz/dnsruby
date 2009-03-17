@@ -5,13 +5,14 @@ class TestQueue < Test::Unit::TestCase
   def test_queue
     q = Queue.new
     r = Dnsruby::Resolver.new
-    timeout = 5
+#    Dnsruby::TheLog.level=Logger::DEBUG
+    timeout = 2
     num_queries = 1000
     r.query_timeout = timeout
     num_queries.times do |i| 
       r.send_async(Dnsruby::Message.new("example#{i}.com"), q, i)
     end
-    sleep(timeout * 1.5)
+    sleep(timeout * 2)
     assert(q.size == num_queries, "#{num_queries} expected, but got #{q.size}")
   end
 end

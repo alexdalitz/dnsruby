@@ -165,7 +165,7 @@ module Dnsruby
     
     def check_ns(ns) #:nodoc: all
       if !ns.kind_of?(Array) ||
-          !ns.all? {|n| (String === n || IPv4 === n || IPv6 === n)}
+          !ns.all? {|n| (Name === n || String === n || IPv4 === n || IPv6 === n)}
         raise ArgumentError.new("invalid nameserver config: #{ns.inspect}")
       end    
       ns.each_index do |i|
@@ -203,6 +203,9 @@ module Dnsruby
       # If it's an IP address, then use that for server
       # If it's a name, then we'll need to resolve it first
       server=ns
+      if (Name === ns)
+        ns = ns.to_s
+      end
       begin
         addr = IPv4.create(ns)
         server = ns

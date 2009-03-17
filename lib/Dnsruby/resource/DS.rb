@@ -127,7 +127,7 @@ module Dnsruby
       
       # Check if the key's digest is the same as that stored in the DS record      
       def check_key(key)
-        if (key.key_tag == @key_tag)
+        if ((key.key_tag == @key_tag) && (key.algorithm == @algorithm))
           
           digestbin = digest_key(key)
           if (@digestbin == digestbin)

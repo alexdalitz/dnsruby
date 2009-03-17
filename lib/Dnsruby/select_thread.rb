@@ -21,6 +21,7 @@ rescue LoadError
   require 'thread'
 end
 require 'singleton'
+require 'Dnsruby/validator_thread.rb'
 module Dnsruby
   Thread::abort_on_exception = true
   class SelectThread #:nodoc: all
@@ -33,9 +34,6 @@ module Dnsruby
     # calculated).
     # Note that a combination of the socket and the packet ID is
     # sufficient to uniquely identify the query to the select thread.
-    # But how do we identify it to the client thread?
-    # Push [id, response] onto the response queue?
-    # Or [id, timeout]
     # 
     # But how do we find the response queue for a particular query?
     # Hash of client_id->[query, client_queue, socket]
@@ -57,11 +55,14 @@ module Dnsruby
         @@tick_observers = []
         @@queued_exceptions=[]
         @@queued_responses=[]
+        @@queued_validation_responses=[]
         #    end
         # Now start the select thread
         @@select_thread = Thread.new {
           do_select
         }
+        #        # Start the validator thread
+        #        @@validator = ValidatorThread.instance
       }
     end
     
@@ -118,10 +119,15 @@ module Dnsruby
     
     def do_select
       unused_loop_count = 0
+      last_tick_time = Time.now - 10
       while true do
-        send_tick_to_observers
+        if (last_tick_time < (Time.now - 0.5))
+          send_tick_to_observers # ONLY NEED TO SEND THIS TWICE A SECOND - NOT EVERY SELECT!!!
+          last_tick_time = Time.now
+        end
         send_queued_exceptions
         send_queued_responses
+        send_queued_validation_responses
         timeout = tick_time = 0.5 # We provide a timer service to various Dnsruby classes
         sockets=[]
         timeouts=[]
@@ -231,7 +237,7 @@ module Dnsruby
             remove_id(id)
             exception = msg.header.get_exception
             Dnsruby.log.debug{"Pushing response to client queue"}
-            push_to_client(id, client_queue, msg, exception)
+            push_to_client(id, client_queue, msg, exception, query, res)
             #            client_queue.push([id, msg, exception])
             #            notify_queue_observers(client_queue, id)
           else
@@ -335,6 +341,7 @@ module Dnsruby
       begin
         ans = Message.decode(buf)
       rescue Exception => e
+#        print "DECODE ERROR\n"
         Dnsruby.log.error{"Decode error! #{e.class}, #{e}\nfor msg (length=#{buf.length}) : #{buf}"}
         client_id=get_client_id_from_answerfrom(socket, answerip, answerport)
         if (client_id != nil) 
@@ -399,7 +406,9 @@ module Dnsruby
         client_queue = @@query_hash[client_id].client_queue
       }
       remove_id(client_id)
-      push_to_client(client_id, client_queue, msg, err)
+      #      push_to_client(client_id, client_queue, msg, err)
+      client_queue.push([client_id, Resolver::EventType::ERROR, msg, err])
+      notify_queue_observers(client_queue, client_id)
     end
     
     def push_exception_to_select(client_id, client_queue, err, msg)
@@ -415,12 +424,12 @@ module Dnsruby
       end
     end
     
-    def push_response_to_select(client_id, client_queue, msg)
+    def push_response_to_select(client_id, client_queue, msg, query, res)
       # This needs to queue the response TO THE SELECT THREAD, which then needs
       # to send it out from its normal loop.
-      Dnsruby.log.debug{"Pushing response to client queue direct from resolver"}
+      Dnsruby.log.debug{"Pushing response to client queue direct from resolver or validator"}
       @@mutex.synchronize{
-        @@queued_responses.push([client_id, client_queue, msg, nil])
+        @@queued_responses.push([client_id, client_queue, msg, nil, query, res])
       }
       # Make sure select loop is running!
       if (@@select_thread && @@select_thread.alive?)
@@ -431,6 +440,22 @@ module Dnsruby
       end
     end
     
+    def push_validation_response_to_select(client_id, client_queue, msg, query, res)
+      # This needs to queue the response TO THE SELECT THREAD, which then needs
+      # to send it out from its normal loop.
+      Dnsruby.log.debug{"Pushing response to client queue direct from resolver or validator"}
+      @@mutex.synchronize{
+        @@queued_validation_responses.push([client_id, client_queue, msg, nil, query, res])
+      }
+      # Make sure select loop is running!
+      if (@@select_thread && @@select_thread.alive?)
+      else
+        @@select_thread = Thread.new {
+          do_select
+        }
+      end
+    end
+
     def send_queued_exceptions
       exceptions = []
       @@mutex.synchronize{
@@ -440,7 +465,9 @@ module Dnsruby
       
       exceptions.each do |item|
         client_id, client_queue, err, msg = item
-        push_to_client(client_id, client_queue, msg, err)
+        #        push_to_client(client_id, client_queue, msg, err)
+        client_queue.push([client_id, Resolver::EventType::ERROR, msg, err])
+        notify_queue_observers(client_queue, client_id)
       end
     end
     
@@ -452,15 +479,55 @@ module Dnsruby
       }
 
       responses.each do |item|
-        client_id, client_queue, msg, err = item
-        push_to_client(client_id, client_queue, msg, err)
+        client_id, client_queue, msg, err, query, res = item
+        #        push_to_client(client_id, client_queue, msg, err)
+        client_queue.push([client_id, Resolver::EventType::RECEIVED, msg, err])
+        notify_queue_observers(client_queue, client_id)
+        # @TODO@ Do we need to validate this? The response has come from the cache -
+        # validate it only if it has not been validated already
+        # So, if we need to validate it, send it to the validation thread
+        # Otherwise, send VALIDATED to the requester.
+        # Should we really just be checking (level != SECURE) ?
+        if ((msg.security_level == Message::SecurityLevel::UNCHECKED) ||
+              (msg.security_level == Message::SecurityLevel::INDETERMINATE))
+          validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
+          validator.run
+        else
+          client_queue.push([client_id, Resolver::EventType::VALIDATED, msg, err])
+          notify_queue_observers(client_queue, client_id)
+        end
       end
     end
 
-    def push_to_client(client_id, client_queue, msg, err)
-      # Now push the response/exception on the queue
-      client_queue.push([client_id, msg, err])
+    def send_queued_validation_responses
+      responses = []
+      @@mutex.synchronize{
+        responses = @@queued_validation_responses
+        @@queued_validation_responses = []
+      }
+
+      responses.each do |item|
+        client_id, client_queue, msg, err, query, res = item
+        #        push_to_client(client_id, client_queue, msg, err)
+        client_queue.push([client_id, Resolver::EventType::VALIDATED, msg, err])
+        notify_queue_observers(client_queue, client_id)
+      end
+    end
+
+    def push_to_client(client_id, client_queue, msg, err, query, res)
+      # @TODO@ Really need to let the client know that we have received a valid response!
+      # Can do that by calling notify_observers here, but with an identifier which
+      # defines the response to be a "Response received - validating. Please stop sending"
+      # type of response.
+      client_queue.push([client_id, Resolver::EventType::RECEIVED, msg, err])
       notify_queue_observers(client_queue, client_id)
+      #
+      # This method now needs to push the response to the validator,
+      # which will then take responsibility for delivering it to the client.
+      # The validator will need access to the queue observers -
+      validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
+      validator.run
+      #      @@validator.add_to_queue([client_id, client_queue, msg, err, query, self, res])
     end
 
     def add_observer(client_queue, observer)
@@ -479,6 +546,8 @@ module Dnsruby
           #          @@observers.delete(observer)
           @@observers.delete(client_queue)
         else
+          if (@@observers[client_queue] == nil)
+          end
           Dnsruby.log.error{"remove_observer called with wrong observer for queue"}
           raise ArgumentError.new("remove_observer called with wrong observer for queue")
         end
@@ -487,7 +556,7 @@ module Dnsruby
         end
       }
     end
-    
+
     def notify_queue_observers(client_queue, client_query_id)
       # If any observers are known for this query queue then notify them
       observer=nil

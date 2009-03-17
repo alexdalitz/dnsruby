@@ -222,7 +222,7 @@ module Dnsruby
     end
         
         
-    #This method is takes a code reference, which is then invoked each time a
+    #This method takes a code reference, which is then invoked each time a
     #packet is received during the recursive lookup.  For example to emulate
     #dig's C<+trace> function:
     #
@@ -253,7 +253,7 @@ module Dnsruby
     def query_dorecursion(name, type=Types.A, klass=Classes.IN)
           
       # Make sure the hint servers are initialized.
-      #      @hints=Hash.new unless @hints
+      # @TODO@ This should use a real Cache, which respects TTLs.
       self.hints=(Hash.new) unless @hints
       @resolver.recurse=(0)
       # Make sure the authority cache is clean.
@@ -264,7 +264,10 @@ module Dnsruby
       @authority_cache = Hash.new
                     
       # Seed name servers with hints
-      return _dorecursion( name, type, klass, ".", @hints, 0)
+      ret =  _dorecursion( name, type, klass, ".", @hints, 0)
+      Dnssec.validate(ret)
+      print "\n\nRESPONSE:\n#{ret}\n"
+      return ret
     end
         
     def _dorecursion(name, type, klass, known_zone, known_authorities, depth)
@@ -391,13 +394,14 @@ module Dnsruby
             # Should construct packet ourselves and clear RD bit
             query = Message.new(name, type, klass)
             query.header.rd = false
+            query.do_validation = false
+#            print "Sending msg from resolver, dnssec = #{resolver.dnssec}, do_validation = #{query.do_validation}\n"
             packet = resolver.send_message(query)
           rescue ResolvTimeout, IOError => e
             TheLog.debug(";; nameserver #{levelns.to_s} didn't respond\n")
             next
           end
-          if (packet)
-              
+          if (packet) # @TODO@ Check that the packet *is* actually authoritative!!
             if (@callback)
               @callback.call(packet)
             end

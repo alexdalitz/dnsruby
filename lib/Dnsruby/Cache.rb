@@ -89,9 +89,12 @@ module Dnsruby
       def message=(m)
         @expiration = get_expiration(m)
         @message = Message.decode(m.encode)
+        @message.cached = true
       end
       def message
         m = Message.decode(@message.encode)
+        m.cached = true
+        # @TODO@ What do we do about answerfrom, answersize, etc.?
         m.header.aa = false # Anything else to do here?
         # Fix up TTLs!!
         offset = (Time.now - @time_stored).to_i

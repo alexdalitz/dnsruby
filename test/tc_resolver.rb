@@ -164,8 +164,8 @@ class TestResolver < Test::Unit::TestCase
   def test_queue_packet_timeout
     if (!RUBY_PLATFORM=~/darwin/)
       res = Resolver.new({:nameserver => "10.0.1.128"})
-      bad = SingleResolver.new("localhost")
-      res.add_resolver(bad)
+#      bad = SingleResolver.new("localhost")
+      res.add_server("localhost")
       expected = 2
       res.query_timeout=expected    
       q = Queue.new
@@ -222,5 +222,9 @@ class TestResolver < Test::Unit::TestCase
     end
     assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])
     assert(res.single_resolvers[0].src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])    
+  end
+
+  def test_eventtype_api
+    # @TODO@ TEST THE Resolver::EventType interface!
   end
 end

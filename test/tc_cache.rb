@@ -9,14 +9,17 @@ class TestCache < Test::Unit::TestCase
     rr1 = RR.create("example.com.		3	IN	A	208.77.188.166")
     m1.add_answer(rr1)
     m1.header.aa = true
+    assert(!m1.cached)
     Cache.add(m1)
     ret = Cache.find("example.com", "A")
+    assert(ret.cached)
     assert(ret.answer == m1.answer, "#{m1.answer}end\n#{ret.answer}end" )
     assert(ret.answer.to_s == m1.answer.to_s, "#{m1.answer.to_s}end\n#{ret.answer.to_s}end" )
     assert(ret.header.aa == false)
     assert(ret.answer.rrsets()[0].ttl == 3)
     sleep(1)
     ret = Cache.find("example.com", "A")
+    assert(ret.cached)
     assert((ret.answer.rrsets()[0].ttl == 2) || (ret.answer.rrsets()[0].ttl == 1), "ttl = #{ret.answer.rrsets()[0].ttl}")
     assert(ret.answer != m1.answer, "ret.answer=#{ret.answer}\nm1.answer=#{m1.answer}" )
     assert(ret.header.aa == false)
@@ -30,6 +33,7 @@ class TestCache < Test::Unit::TestCase
     m2.header.aa = true
     Cache.add(m2)
     ret = Cache.find("example.com", "A")
+    assert(ret.cached)
     assert(ret.answer.rrsets()[0].ttl == 200)
   end
 
@@ -53,6 +57,7 @@ class TestCache < Test::Unit::TestCase
     query = Message.new("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
     ret = res.send_message(query)
 #    print "#{ret}\n"
+    assert(!ret.cached)
     assert(ret.rcode == RCode.NoError)
     assert(ret.header.aa)
     # Store the ttls
@@ -64,6 +69,7 @@ class TestCache < Test::Unit::TestCase
     ret = res.send_message(query)
 #    print "#{ret}\n"
     assert(ret.rcode == RCode.NoError)
+    assert(ret.cached)
     second_ttls = ret.answer.rrset(Types.TXT).ttl
     # make sure the ttl is less the time we waited
     assert((second_ttls == first_ttls - 1) || (second_ttls == first_ttls - 2),

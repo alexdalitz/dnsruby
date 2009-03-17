@@ -94,6 +94,8 @@ module Dnsruby
 
 
     class ValidationPolicy
+      # @TODO@ Could do this by getting client to add verifiers in the order they
+      # want them to be used. Could then dispense with all this logic
       # Note that any DLV registries which have been configured will only be tried
       # after both the root and any local trust anchors (RFC 5074 section 5)
       
@@ -119,21 +121,34 @@ module Dnsruby
     end
 
     @@root_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ROOT)
-    # @TODO@ Configure the root validator
 
     @@dlv_verifier = SingleVerifier.new(SingleVerifier::VerifierType::DLV)
-    # @TODO@ Configure the dlv validator
 
+    # @TODO@ Could add a new one of these fpr each anchor.
     @@anchor_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ANCHOR)
-    # @TODO@ Configure the anchor validator
-    # @TODO@ Should we be loading IANA Trust Anchor Repository?
+    # Should we be loading IANA Trust Anchor Repository? - no need - imported by ISC DLV
 
-    
+
+    # @TODO@ Should we provide methods like :
+#    def Dnssec.enable_isc_dlv
+#
+#    end
+#    def Dnssec.load_itar
+#
+#    end
+#    def Dnssec.load_tar(tar)
+#
+#    end
+    def Dnssec.add_dlv_key(dlv_key)
+      @@dlv_verifier.add_dlv_key(dlv_key)
+    end
     def Dnssec.add_trust_anchor(t)
-      @@anchor_verifier.add_trust_anchor(t)
+        # @TODO@ Create a new verifier?
+        @@anchor_verifier.add_trust_anchor(t)
     end
     # Add the 
     def self.add_trust_anchor_with_expiration(k, expiration)
+      # Create a new verifier?
       @@anchor_verifier.add_trust_anchor_with_expiration(k, expiration)
     end
     
@@ -167,55 +182,70 @@ module Dnsruby
     end
     
     def self.validate_with_query(query, msg)
+      # First, just check there is something to validate!
+      found_sigs = false
+      msg.each_resource {|rr|
+        if (rr.type == Types.RRSIG)
+          found_sigs = true
+        end
+      }
+      if (!found_sigs)
+        msg.security_level = Message::SecurityLevel.INSECURE
+        return true
+      end
+
+
       # SHOULD ALWAYS VERIFY DNSSEC-SIGNED RESPONSES?
       # Yes - if a trust anchor is configured. Otherwise, act on CD bit (in query)
+      TheLog.debug("Checking whether to validate, query.cd = #{query.header.cd}")
       if (((@@validation_policy > ValidationPolicy::ALWAYS_ROOT_ONLY) && (self.trust_anchors().length > 0)) ||
             # Check query here, and validate if CD is true
           (query.header.cd == true))
+        TheLog.debug("Starting validation")
 
         # Validate!
         # Need to think about trapping/storing exceptions and security_levels here
         last_error = ""
-        last_level = Message::SecurityLevel::BOGUS
-        last_error_level = Message::SecurityLevel::BOGUS
+        last_level = Message::SecurityLevel.BOGUS
+        last_error_level = Message::SecurityLevel.BOGUS
         if (@@validation_policy == ValidationPolicy::ALWAYS_LOCAL_ANCHORS_ONLY)
           last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
-            Proc.new{|m| validate_with_anchors(m)}, msg)
+            Proc.new{|m, q| validate_with_anchors(m, q)}, msg, query)
         elsif (@@validation_policy == ValidationPolicy::ALWAYS_ROOT_ONLY)
           last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
-            Proc.new{|m| validate_with_root(m)}, msg)
+            Proc.new{|m, q| validate_with_root(m, q)}, msg, query)
         elsif (@@validation_policy == ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT)
           last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level, 
-            Proc.new{|m| validate_with_anchors(m)}, msg)
-          if (last_level != Message::SecurityLevel::SECURE)
+            Proc.new{|m, q| validate_with_anchors(m, q)}, msg, query)
+          if (last_level != Message::SecurityLevel.SECURE)
             last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
-              Proc.new{|m| validate_with_root(m)}, msg)
+              Proc.new{|m, q| validate_with_root(m, q)}, msg, query)
           end
         elsif (@@validation_policy == ValidationPolicy::ROOT_THEN_LOCAL_ANCHORS)
           last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
-            Proc.new{|m| validate_with_root(m)}, msg)
-          if (last_level != Message::SecurityLevel::SECURE)
+            Proc.new{|m, q| validate_with_root(m, q)}, msg, query)
+          if (last_level != Message::SecurityLevel.SECURE)
             last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
-              Proc.new{|m| validate_with_anchors(m)}, msg)
+              Proc.new{|m, q| validate_with_anchors(m, q)}, msg, query)
           end
         end
-        if (last_level != Message::SecurityLevel::SECURE)
+        if (last_level != Message::SecurityLevel.SECURE)
           last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level, 
-            Proc.new{|m| validate_with_dlv(m)}, msg)
+            Proc.new{|m, q| validate_with_dlv(m, q)}, msg, query)
         end
         # Set the message security level!
         msg.security_level = last_level
         raise VerifyError.new(last_error) if (last_level < 0)
-        return (msg.security_level > Message::SecurityLevel::UNCHECKED)
+        return (msg.security_level.code > Message::SecurityLevel::UNCHECKED)
       end
-      msg.security_level = Message::SecurityLevel::UNCHECKED
+      msg.security_level = Message::SecurityLevel.UNCHECKED
       return true
     end
 
-    def self.try_validation(last_level, last_error, last_error_level, proc, msg)   # :nodoc:
+    def self.try_validation(last_level, last_error, last_error_level, proc, msg, query)   # :nodoc:
       begin
-        proc.call(msg)
-        last_level = [msg.security_level, last_level].max
+        proc.call(msg, query)
+        last_level = Message::SecurityLevel.new([msg.security_level.code, last_level].max)
       rescue VerifyError => e
         if (last_error_level < last_level)
           last_error = e.to_s
@@ -232,16 +262,16 @@ module Dnsruby
     # and validation out to SingleVerifiers (which can each do every type of validation,
     # but which will only be asked to do one type). i.e. DlvVerifier, RootVerifier,
     # AnchorVerifier, etc. Would you have one AnchorVerifier for each trust anchor?
-    def self.validate_with_anchors(msg)
-      return @@anchor_verifier.validate(msg)
+    def self.validate_with_anchors(msg, query)
+      return @@anchor_verifier.validate(msg, query)
     end
 
-    def self.validate_with_root(msg)
-      return @@root_verifier.validate(msg)
+    def self.validate_with_root(msg, query)
+      return @@root_verifier.validate(msg, query)
     end
 
-    def self.validate_with_dlv(msg)
-      return @@dlv_verifier.validate(msg)
+    def self.validate_with_dlv(msg, query)
+      return @@dlv_verifier.validate(msg, query)
     end
 
     def self.verify(msg)

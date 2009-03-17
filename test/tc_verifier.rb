@@ -2,49 +2,6 @@ require 'test/unit'
 require 'dnsruby'
 
 class VerifierTest < Test::Unit::TestCase
-  def test_follow_chain_of_trust
-    Dnsruby::Dnssec.clear_trusted_keys
-    Dnsruby::Dnssec.clear_trust_anchors
-    res = Dnsruby::Resolver.new("dnssec.nominet.org.uk")
-    res.udp_size = 5000
-    res.dnssec=true
-
-    trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
-        :type => Dnsruby::Types.DNSKEY,
-        :key=> "AQPJO6LjrCHhzSF9PIVV7YoQ8iE31FXvghx+14E+jsv4uWJR9jLrxMYm sFOGAKWhiis832ISbPTYtF8sxbNVEotgf9eePruAFPIg6ZixG4yMO9XG LXmcKTQ/cVudqkU00V7M0cUzsYrhc4gPH/NKfQJBC5dbBkbIXJkksPLv Fe8lReKYqocYP6Bng1eBTtkA+N+6mSXzCwSApbNysFnm6yfQwtKlr75p m+pd0/Um+uBkR4nJQGYNt0mPuw4QVBu1TfF5mQYIFoDYASLiDQpvNRN3 US0U5DEG9mARulKSSw448urHvOBwT9Gx5qF2NE4H9ySjOdftjpj62kjb Lmc8/v+z"
-      })
-    ret = Dnsruby::Dnssec.add_trust_anchor_with_expiration(trusted_key, Time.now.to_i + 500000)
-
-    r = res.query("uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-    ret = Dnsruby::Dnssec.verify(r)
-    assert(ret, "Dnssec verification failed")
-
-    r = res.query("www.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-    ret = Dnsruby::Dnssec.verify(r)
-    assert(ret, "Dnssec verification failed")
-
-    r = res.query("bigzone.uk-dnssec.nic.uk", Dnsruby::Types.DS)
-    ret = Dnsruby::Dnssec.verify(r)
-    assert(ret, "Dnssec verification failed")
-    
-    r = res.query("bigzone.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-    ret = Dnsruby::Dnssec.verify(r)
-    assert(ret, "Dnssec verification failed")
-    
-    r = res.query("aaa.bigzone.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-
-    rrset = r.authority.rrset('NSEC')
-    assert(rrset.rrs.length > 0)
-    assert(rrset.sigs.length > 0)
-    ret = Dnsruby::Dnssec.verify_rrset(rrset)
-    assert(ret, "Dnssec verification failed")
-
-    ret = Dnsruby::Dnssec.verify(r) # no DS record for aaa - validate should work
-    assert(ret, "Dnssec verification failed")
-    ret = Dnsruby::Dnssec.validate(r) # no DS record for aaa - validate should work
-    assert(ret, "Dnssec validation failed")
-
-  end
   
   def test_se_query
     # Run some queries on the .se zone
@@ -88,25 +45,6 @@ class VerifierTest < Test::Unit::TestCase
     #    assert(!ret, "Dnssec message verification failed")    
   end
   
-  def test_validation
-    Dnsruby::Dnssec.clear_trusted_keys
-    Dnsruby::Dnssec.clear_trust_anchors
-    res = Dnsruby::Resolver.new("dnssec.nominet.org.uk")
-    res.dnssec=true
-
-    trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
-        :type => Dnsruby::Types.DNSKEY,
-        :key=> "AQPJO6LjrCHhzSF9PIVV7YoQ8iE31FXvghx+14E+jsv4uWJR9jLrxMYm sFOGAKWhiis832ISbPTYtF8sxbNVEotgf9eePruAFPIg6ZixG4yMO9XG LXmcKTQ/cVudqkU00V7M0cUzsYrhc4gPH/NKfQJBC5dbBkbIXJkksPLv Fe8lReKYqocYP6Bng1eBTtkA+N+6mSXzCwSApbNysFnm6yfQwtKlr75p m+pd0/Um+uBkR4nJQGYNt0mPuw4QVBu1TfF5mQYIFoDYASLiDQpvNRN3 US0U5DEG9mARulKSSw448urHvOBwT9Gx5qF2NE4H9ySjOdftjpj62kjb Lmc8/v+z"
-      })
-    ret = Dnsruby::Dnssec.add_trust_anchor_with_expiration(trusted_key, Time.now.to_i + 5000)
-
-    r = res.query("aaa.bigzone.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-    ret = Dnsruby::Dnssec.validate(r)
-    assert(ret, "Dnssec validation failed")
-    
-    # @TODO@ Test other validation policies!!
-  end
-
   def test_trusted_key
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors

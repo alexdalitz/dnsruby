@@ -121,7 +121,7 @@ module Dnsruby
         return false if (!otherrrs.include?rr)
       }
       othersigs= other.sigs
-      self.sigs.each {|sigs|
+      self.sigs.each {|sig|
         return false if (!othersigs.include?sig)
       }
       return true
@@ -140,7 +140,10 @@ module Dnsruby
     end
     #Return the type of this RRSet
     def type
+      if (@rrs[0])
       return @rrs[0].type
+      end
+      return nil
     end
     #Return the klass of this RRSet
     def klass
@@ -349,10 +352,6 @@ module Dnsruby
       if rdata 
         rdata.gsub!(/\s+$/o, "")
       end
-      if name 
-        name.gsub!(/\.$/o, "");
-      end
-      
       
       # RFC3597 tweaks
       # This converts to known class and type if specified as TYPE###
@@ -431,7 +430,7 @@ module Dnsruby
       MessageDecoder.new(rdata) {|msg|
         record = get_class(rrtype, rrclass).decode_rdata(msg)
       }
-      record.name = name
+      record.name = Name.create(name)
       record.ttl = ttl
       record.type = rrtype
       record.klass = rrclass        
@@ -448,7 +447,7 @@ module Dnsruby
     def RR._get_subclass(name, rrtype, rrclass, ttl, rdata) #:nodoc: all
       return unless (rrtype!=nil)        
       record = get_class(rrtype, rrclass).new(rdata)        
-      record.name = name
+      record.name = Name.create(name)
       record.ttl = ttl
       record.type = rrtype
       record.klass = rrclass   

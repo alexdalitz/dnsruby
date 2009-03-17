@@ -60,12 +60,13 @@ module Dnsruby
   #      Dnsruby::Message::decode(data)
   class Message
     # The security level (see RFC 4035 section 4.3)
-    class SecurityLevel
-       BOGUS = -2
-       INDETERMINATE = -1
+    class SecurityLevel < CodeMapper
+       INDETERMINATE = -2
+       BOGUS = -1
        UNCHECKED = 0
        INSECURE = 1
        SECURE = 2
+       update()
     end
     # If dnssec is set on, then each message will have the security level set
     # To find the precise error (if any), call Dnsruby::Dnssec::validate(msg) -
@@ -74,6 +75,10 @@ module Dnsruby
     # If there was a problem verifying this message with DNSSEC, then securiy_error
     # will hold a description of the problem. It defaults to ""
     attr_accessor :security_error
+
+    # If the Message was returned from the cache, the cached flag will be set
+    # true. It will be false otherwise.
+    attr_accessor :cached
 
 
     class Section < Array
@@ -139,8 +144,11 @@ module Dnsruby
       @answerfrom = nil
       @answerip = nil
       @send_raw = false
-      @security_level = SecurityLevel::UNCHECKED
+      @do_validation = true
+      @do_caching = true
+      @security_level = SecurityLevel.UNCHECKED
       @security_error = ""
+      @cached = false
       type = Types.A
       klass = Classes.IN
       if (args.length > 0)
@@ -195,11 +203,21 @@ module Dnsruby
     
     #Set send_raw if you wish to send and receive the response to this Message 
     #with no additional processing. In other words, if set, then Dnsruby will 
-    #not touch the Header of the outgoing Message, nor will it attempt any
-    #verification/validation of incoming DNSSEC-signed messages. 
+    #not touch the Header of the outgoing Message. This option does not affect
+    #caching or dnssec validation
     #
     #This option should not normally be set.
     attr_accessor :send_raw
+
+    #do_validation is set by default. If you do not wish dnsruby to validate
+    #this message (on a Resolver with @dnssec==true), then set do_validation
+    #to false. This option does not affect caching, or the header options
+    attr_accessor :do_validation
+
+    #do_caching is set by default. If you do not wish dnsruby to inspect the
+    #cache before sending the query, nor cache the result of the query, then
+    #set do_caching to false.
+    attr_accessor :do_caching
 
     def ==(other)
       ret = false
@@ -371,6 +389,7 @@ module Dnsruby
       if (@answerfrom != nil && @answerfrom != "")
         retval = retval + ";; Answer received from #{@answerfrom} (#{@answersize} bytes)\n;;\n";
       end
+      retval = retval + ";; Security Level : #{@security_level.string}\n"
       
       retval = retval + ";; HEADER SECTION\n"
       # OPT pseudosection? EDNS flags, udpsize
@@ -567,7 +586,11 @@ module Dnsruby
     #Query response code
     #deprecated - use Message#rcode
     #    attr_reader :rcode
-    # This new get_header_rcode method is intended for use only by the Message class
+
+    # This new get_header_rcode method is intended for use only by the Message class.
+    # This is because the Message OPT section may contain an extended rcode (see
+    # RFC 2671 section 4.6). Using the header rcode only ignores this extension, and
+    # is not recommended.
     def get_header_rcode
       @rcode
     end

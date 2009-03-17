@@ -70,12 +70,16 @@ module Dnsruby
     end
     def keys_and_expirations
       remove_expired_keys
-      return keys()
+      return keys.values
     end
     def remove_expired_keys
       @keys.delete_if {|k,v|
         v[0] < Time.now.to_i
       }
+    end
+    def find_key_for(name)
+      each {|key| return key if key.name == name}
+      return false
     end
   end
 end
