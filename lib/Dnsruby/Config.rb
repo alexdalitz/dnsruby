@@ -169,7 +169,12 @@ module Dnsruby
         raise ArgumentError.new("invalid nameserver config: #{ns.inspect}")
       end    
       ns.each_index do |i|
-        ns[i]=Config.resolve_server(ns[i])
+        ret = Config.resolve_server(ns[i])
+        if (ret)
+          ns[i]= ret
+        else
+          ns.delete_at(i) # Don't use it if we can't resolve it
+        end
       end
     end
     
@@ -220,7 +225,8 @@ module Dnsruby
             server = addr
           rescue Exception => e
             Dnsruby.log.error{"Can't make sense of nameserver : #{server}, exception : #{e}"}
-            raise ArgumentError.new("Can't make sense of nameserver : #{server}, exception : #{e}")
+            #            raise ArgumentError.new("Can't make sense of nameserver : #{server}, exception : #{e}")
+            return nil
           end
         end
       end

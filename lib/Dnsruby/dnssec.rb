@@ -182,6 +182,9 @@ module Dnsruby
     end
     
     def self.validate_with_query(query, msg)
+      if (!msg)
+        return false
+      end
       # First, just check there is something to validate!
       found_sigs = false
       msg.each_resource {|rr|

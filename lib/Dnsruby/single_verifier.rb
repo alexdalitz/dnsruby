@@ -364,6 +364,9 @@ module Dnsruby
       if (key_rrset && key_rrset.num_sigs > 0)
         if (verify_rrset(key_rrset, keys))
           #            key_rrset.rrs.each do |rr|
+#          print "Adding keys : "
+#          key_rrset.rrs.each {|rr| print "#{rr.key_tag}, "}
+#          print "\n"
           @trusted_keys.add(key_rrset) # rr)
         end
         check_ds_stores(key_rrset)
@@ -650,18 +653,25 @@ module Dnsruby
       TheLog.debug("Follow chain from #{anchor.name} to #{name}")
 
       res = nil
-      while ((next_step != name) || (next_key.type != Types.DNSKEY))
+#      while ((next_step != name) || (next_key.type != Types.DNSKEY))
+      while (true)
+#        print "In loop for parent=#{parent}, next step = #{next_step}\n"
         dont_move_on = false
         if (next_key.type != Types.DNSKEY)
           dont_move_on = true
         end
         next_key, res = get_anchor_for(next_step, parent, next_key, res)
+        if (next_step == name)
+#      print "Returning #{next_key.type} for #{next_step}, #{(next_key.type != Types.DNSKEY)}\n"
+      return next_key
+        end
         return false if (!next_key)
         # Add the next label on
         if (!dont_move_on)
           parent = next_step
           next_step = Name.new(name.labels[name.labels.length-1-next_step.labels.length,1] +
               next_step.labels , name.absolute?)
+#          print "Next parent = #{parent}, next_step = #{next_step}, next_key.type = #{next_key.type.string}\n"
         end
       end
 
@@ -710,7 +720,7 @@ module Dnsruby
             ds_rrset = ds_ret.answer.rrset(Types.DS)
             if (ds_rrset.rrs.length == 0)
               # @TODO@ Check NSEC(3) records
-              print "NO DS RECORDS RETURNED FOR #{parent}\n"
+#              print "NO DS RECORDS RETURNED FOR #{parent}\n"
               child_res = parent_res
             else
               if (!verify(ds_rrset, current_anchor))
@@ -933,7 +943,10 @@ module Dnsruby
           TheLog.debug("Unable to follow chain from anchor : #{closest_anchor.name}")
           msg.security_level = Message::SecurityLevel.INSECURE
         else
-          TheLog.debug("Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname}")
+          actual_anchor_keys = ""
+          actual_anchor.rrs.each {|rr| actual_anchor_keys += ", #{rr.key_tag}"}
+          TheLog.debug("Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}")
+#          print "Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}\n"
           begin
             if (verify(msg, actual_anchor))
               TheLog.debug("Validated #{qname}")

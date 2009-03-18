@@ -117,6 +117,9 @@ module Dnsruby
       @config = Config.new()
       @config.set_config_info(config_info)
       @resolver = Resolver.new(@config)
+      if (@resolver.single_resolvers.length == 0)
+        raise ArgumentError.new("Must pass at least one valid resolver address")
+      end
     end
     
     attr_reader :config    
