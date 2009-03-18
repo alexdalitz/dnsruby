@@ -187,6 +187,12 @@ class TestUpdate < Test::Unit::TestCase
     assert_equal(rdata,                  rr.rdata, 'rr_del - right data');    #60
     
     rr = nil
+
+    data = update.encode
+    header = Header.new_from_data(data)
+    assert(header.opcode == OpCode.Update)
+    new_update = Message.decode(data)
+    assert(new_update.header.opcode == OpCode.Update)
     
     #------------------------------------------------------------------------------
     # Make sure RRs in an update packet have the same class as the zone, unless
