@@ -96,7 +96,7 @@ a2 cc 00 06 03 6e 73 63  c0 10 c0 86 00 01 00 01
 
     message = Dnsruby::Message.decode(packetdata)
 #      message.additional.rrsets.each {|rr| print "RRSet : #{rr}\n"}
-        sec_hash = message.section_rrsets(true) # include the OPT record
+        sec_hash = message.section_rrsets(nil, true) # include the OPT record
         sec_hash.each {|section, rrsets|
           rrsets.each {|rrset|
 #              print "#{section} rrset : #{rrset}\n"
@@ -106,7 +106,7 @@ a2 cc 00 06 03 6e 73 63  c0 10 c0 86 00 01 00 01
         }
 
 
-        sec_hash = message.section_rrsets(true) # include the OPT record
+        sec_hash = message.section_rrsets(nil, true) # include the OPT record
         sec_hash.each {|section, rrsets|
           rrsets.each {|rrset|
 #              print "#{section} rrset : #{rrset}\n"

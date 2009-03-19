@@ -61,7 +61,8 @@ class TestCache < Test::Unit::TestCase
     assert(ret.rcode == RCode.NoError)
     assert(ret.header.aa)
     # Store the ttls
-    first_ttls = ret.answer.rrset(Types.TXT).ttl
+    first_ttls = ret.answer.rrset(
+      "overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT).ttl
     # Wait a while
     sleep(1)
     # Ask for the same records
@@ -70,7 +71,8 @@ class TestCache < Test::Unit::TestCase
 #    print "#{ret}\n"
     assert(ret.rcode == RCode.NoError)
     assert(ret.cached)
-    second_ttls = ret.answer.rrset(Types.TXT).ttl
+    second_ttls = ret.answer.rrset(
+      "overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT).ttl
     # make sure the ttl is less the time we waited
     assert((second_ttls == first_ttls - 1) || (second_ttls == first_ttls - 2),
             "First ttl = #{first_ttls}, second = #{second_ttls}\n")

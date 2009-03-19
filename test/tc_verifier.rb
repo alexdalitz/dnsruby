@@ -11,8 +11,8 @@ class VerifierTest < Test::Unit::TestCase
     res.dnssec = true
     r = res.query("se", Dnsruby::Types.ANY)    
     # See comment below
-    Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset('DNSKEY'))
-    nss = r.answer.rrset('NS')
+    Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset("se", 'DNSKEY'))
+    nss = r.answer.rrset("se", 'NS')
     ret = Dnsruby::Dnssec.verify_rrset(nss)
     assert(ret, "Dnssec verification failed")    
   end
@@ -26,7 +26,7 @@ class VerifierTest < Test::Unit::TestCase
     # This shouldn't be in the code - but the key is rotated by the .se registry
     # so we can't keep up with it in the test code.
     # Oh, for a signed root...
-    Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset('DNSKEY'))
+    Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset("se", 'DNSKEY'))
     ret = Dnsruby::Dnssec.verify(r)
     assert(ret, "Dnssec message verification failed")    
   end
@@ -152,7 +152,7 @@ class VerifierTest < Test::Unit::TestCase
     res.dnssec = true
     message = Dnsruby::Message.new("sources.org", Dnsruby::Types.DNSKEY)
     ret = res.send_message(message)
-    keys = ret.rrset("DNSKEY")
+    keys = ret.rrset("sources.org", "DNSKEY")
     assert(keys && keys.length > 0)
     dsa = nil
     keys.each {|key|

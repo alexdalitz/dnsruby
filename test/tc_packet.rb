@@ -51,9 +51,9 @@ class TestPacket < Test::Unit::TestCase
     assert_equal(1, packet.header.ancount, 'First push into answer section worked');      #10
       
       
-    ret = packet.answer.rrset('NSEC')
+    ret = packet.answer.rrset("example.com", 'NSEC')
     assert_equal(ret.rrs.length, 0, "#{ret.rrs.length}")
-    ret = packet.answer.rrset('A')
+    ret = packet.answer.rrset("a1.example.com", 'A')
     assert_equal(ret.rrs.length, 1, "#{ret.rrs.length}")
     ret = packet.answer.rrsets()
     assert_equal(ret.length, 1, "#{ret.length}")

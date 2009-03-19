@@ -45,17 +45,17 @@ module Dnsruby
       begin
         ret = res.send_message(query)
       rescue ResolvTimeout => e
-#        print "ERROR - Can't get DLV nameserver : #{e}\n"
+        #        print "ERROR - Can't get DLV nameserver : #{e}\n"
         TheLog.error("Can't get DLV nameserver : #{e}")
         return Resolver.new # @TODO@ !!!
       end
-      ns_rrset = ret.answer.rrset(Types.NS)
+      ns_rrset = ret.answer.rrset("dlv.isc.org", Types.NS)
       nameservers = []
       ns_rrset.rrs.sort_by {rand}.each {|rr|
         nameservers.push(rr.nsdname)
       }
       if (nameservers.length == 0)
-#        print "Can't find DLV nameservers!\n"
+        #        print "Can't find DLV nameservers!\n"
         TheLog.error("Can't find DLV nameservers!\n")
       end
       res = Resolver.new
@@ -87,19 +87,19 @@ module Dnsruby
       begin
         ret = @res.send_message(query)
       rescue ResolvTimeout => e
-#        print "ERROR - Couldn't find the DLV key\n"
+        #        print "ERROR - Couldn't find the DLV key\n"
         TheLog.error("Couldn't find the DLV key\n")
         return
       end
-      key_rrset = ret.answer.rrset(Types.DNSKEY)
+      key_rrset = ret.answer.rrset("dlv.isc.org", Types.DNSKEY)
       begin
         verify(key_rrset, ksk)
         add_trusted_key(key_rrset)
-#        print "Successfully added DLV key\n"
+        #        print "Successfully added DLV key\n"
         TheLog.info("Successfully added DLV key")
         @added_dlv_key = true
       rescue VerifyError => e
-#        print "Error verifying DLV key : #{e}\n"
+        #        print "Error verifying DLV key : #{e}\n"
         TheLog.error("Error verifying DLV key : #{e}")
       end
     end
@@ -111,7 +111,7 @@ module Dnsruby
       if (k.type == Types.DNSKEY)
         k.flags = k.flags | RR::IN::DNSKEY::SEP_KEY
         @trust_anchors.add_key_with_expiration(k, expiration)
-#        print "Adding trust anchor for #{k.name}\n"
+        #        print "Adding trust anchor for #{k.name}\n"
         TheLog.info("Adding trust anchor for #{k.name}")
       elsif ((k.type == Types.DS) || ((k.type == Types.DLV) && (@verifier_type == VerifierType::DLV)))
         @configured_ds_store.push(k)
@@ -242,14 +242,18 @@ module Dnsruby
       # Return true if we can verify the whole message.
 
       msg.each_section do |section|
-        ds_rrset = section.rrset(Types.DS)
-        if ((!ds_rrset) && (@verifier_type == VerifierType::DLV))
-          ds_rrset = section.rrset(Types.DLV)
+        ds_rrsets = section.rrsets(Types.DS)
+        if ((!ds_rrsets) && (@verifier_type == VerifierType::DLV))
+          ds_rrsets = section.rrsets(Types.DLV)
         end
-        verify_ds_rrset(ds_rrset, keys, msg)
+        ds_rrsets.each {|ds_rrset|
+          verify_ds_rrset(ds_rrset, keys, msg)
+        }
 
-        key_rrset = section.rrset(Types.DNSKEY)
-        verify_key_rrset(key_rrset, keys)
+        key_rrsets = section.rrsets(Types.DNSKEY)
+        key_rrsets.each {|key_rrset|
+          verify_key_rrset(key_rrset, keys)
+        }
       end
 
       msg.section_rrsets.each do |section, rrsets|
@@ -259,16 +263,16 @@ module Dnsruby
 
           if (section == "authority")
             # Check for delegation
-            dsrrset = msg.authority.rrset('DS')
+            dsrrset = msg.authority.rrsets('DS')[0]
             #            nsrrset = msg.authority.rrset('NS')
             if ((msg.answer.size == 0) && (!dsrrset) && (rrset.type == Types.NS)) # && (nsrrset.length > 0))# (isDelegation)
               # Now check NSEC(3) records for absence of DS and SOA
-              nsec = msg.authority.rrset('NSEC')
+              nsec = msg.authority.rrsets('NSEC')[0]
               if (nsec.length == 0)
-                nsec = msg.authority.rrset('NSEC3')
+                nsec = msg.authority.rrsets('NSEC3')[0]
               end
               if (nsec.rrs.length > 0)
-                if (!(nsec.rrs[0].types.include?'DS') || !(nsec.rrset.rrs[0].types.include?'SOA'))
+                if (!(nsec.rrs()[0].types.include?'DS') || !(nsec.rrs()[0].types.include?'SOA'))
                   next
                 end
               end
@@ -296,15 +300,18 @@ module Dnsruby
             # check for glue
             # if the ownername (in the addtional section) of the glue address is the same or longer as the ownername of the NS record, it is glue
             if (msg.additional.size > 0)
-              arec = msg.additional.rrset('A')
+              arec = msg.additional.rrsets('A')[0]
               if (arec.rrs.length == 0)
-                arec = msg.additional.rrset('AAAA')
+                arec = msg.additional.rrsets('AAAA')[0]
               end
-              nsname = msg.rrset('NS').rrs()[0].name
-              if (arec.rrs().length > 0)
-                aname = arec.rrs()[0].name
-                if (nsname.subdomain_of?aname)
-                  next
+              ns_rrset = msg.rrset('NS')
+              if (ns_rrset)
+                nsname = ns_rrset.rrs()[0].name
+                if (arec.rrs().length > 0)
+                  aname = arec.rrs()[0].name
+                  if (nsname.subdomain_of?aname)
+                    next
+                  end
                 end
               end
             end
@@ -315,7 +322,7 @@ module Dnsruby
           end
           # else verify RRSet
           if (!verify_rrset(rrset, keys))
-#            print "Failed to verify rrset\n"
+            #            print "Failed to verify rrset\n"
             TheLog.debug("Failed to verify rrset")
             return false
           end
@@ -333,11 +340,13 @@ module Dnsruby
           found = false
           if (msg)
             msg.each_section do |section|
-              section.rrset('DNSKEY').rrs.each do |rr|
-                if (check_ds(rr, ds_rrset))
-                  found = true
+              section.rrsets('DNSKEY').each {|rrset|
+                rrset.rrs.each do |rr|
+                  if (check_ds(rr, ds_rrset))
+                    found = true
+                  end
                 end
-              end
+              }
             end
           end
           get_keys_to_check().each {|key|
@@ -364,9 +373,9 @@ module Dnsruby
       if (key_rrset && key_rrset.num_sigs > 0)
         if (verify_rrset(key_rrset, keys))
           #            key_rrset.rrs.each do |rr|
-#          print "Adding keys : "
-#          key_rrset.rrs.each {|rr| print "#{rr.key_tag}, "}
-#          print "\n"
+          #          print "Adding keys : "
+          #          key_rrset.rrs.each {|rr| print "#{rr.key_tag}, "}
+          #          print "\n"
           @trusted_keys.add(key_rrset) # rr)
         end
         check_ds_stores(key_rrset)
@@ -571,17 +580,17 @@ module Dnsruby
       begin
         ret = res.send_message(query)
       rescue ResolvTimeout => e
-#        print "Error getting zone key from DLV RR for #{name} : #{e}\n"
+        #        print "Error getting zone key from DLV RR for #{name} : #{e}\n"
         TheLog.error("Error getting zone key from DLV RR for #{name} : #{e}")
         return false
       end
-      key_rrset = ret.answer.rrset(Types.DNSKEY)
+      key_rrset = ret.answer.rrset(name, Types.DNSKEY)
       begin
         verify(key_rrset, dlv_rrset)
         #        Cache.add(ret)
         return key_rrset
       rescue VerifyError => e
-#        print "Can't move from DLV RR to zone DNSKEY for #{name}, error : #{e}\n"
+        #        print "Can't move from DLV RR to zone DNSKEY for #{name}, error : #{e}\n"
         TheLog.debug("Can't move from DLV RR to zone DNSKEY for #{name}, error : #{e}")
       end
       return false
@@ -593,30 +602,31 @@ module Dnsruby
         @res = get_dlv_resolver
       end
       begin
-        query = Message.new(name.to_s+".dlv.isc.org", Types.DLV)
+        name_to_query = name.to_s+".dlv.isc.org"
+        query = Message.new(name_to_query, Types.DLV)
         @res.single_resolvers()[0].prepare_for_dnssec(query)
         query.do_validation = false
         ret = nil
         begin
           ret = @res.send_message(query)
         rescue ResolvTimeout => e
-#          print "Error getting DLV record for #{name} : #{e}\n"
+          #          print "Error getting DLV record for #{name} : #{e}\n"
           TheLog.info("Error getting DLV record for #{name} : #{e}")
           return nil
         end
-        dlv_rrset = ret.answer.rrset(Types.DLV)
+        dlv_rrset = ret.answer.rrset(name_to_query,Types.DLV)
         if (dlv_rrset.rrs.length > 0)
           begin
             verify(dlv_rrset)
             #            Cache.add(ret)
             return dlv_rrset
           rescue VerifyError => e
-#            print "Error verifying DLV records for #{name}, #{e}\n"
+            #            print "Error verifying DLV records for #{name}, #{e}\n"
             TheLog.info("Error verifying DLV records for #{name}, #{e}")
           end
         end
       rescue NXDomain
-#        print "NXDomain for DLV lookup for #{name}\n"
+        #        print "NXDomain for DLV lookup for #{name}\n"
         return nil
       end
       return nil
@@ -649,21 +659,21 @@ module Dnsruby
       next_key = anchor
       next_step = anchor.name
       parent = next_step
-#      print "Follow chain from #{anchor.name} to #{name}\n"
+      #      print "Follow chain from #{anchor.name} to #{name}\n"
       TheLog.debug("Follow chain from #{anchor.name} to #{name}")
 
       res = nil
-#      while ((next_step != name) || (next_key.type != Types.DNSKEY))
+      #      while ((next_step != name) || (next_key.type != Types.DNSKEY))
       while (true)
-#        print "In loop for parent=#{parent}, next step = #{next_step}\n"
+        #        print "In loop for parent=#{parent}, next step = #{next_step}\n"
         dont_move_on = false
         if (next_key.type != Types.DNSKEY)
           dont_move_on = true
         end
         next_key, res = get_anchor_for(next_step, parent, next_key, res)
         if (next_step == name)
-#      print "Returning #{next_key.type} for #{next_step}, #{(next_key.type != Types.DNSKEY)}\n"
-      return next_key
+          #      print "Returning #{next_key.type} for #{next_step}, #{(next_key.type != Types.DNSKEY)}\n"
+          return next_key
         end
         return false if (!next_key)
         # Add the next label on
@@ -671,17 +681,17 @@ module Dnsruby
           parent = next_step
           next_step = Name.new(name.labels[name.labels.length-1-next_step.labels.length,1] +
               next_step.labels , name.absolute?)
-#          print "Next parent = #{parent}, next_step = #{next_step}, next_key.type = #{next_key.type.string}\n"
+          #          print "Next parent = #{parent}, next_step = #{next_step}, next_key.type = #{next_key.type.string}\n"
         end
       end
 
-#      print "Returning #{next_key.type} for #{next_step}, #{(next_key.type != Types.DNSKEY)}\n"
+      #      print "Returning #{next_key.type} for #{next_step}, #{(next_key.type != Types.DNSKEY)}\n"
 
       return next_key
     end
 
     def get_anchor_for(child, parent, current_anchor, parent_res = nil) # :nodoc:
-#      print "Trying to discover anchor for #{child} from #{parent}\n"
+      #      print "Trying to discover anchor for #{child} from #{parent}\n"
       TheLog.debug("Trying to discover anchor for #{child} from #{parent}")
       # We wish to return a DNSKEY which the caller can use to verify name
       # We are either given a key or a ds record from the parent zone
@@ -696,7 +706,7 @@ module Dnsruby
         #        parent_res.dnssec = true
         if (child!=parent)
           if (!parent_res)
-#            print "No res passed - try to get nameservers for #{parent}\n"
+            #            print "No res passed - try to get nameservers for #{parent}\n"
             parent_res = get_nameservers_for(parent)
             if (!parent_res)
               parent_res = Resolver.new # @TODO@
@@ -705,7 +715,7 @@ module Dnsruby
           # Use that Resolver to query for DS record and NS for children
           ds_rrset = current_anchor
           if (current_anchor.type == Types.DNSKEY)
-#            print "Trying to find DS records for #{child} from servers for #{parent}\n"
+            #            print "Trying to find DS records for #{child} from servers for #{parent}\n"
             TheLog.debug("Trying to find DS records for #{child} from servers for #{parent}")
             query = Message.new(child, Types.DS)
             query.do_validation = false
@@ -713,18 +723,18 @@ module Dnsruby
             begin
               ds_ret = parent_res.send_message(query)
             rescue ResolvTimeout => e
-#              print "Error getting DS record for #{child} : #{e}\n"
+              #              print "Error getting DS record for #{child} : #{e}\n"
               TheLog.error("Error getting DS record for #{child} : #{e}")
               return false, nil
             end
-            ds_rrset = ds_ret.answer.rrset(Types.DS)
+            ds_rrset = ds_ret.answer.rrset(child, Types.DS)
             if (ds_rrset.rrs.length == 0)
               # @TODO@ Check NSEC(3) records
-#              print "NO DS RECORDS RETURNED FOR #{parent}\n"
+              #              print "NO DS RECORDS RETURNED FOR #{parent}\n"
               child_res = parent_res
             else
               if (!verify(ds_rrset, current_anchor))
-#                print "FAILED TO VERIFY DS RRSET FOR #{child}\n"
+                #                print "FAILED TO VERIFY DS RRSET FOR #{child}\n"
                 TheLog.info("FAILED TO VERIFY DS RRSET FOR #{child}")
                 return false, nil
               end
@@ -742,7 +752,7 @@ module Dnsruby
         end
         # Query for DNSKEY record, and verify against DS in parent.
         # Need to get resolver NOT to verify this message - we verify it afterwards
-#        print "Trying to find DNSKEY records for #{child} from servers for #{child}\n"
+        #        print "Trying to find DNSKEY records for #{child} from servers for #{child}\n"
         TheLog.info("Trying to find DNSKEY records for #{child} from servers for #{child}")
         query = Message.new(child, Types.DNSKEY)
         query.do_validation = false
@@ -750,14 +760,14 @@ module Dnsruby
         begin
           key_ret = child_res.send_message(query)
         rescue ResolvTimeout => e
-#          print "Error getting DNSKEY for #{child} : #{e}\n"
+          #          print "Error getting DNSKEY for #{child} : #{e}\n"
           TheLog.error("Error getting DNSKEY for #{child} : #{e}")
           return false, nil
         end
         verified = true
-        key_rrset = key_ret.answer.rrset(Types.DNSKEY)
+        key_rrset = key_ret.answer.rrset(child, Types.DNSKEY)
         if (key_rrset.rrs.length == 0)
-#          print "NO DNSKEY RECORDS RETURNED FOR #{child}\n"
+          #          print "NO DNSKEY RECORDS RETURNED FOR #{child}\n"
           TheLog.debug("NO DNSKEY RECORDS RETURNED FOR #{child}")
           #        end
           verified = false
@@ -765,7 +775,7 @@ module Dnsruby
           # Should check that the matching key's zone flag is set (RFC 4035 section 5.2)
           key_rrset.rrs.each {|k|
             if (!k.zone_key?)
-#              print "Discovered DNSKEY is not a zone key - ignoring\n"
+              #              print "Discovered DNSKEY is not a zone key - ignoring\n"
               TheLog.debug("Discovered DNSKEY is not a zone key - ignoring")
               return false, new_res
             end
@@ -791,7 +801,7 @@ module Dnsruby
         #        Cache.add(key_ret)
         return key_rrset, new_res
       rescue VerifyError => e
-#        print "Verification error : #{e}\n"
+        #        print "Verification error : #{e}\n"
         TheLog.info("Verification error : #{e}\n")
         return false, new_res
       end
@@ -812,7 +822,7 @@ module Dnsruby
       begin
         ns_ret = res.send_message(query)
       rescue ResolvTimeout => e
-#        print "Error getting NS records for #{name} : #{e}\n"
+        #        print "Error getting NS records for #{name} : #{e}\n"
         TheLog.error("Error getting NS records for #{name} : #{e}")
         return Resolver.new # @TODO@ !!!
       end
@@ -823,9 +833,9 @@ module Dnsruby
 
     def get_nameservers_from_message(name, ns_ret)
 
-      ns_rrset = ns_ret.answer.rrset(Types.NS)
+      ns_rrset = ns_ret.answer.rrset(name, Types.NS)
       if (!ns_rrset || ns_rrset.length == 0)
-        ns_rrset = ns_ret.authority.rrset(Types.NS) # @TOO@ Is ths OK?
+        ns_rrset = ns_ret.authority.rrset(name, Types.NS) # @TOO@ Is ths OK?
       end
       if (!ns_rrset || ns_rrset.length == 0 || ns_rrset.name.to_s != name.to_s)
         return nil
@@ -843,7 +853,7 @@ module Dnsruby
       add_nameservers(ns_rrset, ns_additional, nameservers) if (ns_additional.length > 0)
       # Make Resolver using all NSs
       if (nameservers.length == 0)
-#        print "Can't find nameservers for #{ns_ret.question()[0].qname} from #{ns_rrset.rrs}\n"
+        #        print "Can't find nameservers for #{ns_ret.question()[0].qname} from #{ns_rrset.rrs}\n"
         TheLog.info("Can't find nameservers for #{ns_ret.question()[0].qname} from #{ns_rrset.rrs}")
         return  nil # @TODO@
       end
@@ -908,11 +918,11 @@ module Dnsruby
         # check the DLV registry and work down from there.
         dlv_anchor = find_closest_dlv_anchor_for(qname)
         if (dlv_anchor)
-#          print "Trying to follow DLV anchor from #{dlv_anchor.name} to #{qname}\n"
+          #          print "Trying to follow DLV anchor from #{dlv_anchor.name} to #{qname}\n"
           TheLog.debug("Trying to follow DLV anchor from #{dlv_anchor.name} to #{qname}")
           error = try_to_follow_from_anchor(dlv_anchor, msg, qname)
         else
-#          print "Couldn't find DLV anchor for #{qname}\n"
+          #          print "Couldn't find DLV anchor for #{qname}\n"
           TheLog.debug("Couldn't find DLV anchor for #{qname}")
         end
       end
@@ -946,7 +956,7 @@ module Dnsruby
           actual_anchor_keys = ""
           actual_anchor.rrs.each {|rr| actual_anchor_keys += ", #{rr.key_tag}"}
           TheLog.debug("Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}")
-#          print "Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}\n"
+          #          print "Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}\n"
           begin
             if (verify(msg, actual_anchor))
               TheLog.debug("Validated #{qname}")

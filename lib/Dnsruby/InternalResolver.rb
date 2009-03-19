@@ -503,7 +503,7 @@ module Dnsruby
       optrr = RR::OPT.new(udp_packet_size)   # Decimal UDPpayload
       optrr.dnssec_ok=true
 
-      if (packet.additional.rrset(Types.OPT).rrs.length == 0)
+      if (packet.additional.rrset(packet.question()[0].qname, Types.OPT).rrs.length == 0)
         packet.add_additional(optrr)
       end
 

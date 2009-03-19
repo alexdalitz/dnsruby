@@ -61,12 +61,12 @@ module Dnsruby
   class Message
     # The security level (see RFC 4035 section 4.3)
     class SecurityLevel < CodeMapper
-       INDETERMINATE = -2
-       BOGUS = -1
-       UNCHECKED = 0
-       INSECURE = 1
-       SECURE = 2
-       update()
+      INDETERMINATE = -2
+      BOGUS = -1
+      UNCHECKED = 0
+      INSECURE = 1
+      SECURE = 2
+      update()
     end
     # If dnssec is set on, then each message will have the security level set
     # To find the precise error (if any), call Dnsruby::Dnssec::validate(msg) -
@@ -83,13 +83,13 @@ module Dnsruby
 
     class Section < Array
       # Return the rrset of the specified type in this section
-      def rrset(type, klass=Classes::IN)
+      def rrset(name, type=Types.A, klass=Classes::IN)
         rrs = select{|rr| 
           type_ok = (rr.type==type)
           if (rr.type == Types.RRSIG)
             type_ok = (rr.type_covered == type)
           end
-          type_ok && (rr.klass == klass)
+          type_ok && (rr.klass == klass) && (rr.name.to_s == name.to_s)
         }
         rrset = RRSet.new
         rrs.each do |rr|
@@ -99,10 +99,18 @@ module Dnsruby
       end
       
       # Return an array of all the rrsets in the section
-      def rrsets(include_opt = false)
+      def rrsets(type = nil, include_opt = false)
         ret = []
         each do |rr|
           next if (!include_opt && (rr.type == Types.OPT))
+          if (type)
+            if (rr.type == Types.RRSIG)
+              next if (rr.type_covered != type)
+            elsif (rr.type != type)
+              next
+            end
+          end
+
           found_rrset = false
           ret.each do |rrset|
             found_rrset = rrset.add(rr)
@@ -122,6 +130,18 @@ module Dnsruby
           return false unless otherrrsets.include?rrset
         }
         return true
+      end
+
+      def remove_rrset(name, type)
+        # Remove all RRs with the name and type from the section.
+        # Need to worry about header counts here - can we get Message to
+        # update the counts itself, rather than the section worrying about it?
+        each do |rr|
+          if ((rr.name == name) && (rr.type == type))
+            delete(rr)
+          end
+        end
+        update_counts
       end
     end
     #Create a new Message. Takes optional name, type and class
@@ -243,10 +263,10 @@ module Dnsruby
     
     # Return a hash, with the section as key, and the RRSets in that
     # section as the data : {section => section_rrs}
-    def section_rrsets(include_opt = false)
+    def section_rrsets(type = nil, include_opt = false)
       ret = {}
       ["answer", "authority", "additional"].each do |section|
-        ret[section] = self.send(section).rrsets(include_opt)
+        ret[section] = self.send(section).rrsets(type, include_opt)
       end  
       return ret      
     end
@@ -262,7 +282,7 @@ module Dnsruby
         question = Question.new(question, type, klass)
       end
       @question << question
-      @header.qdcount = @question.length
+      update_counts
     end
     
     def each_question
@@ -270,12 +290,19 @@ module Dnsruby
         yield rec
       }
     end
+
+    def update_counts # :nodoc:all
+      @header.ancount = @answer.length
+      @header.arcount = @additional.length
+      @header.qdcount = @question.length
+      @header.nscount = @authority.length
+    end
     
     
     def add_answer(rr) #:nodoc: all
       if (!@answer.include?rr)
         @answer << rr
-        @header.ancount = @answer.length
+        update_counts
       end
     end
     
@@ -288,7 +315,7 @@ module Dnsruby
     def add_authority(rr) #:nodoc: all
       if (!@authority.include?rr)
         @authority << rr
-        @header.nscount = @authority.length
+        update_counts
       end
     end
     
@@ -301,7 +328,7 @@ module Dnsruby
     def add_additional(rr) #:nodoc: all
       if (!@additional.include?rr)
         @additional << rr
-        @header.arcount = @additional.length
+        update_counts
       end
     end
     
@@ -902,8 +929,8 @@ module Dnsruby
     def get_label
       label = Name::Label.new(Name::decode(self.get_string))
       return label
-#         return Name::Label::Str.new(self.get_string)
-     end
+      #         return Name::Label::Str.new(self.get_string)
+    end
     
     def get_question
       name = self.get_name
