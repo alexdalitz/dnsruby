@@ -182,17 +182,17 @@ f4 00 31 04 64 6e 73 31 05 69 63 61 6e 6e 03 6f
   def test_rrset
     packet = get_test_packet
     packet.each_section do |section|
- #     print "#{section.rrsets}\n"
+      #     print "#{section.rrsets}\n"
     end
     packet.section_rrsets.each do |section, rrsets|
-#      print "section = #{section}, rrsets = #{rrsets.length}\n"
+      #      print "section = #{section}, rrsets = #{rrsets.length}\n"
     end
     assert(packet.authority.rrsets.length == 1)
     assert(packet.question.rrsets.length == 1)
     assert(packet.answer.rrsets.length == 1)
     assert(packet.additional.rrsets.length == 0)
     assert(packet.authority.rrsets[0].length == 3)
-#    assert(packet.additional.rrsets[0].length == 0)
+    #    assert(packet.additional.rrsets[0].length == 0)
     assert(packet.question.rrsets[0].length == 1)
     assert(packet.answer.rrsets[0].length == 1)
   end
@@ -206,26 +206,26 @@ f4 00 31 04 64 6e 73 31 05 69 63 61 6e 6e 03 6f
 				/EYCTbmTfPpfZTnAUPAfNRIA4RS9etMgh5Zy3Wug4dKs
 				20+3vwlSz0Ge5jluOoowkWAK3YbLkqwSi1DeZg/HT1Ns
 				zcBDHMJ9sxmB6d4nuRA6653w9RULVjpKng1gh0s= )
-"))
-packet.add_authority(RR.create("nic.se.			3600 IN	NS ns2.nic.se."))
-packet.add_authority(RR.create("nic.se.			3600 IN	NS ns3.nic.se."))
-packet.add_authority(RR.create("nic.se.			3600 IN	NS ns.nic.se."))
-packet.add_authority(RR.create("nic.se.			3600 IN	RRSIG NS 5 2 3600 20090329175503 (
+        "))
+    packet.add_authority(RR.create("nic.se.			3600 IN	NS ns2.nic.se."))
+    packet.add_authority(RR.create("nic.se.			3600 IN	NS ns3.nic.se."))
+    packet.add_authority(RR.create("nic.se.			3600 IN	NS ns.nic.se."))
+    packet.add_authority(RR.create("nic.se.			3600 IN	RRSIG NS 5 2 3600 20090329175503 (
 				20090319175503 32532 nic.se.
 				ZExPKC9zDiyY0TuuPGDBtzYE119fiXWqihARO41l7uTT
 				LBbYcCNg3ItJZW2y0o4iFYpqrp62l25uKhO4cMEZbgZs
 				Gq9B6zZ4/2D0v4zFjlzCEZ0lTrGb6xgOrnQbZUiTbg46
 				x9iBai7Ud1w/hgV/TSxikP1SS0J1AillybPiMWQ= )"))
-packet.add_additional(RR.create("ns.nic.se.		3600 IN	A 212.247.7.228"))
-packet.add_additional(RR.create("ns.nic.se.		3600 IN	AAAA 2a00:801:f0:53::53"))
-packet.add_additional(RR.create("ns3.nic.se.		60 IN A	212.247.3.83"))
-packet.add_additional(RR.create("ns.nic.se.		3600 IN	RRSIG A 5 3 3600 20090329175503 (
+    packet.add_additional(RR.create("ns.nic.se.		3600 IN	A 212.247.7.228"))
+    packet.add_additional(RR.create("ns.nic.se.		3600 IN	AAAA 2a00:801:f0:53::53"))
+    packet.add_additional(RR.create("ns3.nic.se.		60 IN A	212.247.3.83"))
+    packet.add_additional(RR.create("ns.nic.se.		3600 IN	RRSIG A 5 3 3600 20090329175503 (
 				20090319175503 32532 nic.se.
 				opTtrYBF+Mm4BGK+5vvAvzxxgh4GUxa7YxflT1DybG7u
 				uRdi+ZD6+DFXvaMKPcmVLRcMV2wEv7v1zBj+jaAkqPno
 				ikOHMtd9g0FtmfxR//TLLzgjDsunee0MX6hLX/ApTUy8
 				hhcGB1pxk371tZKSBkNI7SN7gaSnknUUEp6eNN4= )"))
-packet.add_additional(RR.create("ns.nic.se.		3600 IN	RRSIG AAAA 5 3 3600 20090329175503 (
+    packet.add_additional(RR.create("ns.nic.se.		3600 IN	RRSIG AAAA 5 3 3600 20090329175503 (
 				20090319175503 32532 nic.se.
 				Qaj/eG9MPGF6QZUPpRq3LBxfxQiKki3J2myKy+OQuE65
 				juDBb+29YjteqQW1PrilxRjo4apX5Q4LNAhS+bEx+PNU
