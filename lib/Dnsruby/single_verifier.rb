@@ -39,7 +39,7 @@ module Dnsruby
 
     def get_dlv_resolver
       res = Resolver.new
-      query = Message.new("dlv.isc.org", Types.NS)
+      query = Message.new("dlv.isc.org.", Types.NS)
       query.do_validation = false
       ret = nil
       begin
@@ -80,7 +80,7 @@ module Dnsruby
       if (!@res && (@verifier_type == VerifierType::DLV))
         @res = get_dlv_resolver
       end
-      query = Message.new("dlv.isc.org", Types.DNSKEY)
+      query = Message.new("dlv.isc.org.", Types.DNSKEY)
       query.do_validation = false
       #      print "Sending query : res.dnssec = #{@res.dnssec}"
       ret = nil
@@ -226,16 +226,18 @@ module Dnsruby
     #
     # Returns true if the message verifies OK, and false otherwise.
     def verify(msg, keys = nil)
+#      print "VERIFY CALLED\n"
       if (msg.kind_of?RRSet)
         if (msg.type == Types.DNSKEY)
-          verify_key_rrset(msg, keys)
+          return verify_key_rrset(msg, keys)
         end
         if ((msg.type == Types.DS) || (msg.type == Types.DLV))
-          verify_ds_rrset(msg, keys)
+          return verify_ds_rrset(msg, keys)
 
         end
         return verify_rrset(msg, keys)
       end
+#      print "VERIFY about to start\n"
       # Use the set of trusted keys to check any RRSets we can, ideally
       # those of other DNSKEY RRSets first. Then, see if we can use any of the
       # new total set of keys to check the rest of the rrsets.
@@ -243,16 +245,20 @@ module Dnsruby
 
       msg.each_section do |section|
         ds_rrsets = section.rrsets(Types.DS)
-        if ((!ds_rrsets) && (@verifier_type == VerifierType::DLV))
+        if ((!ds_rrsets || ds_rrsets.length == 0) && (@verifier_type == VerifierType::DLV))
           ds_rrsets = section.rrsets(Types.DLV)
         end
         ds_rrsets.each {|ds_rrset|
-          verify_ds_rrset(ds_rrset, keys, msg)
+          if ((ds_rrset && ds_rrset.rrs.length > 0) && !verify_ds_rrset(ds_rrset, keys, msg))
+            return false
+          end
         }
 
         key_rrsets = section.rrsets(Types.DNSKEY)
         key_rrsets.each {|key_rrset|
-          verify_key_rrset(key_rrset, keys)
+          if ((key_rrset && key_rrset.rrs.length > 0) && !verify_key_rrset(key_rrset, keys))
+            return false
+          end
         }
       end
 
@@ -301,13 +307,13 @@ module Dnsruby
             # if the ownername (in the addtional section) of the glue address is the same or longer as the ownername of the NS record, it is glue
             if (msg.additional.size > 0)
               arec = msg.additional.rrsets('A')[0]
-              if (arec.rrs.length == 0)
+              if (!arec || arec.rrs.length == 0)
                 arec = msg.additional.rrsets('AAAA')[0]
               end
               ns_rrset = msg.rrset('NS')
               if (ns_rrset)
                 nsname = ns_rrset.rrs()[0].name
-                if (arec.rrs().length > 0)
+                if (arec && arec.rrs().length > 0)
                   aname = arec.rrs()[0].name
                   if (nsname.subdomain_of?aname)
                     next
@@ -321,8 +327,9 @@ module Dnsruby
             next
           end
           # else verify RRSet
+#          print "About to verify #{rrset.name}, #{rrset.type}\n"
           if (!verify_rrset(rrset, keys))
-            #            print "Failed to verify rrset\n"
+#            print "FAILED TO VERIFY RRSET #{rrset.name}, #{rrset.type}\n"
             TheLog.debug("Failed to verify rrset")
             return false
           end
@@ -332,6 +339,7 @@ module Dnsruby
     end
     
     def verify_ds_rrset(ds_rrset, keys = nil, msg = nil)
+#      print "verify_ds_rrset #{ds_rrset}\n"
       if (ds_rrset && ds_rrset.num_sigs > 0)
         if (verify_rrset(ds_rrset, keys))
           # Need to handle DS RRSets (with RRSIGs) not just DS records.
@@ -364,22 +372,29 @@ module Dnsruby
             @discovered_ds_store.push(ds_rrset)
           end
           #            end
+          return true
         else
+          return false
         end
       end
+      return false # no DS rrset to verify
     end
 
     def verify_key_rrset(key_rrset, keys = nil)
+#      print "verify_key_rrset\n"
+      verified = false
       if (key_rrset && key_rrset.num_sigs > 0)
         if (verify_rrset(key_rrset, keys))
           #            key_rrset.rrs.each do |rr|
-          #          print "Adding keys : "
-          #          key_rrset.rrs.each {|rr| print "#{rr.key_tag}, "}
-          #          print "\n"
+#          print "Adding keys : "
+#          key_rrset.rrs.each {|rr| print "#{rr.key_tag}, "}
+#          print "\n"
           @trusted_keys.add(key_rrset) # rr)
+          verified = true
         end
         check_ds_stores(key_rrset)
       end
+      return verified
     end
 
     def check_ds_stores(key_rrset)
@@ -434,6 +449,7 @@ module Dnsruby
 
         sigrecs.each {|sig|
           if ((key.key_tag == sig.key_tag) && (key.algorithm == sig.algorithm))
+#            print "Found key #{key.key_tag}\n"
             return key, sig
           end
         }
@@ -447,6 +463,7 @@ module Dnsruby
     # Returns true if the RRSet verified, false otherwise.
     def verify_rrset(rrset, keys = nil)
       # @TODO@ Finer-grained reporting than "false".
+#      print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
       sigrecs = rrset.sigs
       #      return false if (rrset.num_sigs == 0)
       if (rrset.rrs.length == 0)
@@ -482,6 +499,7 @@ module Dnsruby
 
       #      return false if !keyrec
       if (!keyrec)
+#        print "Couldn't find signing key! #{rrset.name}, #{rrset.type},\n "
         raise VerifyError.new("Signing key not found")
       end
 
@@ -545,7 +563,7 @@ module Dnsruby
       expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
       rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl,
           expiration_diff].sort)[0]
-
+#      print "VERIFIED OK\n"
       return true
     end
 
@@ -926,16 +944,20 @@ module Dnsruby
           TheLog.debug("Couldn't find DLV anchor for #{qname}")
         end
       end
-      if (error)
-        raise error
-      end
       if (msg.security_level.code != Message::SecurityLevel::SECURE)
         begin
+#          print "Trying to verify one last time\n"
+
           if verify(msg) # Just make sure we haven't picked the keys up anywhere
             msg.security_level = Message::SecurityLevel.SECURE
+            return true
           end
-        rescue VerifyError
+        rescue VerifyError => e
+#          print "Verify failed : #{e}\n"
         end
+      end
+      if (error)
+        raise error
       end
       if (msg.security_level.code > Message::SecurityLevel::UNCHECKED)
         return true
@@ -956,7 +978,7 @@ module Dnsruby
           actual_anchor_keys = ""
           actual_anchor.rrs.each {|rr| actual_anchor_keys += ", #{rr.key_tag}"}
           TheLog.debug("Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}")
-          #          print "Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}\n"
+#          print "Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}\n"
           begin
             if (verify(msg, actual_anchor))
               TheLog.debug("Validated #{qname}")
@@ -964,6 +986,7 @@ module Dnsruby
             end
           rescue VerifyError => e
             TheLog.info("BOGUS #{qname}! Error : #{e}")
+#            print "BOGUS #{qname}! Error : #{e}\n"
             msg.security_level = Message::SecurityLevel.BOGUS
             error = e
           end

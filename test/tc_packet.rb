@@ -176,7 +176,7 @@ f4 00 31 04 64 6e 73 31 05 69 63 61 6e 6e 03 6f
       
     packet2=Message.decode(data)
       
-    assert_equal(packet.to_s,packet2.to_s,"Packet to data and back (failure indicates brasserten dn_comp)");  #39      
+    assert_equal(packet.to_s,packet2.to_s,"Packet decode and encode");  #39
   end
   
   def test_rrset
@@ -195,5 +195,108 @@ f4 00 31 04 64 6e 73 31 05 69 63 61 6e 6e 03 6f
 #    assert(packet.additional.rrsets[0].length == 0)
     assert(packet.question.rrsets[0].length == 1)
     assert(packet.answer.rrsets[0].length == 1)
+  end
+
+  def test_section
+    packet = Message.new("ns2.nic.se")
+    packet.add_answer(RR.create("ns2.nic.se.		3600 IN	A 194.17.45.54"))
+    packet.add_answer(RR.create("ns2.nic.se.		3600 IN	RRSIG A 5 3 3600 20090329175503 (
+				20090319175503 32532 nic.se.
+				YFvEOPpVHgAmPwtM2Q0KD5x6UaZ5bMzINMyW4xXSXOxG
+				/EYCTbmTfPpfZTnAUPAfNRIA4RS9etMgh5Zy3Wug4dKs
+				20+3vwlSz0Ge5jluOoowkWAK3YbLkqwSi1DeZg/HT1Ns
+				zcBDHMJ9sxmB6d4nuRA6653w9RULVjpKng1gh0s= )
+"))
+packet.add_authority(RR.create("nic.se.			3600 IN	NS ns2.nic.se."))
+packet.add_authority(RR.create("nic.se.			3600 IN	NS ns3.nic.se."))
+packet.add_authority(RR.create("nic.se.			3600 IN	NS ns.nic.se."))
+packet.add_authority(RR.create("nic.se.			3600 IN	RRSIG NS 5 2 3600 20090329175503 (
+				20090319175503 32532 nic.se.
+				ZExPKC9zDiyY0TuuPGDBtzYE119fiXWqihARO41l7uTT
+				LBbYcCNg3ItJZW2y0o4iFYpqrp62l25uKhO4cMEZbgZs
+				Gq9B6zZ4/2D0v4zFjlzCEZ0lTrGb6xgOrnQbZUiTbg46
+				x9iBai7Ud1w/hgV/TSxikP1SS0J1AillybPiMWQ= )"))
+packet.add_additional(RR.create("ns.nic.se.		3600 IN	A 212.247.7.228"))
+packet.add_additional(RR.create("ns.nic.se.		3600 IN	AAAA 2a00:801:f0:53::53"))
+packet.add_additional(RR.create("ns3.nic.se.		60 IN A	212.247.3.83"))
+packet.add_additional(RR.create("ns.nic.se.		3600 IN	RRSIG A 5 3 3600 20090329175503 (
+				20090319175503 32532 nic.se.
+				opTtrYBF+Mm4BGK+5vvAvzxxgh4GUxa7YxflT1DybG7u
+				uRdi+ZD6+DFXvaMKPcmVLRcMV2wEv7v1zBj+jaAkqPno
+				ikOHMtd9g0FtmfxR//TLLzgjDsunee0MX6hLX/ApTUy8
+				hhcGB1pxk371tZKSBkNI7SN7gaSnknUUEp6eNN4= )"))
+packet.add_additional(RR.create("ns.nic.se.		3600 IN	RRSIG AAAA 5 3 3600 20090329175503 (
+				20090319175503 32532 nic.se.
+				Qaj/eG9MPGF6QZUPpRq3LBxfxQiKki3J2myKy+OQuE65
+				juDBb+29YjteqQW1PrilxRjo4apX5Q4LNAhS+bEx+PNU
+				dHr8x0u7z7fZMCAaZhQndnWTD5Wzf1J97bt0ml78yqDi
+				PkYeqNTNeM0Y40VTu0aHsPPPZpQRR7MYcODUbl0= )"))
+    packet.add_additional(RR.create("ns3.nic.se.		60 IN RRSIG A 5 3 60 20090329175503 (
+				20090319175503 32532 nic.se.
+				Ql7Msgt0HKDifPaCV8UYsiLj7hOEp6LPJJ5oaFrJhooU
+				Nrp4gcwlX9QbrYXWQ8cgE0Z+bL2c07EX/f+n7+xfgCIu
+				UtL1tXJPsujZBojMtpnkbZsCb5cQmUv0CjAVIdF82W7Q
+				mUg/YzRLeIyl/wBm0u8/v7TZp/KbGbaKMWMXkjo= )"))
+    packet.add_additional(RR::OPT.new(4096, 0x9e22))
+    packet.header.aa = true
+
+    assert(packet.answer.length == 2)
+    assert(packet.authority.length == 4)
+    assert(packet.additional.length == 7)
+
+    ns3_a_rrset = packet.additional.rrset("ns3.nic.se", "A")
+    assert(ns3_a_rrset.length == 2)
+
+    section_rrsets = packet.section_rrsets
+    assert(section_rrsets["answer"].length == 1)
+    assert(section_rrsets["authority"].length == 1)
+    assert(section_rrsets["additional"].length == 3)
+
+    add_count = 0
+    packet.each_additional {|rr| add_count += 1}
+    assert(add_count == 7)
+
+    packet.additional.remove_rrset(Name.create("ns.nic.se."), Types.AAAA)
+    assert(packet.answer.length == 2)
+    assert(packet.authority.length == 4)
+    assert(packet.additional.length == 5)
+    section_rrsets = packet.section_rrsets
+    assert(section_rrsets["answer"].length == 1)
+    assert(section_rrsets["authority"].length == 1)
+    assert(section_rrsets["additional"].length == 2)
+
+    add_count = 0
+    packet.each_additional {|rr| add_count += 1}
+    assert(add_count == 5)
+
+    packet.additional.remove_rrset(Name.create("ns.nic.se."), Types.A)
+    assert(packet.answer.length == 2)
+    assert(packet.authority.length == 4)
+    assert(packet.additional.length == 3)
+    section_rrsets = packet.section_rrsets
+    assert(section_rrsets["answer"].length == 1)
+    assert(section_rrsets["authority"].length == 1)
+    assert(section_rrsets["additional"].length == 1)
+
+    packet.additional.remove_rrset(Name.create("ns3.nic.se."), Types.A)
+    assert(packet.answer.length == 2)
+    assert(packet.authority.length == 4)
+    assert(packet.additional.length == 1)
+    section_rrsets = packet.section_rrsets
+    assert(section_rrsets["answer"].length == 1)
+    assert(section_rrsets["authority"].length == 1)
+    assert(section_rrsets["additional"].length == 0)
+
+    i = InternalResolver.new
+    i.prune_unrelated_rrsets(packet)
+
+    section_rrsets = packet.section_rrsets
+    assert(packet.answer.length == 2)
+    assert(packet.authority.length == 0)
+    assert(packet.additional.length == 1)
+    assert(section_rrsets["answer"].length == 1)
+    assert(section_rrsets["authority"].length == 0)
+    assert(section_rrsets["additional"].length == 0)
+
   end
 end

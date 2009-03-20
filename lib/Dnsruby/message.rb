@@ -82,6 +82,10 @@ module Dnsruby
 
 
     class Section < Array
+      def initialize(msg = nil)
+        @msg = msg
+        super(0)
+      end
       # Return the rrset of the specified type in this section
       def rrset(name, type=Types.A, klass=Classes::IN)
         rrs = select{|rr| 
@@ -91,7 +95,7 @@ module Dnsruby
           end
           type_ok && (rr.klass == klass) && (rr.name.to_s == name.to_s)
         }
-        rrset = RRSet.new
+        rrset = RRSet.new()
         rrs.each do |rr|
           rrset.add(rr)
         end
@@ -136,28 +140,35 @@ module Dnsruby
         # Remove all RRs with the name and type from the section.
         # Need to worry about header counts here - can we get Message to
         # update the counts itself, rather than the section worrying about it?
+        rrs_to_delete = []
         each do |rr|
-          if ((rr.name == name) && (rr.type == type))
-            delete(rr)
+          next if rr.rr_type == Types.OPT
+          if ((rr.name == name) && 
+                ((rr.type == type) ||
+                  ((rr.type == Types.RRSIG) && (rr.type_covered == type)) ))
+            rrs_to_delete.push(rr)
           end
         end
-        update_counts
+        rrs_to_delete.each {|rr|
+          delete(rr)
+        }
+        @msg.update_counts if @msg
       end
     end
     #Create a new Message. Takes optional name, type and class
-    # 
+    #
     #type defaults to A, and klass defaults to IN
-    # 
+    #
     #*  Dnsruby::Message.new("example.com") # defaults to A, IN
     #*  Dnsruby::Message.new("example.com", 'AAAA')
     #*  Dnsruby::Message.new("example.com", Dnsruby::Types.PTR, "HS")
-    #    
+    #
     def initialize(*args)
       @header = Header.new()
-      @question = Section.new
-      @answer = Section.new
-      @authority = Section.new
-      @additional = Section.new
+      @question = Section.new(self)
+      @answer = Section.new(self)
+      @authority = Section.new(self)
+      @additional = Section.new(self)
       @tsigstate = :Unsigned
       @signing = false
       @tsigkey = nil
@@ -204,7 +215,7 @@ module Dnsruby
     #If this Message is a response from a server, then answersize contains the size of the response
     attr_accessor :answersize
     
-    #If this message has been verified using a TSIG RR then tsigerror contains 
+    #If this message has been verified using a TSIG RR then tsigerror contains
     #the error code returned by the TSIG verification. The error will be an RCode
     attr_accessor :tsigerror
     
@@ -221,8 +232,8 @@ module Dnsruby
     attr_accessor :tsigstart
     #++
     
-    #Set send_raw if you wish to send and receive the response to this Message 
-    #with no additional processing. In other words, if set, then Dnsruby will 
+    #Set send_raw if you wish to send and receive the response to this Message
+    #with no additional processing. In other words, if set, then Dnsruby will
     #not touch the Header of the outgoing Message. This option does not affect
     #caching or dnssec validation
     #
@@ -267,18 +278,18 @@ module Dnsruby
       ret = {}
       ["answer", "authority", "additional"].each do |section|
         ret[section] = self.send(section).rrsets(type, include_opt)
-      end  
-      return ret      
+      end
+      return ret
     end
     
-    #Add a new Question to the Message. Takes either a Question, 
+    #Add a new Question to the Message. Takes either a Question,
     #or a name, and an optional type and class.
-    # 
+    #
     #* msg.add_question(Question.new("example.com", 'MX'))
     #* msg.add_question("example.com") # defaults to Types.A, Classes.IN
     #* msg.add_question("example.com", Types.LOC)
     def add_question(question, type=Types.A, klass=Classes.IN)
-      if (!question.kind_of?Question) 
+      if (!question.kind_of?Question)
         question = Question.new(question, type, klass)
       end
       @question << question
@@ -349,7 +360,7 @@ module Dnsruby
       each_authority {|rec| yield rec}
       each_additional {|rec| yield rec}
     end
-    
+
     # Returns the TSIG record from the ADDITIONAL section, if one is present.
     def tsig
       if (@additional.last)
@@ -408,7 +419,7 @@ module Dnsruby
         rcode = RCode.new(rcode)
       end
       return rcode;
-    end    
+    end
 
     def to_s
       retval = "";
@@ -470,7 +481,7 @@ module Dnsruby
       return retval;
     end
     
-    #Signs the message. If used with no arguments, then the message must have already 
+    #Signs the message. If used with no arguments, then the message must have already
     #been set (set_tsig). Otherwise, the arguments can either be a Dnsruby::RR::TSIG
     #object, or a (name, key) tuple, or a hash which takes
     #Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
@@ -484,12 +495,12 @@ module Dnsruby
       else
         if ((@tsigkey) && @tsigstate == :Unsigned)
           @tsigkey.apply(self)
-        end      
+        end
       end
     end
     
     #Return the encoded form of the message
-    # If there is a TSIG record present and the record has not been signed 
+    # If there is a TSIG record present and the record has not been signed
     # then sign it
     def encode
       if ((@tsigkey) && @tsigstate == :Unsigned && !@signing)
@@ -634,7 +645,7 @@ module Dnsruby
     #The number of records in the additional record section og the message
     attr_accessor :arcount
     
-    def initialize(*args)  
+    def initialize(*args)
       if (args.length == 0)
         @id = rand(MAX_ID)
         @qr = false
@@ -651,7 +662,7 @@ module Dnsruby
         @ancount = 0
         @arcount = 0
       elsif (args.length == 1)
-        decode(args[0])        
+        decode(args[0])
       end
     end
     
@@ -685,7 +696,7 @@ module Dnsruby
         (@tc ? 1:0) << 9 |
         (@rd ? 1:0) << 8 |
         (@ra ? 1:0) << 7 |
-        (@ad ? 1:0) << 5 | 
+        (@ad ? 1:0) << 5 |
         (@cd ? 1:0) << 4 |
         (@rcode.code & 15),
         @qdcount,
@@ -857,7 +868,7 @@ module Dnsruby
         when littlec, bigc
           len += 1
         when littleh, bigh
-          len += 1          
+          len += 1
         when littlen
           len += 2
         when bign
@@ -891,7 +902,7 @@ module Dnsruby
         strings << self.get_string
       end
       strings
-    end    
+    end
     
     def get_name
       return Name.new(self.get_labels)
@@ -902,7 +913,7 @@ module Dnsruby
       d = []
       while true
         temp = @data[@index]
-        if (temp.class == String) 
+        if (temp.class == String)
           temp = (temp.getbyte(0))
         end
         case temp # @data[@index]
@@ -953,7 +964,7 @@ module Dnsruby
       rec.klass = klass
       return rec
     end
-  end 
+  end
   
   class MessageEncoder #:nodoc: all
     def initialize
@@ -1049,12 +1060,12 @@ module Dnsruby
     #
     #If an IPv4 or IPv6 object is used then the type is set to PTR.
     def initialize(*args)
-      if (args.length > 0) 
+      if (args.length > 0)
         @qtype = Types.A
-        if (args.length > 1) 
+        if (args.length > 1)
           @qtype = Types.new(args[1])
           @qclass = Classes.IN
-          if (args.length > 2) 
+          if (args.length > 2)
             @qclass = Classes.new(args[2])
           end
         end
@@ -1105,7 +1116,7 @@ module Dnsruby
       else
         @qname = Name.create(qname)
       end
-    end  
+    end
     
     #Returns a string representation of the question record.
     def to_s
