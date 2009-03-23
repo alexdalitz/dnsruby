@@ -667,6 +667,8 @@ module Dnsruby
       return false
     end
 
+    # @TODO@ Handle REVOKED keys! (RFC 5011)
+
     def follow_chain(anchor, name) # :nodoc:
       # Follow the chain from the anchor to name, returning the appropriate
       # key at the end, or false.
