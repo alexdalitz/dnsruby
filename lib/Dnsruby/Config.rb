@@ -167,15 +167,25 @@ module Dnsruby
       if !ns.kind_of?(Array) ||
           !ns.all? {|n| (Name === n || String === n || IPv4 === n || IPv6 === n)}
         raise ArgumentError.new("invalid nameserver config: #{ns.inspect}")
-      end    
-      ns.each_index do |i|
-        ret = Config.resolve_server(ns[i])
-        if (ret)
-          ns[i]= ret
-        else
-          ns.delete_at(i) # Don't use it if we can't resolve it
-        end
       end
+      ns.each {|n|
+        if (String ===n)
+          # Make sure we can make a Name or an address from it
+          begin
+            a = IPv4.create(n)
+          rescue ArgumentError
+            begin
+              a = IPv6.create(n)
+            rescue ArgumentError
+              begin
+                a = Name.create(n)
+              rescue ArgumentError
+                raise ArgumentError.new("Can't interpret #{n} as IPv4, IPv6 or Name")
+              end
+            end
+          end
+        end
+      }
     end
     
     # Add a nameserver to the list of nameservers.

@@ -80,7 +80,9 @@ class TestDNS < Test::Unit::TestCase
     #
     Dnsruby.log.level=Logger::FATAL
     [:nameserver].each do |test|
-      [{}, 'kjghdfkjhase',1,'\1',nil].each do |input|
+#      [{}, 'kjghdfkjhase',1,'\1',nil].each do |input|
+# Config now only checks that an IPv4, IPv6 or Name can be made with each input
+      [{},1,nil].each do |input|
         res=nil
         begin
           res = Dnsruby::DNS.new({test => input})

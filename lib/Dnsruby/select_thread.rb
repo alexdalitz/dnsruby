@@ -211,6 +211,7 @@ module Dnsruby
     
     def send_response_to_client(msg, bytes, socket)
       # Figure out which client_ids we were expecting on this socket, then see if any header ids match up
+      # @TODO@ Can get rid of this, as we only have one query per socket.
       client_ids=[]
       @@mutex.synchronize{
         client_ids = @@socket_hash[socket]
@@ -343,6 +344,7 @@ module Dnsruby
       rescue Exception => e
 #        print "DECODE ERROR\n"
         Dnsruby.log.error{"Decode error! #{e.class}, #{e}\nfor msg (length=#{buf.length}) : #{buf}"}
+        # @TODO@ Should know this from the socket!
         client_id=get_client_id_from_answerfrom(socket, answerip, answerport)
         if (client_id != nil) 
           send_exception_to_client(e, socket, client_id)
@@ -381,6 +383,7 @@ module Dnsruby
     end
     
     def get_client_id_from_answerfrom(socket, answerip, answerport)
+      # @TODO@ Can get rid of this, as there is only one query per socket
       client_id=nil
       # Figure out client id from answerfrom
       @@mutex.synchronize{
