@@ -938,9 +938,13 @@ module Dnsruby
     end
     
     def get_label
-      label = Name::Label.new(Name::decode(self.get_string))
-      return label
-      #         return Name::Label::Str.new(self.get_string)
+      begin
+        label = Name::Label.new(Name::decode(self.get_string))
+        return label
+        #         return Name::Label::Str.new(self.get_string)
+      rescue ResolvError => e
+        raise DecodeError(e) # Turn it into something more suitable
+      end
     end
     
     def get_question
