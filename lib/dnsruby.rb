@@ -510,19 +510,14 @@ module Dnsruby
     end
     
     
+    require 'Dnsruby/Cache'
     require 'Dnsruby/DNS'
     require 'Dnsruby/Hosts'
     require 'Dnsruby/message'
     require 'Dnsruby/update'
     require 'Dnsruby/zone_transfer'
     require 'Dnsruby/dnssec'
-    require 'Dnsruby/Cache'
     
-    @@cache = Cache.new
-    def Dnsruby.cache # :nodoc:
-      return @@cache
-    end
-
     #Default Resolver to use for Dnsruby class methods
     DefaultResolver = self.new
     

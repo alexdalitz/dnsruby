@@ -46,7 +46,7 @@ module Dnsruby
       cache_if_valid(@query, @response)
 
       # Now send the response back to the client...
-     @st.push_validation_response_to_select(@client_id, @client_queue, @response, @query, @res)
+      @st.push_validation_response_to_select(@client_id, @client_queue, @response, @query, @res)
 
 
       #      end
@@ -96,7 +96,11 @@ module Dnsruby
         # Don't cache any packets with "*" in the query name! (RFC1034 sec 4.3.3)
         if (!question.qname.to_s.include?"*")
           # Now cache response RRSets
-          Cache.add(response);
+          if (query.header.rd)
+            InternalResolver.cache_recursive(response);
+          else
+            InternalResolver.cache_authoritative(response);
+          end
         end
       end
 

@@ -10,47 +10,48 @@
 
 
 #@TODO@ Max size for cache?
-require 'singleton'
 module Dnsruby
   class Cache
-    @@cache = Hash.new
-    @@mutex = Mutex.new
-    def Cache.cache
-      @@cache
+    def initialize()
+    @cache = Hash.new
+    @mutex = Mutex.new
     end
-    def Cache.clear()
-      @@mutex.synchronize {
-        @@cache = Hash.new
+    def cache
+      @cache
+    end
+    def clear()
+      @mutex.synchronize {
+        @cache = Hash.new
       }
     end
-    def Cache.add(message)
+    def add(message)
       q = message.question[0]
       key = CacheKey.new(q.qname, q.qtype, q.qclass).to_s
       data = CacheData.new(message)
-      @@mutex.synchronize {
-        if (@@cache[key])
+      @mutex.synchronize {
+        if (@cache[key])
           TheLog.debug("CACHE REPLACE : #{q.qname}, #{q.qtype}\n")
         else
           TheLog.debug("CACHE ADD : #{q.qname}, #{q.qtype}\n")
         end
-        @@cache[key] = data
+        @cache[key] = data
       }
     end
     # This method "fixes up" the response, so that the header and ttls are OK
     # The resolver will still need to copy the flags and ID across from the query
-    def Cache.find(qname, qtype, qclass = Classes.IN)
+    def find(qname, qtype, qclass = Classes.IN)
 #      print "CACHE find : #{qname}, #{qtype}\n"
       qn = Name.create(qname)
       qn.absolute = true
       key = CacheKey.new(qn, qtype, qclass).to_s
-      @@mutex.synchronize {
-        data = @@cache[key]
+      @mutex.synchronize {
+        data = @cache[key]
         if (!data)
 #          print "CACHE lookup failed\n"
           return nil
         end
         if (data.expiration <= Time.now.to_i)
-          @@cache.delete(key)
+          @cache.delete(key)
           TheLog.debug("CACHE lookup stale\n")
           return nil
         end
@@ -61,8 +62,8 @@ module Dnsruby
     end
     def Cache.delete(qname, qtype, qclass = Classes.IN)
       key = CacheKey.new(qname, qtype, qclass)
-      @@mutex.synchronize {
-        @@cache.delete(key)
+      @mutex.synchronize {
+        @cache.delete(key)
       }
     end
     class CacheKey

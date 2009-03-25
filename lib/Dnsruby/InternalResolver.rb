@@ -17,6 +17,20 @@ require 'Dnsruby/select_thread'
 require 'Dnsruby/iana_ports'
 module Dnsruby
   class InternalResolver # :nodoc: all
+    @@authoritative_cache = Cache.new
+    @@recursive_cache = Cache.new
+
+    def InternalResolver.cache_authoritative(answer)
+      return if !answer.header.aa
+      @@authoritative_cache.add(answer)
+    end
+    def InternalResolver.cache_recursive(answer)
+      @@recursive_cache.add(answer)
+    end
+    def InternalResolver.clear_caches
+      @@recursive_cache.clear
+      @@authoritative_cache.clear
+    end
     attr_accessor :packet_timeout
     
     # The port on the resolver to send queries to.
@@ -238,7 +252,12 @@ module Dnsruby
 
       if (msg.do_caching && (msg.class != Update))
         # Check the cache!!
-        cachedanswer = Cache.find(msg.question()[0].qname, msg.question()[0].type)
+        cachedanswer = nil
+        if (msg.header.rd)
+          cachedanswer = @@recursive_cache.find(msg.question()[0].qname, msg.question()[0].type)
+        else
+          cachedanswer = @@authoritative_cache.find(msg.question()[0].qname, msg.question()[0].type)
+        end
         if (cachedanswer)
           TheLog.debug("Sending cached answer to client\n")
           # @TODO@ Fix up the header - ID and flags

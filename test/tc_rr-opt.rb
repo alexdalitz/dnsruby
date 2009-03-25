@@ -43,7 +43,7 @@ class TestRrOpt < Test::Unit::TestCase
     # Set up a server running on localhost. Get the resolver to send a
     # query to it with the UDP size set to 4096. Make sure that it is received
     # correctly.
-    Cache.clear
+    Dnsruby::InternalResolver.clear_caches
     socket = UDPSocket.new
     socket.bind("127.0.0.1", 0)
     port = socket.addr[1]

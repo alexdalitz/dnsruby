@@ -308,14 +308,6 @@ module Dnsruby
       # Otherwise, see if we know any of its parents (will know at least ".")
       known_zone, known_authorities = get_closest_known_zone_authorities_for(name) # ".", @hints if nothing else
 
-      # @TODO@ Should the InternalResolver cache be used when querying?
-      # Yes, but we don't want non-authoritative replies!
-      # So should a special "Authoritative" cache be used?
-      # @TODO@ Would need to mark message as "authoritative_wanted" or something
-      # check header.rd!!
-      # And make two caches, rather than one.
-      # For now, mark messages as NOT "do_caching"
-
       # Seed name servers with the closest known authority
       #      ret =  _dorecursion( name, type, klass, ".", @hints, 0)
       ret =  _dorecursion( name, type, klass, known_zone, known_authorities, 0)
@@ -492,7 +484,6 @@ module Dnsruby
             query = Message.new(name, type, klass)
             query.header.rd = false
             query.do_validation = false # @TODO@ !!!
-            query.do_caching = false # @TODO@ !!!
             #            print "Sending msg from resolver, dnssec = #{resolver.dnssec}, do_validation = #{query.do_validation}\n"
             packet = resolver.send_message(query)
           rescue ResolvTimeout, IOError => e

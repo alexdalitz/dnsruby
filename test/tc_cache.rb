@@ -4,7 +4,7 @@ include Dnsruby
 
 class TestCache < Test::Unit::TestCase
   def test_cache
-    Cache.clear
+    Dnsruby::InternalResolver.clear_caches
     m1 = Message.new("example.com.", Types.A, Classes.IN)
     rr1 = RR.create("example.com.		3	IN	A	208.77.188.166")
     m1.add_answer(rr1)
@@ -51,7 +51,7 @@ class TestCache < Test::Unit::TestCase
   def test_online
     # @TODO@ !!!
     # Get the records back from the test zone
-    Cache.clear
+    Dnsruby::InternalResolver.clear_caches
     res = SingleResolver.new("ns0.validation-test-servers.nominet.org.uk.")
     res.udp_size = 4096
     query = Message.new("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
