@@ -309,7 +309,7 @@ module Dnsruby
       #      ResolverRegister::register_resolver(self)
     end
     
-    def add_config_nameservers
+    def add_config_nameservers # :nodoc: all
       # Add the Config nameservers
       @config.nameserver.each do |ns|
         @single_resolvers.push(InternalResolver.new({:server=>ns, :dnssec=>@dnssec,

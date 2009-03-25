@@ -570,6 +570,10 @@ module Dnsruby
     def find_closest_dlv_anchor_for(name) # :nodoc:
       # To find the closest anchor, query DLV.isc.org for [a.b.c.d], then [a.b.c], [a.b], etc.
       # once closest anchor found, simply run follow_chain from that anchor
+
+      # @TODO@ REALLY NEED AGGRESSIVE NEGATIVE CACHING HERE!!
+      # i.e. don't look up zones which we *know* we don't have a DLV anchor for
+      
       n = Name.create(name)
       root = Name.create(".")
       while (n != root)

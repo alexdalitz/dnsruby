@@ -284,7 +284,7 @@ module Dnsruby
     #  packet = res.query_dorecursion( "www.netscape.com.", "A")
     #
     #
-    def query_dorecursion(name, type=Types.A, klass=Classes.IN)
+    def query(name, type=Types.A, klass=Classes.IN)
           
       # Make sure the hint servers are initialized.
       self.hints=(Hash.new) unless @hints

@@ -23,7 +23,8 @@ if (type == nil)
   type = Types.A
 end
 begin
-  res.query_dorecursion(ARGV[0], type)
+  ret = res.query(ARGV[0], type)
+  print "\nRESPONSE : #{ret}\n"
 rescue NXDomain
   print "Domain doesn't exist\n"
 end

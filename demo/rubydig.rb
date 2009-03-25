@@ -23,12 +23,19 @@ include Dnsruby
 res = Dnsruby::Resolver.new
 zt=Dnsruby::ZoneTransfer.new
   
+    dlv_key = RR.create("dlv.isc.org. IN DNSKEY 257 3 5 BEAAAAPHMu/5onzrEE7z1egmhg/WPO0+juoZrW3euWEn4MxDCE1+lLy2 brhQv5rN32RKtMzX6Mj70jdzeND4XknW58dnJNPCxn8+jAGl2FZLK8t+ 1uq4W+nnA3qO2+DL+k6BD4mewMLbIYFwe0PG73Te9fZ2kJb56dhgMde5 ymX4BI/oQ+cAK50/xvJv00Frf8kw6ucMTwFlgPe+jnGxPPEmHAte/URk Y62ZfkLoBAADLHQ9IrS2tryAe7mbBZVcOwIeU/Rw/mRx/vwwMCTgNboM QKtUdvNXDrYJDSHZws3xiRXF1Rf+al9UmZfSav/4NWLKjHzpT59k/VSt TDN0YUuWrBNh")
+    Dnssec.add_dlv_key(dlv_key)
+
 if (ARGV && (ARGV[0] =~ /^@/))
-  nameserver = ARGV.shift 
+  nameserver = ARGV.shift
+  if (nameserver == "@auth")
+    res = Dnsruby::Recursor.new
+  else
   print "Setting nameserver : #{nameserver}\n"
   res.nameserver=(nameserver.sub(/^@/, ""))
   print "nameservers = #{res.config.nameserver}\n"
   zt.server=(nameserver.sub(/^@/, ""))
+  end
 end
 
 raise RuntimeError, "Usage: #{$0} [ \@nameserver ] name [ type [ class ] ]\n" unless (ARGV.length >= 1) && (ARGV.length <= 3)
@@ -50,10 +57,9 @@ if (type.upcase == "AXFR")
     
 else
 
-    dlv_key = RR.create("dlv.isc.org. IN DNSKEY 257 3 5 BEAAAAPHMu/5onzrEE7z1egmhg/WPO0+juoZrW3euWEn4MxDCE1+lLy2 brhQv5rN32RKtMzX6Mj70jdzeND4XknW58dnJNPCxn8+jAGl2FZLK8t+ 1uq4W+nnA3qO2+DL+k6BD4mewMLbIYFwe0PG73Te9fZ2kJb56dhgMde5 ymX4BI/oQ+cAK50/xvJv00Frf8kw6ucMTwFlgPe+jnGxPPEmHAte/URk Y62ZfkLoBAADLHQ9IrS2tryAe7mbBZVcOwIeU/Rw/mRx/vwwMCTgNboM QKtUdvNXDrYJDSHZws3xiRXF1Rf+al9UmZfSav/4NWLKjHzpT59k/VSt TDN0YUuWrBNh")
-    Dnssec.add_dlv_key(dlv_key)
 #    Dnsruby::TheLog.level=Logger::DEBUG
   begin
+    answer = nil
     answer = res.query(name, type, klass)
     print answer
   rescue Exception => e
