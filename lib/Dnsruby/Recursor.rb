@@ -15,6 +15,40 @@
 #++
 module Dnsruby
   class Recursor
+    class AddressCache
+      # Like an array, but stores the expiration of each record.
+      def initialize(*args)
+        @hash = Hash.new # stores addresses against their expiration
+      end
+      def push(item)
+        address, ttl = item
+        expiration = Time.now + ttl
+        @hash[address] = expiration
+      end
+      def values
+        ret =[]
+        keys_to_delete = []
+        @hash.keys.each {|address|
+          if (@hash[address] > Time.now)
+            ret.push(address)
+          else
+            keys_to_delete.push(address)
+          end
+        }
+        keys_to_delete.each {|key|
+          @hash.delete(key)
+        }
+        return ret
+      end
+      def length
+        return @hash.length
+      end
+      def each()
+        values.each {|v|
+          yield v
+        }
+      end
+    end
     #= NAME
     #
     #Dnsruby::Recursor - Perform recursive dns lookups
@@ -163,7 +197,7 @@ module Dnsruby
               server = rr.nsdname.to_s.downcase
               server.sub!(/\.$/,"")
               TheLog.debug(";; FOUND HINT: #{server}\n")
-              hints[server] = []
+              hints[server] = AddressCache.new
             end
           end
           packet.additional.each do |rr|
@@ -175,14 +209,14 @@ module Dnsruby
                 #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
                 if (hints[server]!=nil)
                   TheLog.debug(";; STORING IP: #{server} IN A "+rr.address.to_s+"\n")
-                  hints[server]=[rr.address.to_s]
+                  hints[server].push([rr.address.to_s, rr.ttl])
                 end
               end
               if ( rr.type == Types.AAAA)
                 #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
                 if (hints[server])
                   TheLog.debug(";; STORING IP6: #{server} IN AAAA "+rr.address.to_s+"\n")
-                  hints[server]=[rr.address.to_s]
+                  hints[server].push([rr.address.to_s, rr.ttl])
                 end
               end
                   
@@ -191,14 +225,14 @@ module Dnsruby
         end
         #                      foreach my $server (keys %hints) {
         hints.keys.each do |server|
-          if (!hints[server] || hints[server]==[])
+          if (!hints[server] || hints[server].length == 0)
             # Wipe the servers without lookups
             hints.delete(server)
           end
         end
         @hints = hints
       else
-        @hints = []
+        @hints = {}
       end
       if (@hints.size > 0)
         if (@debug)
@@ -253,26 +287,91 @@ module Dnsruby
     def query_dorecursion(name, type=Types.A, klass=Classes.IN)
           
       # Make sure the hint servers are initialized.
-      # @TODO@ This should use a real Cache, which respects TTLs.
       self.hints=(Hash.new) unless @hints
       @resolver.recurse=(0)
       # Make sure the authority cache is clean.
       # It is only used to store A and AAAA records of
       # the suposedly authoritative name servers.
-      # @TODO@ Use a proper cache, which respects TTL!!!
-      # @TODO@ Also, keep cache across queries
-      @authority_cache = Hash.new
-                    
-      # Seed name servers with hints
-      ret =  _dorecursion( name, type, klass, ".", @hints, 0)
+      # TTLs are respected
+      if (!@authority_cache)
+        @authority_cache = Hash.new
+      end
+      if (!@zones_cache)
+        @zones_cache = Hash.new # key zone_name, values Hash of servers and AddressCaches
+        @zones_cache["."] = @hints
+      end
+
+      # So we have normal hashes, but the array of addresses at the end is now an AddressCache
+      # which respects the ttls of the A/AAAA records
+
+      # Now see if we already know the zone in question
+      # Otherwise, see if we know any of its parents (will know at least ".")
+      known_zone, known_authorities = get_closest_known_zone_authorities_for(name) # ".", @hints if nothing else
+
+      # @TODO@ Should the InternalResolver cache be used when querying?
+      # Yes, but we don't want non-authoritative replies!
+      # So should a special "Authoritative" cache be used?
+      # @TODO@ Would need to mark message as "authoritative_wanted" or something
+      # check header.rd!!
+      # And make two caches, rather than one.
+      # For now, mark messages as NOT "do_caching"
+
+      # Seed name servers with the closest known authority
+      #      ret =  _dorecursion( name, type, klass, ".", @hints, 0)
+      ret =  _dorecursion( name, type, klass, known_zone, known_authorities, 0)
       Dnssec.validate(ret)
-      print "\n\nRESPONSE:\n#{ret}\n"
+      #      print "\n\nRESPONSE:\n#{ret}\n"
       return ret
+    end
+
+    def get_closest_known_zone_for(n)
+      # Find the closest parent of name that we know
+      # e.g. for nominet.org.uk, try nominet.org.uk., org.uk., uk., .
+      # does @zones_cache contain the name we're after
+      name = n.tr("","")
+      if (name[name.length-1] != ".")
+        name = name + "."
+      end
+
+      while (true)
+#        print "Checking for known zone : #{name}\n"
+        zone = @zones_cache[name]
+        if (zone != nil)
+          return name
+        end
+        return false if name=="." 
+        # strip the name up to the first dot
+        first_dot = name.index(".")
+        if (first_dot == (name.length-1))
+          name = "."
+        else
+          name = name[first_dot+1, name.length]
+        end
+      end
+    end
+
+    def get_closest_known_zone_authorities_for(name)
+      done = false
+      known_authorities, known_zone = nil
+      while (!done)
+        known_zone = get_closest_known_zone_for(name)
+#        print "GOT KNOWN ZONE : #{known_zone}\n"
+        known_authorities = @zones_cache[known_zone] # ".", @hints if nothing else
+#        print "Known authorities : #{known_authorities}\n"
+
+        # Make sure that known_authorities still contains some authorities!
+        # If not, remove the zone from zones_cache, and start again
+        if (known_authorities.values.length > 0)
+          done = true
+        else
+          @zones_cache.delete(known_zone)
+        end
+      end
+      return known_zone, known_authorities
     end
         
     def _dorecursion(name, type, klass, known_zone, known_authorities, depth)
-      # @TODO@ cache and known_authorities need to have ttls in place - use a proper cache!
-      cache = @authority_cache
+      cache = @authority_cache # this acts as a store of known server_names - NOT zones
           
       if ( depth > 255 )
         TheLog.debug(";; _dorecursion() Recursion too deep, aborting...\n")
@@ -283,10 +382,9 @@ module Dnsruby
       known_zone.sub!(/\.*$/, ".")
           
       # Get IPs from authorities
-      ns = []
+      ns = [] # Array of AddressCaches (was array of array of addresses)
       known_authorities.keys.each do |ns_rec|
         if (known_authorities[ns_rec] != nil  && known_authorities[ns_rec] != [] )
-          # @TODO@ Deal with TTLs here! Use a proper cache...
           cache[ns_rec] = known_authorities[ns_rec]
           ns.push(cache[ns_rec])
         elsif (cache[ns_rec]!=nil && cache[ns_rec]!=[])
@@ -338,7 +436,7 @@ module Dnsruby
                         cname.sub!(/\.*$/, ".")
                         TheLog.debug(";; _dorecursion() Following CNAME ns [#{ns_rec}] -> [#{cname}]\n")
                         if (!(known_authorities[cname]))
-                          known_authorities[cname] = []
+                          known_authorities[cname] = AddressCache.new
                         end
                         known_authorities.delete(ns_rec)
                         next
@@ -351,9 +449,8 @@ module Dnsruby
                       if (known_authorities[server]!=nil)
                         ip = rr.address.to_s
                         TheLog.debug(";; _dorecursion() Found ns: #{server} IN A #{ip}\n")
-                        # @TODO@ Worry about TTLs here - use a proper cache!
                         cache[server] = known_authorities[server]
-                        cache[ns_rec].push(ip)
+                        cache[ns_rec].push([ip, rr.ttl])
                         found_auth+=1
                         next
                       end
@@ -387,15 +484,16 @@ module Dnsruby
         nss.each do |levelns|
           TheLog.debug(";; _dorecursion() Trying nameserver [#{levelns}]\n")
           #        @nameservers=(levelns)
-          #            
+          #
           #        packet = @resolver.query( name, type, klass )
           resolver = SingleResolver.new(levelns.to_s)
           begin
             # Should construct packet ourselves and clear RD bit
             query = Message.new(name, type, klass)
             query.header.rd = false
-            query.do_validation = false
-#            print "Sending msg from resolver, dnssec = #{resolver.dnssec}, do_validation = #{query.do_validation}\n"
+            query.do_validation = false # @TODO@ !!!
+            query.do_caching = false # @TODO@ !!!
+            #            print "Sending msg from resolver, dnssec = #{resolver.dnssec}, do_validation = #{query.do_validation}\n"
             packet = resolver.send_message(query)
           rescue ResolvTimeout, IOError => e
             TheLog.debug(";; nameserver #{levelns.to_s} didn't respond\n")
@@ -433,7 +531,7 @@ module Dnsruby
                       next
                     elsif (of =~ /#{known_zone}/)
                       TheLog.debug(";; _dorecursion() FOUND closer authority for [#{of}] at [#{server}].\n")
-                      auth[server] ||= []
+                      auth[server] ||= AddressCache.new #[]
                     else
                       TheLog.debug(";; _dorecursion() Confused name server [" + @answerfrom + "] thinks [#{of}] is closer than [#{known_zone}]?\n")
                       last
@@ -449,11 +547,11 @@ module Dnsruby
                     server = rr.name.to_s.downcase
                     if (server)
                       server.sub!(/\.*$/, ".")
-                      if (auth[server]!=nil && auth[server]!=[])
+                      if (auth[server]!=nil && auth[server].length > 0)
                         cname = rr.cname.to_s.downcase
                         cname.sub!(/\.*$/, ".")
                         TheLog.debug(";; _dorecursion() FOUND CNAME authority: " + rr.string + "\n")
-                        auth[cname] ||= []
+                        auth[cname] ||= AddressCache.new # []
                         auth[server] = auth[cname]
                         next
                       end
@@ -464,13 +562,13 @@ module Dnsruby
                     if (server)
                       server.sub!(/\.*$/, ".")
                       if (auth[server]!=nil)
-                        if (rr.type = Types.A)
+                        if (rr.type == Types.A)
                           TheLog.debug(";; _dorecursion() STORING: #{server} IN A    " + rr.address.to_s + "\n")
                         end
-                        if (rr.type = Types.AAAA)
+                        if (rr.type == Types.AAAA)
                           TheLog.debug(";; _dorecursion() STORING: #{server} IN AAAA " + rr.address.to_s + "\n")
                         end
-                        auth[server].push(rr.address.to_s)
+                        auth[server].push([rr.address.to_s, rr.ttl])
                         next
                       end
                     end
@@ -478,6 +576,8 @@ module Dnsruby
                   TheLog.debug(";; _dorecursion() Ignoring useless: " + rr.inspect + "\n")
                 end
                 if (of =~ /#{known_zone}/)
+#                  print "Adding #{of} with :\n#{auth}\nto zones_cache\n"
+                  @zones_cache[of]=auth
                   return _dorecursion( name, type, klass, of, auth, depth+1 )
                 else
                   return _dorecursion( name, type, klass, known_zone, known_authorities, depth+1 )
