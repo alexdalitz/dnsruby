@@ -124,27 +124,28 @@ module Dnsruby
 
     @@dlv_verifier = SingleVerifier.new(SingleVerifier::VerifierType::DLV)
 
-    # @TODO@ Could add a new one of these fpr each anchor.
+    # @TODO@ Could add a new one of these for each anchor.
     @@anchor_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ANCHOR)
     # Should we be loading IANA Trust Anchor Repository? - no need - imported by ISC DLV
 
 
     # @TODO@ Should we provide methods like :
-#    def Dnssec.enable_isc_dlv
-#
-#    end
-#    def Dnssec.load_itar
-#
-#    end
-#    def Dnssec.load_tar(tar)
-#
-#    end
+    #    def Dnssec.enable_isc_dlv
+    #
+    #    end
+    #    def Dnssec.load_itar
+    # # @TODO@ Would need to ensure that they were correct
+    # # @TODO@ Provide trace_dns and rubydig with options for these
+    #    end
+    #    def Dnssec.load_tar(tar)
+    #
+    #    end
     def Dnssec.add_dlv_key(dlv_key)
       @@dlv_verifier.add_dlv_key(dlv_key)
     end
     def Dnssec.add_trust_anchor(t)
-        # @TODO@ Create a new verifier?
-        @@anchor_verifier.add_trust_anchor(t)
+      # @TODO@ Create a new verifier?
+      @@anchor_verifier.add_trust_anchor(t)
     end
     # Add the 
     def self.add_trust_anchor_with_expiration(k, expiration)
@@ -195,6 +196,14 @@ module Dnsruby
       if (!found_sigs)
         msg.security_level = Message::SecurityLevel.INSECURE
         return true
+      end
+
+      begin
+        if (verify(msg))
+          msg.security_level = Message::SecurityLevel.SECURE
+          return true
+        end
+      rescue VerifyError
       end
 
 
@@ -278,9 +287,15 @@ module Dnsruby
     end
 
     def self.verify(msg)
-      return ((@@anchor_verifier.verify(msg) ||
-            @@root_verifier.verify(msg) ||
-            @@dlv_verifier.verify(msg)))
+      begin
+        return true if @@anchor_verifier.verify(msg)
+      rescue VerifyError
+        begin
+          return true if @@root_verifier.verify(msg)
+        rescue VerifyError
+          return true if @@dlv_verifier.verify(msg) # Will carry error to client
+        end
+      end
     end
 
     def self.anchor_verifier
