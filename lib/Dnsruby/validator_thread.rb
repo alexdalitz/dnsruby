@@ -43,6 +43,8 @@ module Dnsruby
       #        client_id, client_queue, response, err, query, st, res = item
       validated_ok = validate(@query, @response, @res)
 
+      validated_ok = false if @error
+
       cache_if_valid(@query, @response)
 
       # Now send the response back to the client...
@@ -58,7 +60,7 @@ module Dnsruby
     end
 
     def should_validate
-      if (@query.do_validation)
+      if (!@error && @query.do_validation)
         if (@res.dnssec)
           if (@response.security_level != Message::SecurityLevel::SECURE)
             return true
@@ -81,15 +83,18 @@ module Dnsruby
           # The validator validates it (or just releases it with no validation), and then
           # sends the request to the client via the client queue.
           Dnssec.validate_with_query(query,response)
+          return true
         rescue VerifyError => e
           response.security_error = e
           # Response security_level should already be set
           return false
         end
       end
+      return true
     end
 
     def cache_if_valid(query, response)
+      return if @error
       # ONLY cache the response if it is not an update response
       question = query.question()[0]
       if (query.do_caching && (query.class != Update) &&

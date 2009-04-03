@@ -401,6 +401,10 @@ module Dnsruby
   #Another kind of resolver error has occurred
   class OtherResolvError < ResolvError
   end
+
+  #An error occurred processing the TSIG
+  class TsigError < OtherResolvError
+  end
   
   #Indicates an error in decoding an incoming DNS message
   class DecodeError < ResolvError

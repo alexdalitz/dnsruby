@@ -17,6 +17,7 @@ require 'rubygems'
 require 'test/unit'
 require 'dnsruby'
 require "digest/md5"
+include Dnsruby
 class TestTSig < Test::Unit::TestCase
   KEY_NAME="rubytsig"
   KEY = "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw=="
@@ -24,21 +25,21 @@ class TestTSig < Test::Unit::TestCase
     return (string == "; no data" || string == "; rdlength = 0")
   end
   def test_signed_update
-#    Dnsruby::Resolver::use_eventmachine(false)
+    #    Dnsruby::Resolver::use_eventmachine(false)
     run_test_client_signs
     run_test_resolver_signs
   end
-#  def test_signed_update_em
-#    begin
-#      Dnsruby::Resolver::use_eventmachine(true)
-#    rescue RuntimeError
-#      Dnsruby.log.error("EventMachine not installed - not running tsig EM tests")
-#      return 
-#    end
-#    run_test_client_signs
-#    run_test_resolver_signs
-#    Dnsruby::Resolver::use_eventmachine(false)
-#  end
+  #  def test_signed_update_em
+  #    begin
+  #      Dnsruby::Resolver::use_eventmachine(true)
+  #    rescue RuntimeError
+  #      Dnsruby.log.error("EventMachine not installed - not running tsig EM tests")
+  #      return
+  #    end
+  #    run_test_client_signs
+  #    run_test_resolver_signs
+  #    Dnsruby::Resolver::use_eventmachine(false)
+  #  end
   
   def run_test_client_signs
     # NOTE - client signing is only appropriate if DNSSEC and EDNS are switched
@@ -89,7 +90,7 @@ class TestTSig < Test::Unit::TestCase
     
     # Now check the record does not exist
     Dnsruby::InternalResolver.clear_caches
- # Or else the cache will tell us it still deos!
+    # Or else the cache will tell us it still deos!
     begin
       rr = res.query(update_name, 'TXT')
       assert(false)
@@ -145,7 +146,7 @@ class TestTSig < Test::Unit::TestCase
     
     # Now check the record does not exist
     Dnsruby::InternalResolver.clear_caches
- # Make sure the cache doesn't have an old copy!
+    # Make sure the cache doesn't have an old copy!
     begin
       rr = res.query(update_name, 'TXT')
       assert(false)
@@ -236,6 +237,17 @@ class TestTSig < Test::Unit::TestCase
       soa_rr = dns.getresource(name, 'SOA')
       soa_serial = soa_rr.serial
     }
-    return soa_serial    
+    return soa_serial
+  end
+
+  def test_bad_tsig
+    res = Resolver.new
+    res.query_timeout=5
+    res.tsig=KEY_NAME, KEY
+    begin
+      ret = res.query("example.com")
+      assert(false, "Should not have got TSIG response from non-TSIG server!\n #{ret}\n")
+    rescue TsigError => e
+    end
   end
 end

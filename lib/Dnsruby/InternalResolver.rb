@@ -432,7 +432,9 @@ module Dnsruby
       # @TODO@ Should send_raw avoid this?
       if (!query.send_raw)
         if (!check_tsig(query, response, response_bytes))
-          return false
+            # Should send error back up to Resolver here, and then NOT QUERY AGAIN!!!
+            return TsigError.new
+#          return false
         end
         # Should check that question section is same as question that was sent! RFC 5452
         # If it's not an update...
@@ -496,7 +498,6 @@ module Dnsruby
           if !query.tsig.verify(query, response, response_bytes)
             # Discard packet and wait for correctly signed response
             Dnsruby.log.error{"TSIG authentication failed!"}
-            # @TODO@ Should send error back up to Resolver here, and then NOT QUERY AGAIN!!!
             return false
           end
         else

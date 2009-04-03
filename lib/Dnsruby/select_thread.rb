@@ -236,9 +236,12 @@ module Dnsruby
           }
           tcp = (socket.class == TCPSocket)
           # At this point, we should check if the response is OK
-          if (res.check_response(msg, bytes, query, client_queue, id, tcp))
+          if (ret = res.check_response(msg, bytes, query, client_queue, id, tcp))
             remove_id(id)
             exception = msg.header.get_exception
+            if (ret.instance_of?TsigError)
+              exception = ret
+            end
             Dnsruby.log.debug{"Pushing response to client queue"}
             push_to_client(id, client_queue, msg, exception, query, res)
             #            client_queue.push([id, msg, exception])
@@ -526,6 +529,8 @@ module Dnsruby
       # type of response.
       client_queue.push([client_id, Resolver::EventType::RECEIVED, msg, err])
       notify_queue_observers(client_queue, client_id)
+
+      if (!err)
       #
       # This method now needs to push the response to the validator,
       # which will then take responsibility for delivering it to the client.
@@ -533,6 +538,7 @@ module Dnsruby
       validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
       validator.run
       #      @@validator.add_to_queue([client_id, client_queue, msg, err, query, self, res])
+      end
     end
 
     def add_observer(client_queue, observer)
