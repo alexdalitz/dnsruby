@@ -496,6 +496,7 @@ module Dnsruby
           if !query.tsig.verify(query, response, response_bytes)
             # Discard packet and wait for correctly signed response
             Dnsruby.log.error{"TSIG authentication failed!"}
+            # @TODO@ Should send error back up to Resolver here, and then NOT QUERY AGAIN!!!
             return false
           end
         else

@@ -862,14 +862,12 @@ module Dnsruby
             #        Dnsruby.log.error("Random object #{event.class} returned through queue to Resolver")
           end
         elsif (event_type == Resolver::EventType::VALIDATED)
-          #        if (error != nil)
-          #          handle_validation_error(queue, event_id, error, response)
-          #        else
-          handle_validation_response(queue, event_id, response)
-          #        end
-          # @TODO@ Handle validation response : could be all OK, or an error
+          if (error != nil)
+            handle_validation_error(queue, event_id, error, response)
+          else
+            handle_validation_response(queue, event_id, response)
+          end
         elsif (event_type == Resolver::EventType::ERROR)
-          # @TODO@ Could this be a validation error? If it is, we need to call handle_validation_response...
           handle_error_response(queue, event_id, error, response)
         else
           #          print "ERROR - UNKNOWN EVENT TYPE IN RESOLVER : #{event_type}\n"
@@ -989,6 +987,22 @@ module Dnsruby
       send_result(client_queue, client_query_id, select_queue, response, nil)
       #      }
     end
-  end   
+    
+    def handle_validation_error(select_queue, query_id, error, response)
+      resolver, msg, client_query_id, retry_count = query_id
+      query, client_queue, s_queue, outstanding = @query_list[client_query_id]
+      if (s_queue != select_queue)
+        Dnsruby.log.error{"Serious internal error : expected select queue #{s_queue}, got #{select_queue}"}
+        raise RuntimeError.new("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
+      end
+#      For some errors, we immediately send result. For others, should we retry?
+#      Either :
+#                handle_error_response(queue, event_id, error, response)
+#                Or:
+      send_result(client_queue, client_query_id, select_queue, response, error)
+#                
+#
+    end
+      end
 end
 require "Dnsruby/SingleResolver"

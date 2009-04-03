@@ -178,7 +178,7 @@ module Dnsruby
       @do_validation = true
       @do_caching = true
       @security_level = SecurityLevel.UNCHECKED
-      @security_error = ""
+      @security_error = nil
       @cached = false
       type = Types.A
       klass = Classes.IN

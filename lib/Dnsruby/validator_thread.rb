@@ -41,12 +41,17 @@ module Dnsruby
       ##        }
       #      print "Popped validation request\n"
       #        client_id, client_queue, response, err, query, st, res = item
-      validate(@query, @response, @res)
+      validated_ok = validate(@query, @response, @res)
 
       cache_if_valid(@query, @response)
 
       # Now send the response back to the client...
-      @st.push_validation_response_to_select(@client_id, @client_queue, @response, @query, @res)
+      if (validated_ok)
+        @st.push_validation_response_to_select(@client_id, @client_queue, @response, nil, @query, @res)
+      else
+        @st.push_validation_response_to_select(@client_id, @client_queue, @response,
+          @response.security_error, @query, @res)
+      end
 
 
       #      end
@@ -77,7 +82,7 @@ module Dnsruby
           # sends the request to the client via the client queue.
           Dnssec.validate_with_query(query,response)
         rescue VerifyError => e
-          response.security_error = e.to_s
+          response.security_error = e
           # Response security_level should already be set
           return false
         end

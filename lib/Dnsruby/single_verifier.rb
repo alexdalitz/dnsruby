@@ -262,6 +262,26 @@ module Dnsruby
         }
       end
 
+      # @TODO@ NSEC(3) handling. Get NSEC(3)s in four cases : (RFC 4035, section 3.1.3)
+      # a) No data - <SNAME, SCLASS> matches, but no <SNAME, SCLASS, STYPE) (§3.1.3.1)
+      #     - will expect NSEC in Authority (and associated RRSIG)
+      #     - NOERROR returned
+      # b) Name error - no RRSets that match <SNAME, SCLASS> either exactly or through wildcard expansion   (§3.1.3.2)
+      #     - NSEC wil prove i) no exact match for <SNAME, SCLASS>, and ii) no RRSets that could match through wildcard expansion
+      #     - this may be proved in one or more NSECs (and associated RRSIGs)
+      #     - NXDOMAIN returned
+      # c) Wildcard answer - No <SNAME, SCLASS> direct matches, but matches <SNAME, SCLASS, STYPE> through wildcard expansion (§3.1.3.3)
+      #     - Answer section must include wildcard-expanded answer (and associated RRSIGs)
+      #     - label count in answer RRSIG indicates wildcard RRSet was expanded (less labels than in owner name)
+      #     - Authority section must include NSEC (and RRSIGs) proving that zone does not contain a closer match
+      #     - NOERROR returned
+      # d) Wildcard no data - No <SNAME, SCLASS> direct. <SNAME, SCLASS> yes but <SNAME, SCLASS, STYPE> no through wildcard expansion (§3.1.3.4)
+      #     - Authority section contains NSECs (and RRSIGs) for :
+      #         i) NSEC proving no RRSets matching STYPE at wildcard owner name that matched <SNAME, SCLASS> via wildcard expansion
+      #         ii) NSEC proving no RRSets in zone that would have been closer match for <SNAME, SCLASS>
+      #     - this may be proved by one or more NSECs (and associated RRSIGs)
+      #     - NOERROR returned
+      #
       msg.section_rrsets.each do |section, rrsets|
         rrsets.each do |rrset|
           # If delegation NS or glue AAAA/A, then don't expect RRSIG.

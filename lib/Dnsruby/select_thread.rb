@@ -198,9 +198,11 @@ module Dnsruby
           # Check that the IP we received from was the IP we sent to!
           answerip = msg.answerip.downcase
           answerfrom = msg.answerfrom.downcase
-          if ((answerip != query_settings.dest_server.downcase) && 
-                (answerfrom != query_settings.dest_server.downcase))
-            Dnsruby.log.warn("Unsolicited response received from #{answerip}")
+          dest_server = query_settings.dest_server
+          if (dest_server && (dest_server != '0.0.0.0') &&
+              (answerip != query_settings.dest_server.downcase) &&
+                 (answerfrom != query_settings.dest_server.downcase))
+            Dnsruby.log.warn("Unsolicited response received from #{answerip} instead of #{query_settings.dest_server}")
           else 
             send_response_to_client(msg, bytes, socket)
           end
@@ -443,12 +445,12 @@ module Dnsruby
       end
     end
     
-    def push_validation_response_to_select(client_id, client_queue, msg, query, res)
+    def push_validation_response_to_select(client_id, client_queue, msg, err, query, res)
       # This needs to queue the response TO THE SELECT THREAD, which then needs
       # to send it out from its normal loop.
       Dnsruby.log.debug{"Pushing response to client queue direct from resolver or validator"}
       @@mutex.synchronize{
-        @@queued_validation_responses.push([client_id, client_queue, msg, nil, query, res])
+        @@queued_validation_responses.push([client_id, client_queue, msg, err, query, res])
       }
       # Make sure select loop is running!
       if (@@select_thread && @@select_thread.alive?)
