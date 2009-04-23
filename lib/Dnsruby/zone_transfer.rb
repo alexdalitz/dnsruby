@@ -309,8 +309,8 @@ module Dnsruby
     
     def tcp_read(socket, len) #:nodoc: all
       buf=""
-      while (buf.length < len) do
-        buf += socket.recv(len-buf.length)
+      while (buf.length < len) and not socket.eof? do
+        buf += socket.read(len-buf.length)
       end
       return buf
     end
@@ -318,6 +318,9 @@ module Dnsruby
     def receive_message(socket) #:nodoc: all
       buf = tcp_read(socket, 2)
       answersize = buf.unpack('n')[0]
+      # Some servers (e.g. dnscache) apparently hang up on some connections.
+      # Thanks to Matt Palmer for the fix.
+      raise ResolvError.new("Server did not send a valid answer") if answersize.nil?
       buf = tcp_read(socket, answersize)
       msg = Message.decode(buf)
       if (@tsig)
