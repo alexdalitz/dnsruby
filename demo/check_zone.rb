@@ -26,8 +26,8 @@
 #
 
 
-require 'Dnsruby'
-require 'GetoptLong'
+require 'dnsruby'
+require 'getoptLong'
 
 def check_domain(args)
   domain = args[0]

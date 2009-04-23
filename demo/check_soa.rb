@@ -24,7 +24,7 @@
 #
 #axfr, check_zone, mresolv, mx, perldig, Net::DNS
 
-require 'Dnsruby'
+require 'dnsruby'
 
 #------------------------------------------------------------------------------
 # Get the domain from the command line.

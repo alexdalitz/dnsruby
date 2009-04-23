@@ -43,8 +43,8 @@
 #      Michael Fuhr <mike@fuhr.org>
 #      
 
-require 'GetoptLong'
-require 'Dnsruby'
+require 'getoptLong'
+require 'dnsruby'
 
 #------------------------------------------------------------------------------
 # Read any command-line options and check syntax.

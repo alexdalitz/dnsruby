@@ -1,4 +1,4 @@
-require 'Dnsruby'
+require 'dnsruby'
 
 #= NAME
 #
