@@ -10,6 +10,7 @@ class TestDlv < Test::Unit::TestCase
         Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     Dnsruby::InternalResolver.clear_caches
+#    Dnssec.do_validation_with_recursor(true)
     # @TODO@ Should use whole RRSet of authoritative NS for these resolvers,
     # not individual servers!
     res = Dnsruby::Resolver.new("a.ns.se")
@@ -49,6 +50,7 @@ class TestDlv < Test::Unit::TestCase
   end
 
   def test_scrub_non_authoritative
+#    Dnssec.do_validation_with_recursor(true)
     res = Dnsruby::Resolver.new("ns1.frobbit.se")
     res.add_server("ns.cafax.se")
     ret = res.query("frobbit.se")

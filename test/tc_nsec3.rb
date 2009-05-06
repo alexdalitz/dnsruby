@@ -61,4 +61,9 @@ class Nsec3Test < Test::Unit::TestCase
     assert(nsec.types.include?(Types.TYPE65534))
     assert(nsec.to_s.include?(Types.TYPE65534.string))
   end
+
+  def test_rfc_examples
+    print "IMPLEMENT NSEC3 validation!\n"
+    return
+  end
 end

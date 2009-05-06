@@ -33,6 +33,10 @@ module Dnsruby
   #         If apply_search_list is true, then each member of the search list
   #         is appended to the name.
   #
+  # The Config class has now been modified for lazy loading. Previously, the config
+  # was loaded when a Resolver was instantiated. Now, the config is only loaded if
+  # a query is performed (or a config parameter requested on) a Resolver which has
+  # not yet been configured.
   class Config
     #--
     #@TODO@ Switches for :
@@ -42,13 +46,23 @@ module Dnsruby
     #++
     
     # The list of nameservers to query
-    attr_reader :nameserver
+    def nameserver
+      if (!@configured)
+        parse_config
+      end
+      return @nameserver
+    end
     # Should the search list be applied?
     attr_accessor :apply_search_list
     # Should the default domain be applied?
     attr_accessor :apply_domain
     # The minimum number of labels in the query name (if it is not absolute) before it is considered complete
-    attr_reader :ndots
+    def ndots
+      if (!@configured)
+        parse_config
+      end
+      return @ndots
+    end
     
     # Set the config. Parameter can be :
     # 
@@ -69,12 +83,14 @@ module Dnsruby
     # Create a new Config with system default values  
     def initialize()
       @mutex = Mutex.new
-      parse_config
+      @configured = false
+      #      parse_config
     end
     # Reset the config to default values    
     def Config.reset
       c = Config.new
-      c.parse_config
+      @configured = false
+      #      c.parse_config
     end
     
     def parse_config(config_info=nil) #:nodoc: all
@@ -109,8 +125,11 @@ module Dnsruby
         @apply_search_list = config_hash[:apply_search_list] if config_hash.include? :apply_search_list
         @apply_domain= config_hash[:apply_domain] if config_hash.include? :apply_domain
         dom = config_hash[:domain] if config_hash.include? :domain
-        
-        send("nameserver=",ns)        
+
+        if (!@configured)
+          send("nameserver=",ns)
+        end
+        @configured = true
         send("search=",s)        
         send("ndots=",nd)
         send("domain=",dom)        
@@ -120,6 +139,7 @@ module Dnsruby
     
     # Set the default domain
     def domain=(dom)
+      #      @configured = true
       if (dom)
         if !dom.kind_of?(String)
           raise ArgumentError.new("invalid domain config: #{@domain.inspect}")
@@ -132,6 +152,7 @@ module Dnsruby
     
     # Set ndots
     def ndots=(nd)
+      @configured = true
       @ndots=nd
       if !@ndots.kind_of?(Integer)
         raise ArgumentError.new("invalid ndots config: #{@ndots.inspect}")
@@ -140,6 +161,7 @@ module Dnsruby
     
     # Set the default search path
     def search=(s)
+      @configured = true
       @search=s
       if @search
         if @search.class == Array
@@ -193,6 +215,7 @@ module Dnsruby
     # Can take either a single String or an array of Strings.
     # The new nameservers are added at a higher priority.
     def add_nameserver(ns)
+      @configured = true
       if (ns.kind_of?String) 
         ns=[ns]
       end
@@ -206,6 +229,7 @@ module Dnsruby
     
     # Set the config to point to a single nameserver
     def nameserver=(ns)
+      @configured = true
       check_ns(ns)
       #      @nameserver = ['0.0.0.0'] if (@nameserver.class != Array || @nameserver.empty?)
       # Now go through and ensure that all ns point to IP addresses, not domain names
@@ -290,6 +314,9 @@ module Dnsruby
     end
     
     def to_s
+      if (!@configured)
+        parse_config
+      end
       ret = "Config - nameservers : "
       @nameserver.each {|n| ret += n.to_s + ", "}
       domain_string="empty"
@@ -330,6 +357,9 @@ module Dnsruby
     
     # Return the search path
     def search
+      if (!@configured)
+        parse_config
+      end
       search = []
       @search.each do |s|
         search.push(Name.new(s).to_s)
@@ -339,6 +369,9 @@ module Dnsruby
     
     # Return the default domain
     def domain
+      if (!@configured)
+        parse_config
+      end
       if (@domain==nil)
         return nil
       end
@@ -352,8 +385,17 @@ module Dnsruby
         return nil
       end
     end
+
+    def get_ready
+      if (!@configured)
+        parse_config
+      end
+    end
     
     def generate_candidates(name) #:nodoc: all
+      if !@configured
+        parse_config
+      end
       candidates = []
       name = Name.create(name)
       if name.absolute?

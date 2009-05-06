@@ -64,7 +64,7 @@ class TestResOpt < Test::Unit::TestCase
   
   def test_config_hash_singleresolver
     # Resolver interface gives us : port, TCP, IgnoreTruncation, TSIGkey, timeout
-    # SR : server, local_address, persistent_tcp, persistent_udp, udp_size
+    # SR : server, local_address, udp_size
     test_config = {
       :server	   => '10.0.0.1',
       :port		   => 54, # SingleResolver and Multi-Resolver
@@ -74,8 +74,6 @@ class TestResOpt < Test::Unit::TestCase
       :ignore_truncation          => true, # SingleResolver and Multi-Resolver
       :recurse        => false,
       :packet_timeout    => 60, # SingleResolver and Multi-Resolver # Only have one timeout for both UDP and TCP
-      :persistent_tcp => true, # SingleResolver and Multi-Resolver
-      :persistent_udp => true, # SingleResolver and Multi-Resolver
       :dnssec         => true,
     }
     
@@ -101,8 +99,6 @@ class TestResOpt < Test::Unit::TestCase
       :recurse        => false, 
       :packet_timeout    => 60, # SingleResolver and Multi-Resolver # Only have one timeout for both UDP and TCP
       :query_timeout    => 60, # Multi-Resolver only
-      :persistent_tcp => true, # SingleResolver and Multi-Resolver
-      :persistent_udp => true, # SingleResolver and Multi-Resolver
       :dnssec         => true,
     }
     

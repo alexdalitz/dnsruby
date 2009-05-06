@@ -4,10 +4,13 @@ include Dnsruby
 
 class TestValidator < Test::Unit::TestCase
   def test_validation
+#    Dnsruby::TheLog.level = Logger::DEBUG
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     res = Dnsruby::Resolver.new("dnssec.nominet.org.uk")
     res.dnssec=true
+    Dnsruby::Dnssec.do_validation_with_recursor(false)
+    Dnsruby::Dnssec.default_resolver=(res) # This is a closed zone (not reachable by recursion)
 
     trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
         :type => Dnsruby::Types.DNSKEY,
@@ -24,7 +27,7 @@ class TestValidator < Test::Unit::TestCase
   end
 
   def test_validator
-    print "Test validation rom built-in anchors!\n"
+    print "Test validation from built-in anchors!\n"
     return
     res = Resolver.new
     res.dnssec=true
@@ -41,17 +44,6 @@ class TestValidator < Test::Unit::TestCase
     res.dnssec=true
     r = res.query("uk-dnssec.nic.uk", Dnsruby::Types.A)
     assert(r.security_level = Message::SecurityLevel::INSECURE)
-  end
-
-  # @TODO@ OTHER TESTS!!!
-  def test_nsec
-    print "Test NSEC handling in validation\n"
-    # @TODO@
-  end
-
-  def test_nsec3
-    print "Test NSEC3 handling in validation\n"
-    # @TODO@
   end
 
   def test_eventtype_api

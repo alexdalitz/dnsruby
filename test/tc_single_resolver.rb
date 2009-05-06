@@ -155,7 +155,7 @@ class TestSingleResolver < Test::Unit::TestCase
   
   def test_truncated_response
     res = SingleResolver.new
-    print "Dnssec = #{res.dnssec}\n"
+#    print "Dnssec = #{res.dnssec}\n"
     res.server=('ns0.validation-test-servers.nominet.org.uk')
     res.packet_timeout = 15
     m = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", 'txt')

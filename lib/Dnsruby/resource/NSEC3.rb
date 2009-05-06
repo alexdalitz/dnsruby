@@ -60,6 +60,16 @@ module Dnsruby
       #NSEC RR's owner name
       attr_reader :types
       
+      def check_name_in_range(name)
+        # @TODO@ Check if the name is covered by this record
+        return false
+      end
+
+      def check_name_in_wildcard_range(name)
+        # @TODO@ Check if the name is covered by this record
+        return false
+      end
+
       def hash_alg=(a)
         if (a.instance_of?String)
           if (a.length == 1)

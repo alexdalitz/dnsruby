@@ -44,7 +44,7 @@ module Dnsruby
       when Name
         return Name.new(arg.labels, arg.absolute?)
       when String
-#        arg.gsub!(/\.$/o, "")
+        #        arg.gsub!(/\.$/o, "")
         if (arg==".")
           return Name.new([],true)
         end
@@ -52,7 +52,7 @@ module Dnsruby
           return Name.new([],false)
         end
         return Name.new(split_escaped(arg), /\.\z/ =~ arg ? true : false)
-#        return Name.new(Label.split(arg), /\.\z/ =~ arg ? true : false)
+        #        return Name.new(Label.split(arg), /\.\z/ =~ arg ? true : false)
       when Array
         return Name.new(arg, /\.\z/ =~ ((arg.last.kind_of?String)?arg.last : arg.last.string) ? true : false)
       else        
@@ -104,8 +104,8 @@ module Dnsruby
     end
 
     def strip_label # :nodoc:
-        n = Name.new(self.labels()[1, self.labels.length-1], self.absolute?)
-        return n
+      n = Name.new(self.labels()[1, self.labels.length-1], self.absolute?)
+      return n
     end
     
     #Is this name a wildcard?
@@ -114,6 +114,36 @@ module Dnsruby
         return false
       end
       return (labels[0].string == '*')
+    end
+
+    def canonically_before(n)
+      if (!(Name === n))
+        n = Name.create(n)
+      end
+      # @TODO@ Work out whether this name is canonically before the passed Name
+      # RFC 4034 section 6.1
+      # For the purposes of DNS security, owner names are ordered by treating
+      #individual labels as unsigned left-justified octet strings.  The
+      #absence of a octet sorts before a zero value octet, and uppercase
+      #US-ASCII letters are treated as if they were lowercase US-ASCII
+      #letters.
+      #To compute the canonical ordering of a set of DNS names, start by
+      #sorting the names according to their most significant (rightmost)
+      #labels.  For names in which the most significant label is identical,
+      #continue sorting according to their next most significant label, and
+      #so forth.
+
+      # Get the list of labels for both names, and then swap them
+      my_labels = @labels.reverse
+      other_labels = n.labels.reverse
+      my_labels.each_index {|i|
+        if (!other_labels[i])
+          return false
+        end
+        next if (other_labels[i].downcase == my_labels[i].downcase)
+        return (my_labels[i].downcase < other_labels[i].downcase)
+      }
+      return true
     end
     
     def ==(other) # :nodoc:

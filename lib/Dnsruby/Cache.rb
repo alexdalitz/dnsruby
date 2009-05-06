@@ -11,7 +11,7 @@
 
 #@TODO@ Max size for cache?
 module Dnsruby
-  class Cache
+  class Cache # :nodoc: all
     def initialize()
     @cache = Hash.new
     @mutex = Mutex.new

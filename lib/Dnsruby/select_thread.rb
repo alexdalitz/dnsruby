@@ -238,7 +238,7 @@ module Dnsruby
           # At this point, we should check if the response is OK
           if (ret = res.check_response(msg, bytes, query, client_queue, id, tcp))
             remove_id(id)
-            exception = msg.header.get_exception
+            exception = msg.get_exception
             if (ret.instance_of?TsigError)
               exception = ret
             end
@@ -254,6 +254,7 @@ module Dnsruby
       end
       # If not, then we have an error
       Dnsruby.log.error{"Stray packet - " + msg.inspect + "\n from " + socket.inspect}
+      print("Stray packet - " + msg.question()[0].qname.to_s + " from " + msg.answerip.to_s + ", #{client_ids.length} client_ids\n")
     end
     
     def remove_id(id)
@@ -496,8 +497,9 @@ module Dnsruby
         # So, if we need to validate it, send it to the validation thread
         # Otherwise, send VALIDATED to the requester.
         # Should we really just be checking (level != SECURE) ?
-        if ((msg.security_level == Message::SecurityLevel::UNCHECKED) ||
-              (msg.security_level == Message::SecurityLevel::INDETERMINATE))
+        if (((msg.security_level == Message::SecurityLevel::UNCHECKED) ||
+              (msg.security_level == Message::SecurityLevel::INDETERMINATE)) &&
+            (ValidatorThread.requires_validation?(query, msg, err, res)))
           validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
           validator.run
         else
@@ -530,7 +532,7 @@ module Dnsruby
       client_queue.push([client_id, Resolver::EventType::RECEIVED, msg, err])
       notify_queue_observers(client_queue, client_id)
 
-      if (!err)
+      if (!err || (err.instance_of?(NXDomain)))
       #
       # This method now needs to push the response to the validator,
       # which will then take responsibility for delivering it to the client.

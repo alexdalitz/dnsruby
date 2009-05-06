@@ -36,13 +36,13 @@ class TestResolver < Test::Unit::TestCase
     ret = res.send_message(Message.new("example.com", Types.A))
     assert(ret.kind_of?(Message))
   end
-  
+
   def test_query
     res = Resolver.new
     ret = res.query("example.com")
     assert(ret.kind_of?(Message))
   end
-  
+
   def test_query_async
     res = Resolver.new
     q = Queue.new
@@ -52,7 +52,7 @@ class TestResolver < Test::Unit::TestCase
     assert(ret.kind_of?(Message), "Ret wrong!")
     assert(error==nil)
   end
-  
+
   def test_query_one_duff_server_one_good
     res = Resolver.new({:nameserver => ["localhost", "128.8.10.90"]})
     res.retry_delay=1

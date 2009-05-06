@@ -2,7 +2,7 @@ module Dnsruby
   # Takes care of the validation for the SelectThread. If queries need to be
   # made in order to validate the response, then a separate thread is fired up
   # to do this.
-  class ValidatorThread
+  class ValidatorThread # :nodoc: all
     #    include Singleton
     def initialize(*args)
       @client_id, @client_queue, @response, @err, @query, @st, @res = args
@@ -48,6 +48,7 @@ module Dnsruby
       cache_if_valid(@query, @response)
 
       # Now send the response back to the client...
+#      print "#{Time.now} : Got result for #{@query.question()[0].qname}, #{@query.question()[0].qtype}\n"
       if (validated_ok)
         @st.push_validation_response_to_select(@client_id, @client_queue, @response, nil, @query, @res)
       else
@@ -59,10 +60,16 @@ module Dnsruby
       #      end
     end
 
+
     def should_validate
-      if (!@error && @query.do_validation)
-        if (@res.dnssec)
-          if (@response.security_level != Message::SecurityLevel::SECURE)
+      return ValidatorThread.requires_validation?(@query, @response, @error, @res)
+    end
+
+    def ValidatorThread.requires_validation?(query, response, error, res)
+      # @error will be nil for DNS RCODE errors - it will be true for TsigError. really?!
+      if ((!error || (error.instance_of?NXDomain)) && query.do_validation)
+        if (res.dnssec)
+          if (response.security_level != Message::SecurityLevel::SECURE)
             return true
           end
         end
@@ -95,6 +102,7 @@ module Dnsruby
 
     def cache_if_valid(query, response)
       return if @error
+      return if response.cached
       # ONLY cache the response if it is not an update response
       question = query.question()[0]
       if (query.do_caching && (query.class != Update) &&

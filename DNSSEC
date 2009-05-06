@@ -7,9 +7,13 @@ Dnsruby provides a recursive, validating security-aware stub resolver which main
 
 The dnssec security status of a message is stored in Message#security_level (defined by Message::SecurityLevel).
 
-In the absence of a signed root, it is possible to configure dnsruby with individual trust ancors. It is also possible to import a trust anchor repository (such as the one maintained by IANA), and configure the ISC DLV registry.
+It is possible to tell Dnsruby to use a Recursor or a defined (or system default) Resolver to perform the validation. The default is to use a Recursor, as many systems are behind dodgy servers which mangle the DNS records. Using a Recursor means that only authoritative nameservers are queried for the DNSSEC records.
+
+In the absence of a signed root, Dnsruby has no trust anchor to validate messages against. It is possible to manually configure dnsruby with individual trust ancors. It is also possible to import a trust anchor repository (such as the one maintained by IANA), and configure the ISC DLV registry. Dnsruby contains basic methods to do this, although they are not currently secured. Clients are recommended to develop their own means of obtaining the initial trust anchors.
 
 It is possible to turn off dnssec validation on a per-message basis. Simply set Message#do_validation to false.
 
 DNSSEC is on by default - if desired, you can turn it off with the dnssec flag in Dnsruby::(Single)Resolver if desired. EDNS0 support is also enabled by default - if desired, you can turn this off by setting the Dnsruby::(Single)Resolver#udp_packet_size property to be 512. There should generally be no need to do this.
+
+Dnsruby maintains a cache of responses, and a cache of trusted keys. Once the initial keys have been downloaded, and a set of trusted keys built up, very little overhead is required to enjoy the benefits of DNSSEC. There is, however, some initial cost (to build up the caches).
 

@@ -58,6 +58,12 @@ module Dnsruby
   #
   #      Dnsruby::Message#encode
   #      Dnsruby::Message::decode(data)
+  #
+  #===Additional information
+  #security_level records the current DNSSEC status of this Message.
+  #answerfrom records the server which this Message was received from.
+  #cached records whether this response came from the cache.
+  #
   class Message
     # The security level (see RFC 4035 section 4.3)
     class SecurityLevel < CodeMapper
@@ -93,7 +99,7 @@ module Dnsruby
           if (rr.type == Types.RRSIG)
             type_ok = (rr.type_covered == type)
           end
-          type_ok && (rr.klass == klass) && (rr.name.to_s == name.to_s)
+          type_ok && (rr.klass == klass) && (rr.name.to_s.downcase == name.to_s.downcase)
         }
         rrset = RRSet.new()
         rrs.each do |rr|
@@ -104,12 +110,26 @@ module Dnsruby
       
       # Return an array of all the rrsets in the section
       def rrsets(type = nil, include_opt = false)
+        if (type && !(Types === type))
+          type = Types.new(type)
+        end
         ret = []
         each do |rr|
           next if (!include_opt && (rr.type == Types.OPT))
+          #          if (type)
+          #            next if ((rr.type == Types.RRSIG) && (type != Types.RRSIG) && (rr.type_covered != type))
+          #            next if (rr.type != type)
+          #          end
           if (type)
+            # if this is an rrsig type, then :
+            #    only include it if the type_covered is the type requested,
+            #    OR if the type requested is an RRSIG
             if (rr.type == Types.RRSIG)
-              next if (rr.type_covered != type)
+              if ((rr.type_covered == type) || (type == Types.RRSIG))
+              else
+                next
+              end
+#              next if ((rr.type_covered != type) || (type != Types.RRSIG))
             elsif (rr.type != type)
               next
             end
@@ -143,7 +163,7 @@ module Dnsruby
         rrs_to_delete = []
         each do |rr|
           next if rr.rr_type == Types.OPT
-          if ((rr.name == name) && 
+          if ((rr.name.to_s.downcase == name.to_s.downcase) &&
                 ((rr.type == type) ||
                   ((rr.type == Types.RRSIG) && (rr.type_covered == type)) ))
             rrs_to_delete.push(rr)
@@ -222,7 +242,7 @@ module Dnsruby
     #Can be
     #* :Unsigned - the default state
     #* :Signed - the outgoing message has been signed
-    #* :Verified - the incoming message has been verified
+    #* :Verified - the incoming message has been verified by TSIG
     #* :Intermediate - the incoming message is an intermediate envelope in a TCP session
     #in which only every 100th envelope must be signed
     #* :Failed - the incoming response failed verification
@@ -250,6 +270,24 @@ module Dnsruby
     #set do_caching to false.
     attr_accessor :do_caching
 
+    def get_exception
+      exception = nil
+      if (rcode==RCode.NXDOMAIN)
+        exception = NXDomain.new
+      elsif (rcode==RCode.SERVFAIL)
+        exception = ServFail.new
+      elsif (rcode==RCode.FORMERR)
+        exception = FormErr.new
+      elsif (rcode==RCode.NOTIMP)
+        exception = NotImp.new
+      elsif (rcode==RCode.REFUSED)
+        exception = Refused.new
+      elsif (rcode >= RCode.BADVERS && rcode <= RCode.BADALG)
+        return VerifyError.new # @TODO@
+      end
+      return exception
+    end
+
     def ==(other)
       ret = false
       if (other.kind_of?Message)
@@ -261,15 +299,26 @@ module Dnsruby
       end
       return ret
     end
-    
-    # Return the rrset of the specified type in the  section
-    def rrset(type, klass=Classes::IN)
+
+    # Return the first rrset of the specified attributes in the message
+    def rrset(name, type, klass = Classes::IN)
       [@answer, @authority, @additional].each do |section|
-        if ((rrset = section.rrset(type, klass)).length > 0)
+        if ((rrset = section.rrset(name, type, klass)).length > 0)
           return rrset
         end
       end
-      return nil
+      return RRSet.new
+    end
+    
+    # Return the rrsets of the specified type in the message
+    def rrsets(type, klass=Classes::IN)
+      rrsets = []
+      [@answer, @authority, @additional].each do |section|
+        if ((rrset = section.rrsets(type, klass)).length > 0)
+          rrsets.push(rrset)
+        end
+      end
+      return rrsets
     end
     
     # Return a hash, with the section as key, and the RRSets in that
@@ -781,22 +830,6 @@ module Dnsruby
       @rcode = RCode.new(flag & 15)
     end
     
-    def get_exception
-      exception = nil
-      if (@rcode==RCode.NXDOMAIN)
-        exception = NXDomain.new
-      elsif (@rcode==RCode.SERVFAIL)
-        exception = ServFail.new
-      elsif (@rcode==RCode.FORMERR)
-        exception = FormErr.new
-      elsif (@rcode==RCode.NOTIMP)
-        exception = NotImp.new
-      elsif (@rcode==RCode.REFUSED)
-        exception = Refused.new
-      end
-      return exception
-    end
-    
     alias zocount qdcount
     alias zocount= qdcount=
     
@@ -1064,11 +1097,11 @@ module Dnsruby
     #
     #If an IPv4 or IPv6 object is used then the type is set to PTR.
     def initialize(*args)
+      @qtype = Types.A
+      @qclass = Classes.IN
       if (args.length > 0)
-        @qtype = Types.A
         if (args.length > 1)
           @qtype = Types.new(args[1])
-          @qclass = Classes.IN
           if (args.length > 2)
             @qclass = Classes.new(args[2])
           end

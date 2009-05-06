@@ -30,8 +30,6 @@ class TestResolverConfig < Test::Unit::TestCase
 	"ignore_truncation"          => true,
 	"recurse"        => false,
 	"packet_timeout"    => 5,
-	"persistent_tcp" => true,
-	"persistent_udp" => true,
     #	"dnssec"         => 1,
     #	"force_v4"       => 1,
   };
@@ -54,7 +52,7 @@ class TestResolverConfig < Test::Unit::TestCase
     assert(res, "new returned something");
     assert_instance_of(Dnsruby::Resolver, res, "new() returns an object of the correct class.");
     
-    assert(res.config.nameserver,       'nameserver() works');
+#    assert(res.config.nameserver,       'nameserver() works');
     
     searchlist = ["t.dnsruby.validation-test-servers.nominet.org.uk", "t2.dnsruby.validation-test-servers.nominet.org.uk"];
     assert_equal(res.config.search=searchlist, searchlist, 'setting searchlist returns correctly.');

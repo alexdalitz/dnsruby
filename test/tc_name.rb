@@ -50,4 +50,25 @@ class TestName < Test::Unit::TestCase
     n = Name.create("*.example.com.")
     assert(n.wild?)
   end
+
+  def test_canonical_ordering
+    names = []
+    names.push(Name.create("example"))
+    names.push(Name.create("a.example"))
+    names.push(Name.create("yljkjljk.a.example"))
+    names.push(Name.create("Z.a.example"))
+    names.push(Name.create("zABC.a.EXAMPLE"))
+    names.push(Name.create("z.example"))
+#    names.push(Name.create("\001.z.example")) # @TODO@ Binary labels in strings
+    names.push(Name.create("*.z.example"))
+#    names.push(Name.create("\200.z.example")) # @TODO@ Binary labels in strings
+    names.each_index {|i|
+      if (i < (names.length() - 1))
+        assert(names[i].canonically_before(names[i+1]))
+        assert(!(names[i+1].canonically_before(names[i])))
+      end
+    }
+    assert(Name.create("x.w.example").canonically_before(Name.create("z.w.example")))
+    assert(Name.create("x.w.example").canonically_before(Name.create("a.z.w.example")))
+  end
 end

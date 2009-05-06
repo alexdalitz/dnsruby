@@ -14,81 +14,36 @@
 #limitations under the License.
 #++
 require 'digest/sha2'
+require 'net/ftp'
 require 'Dnsruby/key_cache'
 require 'Dnsruby/single_verifier'
-#---
-# @TODO@
+module Dnsruby
+
 # RFC4033, section 7
-#   There is one more step that a security-aware stub resolver can take
+#   "There is one more step that a security-aware stub resolver can take
 #   if, for whatever reason, it is not able to establish a useful trust
 #   relationship with the recursive name servers that it uses: it can
 #   perform its own signature validation by setting the Checking Disabled
 #   (CD) bit in its query messages.  A validating stub resolver is thus
 #   able to treat the DNSSEC signatures as trust relationships between
-#   the zone administrators and the stub resolver itself. 
-#+++
-module Dnsruby
-  # Dnsruby will, by default, request DNSSEC records on each query. It
-  # will also, by default, request that any checking be done by an upstream 
-  # resolver - this assumes a secure link to a trusted resolver. In this case,
-  # the client application need do nothing to enjoy the benefits of DNSSEC.
-  # 
-  # If an insecure link or untrusted resolver is used, then it is possible to
-  # verify messages using the Dnsruby::Dnssec#verify method, once a chain
-  # of trust has been established. In the absence of a signed root, the client 
-  # application must supply Dnsruby
-  # with a (set of) trusted key(s). Dnsruby can then use those keys to verify 
-  # responses, and build up a new set of trusted keys under the apex of the
-  # supplied trusted key. For example : 
-  #
-  #  res = Dnsruby::Resolver.new("dnssec.nominet.org.uk")
-  #
-  #  # Create the trusted key that we know for a parent zone of the zone
-  #  # we are interested in. This is assumed to be a Secure Entry Point
-  #  # (the SEP flag of the key will be set by default if a DNSKEY is used)
-  #  # A DS RR could also be used here
-  #  trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
-  #      :type => Dnsruby::Types.DNSKEY,
-  #      :key=> "AQPJO6LjrCHhzSF9PIVV7YoQ8iE31FXvghx+14E+jsv4uWJR9jLrxMYm sFOGAKWhiis832ISbPTYtF8sxbNVEotgf9eePruAFPIg6ZixG4yMO9XG LXmcKTQ/cVudqkU00V7M0cUzsYrhc4gPH/NKfQJBC5dbBkbIXJkksPLv Fe8lReKYqocYP6Bng1eBTtkA+N+6mSXzCwSApbNysFnm6yfQwtKlr75p m+pd0/Um+uBkR4nJQGYNt0mPuw4QVBu1TfF5mQYIFoDYASLiDQpvNRN3 US0U5DEG9mARulKSSw448urHvOBwT9Gx5qF2NE4H9ySjOdftjpj62kjb Lmc8/v+z"
-  #    })
-  #  ret = Dnsruby::DnssecVerifier.add_trust_anchor(trusted_key)
-  #
-  #  # Now use the trusted key to obtain the other keys for the zone
-  #  r = res.query("uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-  #  if (!Dnsruby::DnssecVerifier.verify(r))
-  #     # handle verification failure
-  #  end
-  #
-  #  r = res.query("www.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-  #  if (!Dnsruby::DnssecVerifier.verify(r))
-  #     # handle verification failure
-  #  end
-  #
-  #  # Follow the chain of trust
-  #  r = res.query("bigzone.uk-dnssec.nic.uk", Dnsruby::Types.DS)
-  #  if (!Dnsruby::DnssecVerifier.verify(r))
-  #     # handle verification failure
-  #  end
-  #    
-  #  r = res.query("bigzone.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-  #  if (!Dnsruby::DnssecVerifier.verify(r))
-  #     # handle verification failure
-  #  end
-  #    
-  #  # Now query records in the zone we are interested in. 
-  #  # Dnsruby stores all the keys so we can now verify any record signed by
-  #  # any key in the trusted key store.
-  #  r = res.query("aaa.bigzone.uk-dnssec.nic.uk", Dnsruby::Types.ANY)
-  #  if (!Dnsruby::DnssecVerifier.verify(r))
-  #     # handle verification failure
-  #  end
-  #  
-  #  # Verify an rrset
-  #  rrset = r.answer.rrset('NSEC')
-  #  if (!Dnsruby::DnssecVerifier.verify(rrset))
-  #     # handle verification failure
-  #  end
-
+#   the zone administrators and the stub resolver itself. "
+#
+# Dnsruby is configured to validate responses by default. However, it is not
+# configured with any trusted keys by default. Applications may use the
+# verify() method to perform verification with of RRSets of Messages with
+# given keys. Alternatively, trusted keys may be added to this class (either
+# directly, or by loading the IANA TAR or the DLV ISC ZSK). Validation will then
+# be performed from these keuys (or the DLV registry, if configured). Negative
+# and positive responses are validation.
+#
+# Messages are tagged with the current security_level (Message::SecurityLevel).
+# UNCHECKED means Dnsruby has not attempted to validate the response.
+# BOGUS means the response has been checked, and is bogus.
+# INSECURE means the response has been validation to be insecure (e.g. in an unsigned zone)
+# SECURE means that the response has been verfied to be correct.
+#
+# Several validators are provided, with each maintaining its own cache of trusted keys.
+# If validators are added or removed, the caches of the other validators are not affected.
   class Dnssec
     # A class to cache trusted keys
 
@@ -129,30 +84,21 @@ module Dnsruby
     # Should we be loading IANA Trust Anchor Repository? - no need - imported by ISC DLV
 
 
-    # @TODO@ Should we provide methods like :
-    #    def Dnssec.enable_isc_dlv
-    #
-    #    end
-    #    def Dnssec.load_itar
-    # # @TODO@ Would need to ensure that they were correct
-    # # @TODO@ Provide trace_dns and rubydig with options for these
-    #    end
-    #    def Dnssec.load_tar(tar)
-    #
-    #    end
+    # Add a trusted Key Signing Key for the ISC DLV registry.
     def Dnssec.add_dlv_key(dlv_key)
       @@dlv_verifier.add_dlv_key(dlv_key)
     end
+    # Add a new trust anchor
     def Dnssec.add_trust_anchor(t)
       # @TODO@ Create a new verifier?
       @@anchor_verifier.add_trust_anchor(t)
     end
-    # Add the 
+    # Add the trusted key with the given expiration time
     def self.add_trust_anchor_with_expiration(k, expiration)
       # Create a new verifier?
       @@anchor_verifier.add_trust_anchor_with_expiration(k, expiration)
     end
-    
+    # Remove the trusted key
     def Dnssec.remove_trust_anchor(t)
       @@anchor_verifier.remove_trust_anchor(t)
     end
@@ -169,6 +115,59 @@ module Dnsruby
       [@@anchor_verifier, @@root_verifier, @@dlv_verifier].each {|v|
         v.clear_trusted_keys
       }
+    end
+    # Load the IANA TAR.
+    # THIS METHOD IS NOT SECURE!!!
+    def self.load_itar
+      # @TODO@ THIS IS VERY INSECURE!! WRITE THIS PROPERLY!!
+      # Should really check the signatures here to make sure the keys are good!
+      Net::FTP::open("ftp.iana.org") { |ftp|
+        ftp.login("anonymous")
+        ftp.chdir("/itar")
+        lastname=nil
+        ftp.gettextfile("anchors.mf") {|line|
+          next if (line.strip.length == 0)
+          first = line[0]
+          if (first.class == String)
+            first = first.getbyte(0) # Ruby 1.9
+          end
+#            print "Reading ITAR : #{line}, first : #{first}\n"
+          next if (first==59) # ";")
+          if (line.strip=~(/^DS /) || line.strip=~(/^DNSKEY /))
+            line = lastname.to_s + ((lastname.absolute?)?".":"") + " " + line
+          end
+          ds = RR.create(line)
+          if ((ds.type == Types.DS) || (ds.type == Types.DNSKEY))
+            #            assert(ds.name.absolute?)
+            Dnssec.add_trust_anchor(ds)
+          end
+          lastname = ds.name
+        }
+      }
+    end
+
+
+    @@do_validation_with_recursor = true # Many nameservers don't handle DNSSEC correctly yet
+    @@default_resolver = nil
+    # This method defines the choice of Resolver or Recursor, when the validator
+    # is checking responses.
+    # If set to true, then a Recursor will be used to query for the DNSSEC records.
+    # Otherwise, the default system resolver will be used.
+    def self.do_validation_with_recursor(on)
+      @@do_validation_with_recursor = on
+    end
+    def self.do_validation_with_recursor?
+      return @@do_validation_with_recursor
+    end
+    # This method overrides the system default resolver configuration for validation
+    # If default_resolver is set, then it will be used to follow the chain of trust.
+    # If it is not, then the default system resolver will be used (unless do_validation_with_recursor
+    # is set.
+    def self.default_resolver=(res)
+      @@default_resolver = res
+    end
+    def self.default_resolver
+      return @@default_resolver
     end
 
     # Returns true for secure/insecure, false otherwise
@@ -193,19 +192,15 @@ module Dnsruby
           found_sigs = true
         end
       }
-      if (!found_sigs)
-        msg.security_level = Message::SecurityLevel.INSECURE
-        return true
-      end
-
-      begin
-        if (verify(msg))
-          msg.security_level = Message::SecurityLevel.SECURE
-          return true
+      if (found_sigs)
+        begin
+          if (verify(msg))
+            msg.security_level = Message::SecurityLevel.SECURE
+            return true
+          end
+        rescue VerifyError
         end
-      rescue VerifyError
       end
-
 
       # SHOULD ALWAYS VERIFY DNSSEC-SIGNED RESPONSES?
       # Yes - if a trust anchor is configured. Otherwise, act on CD bit (in query)
@@ -267,13 +262,6 @@ module Dnsruby
       return last_level, last_error, last_error_level
     end
         
-    # We need to maintain several sets of trusted keys :
-    #   : one for signed root, one for local anchors, and one from dlv
-    #
-    # So, keep DNSSEC validation level stuff in this class, and split verification
-    # and validation out to SingleVerifiers (which can each do every type of validation,
-    # but which will only be asked to do one type). i.e. DlvVerifier, RootVerifier,
-    # AnchorVerifier, etc. Would you have one AnchorVerifier for each trust anchor?
     def self.validate_with_anchors(msg, query)
       return @@anchor_verifier.validate(msg, query)
     end

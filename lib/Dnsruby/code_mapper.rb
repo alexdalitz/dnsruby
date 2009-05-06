@@ -23,7 +23,7 @@ module Dnsruby
   # Example :
   #   Types::AAAA or Types.AAAA
   #   rcode.string or rcode.code
-  class CodeMapper
+  class CodeMapper # :nodoc: all
     include Comparable
     
     @@strings = {}

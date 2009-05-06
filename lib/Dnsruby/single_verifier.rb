@@ -37,36 +37,16 @@ module Dnsruby
       @configured_ds_store = []
     end
 
-    def get_dlv_resolver
-      res = Resolver.new
-      query = Message.new("dlv.isc.org.", Types.NS)
-      query.do_validation = false
-      ret = nil
-      begin
-        ret = res.send_message(query)
-      rescue ResolvTimeout => e
-        #        print "ERROR - Can't get DLV nameserver : #{e}\n"
-        TheLog.error("Can't get DLV nameserver : #{e}")
-        return Resolver.new # @TODO@ !!!
+    def get_dlv_resolver # :nodoc:
+      if (Dnssec.do_validation_with_recursor?)
+        return Recursor.new
+      else
+        if (Dnssec.default_resolver)
+          return Dnssec.default_resolver
+        else
+          return Resolver.new
+        end
       end
-      ns_rrset = ret.answer.rrset("dlv.isc.org", Types.NS)
-      nameservers = []
-      ns_rrset.rrs.sort_by {rand}.each {|rr|
-        nameservers.push(rr.nsdname)
-      }
-      if (nameservers.length == 0)
-        #        print "Can't find DLV nameservers!\n"
-        TheLog.error("Can't find DLV nameservers!\n")
-      end
-      res = Resolver.new
-      #      nameservers.each {|addr|
-      #        sr = SingleResolver.new(addr)
-      #        sr.dnssec = true
-      #        res.add_resolver(sr)
-      #      }
-      res.nameserver = nameservers
-      res.update
-      return res
     end
     def add_dlv_key(key)
       # Is this a ZSK or a KSK?
@@ -80,13 +60,14 @@ module Dnsruby
       if (!@res && (@verifier_type == VerifierType::DLV))
         @res = get_dlv_resolver
       end
-      query = Message.new("dlv.isc.org.", Types.DNSKEY)
-      query.do_validation = false
       #      print "Sending query : res.dnssec = #{@res.dnssec}"
       ret = nil
       begin
-        ret = @res.send_message(query)
-      rescue ResolvTimeout => e
+        ret = @res.query_no_validation_or_recursion("dlv.isc.org.", Types.DNSKEY)
+        if (!ret)
+          raise ResolvError.new("Couldn't get response from Recursor")
+        end
+      rescue ResolvError => e
         #        print "ERROR - Couldn't find the DLV key\n"
         TheLog.error("Couldn't find the DLV key\n")
         return
@@ -226,7 +207,6 @@ module Dnsruby
     #
     # Returns true if the message verifies OK, and false otherwise.
     def verify(msg, keys = nil)
-#      print "VERIFY CALLED\n"
       if (msg.kind_of?RRSet)
         if (msg.type == Types.DNSKEY)
           return verify_key_rrset(msg, keys)
@@ -237,61 +217,45 @@ module Dnsruby
         end
         return verify_rrset(msg, keys)
       end
-#      print "VERIFY about to start\n"
       # Use the set of trusted keys to check any RRSets we can, ideally
       # those of other DNSKEY RRSets first. Then, see if we can use any of the
       # new total set of keys to check the rest of the rrsets.
       # Return true if we can verify the whole message.
 
       msg.each_section do |section|
+#        print "Checking section : #{section}\n"
         ds_rrsets = section.rrsets(Types.DS)
         if ((!ds_rrsets || ds_rrsets.length == 0) && (@verifier_type == VerifierType::DLV))
           ds_rrsets = section.rrsets(Types.DLV)
         end
         ds_rrsets.each {|ds_rrset|
           if ((ds_rrset && ds_rrset.rrs.length > 0) && !verify_ds_rrset(ds_rrset, keys, msg))
-            return false
+            raise VerifyError.new("Failed to verify DS RRSet")
+            #            return false
           end
         }
 
         key_rrsets = section.rrsets(Types.DNSKEY)
         key_rrsets.each {|key_rrset|
           if ((key_rrset && key_rrset.rrs.length > 0) && !verify_key_rrset(key_rrset, keys))
-            return false
+            raise VerifyError.new("Failed to verify DNSKEY RRSet")
+            #            return false
           end
         }
       end
 
-      # @TODO@ NSEC(3) handling. Get NSEC(3)s in four cases : (RFC 4035, section 3.1.3)
-      # a) No data - <SNAME, SCLASS> matches, but no <SNAME, SCLASS, STYPE) (§3.1.3.1)
-      #     - will expect NSEC in Authority (and associated RRSIG)
-      #     - NOERROR returned
-      # b) Name error - no RRSets that match <SNAME, SCLASS> either exactly or through wildcard expansion   (§3.1.3.2)
-      #     - NSEC wil prove i) no exact match for <SNAME, SCLASS>, and ii) no RRSets that could match through wildcard expansion
-      #     - this may be proved in one or more NSECs (and associated RRSIGs)
-      #     - NXDOMAIN returned
-      # c) Wildcard answer - No <SNAME, SCLASS> direct matches, but matches <SNAME, SCLASS, STYPE> through wildcard expansion (§3.1.3.3)
-      #     - Answer section must include wildcard-expanded answer (and associated RRSIGs)
-      #     - label count in answer RRSIG indicates wildcard RRSet was expanded (less labels than in owner name)
-      #     - Authority section must include NSEC (and RRSIGs) proving that zone does not contain a closer match
-      #     - NOERROR returned
-      # d) Wildcard no data - No <SNAME, SCLASS> direct. <SNAME, SCLASS> yes but <SNAME, SCLASS, STYPE> no through wildcard expansion (§3.1.3.4)
-      #     - Authority section contains NSECs (and RRSIGs) for :
-      #         i) NSEC proving no RRSets matching STYPE at wildcard owner name that matched <SNAME, SCLASS> via wildcard expansion
-      #         ii) NSEC proving no RRSets in zone that would have been closer match for <SNAME, SCLASS>
-      #     - this may be proved by one or more NSECs (and associated RRSIGs)
-      #     - NOERROR returned
-      #
+      verify_nsecs(msg)
+
+      # Then, look through all the remaining RRSets, and verify them all (unless not necessary).
       msg.section_rrsets.each do |section, rrsets|
         rrsets.each do |rrset|
           # If delegation NS or glue AAAA/A, then don't expect RRSIG.
           # Otherwise, expect RRSIG and fail verification if RRSIG is not present
 
-          if (section == "authority")
+          if ((section == "authority") && (rrset.type == Types.NS))
             # Check for delegation
             dsrrset = msg.authority.rrsets('DS')[0]
-            #            nsrrset = msg.authority.rrset('NS')
-            if ((msg.answer.size == 0) && (!dsrrset) && (rrset.type == Types.NS)) # && (nsrrset.length > 0))# (isDelegation)
+            if ((msg.answer.size == 0) && (!dsrrset) && (rrset.type == Types.NS)) # (isDelegation)
               # Now check NSEC(3) records for absence of DS and SOA
               nsec = msg.authority.rrsets('NSEC')[0]
               if (nsec.length == 0)
@@ -299,7 +263,7 @@ module Dnsruby
               end
               if (nsec.rrs.length > 0)
                 if (!(nsec.rrs()[0].types.include?'DS') || !(nsec.rrs()[0].types.include?'SOA'))
-                  next
+                  next # delegation which we expect to be unsigned - so don't verify it!
                 end
               end
             end
@@ -316,7 +280,7 @@ module Dnsruby
               #              if (all_delegate && rrset.sigs.length == 0)
               #                next
               #              end
-              if ((rrset.name == msg.question()[0].qname) && (rrset.sigs.length == 0))
+              if ((rrset.name.to_s.downcase == msg.question()[0].qname.to_s.downcase) && (rrset.sigs.length == 0))
                 next
               end
             end
@@ -330,26 +294,29 @@ module Dnsruby
               if (!arec || arec.rrs.length == 0)
                 arec = msg.additional.rrsets('AAAA')[0]
               end
-              ns_rrset = msg.rrset('NS')
-              if (ns_rrset)
-                nsname = ns_rrset.rrs()[0].name
-                if (arec && arec.rrs().length > 0)
-                  aname = arec.rrs()[0].name
-                  if (nsname.subdomain_of?aname)
-                    next
+              ns_rrsets = msg.additional.rrsets('NS')
+              ns_rrsets.each {|ns_rrset|
+                if (ns_rrset.length > 0)
+                  nsname = ns_rrset.rrs()[0].name
+                  if (arec && arec.rrs().length > 0)
+                    aname = arec.rrs()[0].name
+                    if (nsname.subdomain_of?aname)
+                      next
+                    end
                   end
                 end
-              end
+              }
             end
           end
           # If records are in additional, and no RRSIG, that's Ok - just don't use them!
           if ((section == "additional") && (rrset.sigs.length == 0))
+            # @TODO@ Make sure that we don't cache these records!
             next
           end
           # else verify RRSet
-#          print "About to verify #{rrset.name}, #{rrset.type}\n"
+          #          print "About to verify #{rrset.name}, #{rrset.type}\n"
           if (!verify_rrset(rrset, keys))
-#            print "FAILED TO VERIFY RRSET #{rrset.name}, #{rrset.type}\n"
+            #            print "FAILED TO VERIFY RRSET #{rrset.name}, #{rrset.type}\n"
             TheLog.debug("Failed to verify rrset")
             return false
           end
@@ -357,9 +324,214 @@ module Dnsruby
       end
       return true
     end
+
+    def verify_nsecs(msg) # :nodoc:
+      # NSEC(3) handling. Get NSEC(3)s in four cases : (RFC 4035, section 3.1.3)
+      # a) No data - <SNAME, SCLASS> matches, but no <SNAME, SCLASS, STYPE) (§3.1.3.1)
+      #     - will expect NSEC in Authority (and associated RRSIG)
+      #     - NOERROR returned
+      # b) Name error - no RRSets that match <SNAME, SCLASS> either exactly or through wildcard expansion   (§3.1.3.2)
+      #     - NSEC wil prove i) no exact match for <SNAME, SCLASS>, and ii) no RRSets that could match through wildcard expansion
+      #     - this may be proved in one or more NSECs (and associated RRSIGs)
+      #     - NXDOMAIN returned - should ensure we verify!
+      # c) Wildcard answer - No <SNAME, SCLASS> direct matches, but matches <SNAME, SCLASS, STYPE> through wildcard expansion (§3.1.3.3)
+      #     - Answer section must include wildcard-expanded answer (and associated RRSIGs)
+      #     - label count in answer RRSIG indicates wildcard RRSet was expanded (less labels than in owner name)
+      #     - Authority section must include NSEC (and RRSIGs) proving that zone does not contain a closer match
+      #     - NOERROR returned
+      # d) Wildcard no data - No <SNAME, SCLASS> direct. <SNAME, SCLASS> yes but <SNAME, SCLASS, STYPE> no through wildcard expansion (§3.1.3.4)
+      #     - Authority section contains NSECs (and RRSIGs) for :
+      #         i) NSEC proving no RRSets matching STYPE at wildcard owner name that matched <SNAME, SCLASS> via wildcard expansion
+      #         ii) NSEC proving no RRSets in zone that would have been closer match for <SNAME, SCLASS>
+      #     - this may be proved by one or more NSECs (and associated RRSIGs)
+      #     - NOERROR returned
+      #
+      # Otherwise no NSECs should be returned.
+
+      # So, check for NSEC records in response, and work out what type of answer we have.
+      # Then, if NSECs are present, make sure that we prove what they said they would.
+      # What if the message *should* have no NSEC records? That can only be known by the validator.
+      # We will assume that the validator has checked the (non)-existence of NSEC records - we should not
+      # get upset if there aren't any. However, if there are, then we should verify that they say the right thing
+      qtype = msg.question()[0].qtype
+      return if (msg.rcode == RCode.NOERROR && ((qtype == Types.ANY) || (qtype == Types.NSEC) || (qtype == Types.NSEC3)))
+      if ((msg.rrsets('NSEC').length > 0) || (msg.rrsets('NSEC3').length > 0))
+        if (msg.rcode == RCode.NXDOMAIN)
+#          print "Checking NSECs for Name Error\n"
+          #Name error - NSEC wil prove i) no exact match for <SNAME, SCLASS>, and ii) no RRSets that could match through wildcard expansion
+          #           - this may be proved in one or more NSECs (and associated RRSIGs)
+          check_name_in_nsecs(msg)
+          return check_no_wildcard_expansion(msg)
+        elsif (msg.rcode == RCode.NOERROR)
+          if (msg.answer.length > 0)
+#            print "Checking NSECs for wildcard expansion\n"
+            # wildcard expansion answer - check NSECs!
+            # We want to make sure that the NSEC tells us that there is no closer match for this name
+            # @TODO@ We need to make replace the RRSIG name with the wildcard name before we can verify it correctly.
+            check_num_rrsig_labels(msg)
+            return check_name_in_nsecs(msg, msg.question()[0].qtype, true)
+          else
+            # Either no data or wildcard no data - check to see which
+            # Should be able to tell this by checking the number of labels in the NSEC records.
+            # Sort these two last cases out!
+            isWildcardNoData = false
+            [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
+              nsec_rrsets.each {|nsec_rrset|
+                nsec_rrset.rrs.each {|nsec|
+#                  print "Checking nsec to see if wildcard : #{nsec}\n"
+                  if (nsec.name.wild? ||(nsec.name.labels.length < msg.question()[0].qname.labels.length))
+                    isWildcardNoData = true
+                  end
+                }
+              }
+            }
+
+            if (isWildcardNoData)
+#              print "Checking NSECs for wildcard no data\n"
+              # Check NSECs -
+              #         i) NSEC proving no RRSets matching STYPE at wildcard owner name that matched <SNAME, SCLASS> via wildcard expansion
+              check_name_not_in_wildcard_nsecs(msg)
+              #         ii) NSEC proving no RRSets in zone that would have been closer match for <SNAME, SCLASS>
+              return check_name_in_and_type_not_in_nsecs(msg)
+            else # (isNoData)
+#              print "Checking NSECs for No data\n"
+              # Check NSEC types covered to make sure this type not present.
+              return check_name_in_and_type_not_in_nsecs(msg)
+            end
+          end
+        else
+          # Anything we should do here?
+        end
+      end
+
+    end
+
+    def check_num_rrsig_labels(msg) # :nodoc:
+      # Check that the number of labels in the RRSIG is less than the number
+      # of labels in the answer name
+      answer_rrset = msg.answer.rrset(msg.question()[0].qname, msg.question()[0].qtype)
+      if (answer_rrset.length == 0)
+        raise VerifyError.new("Expected wildcard expanded answer for #{msg.question()[0].qname}")
+      end
+      rrsig = answer_rrset.sigs()[0]
+      if (rrsig.labels >= msg.question()[0].qname.labels.length)
+        raise VerifyError.new("RRSIG does not prove wildcard expansion for #{msg.question()[0].qname}")
+      end
+    end
+
+    def check_no_wildcard_expansion(msg) # :nodoc:
+      proven_no_wildcards = false
+      name = msg.question()[0].qname
+      [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
+        nsec_rrsets.each {|nsecs|
+          nsecs.rrs.each {|nsec|
+#            print "Checking NSEC : #{nsec}\n"
+            next if (nsec.name.wild?)
+            if (check_record_proves_no_wildcard(msg, nsec))
+              proven_no_wildcards = true
+            end
+          }
+        }
+      }
+      if (!proven_no_wildcards)
+#        print "No proof that no RRSets could match through wildcard expansion\n"
+        raise VerifyError.new("No proof that no RRSets could match through wildcard expansion")
+      end
+
+    end
     
-    def verify_ds_rrset(ds_rrset, keys = nil, msg = nil)
-#      print "verify_ds_rrset #{ds_rrset}\n"
+    def check_record_proves_no_wildcard(msg, nsec) # :nodoc:
+      # Check that the NSEC goes from the SOA to a zone canonically after a wildcard
+#      print "Checking wildcard proof for #{nsec.name}\n"
+      soa_rrset = msg.authority.rrset(nsec.name, 'SOA')
+      if (soa_rrset.length > 0)
+#        print "Found SOA for #{nsec.name}\n"
+        wildcard_name = Name.create("*." + nsec.name.to_s)
+#        print "Checking #{wildcard_name}\n"
+        if (wildcard_name.canonically_before(nsec.next_domain))
+          return true
+        end
+      end
+      return false
+    end
+
+    def check_name_in_nsecs(msg, qtype=nil, expected_qtype = false) # :nodoc:
+      # Check these NSECs to make sure that this name cannot be in the zone
+      # and that no RRSets could match through wildcard expansion
+      name = msg.question()[0].qname
+      proven_name_in_nsecs = false
+      type_covered_checked = false
+      [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
+        nsec_rrsets.each {|nsecs|
+          nsecs.rrs.each {|nsec|
+#            print "Checking NSEC : #{nsec}\n"
+            next if (nsec.name.wild?)
+            if nsec.check_name_in_range(name)
+              proven_name_in_nsecs = true
+              qtype_present = false
+              if (qtype)
+                if (nsec.types.include?qtype)
+                  qtype_present = true
+                end
+                if (qtype_present != expected_qtype)
+#                  print "#{nsec.type} record #{nsec} does #{expected_qtype ? 'not ' : ''} include #{qtype} type\n"
+                  raise VerifyError.new("#{nsec.type} record #{nsec} does #{expected_qtype ? 'not ' : ''}include #{qtype} type")
+                  #              return false
+                end
+                type_covered_checked = true
+              end
+            end
+          }
+        }
+      }
+      if (!proven_name_in_nsecs)
+#        print "No proof for non-existence for #{name}\n"
+        raise VerifyError.new("No proof for non-existence for #{name}")
+      end
+      if (qtype && !type_covered_checked)
+#        print "Tyes covered wrong for #{name}\n"
+        raise VerifyError.new("Types covered wrong for #{name}")
+      end
+    end
+
+    def check_name_in_and_type_not_in_nsecs(msg) # :nodoc:
+      check_name_in_nsecs(msg, msg.question()[0].qtype, false)
+    end
+
+    def check_name_not_in_wildcard_nsecs(msg) # :nodoc:
+      name = msg.question()[0].qname
+      qtype = msg.question()[0].qtype
+      done= false
+      [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
+        nsec_rrsets.each {|nsecs|
+          nsecs.rrs.each {|nsec|
+#            print "Checking NSEC : #{nsec}\n"
+            next if !nsec.name.wild?
+            # Check the wildcard expansion
+            # We want to see that the name is in the wildcard range, and that the type
+            # is not in the types for the NSEC
+            if nsec.check_name_in_wildcard_range(name)
+#              print "Wildcard expansion in #{nsec} includes #{name}\n"
+              raise VerifyError.new("Wildcard expansion in #{nsec} includes #{name}")
+              #            return false
+            end
+            if (nsec.types.include?qtype)
+#              print "#{qtype} present in wildcard #{nsec}\n"
+              raise VerifyError.new("#{qtype} present in wildcard #{nsec}")
+              #            return false
+            end
+            done = true
+          }
+        }
+      }
+      return if done
+#      print("Expected wildcard expansion in #{msg}\n")
+      raise VerifyError.new("Expected wildcard expansion in #{msg}")
+      #      return false
+    end
+
+    def verify_ds_rrset(ds_rrset, keys = nil, msg = nil) # :nodoc:
+      #      print "verify_ds_rrset #{ds_rrset}\n"
       if (ds_rrset && ds_rrset.num_sigs > 0)
         if (verify_rrset(ds_rrset, keys))
           # Need to handle DS RRSets (with RRSIGs) not just DS records.
@@ -400,15 +572,15 @@ module Dnsruby
       return false # no DS rrset to verify
     end
 
-    def verify_key_rrset(key_rrset, keys = nil)
-#      print "verify_key_rrset\n"
+    def verify_key_rrset(key_rrset, keys = nil) # :nodoc:
+      #      print "verify_key_rrset\n"
       verified = false
       if (key_rrset && key_rrset.num_sigs > 0)
         if (verify_rrset(key_rrset, keys))
           #            key_rrset.rrs.each do |rr|
-#          print "Adding keys : "
-#          key_rrset.rrs.each {|rr| print "#{rr.key_tag}, "}
-#          print "\n"
+          #          print "Adding keys : "
+          #          key_rrset.rrs.each {|rr| print "#{rr.key_tag}, "}
+          #          print "\n"
           @trusted_keys.add(key_rrset) # rr)
           verified = true
         end
@@ -417,7 +589,7 @@ module Dnsruby
       return verified
     end
 
-    def check_ds_stores(key_rrset)
+    def check_ds_stores(key_rrset) # :nodoc:
       # See if the keys match any of the to_be_trusted_keys
       key_rrset.rrs.each do |key|
         @configured_ds_store.each do |ds|
@@ -444,7 +616,7 @@ module Dnsruby
 
     end
 
-    def get_keys_to_check
+    def get_keys_to_check # :nodoc:
       keys_to_check = @trust_anchors.keys + @trusted_keys.keys
       return keys_to_check
     end
@@ -469,7 +641,7 @@ module Dnsruby
 
         sigrecs.each {|sig|
           if ((key.key_tag == sig.key_tag) && (key.algorithm == sig.algorithm))
-#            print "Found key #{key.key_tag}\n"
+            #            print "Found key #{key.key_tag}\n"
             return key, sig
           end
         }
@@ -483,7 +655,7 @@ module Dnsruby
     # Returns true if the RRSet verified, false otherwise.
     def verify_rrset(rrset, keys = nil)
       # @TODO@ Finer-grained reporting than "false".
-#      print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
+      #      print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
       sigrecs = rrset.sigs
       #      return false if (rrset.num_sigs == 0)
       if (rrset.rrs.length == 0)
@@ -519,7 +691,7 @@ module Dnsruby
 
       #      return false if !keyrec
       if (!keyrec)
-#        print "Couldn't find signing key! #{rrset.name}, #{rrset.type},\n "
+        #        print "Couldn't find signing key! #{rrset.name}, #{rrset.type},\n "
         raise VerifyError.new("Signing key not found")
       end
 
@@ -583,7 +755,7 @@ module Dnsruby
       expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
       rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl,
           expiration_diff].sort)[0]
-#      print "VERIFIED OK\n"
+      #      print "VERIFIED OK\n"
       return true
     end
 
@@ -609,19 +781,31 @@ module Dnsruby
       return false
     end
 
-    def get_zone_key_from_dlv_rrset(dlv_rrset, name)
+    def get_zone_key_from_dlv_rrset(dlv_rrset, name) # :nodoc:
       # We want to return the key for the zone i.e. DS/DNSKEY for .se, NOT DLV for se.dlv.isc.org
       # So, we have the DLv record. Now use it to add the zone's DNSKEYs to the trusted key set.
       res = get_nameservers_for(name)
       if (!res)
-        res = Resolver.new
+        if (Dnssec.do_validation_with_recursor?)
+          res = Recursor.new
+        else
+          if(Dnssec.default_resolver)
+            res = Dnssec.default_resolver
+          else
+            res = Resolver.new
+          end
+        end
       end
-      query = Message.new(name, Types.DNSKEY)
-      query.do_validation = false
+      #      query = Message.new(name, Types.DNSKEY)
+      #      query.do_validation = false
       ret = nil
       begin
-        ret = res.send_message(query)
-      rescue ResolvTimeout => e
+        #        ret = res.send_message(query)
+        ret = res.query_no_validation_or_recursion(name, Types.DNSKEY)
+        if (!ret)
+          raise ResolvError.new("Couldn't get DNSKEY from Recursor")
+        end
+      rescue ResolvError => e
         #        print "Error getting zone key from DLV RR for #{name} : #{e}\n"
         TheLog.error("Error getting zone key from DLV RR for #{name} : #{e}")
         return false
@@ -645,13 +829,17 @@ module Dnsruby
       end
       begin
         name_to_query = name.to_s+".dlv.isc.org"
-        query = Message.new(name_to_query, Types.DLV)
-        @res.single_resolvers()[0].prepare_for_dnssec(query)
-        query.do_validation = false
+        #        query = Message.new(name_to_query, Types.DLV)
+        #        @res.single_resolvers()[0].prepare_for_dnssec(query)
+        #        query.do_validation = false
         ret = nil
         begin
-          ret = @res.send_message(query)
-        rescue ResolvTimeout => e
+          #          ret = @res.send_message(query)
+          ret = @res.query_no_validation_or_recursion(name_to_query, Types.DLV)
+          if (!ret)
+            raise ResolvError.new("Couldn't get DLV record from Recursor")
+          end
+        rescue ResolvError => e
           #          print "Error getting DLV record for #{name} : #{e}\n"
           TheLog.info("Error getting DLV record for #{name} : #{e}")
           return nil
@@ -683,7 +871,7 @@ module Dnsruby
       while (n != root)
         # Try the trusted keys first, then the DS set
         (@trust_anchors.keys + @trusted_keys.keys + @configured_ds_store + @discovered_ds_store).each {|key|
-          return key if key.name == n
+          return key if key.name.to_s.downcase == n.to_s.downcase
         }
         # strip the name
         n = n.strip_label
@@ -746,14 +934,20 @@ module Dnsruby
       # Find NS RRSet for parent
       child_res = nil
       begin
-        #        parent_res = Resolver.new
-        #        parent_res.dnssec = true
         if (child!=parent)
           if (!parent_res)
             #            print "No res passed - try to get nameservers for #{parent}\n"
             parent_res = get_nameservers_for(parent)
             if (!parent_res)
-              parent_res = Resolver.new # @TODO@
+              if (Dnssec.do_validation_with_recursor?)
+                parent_res = Recursor.new
+              else
+                if (Dnssec.default_resolver)
+                  parent_res = Dnssec.default_resolver
+                else
+                  parent_res = Resolver.new
+                end
+              end
             end
           end
           # Use that Resolver to query for DS record and NS for children
@@ -761,29 +955,33 @@ module Dnsruby
           if (current_anchor.type == Types.DNSKEY)
             #            print "Trying to find DS records for #{child} from servers for #{parent}\n"
             TheLog.debug("Trying to find DS records for #{child} from servers for #{parent}")
-            query = Message.new(child, Types.DS)
-            query.do_validation = false
             ds_ret = nil
             begin
-              ds_ret = parent_res.send_message(query)
-            rescue ResolvTimeout => e
+              ds_ret = parent_res.query_no_validation_or_recursion(child, Types.DS)
+              if (!ds_ret)
+                raise ResolvError.new("Couldn't get DS records from Recursor")
+              end
+            rescue ResolvError => e
               #              print "Error getting DS record for #{child} : #{e}\n"
               TheLog.error("Error getting DS record for #{child} : #{e}")
               return false, nil
             end
             ds_rrset = ds_ret.answer.rrset(child, Types.DS)
             if (ds_rrset.rrs.length == 0)
-              # @TODO@ Check NSEC(3) records
+              # @TODO@ Check NSEC(3) records - still need to verify there are REALLY no ds records!
               #              print "NO DS RECORDS RETURNED FOR #{parent}\n"
               child_res = parent_res
             else
-              if (!verify(ds_rrset, current_anchor))
+              begin
+                if (verify(ds_rrset, current_anchor))
+                  # Try to make the resolver from the authority/additional NS RRSets in DS response
+                  child_res = get_nameservers_from_message(child, ds_ret)
+                end
+              rescue VerifyError => e
                 #                print "FAILED TO VERIFY DS RRSET FOR #{child}\n"
                 TheLog.info("FAILED TO VERIFY DS RRSET FOR #{child}")
                 return false, nil
               end
-              # Try to make the resolver from the authority/additional NS RRSets in DS response
-              child_res = get_nameservers_from_message(child, ds_ret)
             end
           end
         end
@@ -792,18 +990,34 @@ module Dnsruby
           child_res = get_nameservers_for(child, parent_res)
         end
         if (!child_res)
-          child_res = Resolver.new # @TODO@
+          if (Dnssec.do_validation_with_recursor?)
+            child_res = Recursor.new
+          else
+            if (Dnssec.default_resolver)
+              child_res = Dnssec.default_resolver
+            else
+              if (Dnssec.default_resolver)
+                child_res = Dnssec.default_resolver
+              else
+                child_res = Resolver.new
+              end
+            end
+          end
         end
         # Query for DNSKEY record, and verify against DS in parent.
         # Need to get resolver NOT to verify this message - we verify it afterwards
         #        print "Trying to find DNSKEY records for #{child} from servers for #{child}\n"
         TheLog.info("Trying to find DNSKEY records for #{child} from servers for #{child}")
-        query = Message.new(child, Types.DNSKEY)
-        query.do_validation = false
+        #        query = Message.new(child, Types.DNSKEY)
+        #        query.do_validation = false
         key_ret = nil
         begin
-          key_ret = child_res.send_message(query)
-        rescue ResolvTimeout => e
+          #          key_ret = child_res.send_message(query)
+          key_ret = child_res.query_no_validation_or_recursion(child, Types.DNSKEY)
+          if (!key_ret)
+            raise ResolvError.new("Couldn't get info from Recursor")
+          end
+        rescue ResolvError => e
           #          print "Error getting DNSKEY for #{child} : #{e}\n"
           TheLog.error("Error getting DNSKEY for #{child} : #{e}")
           return false, nil
@@ -811,6 +1025,7 @@ module Dnsruby
         verified = true
         key_rrset = key_ret.answer.rrset(child, Types.DNSKEY)
         if (key_rrset.rrs.length == 0)
+          # @TODO@ Still need to check NSEC records to make *sure* no key rrs returned!
           #          print "NO DNSKEY RECORDS RETURNED FOR #{child}\n"
           TheLog.debug("NO DNSKEY RECORDS RETURNED FOR #{child}")
           #        end
@@ -824,12 +1039,21 @@ module Dnsruby
               return false, new_res
             end
           }
-          if (!verify(key_rrset, ds_rrset))
-            if (!verify(key_rrset))
-              #        if (!verify(key_ret))
+          begin
+            verify(key_rrset, ds_rrset)
+          rescue VerifyError => e
+            begin
+              verify(key_rrset)
+            rescue VerifyError =>e
               verified = false
             end
           end
+          #          if (!verify(key_rrset, ds_rrset))
+          #            if (!verify(key_rrset))
+          #              #        if (!verify(key_ret))
+          #              verified = false
+          #            end
+          #          end
 
         end
         
@@ -851,31 +1075,23 @@ module Dnsruby
       end
     end
 
-    def get_nameservers_for(name, res = nil)
-      # @TODO@ Want to make it optional whether to follow chain of authoritative
-      # servers, or ask local resolver for DNSKEY/DS records.
-      # Should ask parent res!
-      if (!res)
-        res = Resolver.new
+    def get_nameservers_for(name, res = nil) # :nodoc:
+      # @TODO@ !!!
+      if (Dnssec.do_validation_with_recursor?)
+        return Recursor.new
+      else
+        if (Dnssec.default_resolver)
+          return Dnssec.default_resolver
+        else
+            return Resolver.new
+        end
       end
-      res.dnssec = true
-
-      query = Message.new(name, Types.NS)
-      query.do_validation = false
-      ns_ret = nil
-      begin
-        ns_ret = res.send_message(query)
-      rescue ResolvTimeout => e
-        #        print "Error getting NS records for #{name} : #{e}\n"
-        TheLog.error("Error getting NS records for #{name} : #{e}")
-        return Resolver.new # @TODO@ !!!
-      end
-
-      ret = get_nameservers_from_message(name, ns_ret)
-      return ret
     end
 
-    def get_nameservers_from_message(name, ns_ret)
+    def get_nameservers_from_message(name, ns_ret) # :nodoc:
+      if (Dnssec.default_resolver)
+        return Dnssec.default_resolver
+      end
 
       ns_rrset = ns_ret.answer.rrset(name, Types.NS)
       if (!ns_rrset || ns_rrset.length == 0)
@@ -899,14 +1115,10 @@ module Dnsruby
       if (nameservers.length == 0)
         #        print "Can't find nameservers for #{ns_ret.question()[0].qname} from #{ns_rrset.rrs}\n"
         TheLog.info("Can't find nameservers for #{ns_ret.question()[0].qname} from #{ns_rrset.rrs}")
-        return  nil # @TODO@
+        return  nil # @TODO@ Could return a recursor here?
+        #return Recursor.new
       end
       res = Resolver.new()
-      #      nameservers.each {|addr|
-      #        sr = SingleResolver.new(addr)
-      #        sr.dnssec = true
-      #        res.add_resolver(sr)
-      #      }
       res.nameserver=(nameservers)
       # Set the retry_delay to be (at least) the number of nameservers
       # Otherwise, the queries will be sent at a rate of more than one a second!
@@ -940,7 +1152,56 @@ module Dnsruby
       }
     end
 
+    def validate_no_rrsigs(msg) # :nodoc:
+#      print "Validating unsigned response\n"
+      # WHAT IF THERE ARE NO RRSIGS IN MSG?
+      # Then we need to check that we do not expect any RRSIGs
+      if (!msg.question()[0] && msg.answer.length == 0)
+#        print "Returning Message insecure OK\n"
+        msg.security_level = Message::SecurityLevel.INSECURE
+        return true
+      end
+      qname = msg.question()[0].qname
+      closest_anchor = find_closest_anchor_for(qname)
+#      print "Found closest anchor :#{closest_anchor}\n"
+      if (closest_anchor)
+        actual_anchor = follow_chain(closest_anchor, qname)
+#        print "Actual anchor : #{actual_anchor}\n"
+        if (actual_anchor)
+#          print("Anchor exists for #{qname}, but no signatures in #{msg}\n")
+          TheLog.error("Anchor exists for #{qname}, but no signatures in #{msg}")
+          msg.security_level = Message::SecurityLevel.BOGUS
+          return false
+        end
+      end
+      if ((@verifier_type == VerifierType::DLV) &&
+            @added_dlv_key)
+        # Remember to check DLV registry as well (if appropriate!)
+#        print "Checking DLV for closest anchor\n"
+        dlv_anchor = find_closest_dlv_anchor_for(qname)
+#        print "Found DLV closest anchor :#{dlv_anchor}\n"
+        if (dlv_anchor)
+          actual_anchor = follow_chain(dlv_anchor, qname)
+#          print "Actual anchor : #{actual_anchor}\n"
+          if (actual_anchor)
+#            print("DLV Anchor exists for #{qname}, but no signatures in #{msg}\n")
+            TheLog.error("DLV Anchor exists for #{qname}, but no signatures in #{msg}")
+            msg.security_level = Message::SecurityLevel.BOGUS
+            return false
+          end
+
+        end
+      end
+#      print "Returning Message insecure OK\n"
+      msg.security_level = Message::SecurityLevel.INSECURE
+      return true
+    end
+
     def validate(msg, query)
+      if (msg.rrsets('RRSIG').length == 0)
+        return validate_no_rrsigs(msg)
+      end
+
       # See if it is a child of any of our trust anchors.
       # If it is, then see if we have a trusted key for it
       # If we don't, then see if we can get to it from the closest
@@ -972,14 +1233,14 @@ module Dnsruby
       end
       if (msg.security_level.code != Message::SecurityLevel::SECURE)
         begin
-#          print "Trying to verify one last time\n"
+          #          print "Trying to verify one last time\n"
 
           if verify(msg) # Just make sure we haven't picked the keys up anywhere
             msg.security_level = Message::SecurityLevel.SECURE
             return true
           end
         rescue VerifyError => e
-#          print "Verify failed : #{e}\n"
+          #          print "Verify failed : #{e}\n"
         end
       end
       if (error)
@@ -992,7 +1253,7 @@ module Dnsruby
       end
     end
 
-    def try_to_follow_from_anchor(closest_anchor, msg, qname)
+    def try_to_follow_from_anchor(closest_anchor, msg, qname) # :nodoc:
       error = nil
       if (closest_anchor)
         # Then try to descend to the level we're interested in
@@ -1004,7 +1265,7 @@ module Dnsruby
           actual_anchor_keys = ""
           actual_anchor.rrs.each {|rr| actual_anchor_keys += ", #{rr.key_tag}"}
           TheLog.debug("Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}")
-#          print "Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}\n"
+          #          print "Found anchor #{actual_anchor.name}, #{actual_anchor.type} for #{qname} : #{actual_anchor_keys}\n"
           begin
             if (verify(msg, actual_anchor))
               TheLog.debug("Validated #{qname}")
@@ -1012,7 +1273,7 @@ module Dnsruby
             end
           rescue VerifyError => e
             TheLog.info("BOGUS #{qname}! Error : #{e}")
-#            print "BOGUS #{qname}! Error : #{e}\n"
+            #            print "BOGUS #{qname}! Error : #{e}\n"
             msg.security_level = Message::SecurityLevel.BOGUS
             error = e
           end

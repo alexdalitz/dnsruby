@@ -56,16 +56,6 @@ module Dnsruby
     # Defaults to localhost
     attr_accessor :src_address
     
-    # Should the TCP socket persist between queries?
-    # 
-    # Defaults to false
-    attr_accessor :persistent_tcp
-    
-    # Should the UDP socket persist between queries?
-    # 
-    # Defaults to false
-    attr_accessor :persistent_udp
-    
     # should the Recursion Desired bit be set on queries?
     # 
     # Defaults to true
@@ -125,8 +115,6 @@ module Dnsruby
     # * :src_address
     # * :src_port
     # * :udp_size
-    # * :persistent_tcp
-    # * :persistent_udp
     # * :tsig
     # * :packet_timeout
     # * :recurse
@@ -142,13 +130,11 @@ module Dnsruby
       @src_address        = '0.0.0.0'
       @src_port        = [0]
       @recurse = true
-      @persistent_udp = false
-      @persistent_tcp = false
       
       if (arg==nil)
         # Get default config
         config = Config.new
-        @server = config.nameserver[0]
+#        @server = config.nameserver[0]
       elsif (arg.kind_of?String)
         @server=arg
       elsif (arg.kind_of?Name)
@@ -325,7 +311,7 @@ module Dnsruby
                 ((e.class == Errno::EADDRINUSE) && (src_port == @src_port[0])))
             err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
             Dnsruby.log.error{"#{err}"}
-            st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
+            st.push_exception_to_select(client_query_id, client_queue, err, nil)
             return
           end
         end
@@ -333,11 +319,11 @@ module Dnsruby
       if (socket==nil)
         err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}")
         Dnsruby.log.error{"#{err}"}
-        st.push_exception_to_select(client_query_id, client_queue, err, nil) # @TODO Do we still need this? Can we not just send it from here?
+        st.push_exception_to_select(client_query_id, client_queue, err, nil) 
         return
       end
       Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
-      #      print "Sending packet to #{@server} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
+      #            print "#{Time.now} : Sending packet to #{@server} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
       begin
         if (use_tcp)
           lenmsg = [query_bytes.length].pack('n')
@@ -351,14 +337,14 @@ module Dnsruby
         st.push_exception_to_select(client_query_id, client_queue, err, nil)
         return
       end
-      Dnsruby.log.debug{"Packet sent to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
       
       # Then listen for the response
       query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
       # The select thread will now wait for the response and send that or a timeout
       # back to the client_queue.
       st.add_to_select(query_settings)
-      Dnsruby.log.debug{"Packet added to select thread"}
+      Dnsruby.log.debug{"Packet sent to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
+      #      print "Packet sent to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
     end
     
     # The source port to send queries from
@@ -432,9 +418,9 @@ module Dnsruby
       # @TODO@ Should send_raw avoid this?
       if (!query.send_raw)
         if (!check_tsig(query, response, response_bytes))
-            # Should send error back up to Resolver here, and then NOT QUERY AGAIN!!!
-            return TsigError.new
-#          return false
+          # Should send error back up to Resolver here, and then NOT QUERY AGAIN!!!
+          return TsigError.new
+          #          return false
         end
         # Should check that question section is same as question that was sent! RFC 5452
         # If it's not an update...
@@ -484,6 +470,9 @@ module Dnsruby
         section_rrsets[section].each {|rrset|
           if ((rrset.name.to_s == query_name.to_s) || (rrset.name.subdomain_of?(query_name)) ||
                 (rrset.type == Types.OPT))
+            # @TODO@ Leave in the response if it is an SOA, NSEC or RRSIGfor the parent zone
+#          elsif ((query_name.subdomain_of?rrset.name) &&
+          elsif  ((rrset.type == Types.SOA) || (rrset.type == Types.NSEC) || (rrset.type == Types.NSEC3)) #)
           else
             TheLog.debug"Removing #{rrset.name}, #{rrset.type} from response for #{query_name}"
             msg.send(section).remove_rrset(rrset.name, rrset.type)

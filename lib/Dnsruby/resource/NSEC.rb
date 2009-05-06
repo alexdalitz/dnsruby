@@ -41,7 +41,30 @@ module Dnsruby
         nxt = Name.create(n)
         @next_domain = nxt
       end
+
+      def check_name_in_range(n)
+        # Check if the name is covered by this record
+        if (@name.wild?)
+          return check_name_in_wildcard_range(n)
+        end
+        if (name.canonically_before(n) && (n.canonically_before(next_domain)))
+          return true
+        end
+        return false
+      end
       
+      def check_name_in_wildcard_range(n)
+        #  Check if the name is covered by this record
+        return false if !@name.wild?
+        return false if @next_domain.canonically_before(n)
+        # Now just check that the wildcard is *before* the name
+        # Strip the first label ("*") and then compare
+        n2 = Name.create(@name)
+        n2.labels.delete_at(0)
+        return false if n.canonically_before(n2)
+        return true
+      end
+
       def types=(t)
         @types = NSEC.get_types(t)
       end
@@ -226,7 +249,12 @@ module Dnsruby
         if (input.length > 0)
           data = input.split(" ")
           self.next_domain=(data[0])
-          len = data[0].length + data[1].length + 1
+#          # @TODO@ THIS IS WRONG! IT ASSUMES THERE
+#          len = data[0].length + data[1].length + 1
+          len = data[0].length+ 1
+          if (data[1] == "(")
+            len = len + data[1].length
+          end
           self.types=(input[len, input.length-len])
         end
       end

@@ -9,42 +9,43 @@ class VerifierTest < Test::Unit::TestCase
     Dnsruby::Dnssec.clear_trust_anchors
     res = Dnsruby::Resolver.new("a.ns.se")
     res.dnssec = true
-    r = res.query("se", Dnsruby::Types.ANY)    
+    r = res.query("se", Dnsruby::Types.ANY)
     # See comment below
     Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset("se", 'DNSKEY'))
     nss = r.answer.rrset("se", 'NS')
     ret = Dnsruby::Dnssec.verify_rrset(nss)
-    assert(ret, "Dnssec verification failed")    
+    assert(ret, "Dnssec verification failed")
   end
-    
+
   def test_verify_message
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     res = Dnsruby::Resolver.new("a.ns.se")
     res.udp_size = 5000
-    r = res.query("se", Dnsruby::Types.ANY)    
+    r = res.query("se", Dnsruby::Types.DNSKEY)
     # This shouldn't be in the code - but the key is rotated by the .se registry
     # so we can't keep up with it in the test code.
     # Oh, for a signed root...
+#    print "Adding keys : #{r.answer.rrset("se", 'DNSKEY')}\n"
     Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset("se", 'DNSKEY'))
     ret = Dnsruby::Dnssec.verify(r)
-    assert(ret, "Dnssec message verification failed")    
+    assert(ret, "Dnssec message verification failed : #{ret}")
   end
-  
+
   def test_verify_message_fails
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     res = Dnsruby::Resolver.new("a.ns.se")
-    r = res.query("se", Dnsruby::Types.ANY)    
+    r = res.query("se", Dnsruby::Types.ANY)
     # Haven't configured key for this, so should fail
     begin
       ret = Dnsruby::Dnssec.verify(r)
-      fail
+      fail("Message shouldn't have verified")
     rescue (Dnsruby::VerifyError)
     end
-    #    assert(!ret, "Dnssec message verification failed")    
+    #    assert(!ret, "Dnssec message verification failed")
   end
-  
+
   def test_trusted_key
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
@@ -55,12 +56,12 @@ class VerifierTest < Test::Unit::TestCase
         "AwEAAbhThsjZqxZDyZLie1BYP+R/G1YRhmuIFCbmuQiF4NB86gpW8EVR l2s+gvNuQw6yh2YdDdyJBselE4znRP1XQbpOTC5UO5CDwge9NYja/jrX lvrX2N048vhIG8uk8yVxJDosxf6nmptsJBp3GAjF25soJs07Bailcr+5 vdZ7GibH")
     ret = Dnsruby::Dnssec.add_trust_anchor(bad_key)
     r = res.query("uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
-    
+
     begin
       ret = Dnsruby::Dnssec.verify(r)
-      fail("Dnssec trusted key message verification should have failed with bad key")    
+      fail("Dnssec trusted key message verification should have failed with bad key")
     rescue (Dnsruby::VerifyError)
-      #    assert(!ret, "Dnssec trusted key message verification should have failed with bad key")    
+      #    assert(!ret, "Dnssec trusted key message verification should have failed with bad key")
     end
     trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
         :type => Dnsruby::Types.DNSKEY,
@@ -71,13 +72,13 @@ class VerifierTest < Test::Unit::TestCase
       })
     ret = Dnsruby::Dnssec.add_trust_anchor(trusted_key)
     ret = Dnsruby::Dnssec.verify(r)
-    assert(ret, "Dnssec trusted key message verification failed")    
+    assert(ret, "Dnssec trusted key message verification failed")
 
     #    # Check that keys have been added to trusted key cache
     #    ret = Dnsruby::Dnssec.verify(r)
-    #    assert(ret, "Dnssec trusted key cache failed")    
+    #    assert(ret, "Dnssec trusted key cache failed")
   end
-  
+
   def test_expired_keys
     # Add some keys with an expiration of 1 second.
     # Then wait a second or two, and check they are not available any more.
@@ -93,18 +94,18 @@ class VerifierTest < Test::Unit::TestCase
     sleep(2)
     assert(Dnsruby::Dnssec.trust_anchors.length==0)
   end
-  
+
   def test_tcp
     #These queries work:
     #		 dig @194.0.1.13 isoc.lu dnskey
     #		 dig @194.0.1.13 isoc.lu dnskey +dnssec
     #		 dig @194.0.1.13 isoc.lu dnskey +tcp
-    
+
     #This one does not
     #
     #		 dig @194.0.1.13 isoc.lu dnskey +dnssec +tcp
     r = Dnsruby::SingleResolver.new()# "194.0.1.13")
-    r.dnssec = true    
+    r.dnssec = true
     r.use_tcp = true
     ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
     #    print ret.to_s+"\n"
@@ -120,14 +121,14 @@ class VerifierTest < Test::Unit::TestCase
     ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
     #    print ret.to_s+"\n"
 
-    r.dnssec = true    
+    r.dnssec = true
     begin
       ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
     rescue (Dnsruby::OtherResolvError)
     end
-    
+
   end
-  
+
   def test_sendraw
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
@@ -139,11 +140,11 @@ class VerifierTest < Test::Unit::TestCase
       fail()
     rescue (Exception)
     end
-    
+
     message.send_raw = true
     res.send_message(message)
   end
-  
+
   def test_dsa
     # Let's check sources.org for DSA keys
     Dnsruby::Dnssec.clear_trusted_keys
@@ -162,7 +163,7 @@ class VerifierTest < Test::Unit::TestCase
     }
     assert(dsa)
     # Now do something with it
-    
+
     message = Dnsruby::Message.new("sources.org", Dnsruby::Types.ANY)
     response = res.send_message(message)
     verified = 0

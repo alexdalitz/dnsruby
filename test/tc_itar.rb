@@ -1,6 +1,5 @@
 require 'test/unit'
 require 'dnsruby'
-require 'net/ftp'
 include Dnsruby
 
 class TestItar < Test::Unit::TestCase
@@ -13,7 +12,7 @@ class TestItar < Test::Unit::TestCase
     Dnsruby::Dnssec.clear_trust_anchors
 
     # Download the ITAR - add the DS records to dnssec
-    load_itar()
+    Dnssec.load_itar()
 
     # Then try to validate some records in the published zones
     Dnsruby::InternalResolver.clear_caches
@@ -27,17 +26,18 @@ class TestItar < Test::Unit::TestCase
     # Make sure we don't have any other anchors configured!
     # @TODO@ Should use whole RRSet of authoritative NS for these resolvers,
     # not individual servers!
-    res = Dnsruby::Resolver.new("a.ns.se")
-    res.add_server("b.ns.se")
-    res.dnssec=true
+#    res = Dnsruby::Resolver.new("a.ns.se")
+res = Dnsruby::Recursor.new
+#    res.add_server("b.ns.se")
+#    res.dnssec=true
 #    TheLog.level = Logger::DEBUG
-    ret = res.query("se.", Dnsruby::Types.DNSKEY)
+    ret = res.query("se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::INSECURE, "Level = #{ret.security_level.string}")
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
-    load_itar
+    Dnssec.load_itar
     Dnsruby::InternalResolver.clear_caches
-    ret = res.query("se.", Dnsruby::Types.ANY)
+    ret = res.query("se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
 
     res = Dnsruby::Resolver.new("ns3.nic.se")
@@ -50,7 +50,12 @@ class TestItar < Test::Unit::TestCase
   def run_test_se(should_fail)
     res = Dnsruby::Resolver.new("a.ns.se")
     res.add_server("b.ns.se")
-    r = res.query("se", Dnsruby::Types.ANY)
+    r = res.query("se", Dnsruby::Types.A)
+    if (!should_fail)
+    assert(r.security_level == Dnsruby::Message::SecurityLevel::SECURE)
+    else
+    assert(r.security_level != Dnsruby::Message::SecurityLevel::SECURE)
+    end
     # Haven't configured key for this, so should fail
     begin
       ret = Dnssec.verify(r)
@@ -66,30 +71,4 @@ class TestItar < Test::Unit::TestCase
 
   end
 
-  def load_itar
-    # Should really check the signatures here to make sure the keys are good!
-    Net::FTP::open("ftp.iana.org") { |ftp|
-      ftp.login("anonymous")
-      ftp.chdir("/itar")
-      lastname=nil
-      ftp.gettextfile("anchors.mf") {|line|
-        next if (line.strip.length == 0)
-        first = line[0]
-        if (first.class == String)
-          first = first.getbyte(0) # Ruby 1.9
-        end
-        #  print "Read : #{line}, first : #{first}\n"
-        next if (first==59) # ";")
-        if (line.strip=~(/^DS /) || line.strip=~(/^DNSKEY /))
-          line = lastname.to_s + ((lastname.absolute?)?".":"") + " " + line
-        end
-        ds = RR.create(line)
-        if ((ds.type == Types.DS) || (ds.type == Types.DNSKEY))
-        assert(ds.name.absolute?)
-          Dnssec.add_trust_anchor(ds)
-        end
-        lastname = ds.name
-      }
-    }
-  end
 end

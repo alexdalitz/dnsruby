@@ -17,7 +17,8 @@ module Dnsruby
 
   #== Dnsruby::SingleResolver
   #
-  # This class exists for legacy clients. New clients should use the Dnsruby::Resolver class.
+  # This class has been deprecated.
+  # This implementation exists for legacy clients. New code should use the Dnsruby::Resolver class.
   # The SingleResolver class targets a single resolver, and controls the sending of a single
   # packet with a packet timeout. It performs no retries. Only two threads are used - the client
   # thread and a select thread (which is reused across all queries).
@@ -53,6 +54,7 @@ module Dnsruby
     # * :recurse
     def initialize(*args)
       arg=args[0]
+      @single_res_mutex = Mutex.new
       @packet_timeout = Resolver::DefaultPacketTimeout
       @query_timeout = @packet_timeout
       @port = Resolver::DefaultPort
@@ -69,14 +71,20 @@ module Dnsruby
       @retry_times = 1
       @retry_delay = 0
       @single_resolvers = []
+      @configured = false
+        @config = Config.new
 
       if (arg==nil)
         # Get default config
-        config = Config.new
-        @server = config.nameserver[0]
+#        @config = Config.new
+##        @server = config.nameserver[0]
       elsif (arg.kind_of?String)
+        @config.get_ready
+        @configured= true
         @server=arg
       elsif (arg.kind_of?Name)
+        @config.get_ready
+        @configured= true
         @server=arg
       elsif (arg.kind_of?Hash)
         arg.keys.each do |attr|
@@ -98,12 +106,20 @@ module Dnsruby
     end
 
     def server=(s)
+      if (!@configured)
+        @config.get_ready
+        add_config_nameservers
+      end
       isr = InternalResolver.new(s)
+            @single_res_mutex.synchronize {
       @single_resolvers = [isr]
+            }
     end
 
     def server
+#      @single_res_mutex.synchronize {
         return @single_resolvers[0].server
+#      }
     end
 
     def retry_times=(n) # :nodoc:
