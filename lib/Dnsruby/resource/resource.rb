@@ -263,6 +263,7 @@ module Dnsruby
           return
         else
           @rdata = args[0]
+#          print "Loading RR from #{args[0]}, class : #{args[0].class}\n"
           if (args[0].class == String)
             from_string(args[0])
             return

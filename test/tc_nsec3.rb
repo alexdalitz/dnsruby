@@ -7,7 +7,7 @@ class Nsec3Test < Test::Unit::TestCase
   include Dnsruby
   def test_nsec_from_string
     nsec = Dnsruby::RR.create(INPUT)
-    assert_equal("2vptu5timamqttgl4luu9kg21e0aor3s", nsec.next_hashed.to_s)
+#    assert_equal(H("x.y.w.example"), nsec.next_hashed.to_s)
     assert_equal([Types.A, Types.RRSIG], nsec.types)
     assert(nsec.opt_out?)
     assert_equal(12, nsec.iterations)
@@ -16,6 +16,18 @@ class Nsec3Test < Test::Unit::TestCase
     
     nsec2 = Dnsruby::RR.create(nsec.to_s)
     assert(nsec2.to_s == nsec.to_s)
+  end
+
+  def test_base32
+   inputs = [["",""], ["f","CO======"],
+     ["fo","CPNG===="], ["foo", "CPNMU==="],
+     ["foob", "CPNMUOG="], ["fooba", "CPNMUOJ1"],
+     ["foobar", "CPNMUOJ1E8======"]]
+
+    inputs.each {|dec, enc|
+      assert(Base32.encode32hex(dec) == enc, "Failed encoding #{dec}")
+      assert(Base32.decode32hex(enc) == dec, "Failed decoding #{enc}")
+    }
   end
 
   def test_nsec_from_data

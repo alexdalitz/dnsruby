@@ -249,8 +249,6 @@ module Dnsruby
         if (input.length > 0)
           data = input.split(" ")
           self.next_domain=(data[0])
-#          # @TODO@ THIS IS WRONG! IT ASSUMES THERE
-#          len = data[0].length + data[1].length + 1
           len = data[0].length+ 1
           if (data[1] == "(")
             len = len + data[1].length

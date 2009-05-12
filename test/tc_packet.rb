@@ -286,17 +286,5 @@ f4 00 31 04 64 6e 73 31 05 69 63 61 6e 6e 03 6f
     assert(section_rrsets["answer"].length == 1)
     assert(section_rrsets["authority"].length == 1)
     assert(section_rrsets["additional"].length == 0)
-
-    i = InternalResolver.new
-    i.prune_unrelated_rrsets(packet)
-
-    section_rrsets = packet.section_rrsets
-    assert(packet.answer.length == 2)
-    assert(packet.authority.length == 0)
-    assert(packet.additional.length == 1)
-    assert(section_rrsets["answer"].length == 1)
-    assert(section_rrsets["authority"].length == 0)
-    assert(section_rrsets["additional"].length == 0)
-
   end
 end

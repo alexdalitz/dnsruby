@@ -13,6 +13,32 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
+module Base32
+  module_function
+  def encode32hex(str)
+    str.gsub(/\G(.{5})|(.{1,4}\z)/mn) do
+      full = $1; frag = $2
+      n, c = (full || frag.ljust(5, "\0")).unpack("NC")
+      full = ((n << 8) | c).to_s(32).rjust(8, "0")
+      if frag
+        full[0, (frag.length*8+4).div(5)].ljust(8, "=").upcase
+      else
+        full.upcase
+      end
+    end
+  end
+
+  HEX = '[0-9a-v]'
+  def decode32hex(str)
+    str.gsub(/\G\s*(#{HEX}{8}|#{HEX}{7}=|#{HEX}{5}={3}|#{HEX}{4}={4}|#{HEX}{2}={6}|(\S))/imno) do
+      raise "invalid base32" if $2
+      s = $1
+      s.tr("=", "0").to_i(32).divmod(256).pack("NC")[0,
+        (s.count("^=")*5).div(8)]
+    end
+  end
+end
+
 module Dnsruby
   class RR
     #The NSEC3 Resource Record (RR) provides authenticated denial of
@@ -131,6 +157,29 @@ module Dnsruby
         self.next_hashed=(next_hashed)
         self.types=(types)
       end
+
+      def decode_salt(input)
+        if (input == "-")
+          @salt = []
+        end
+        # @TODO@
+          @salt = input
+      end
+
+      def encode_salt(s)
+        if (s.length == 0)
+          return "-"
+        end
+        return s
+      end
+
+      def decode_next_hashed(input)
+        @next_hashed = Base32.decode32hex(input)
+      end
+
+      def encode_next_hashed(n)
+        return Base32.encode32hex(n)
+      end
       
       def from_string(input)
         if (input.length > 0)
@@ -138,12 +187,25 @@ module Dnsruby
           self.hash_alg=(data[0]).to_i
           self.flags=(data[1]).to_i
           self.iterations=(data[2]).to_i
-          self.salt=(data[3])
-          self.salt_length=(data[3].length)
-          self.next_hashed=(data[5])
-          self.hash_length=(data[5].length)
-          len = data[0].length + data[1].length + data[2].length + data[3].length + data[5].length + 7
-          self.types=(input[len, input.length-len])
+          self.salt=decode_salt(data[3])
+          self.salt_length=(@salt.length)
+
+          len = data[0].length + data[1].length + data[2].length + data[3].length + 4
+          # There may or may not be brackets around next_hashed
+          if (data[4] == "(")
+            len = len + data[4].length + 1
+          end
+          next_hashed_and_types = (input[len, input.length-len])
+          data2 = next_hashed_and_types.split()
+
+
+          self.next_hashed=decode_next_hashed(data2[0])
+          self.hash_length=(@next_hashed.length)
+          len2 = data2[0].length + 1
+          self.types = next_hashed_and_types[len2, next_hashed_and_types.length - len2]
+#          self.types=data2[1]
+#          #          len = data[0].length + data[1].length + data[2].length + data[3].length + data[5].length + 7
+#          #          self.types=(input[len, input.length-len])
         end
       end
       
@@ -153,8 +215,10 @@ module Dnsruby
           @types.each do |t|
             type_strings.push(t.string)
           end
+          salt = encode_salt(@salt)
+          next_hashed = encode_next_hashed(@next_hashed)
           types = type_strings.join(" ")
-          return "#{@hash_alg.code} #{@flags} #{@iterations} #{@salt} ( #{@next_hashed} #{types} )"
+          return "#{@hash_alg.code} #{@flags} #{@iterations} #{salt} ( #{next_hashed} #{types} )"
         else
           return ""
         end
@@ -171,7 +235,11 @@ module Dnsruby
       
       def self.decode_rdata(msg) #:nodoc: all
         hash_alg, flags, iterations, salt_length = msg.get_unpack("ccnc")
-        salt = msg.get_bytes(salt_length)
+        # Salt may be omitted
+        salt = []
+        if (salt_length > 0)
+          salt = msg.get_bytes(salt_length)
+        end
         hash_length, = msg.get_unpack("c")
         next_hashed = msg.get_bytes(hash_length)
         types = NSEC.decode_types(msg.get_bytes)

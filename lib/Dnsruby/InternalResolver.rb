@@ -444,43 +444,9 @@ module Dnsruby
         send_async(query, client_queue, client_query_id, true)
         return false
       end
-      if (!query.send_raw && query.class != Update)
-        # Now prune the response of any unrelated rrsets (RFC5452 section6)
-        prune_unrelated_rrsets(response)
-      end
       return true
     end
 
-    def prune_unrelated_rrsets(msg)
-      # Now prune the response of any unrelated rrsets (RFC5452 section6)
-      # "One very simple way to achieve this is to only accept data if it is
-      # part of the domain for which the query was intended."
-      if (!msg.header.aa)
-        return
-      end
-      if (!msg.question()[0])
-        return
-      end
-      query_name = msg.question()[0].qname
-      # Be kind to users - get rid of any "www." in query name
-      query_name = Name.create(query_name.to_s.sub(/^www\./, "") + ".")
-
-      section_rrsets = msg.section_rrsets
-      section_rrsets.keys.each {|section|
-        section_rrsets[section].each {|rrset|
-          if ((rrset.name.to_s == query_name.to_s) || (rrset.name.subdomain_of?(query_name)) ||
-                (rrset.type == Types.OPT))
-            # @TODO@ Leave in the response if it is an SOA, NSEC or RRSIGfor the parent zone
-#          elsif ((query_name.subdomain_of?rrset.name) &&
-          elsif  ((rrset.type == Types.SOA) || (rrset.type == Types.NSEC) || (rrset.type == Types.NSEC3)) #)
-          else
-            TheLog.debug"Removing #{rrset.name}, #{rrset.type} from response for #{query_name}"
-            msg.send(section).remove_rrset(rrset.name, rrset.type)
-          end
-        }
-      }
-    end
-    
     def check_tsig(query, response, response_bytes)
       if (query.tsig)
         if (response.tsig)

@@ -47,6 +47,12 @@ class TestDlv < Test::Unit::TestCase
     res.add_server("b.ns.nic.cz")
     ret = res.query("b.ns.nic.cz", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
+
+    # Test .gov
+#    Dnsruby::TheLog.level = Logger::DEBUG
+    res = Dnsruby::Recursor.new
+    ret = res.query("nih.gov", "NS")
+    assert(ret.security_level = Dnsruby::Message::SecurityLevel::SECURE)
   end
 
   def test_scrub_non_authoritative
@@ -54,6 +60,9 @@ class TestDlv < Test::Unit::TestCase
     res = Dnsruby::Resolver.new("ns1.frobbit.se")
     res.add_server("ns.cafax.se")
     ret = res.query("frobbit.se")
+    r = Recursor.new
+      r.prune_rrsets_to_rfc5452(ret, "frobbit.se.")
+      Dnssec.validate(ret)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
   end
 end

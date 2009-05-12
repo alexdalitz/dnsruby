@@ -20,6 +20,6 @@ SPEC = Gem::Specification.new do |s|
   s.autorequire="dnsruby"
   s.test_file = "test/ts_dnsruby.rb"
   s.has_rdoc = true
-  s.extra_rdoc_files = ["README", "EVENTMACHINE"]
+  s.extra_rdoc_files = ["DNSSEC", "EXAMPLES", "README", "EVENTMACHINE"]
 end
 

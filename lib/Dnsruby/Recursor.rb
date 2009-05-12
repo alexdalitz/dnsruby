@@ -520,6 +520,8 @@ module Dnsruby
         query.do_validation = false if no_validation
         #            print "Sending msg from resolver, dnssec = #{resolver.dnssec}, do_validation = #{query.do_validation}\n"
         packet = resolver.send_message(query)
+        # @TODO@ Now prune unrelated RRSets (RFC 5452 section 6)
+        prune_rrsets_to_rfc5452(packet, known_zone)
       rescue ResolvTimeout, IOError => e
         #            TheLog.debug(";; nameserver #{levelns.to_s} didn't respond")
         #            next
@@ -623,6 +625,36 @@ module Dnsruby
       end
           
       return nil
+    end
+
+    def prune_rrsets_to_rfc5452(packet, zone)
+      # Now prune the response of any unrelated rrsets (RFC5452 section6)
+      # "One very simple way to achieve this is to only accept data if it is
+      # part of the domain for which the query was intended."
+      if (!packet.header.aa)
+        return
+      end
+      if (!packet.question()[0])
+        return
+      end
+
+      section_rrsets = packet.section_rrsets
+      section_rrsets.keys.each {|section|
+        section_rrsets[section].each {|rrset|
+          n = Name.create(rrset.name)
+          n.absolute = true
+          if ((n.to_s == zone) || (n.to_s == Name.create(zone).to_s) ||
+                (n.subdomain_of?(Name.create(zone))) ||
+                (rrset.type == Types.OPT))
+#            # @TODO@ Leave in the response if it is an SOA, NSEC or RRSIGfor the parent zone
+##          elsif ((query_name.subdomain_of?rrset.name) &&
+#          elsif  ((rrset.type == Types.SOA) || (rrset.type == Types.NSEC) || (rrset.type == Types.NSEC3)) #)
+          else
+            TheLog.debug"Removing #{rrset.name}, #{rrset.type} from response from server for #{zone}"
+            packet.send(section).remove_rrset(rrset.name, rrset.type)
+          end
+        }
+      }
     end
   end
 end
