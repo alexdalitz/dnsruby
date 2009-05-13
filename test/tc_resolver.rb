@@ -37,6 +37,19 @@ class TestResolver < Test::Unit::TestCase
     assert(ret.kind_of?(Message))
   end
 
+  def test_send_plain_message
+    res = Resolver.new
+    response, error = res.send_plain_message(Message.new("example.com"))
+    assert(response.kind_of?Message)
+    assert(!error)
+    response, error = res.send_plain_message(Message.new("fgjkhsklfjedfiuaufewriuf.com"))
+    print "Response : #{response}\n"
+    print "Error : #{error}\n"
+    assert(response.kind_of?Message)
+    assert(error)
+    assert(error.kind_of?NXDomain)
+  end
+
   def test_query
     res = Resolver.new
     ret = res.query("example.com")

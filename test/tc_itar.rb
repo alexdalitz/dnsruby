@@ -6,7 +6,7 @@ class TestItar < Test::Unit::TestCase
   def test_itar
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
-    Dnsruby::InternalResolver.clear_caches
+    Dnsruby::PacketSender.clear_caches
     run_test_se(true)
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
@@ -15,14 +15,14 @@ class TestItar < Test::Unit::TestCase
     Dnssec.load_itar()
 
     # Then try to validate some records in the published zones
-    Dnsruby::InternalResolver.clear_caches
+    Dnsruby::PacketSender.clear_caches
     run_test_se(false)
   end
 
   def test_with_no_dlv_anchor
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
-    Dnsruby::InternalResolver.clear_caches
+    Dnsruby::PacketSender.clear_caches
     # Make sure we don't have any other anchors configured!
     # @TODO@ Should use whole RRSet of authoritative NS for these resolvers,
     # not individual servers!
@@ -36,7 +36,7 @@ res = Dnsruby::Recursor.new
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     Dnssec.load_itar
-    Dnsruby::InternalResolver.clear_caches
+    Dnsruby::PacketSender.clear_caches
     ret = res.query("se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
 

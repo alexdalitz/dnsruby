@@ -16,18 +16,18 @@
 require 'Dnsruby/select_thread'
 require 'Dnsruby/iana_ports'
 module Dnsruby
-  class InternalResolver # :nodoc: all
+  class PacketSender # :nodoc: all
     @@authoritative_cache = Cache.new
     @@recursive_cache = Cache.new
 
-    def InternalResolver.cache_authoritative(answer)
+    def PacketSender.cache_authoritative(answer)
       return if !answer.header.aa
       @@authoritative_cache.add(answer)
     end
-    def InternalResolver.cache_recursive(answer)
+    def PacketSender.cache_recursive(answer)
       @@recursive_cache.add(answer)
     end
-    def InternalResolver.clear_caches
+    def PacketSender.clear_caches
       @@recursive_cache.clear
       @@authoritative_cache.clear
     end
@@ -69,7 +69,7 @@ module Dnsruby
     # The address of the resolver to send queries to
     attr_reader :server
     
-    # Use DNSSEC for this InternalResolver
+    # Use DNSSEC for this PacketSender
     # dnssec defaults to ON
     attr_reader :dnssec
     
@@ -78,7 +78,7 @@ module Dnsruby
     #Pass in nil to stop tsig signing.
     #It is possible for client code to sign packets prior to sending - see
     #Dnsruby::RR::TSIG#apply and Dnsruby::Message#sign
-    #Note that pre-signed packets will not be signed by InternalResolver.
+    #Note that pre-signed packets will not be signed by PacketSender.
     #* res.tsig=(tsig_rr)
     #* res.tsig=(key_name, key)
     #* res.tsig=nil # Stop the resolver from signing
@@ -180,7 +180,7 @@ module Dnsruby
     #* msg - the message to send
     #* client_queue - a Queue to push the response to, when it arrives
     #* client_query_id - an optional ID to identify the query to the client
-    #* use_tcp - whether to use TCP (defaults to InternalResolver.use_tcp)
+    #* use_tcp - whether to use TCP (defaults to PacketSender.use_tcp)
     #
     #Returns :
     #

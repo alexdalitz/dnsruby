@@ -115,9 +115,9 @@ module Dnsruby
         if (!question.qname.to_s.include?"*")
           # Now cache response RRSets
           if (query.header.rd)
-            InternalResolver.cache_recursive(response);
+            PacketSender.cache_recursive(response);
           else
-            InternalResolver.cache_authoritative(response);
+            PacketSender.cache_authoritative(response);
           end
         end
       end

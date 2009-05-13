@@ -89,7 +89,7 @@ class TestTSig < Test::Unit::TestCase
     assert(response.verified?, "Response has not been verified")
     
     # Now check the record does not exist
-    Dnsruby::InternalResolver.clear_caches
+    Dnsruby::PacketSender.clear_caches
     # Or else the cache will tell us it still deos!
     begin
       rr = res.query(update_name, 'TXT')
@@ -145,7 +145,7 @@ class TestTSig < Test::Unit::TestCase
     assert(response.verified?, "Response has not been verified")
     
     # Now check the record does not exist
-    Dnsruby::InternalResolver.clear_caches
+    Dnsruby::PacketSender.clear_caches
     # Make sure the cache doesn't have an old copy!
     begin
       rr = res.query(update_name, 'TXT')

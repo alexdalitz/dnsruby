@@ -3,7 +3,7 @@ require 'test/unit'
 
 class TestRecur < Test::Unit::TestCase
   def test_recur
-    Dnsruby::InternalResolver.clear_caches
+    Dnsruby::PacketSender.clear_caches
     r = Dnsruby::Recursor.new
 #    Dnsruby::TheLog.level = Logger::DEBUG
     ret = r.query("uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)

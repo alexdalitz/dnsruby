@@ -14,7 +14,7 @@
 #limitations under the License.
 #++
 #require "Dnsruby/resolver_register.rb"
-require "Dnsruby/InternalResolver"
+require "Dnsruby/PacketSender"
 require "Dnsruby/Recursor"
 module Dnsruby
   #== Description
@@ -183,7 +183,8 @@ module Dnsruby
     # 
     # example :
     # 
-    #   require 'Dnsruby'
+    #   require 'dnsruby'
+    #   include Dnsruby
     #   res = Dnsruby::Resolver.new
     #   begin
     #   response = res.send_message(Message.new("example.com", Types.MX))
@@ -217,6 +218,37 @@ module Dnsruby
       else
         return result
       end
+    end
+
+    # This method takes a Message (supplied by the client), and sends it to
+    # the configured nameservers. No changes are made to the Message before it
+    # is sent. Retries are handled as the Resolver is configured to do.
+    # Incoming responses to the query are not cached or validated (although TCP
+    # fallback will be performed if the TC bit is set and the (Single)Resolver has
+    # ignore_truncation set to false).
+    # The return value from this method is the [response, error] tuple. Either of
+    # these values may be nil - it is up to the client to check.
+    #
+    # example :
+    #
+    #   require 'dnsruby'
+    #   include Dnsruby
+    #   res = Dnsruby::Resolver.new
+    #   response, error = res.send_plain_message(Message.new("example.com", Types.MX))
+    #   if (error)
+    #     print "Error returned : #{error}\n"
+    #   else
+    #     process_response(response)
+    #   end
+    def send_plain_message(message)
+      Dnsruby::TheLog.debug("Resolver : send_plain_message")
+      message.do_caching = false
+      message.do_validation = false
+      message.send_raw = true
+      q = Queue.new
+      send_async(message, q)
+      id, result, error = q.pop
+      return [result, error]
     end
     
     
@@ -358,7 +390,7 @@ module Dnsruby
       @single_res_mutex.synchronize {
       # Add the Config nameservers
       @config.nameserver.each do |ns|
-        @single_resolvers.push(InternalResolver.new({:server=>ns, :dnssec=>@dnssec,
+        @single_resolvers.push(PacketSender.new({:server=>ns, :dnssec=>@dnssec,
               :use_tcp=>@use_tcp, :packet_timeout=>@packet_timeout,
               :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
               :src_address=>@src_address, :src_port=>@src_port,
@@ -420,13 +452,13 @@ module Dnsruby
     #    # Add a new SingleResolver to the list of resolvers this Resolver object will
     #    # query.
     #    def add_resolver(internal) # :nodoc:
-    #      # @TODO@ Make a new InternalResolver from this SingleResolver!!
+    #      # @TODO@ Make a new PacketSender from this SingleResolver!!
     #      @single_resolvers.push(internal)
     #    end
 
     def add_server(server)# :nodoc:
       @configured = true
-      res = InternalResolver.new(server)
+      res = PacketSender.new(server)
       update_internal_res(res)
       @single_res_mutex.synchronize {
         @single_resolvers.push(res)

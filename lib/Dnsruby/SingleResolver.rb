@@ -98,7 +98,7 @@ module Dnsruby
       end
             #Check server is IP
 #            @server=Config.resolve_server(@server)
-      isr = InternalResolver.new(*args)
+      isr = PacketSender.new(*args)
 #      isr.server = @server
       @single_resolvers = [isr]
 
@@ -110,7 +110,7 @@ module Dnsruby
         @config.get_ready
         add_config_nameservers
       end
-      isr = InternalResolver.new(s)
+      isr = PacketSender.new(s)
             @single_res_mutex.synchronize {
       @single_resolvers = [isr]
             }
