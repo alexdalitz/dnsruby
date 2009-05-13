@@ -222,7 +222,8 @@ module Dnsruby
 
     # This method takes a Message (supplied by the client), and sends it to
     # the configured nameservers. No changes are made to the Message before it
-    # is sent. Retries are handled as the Resolver is configured to do.
+    # is sent (TSIG signatures will be applied if configured on the Resolver).
+    # Retries are handled as the Resolver is configured to do.
     # Incoming responses to the query are not cached or validated (although TCP
     # fallback will be performed if the TC bit is set and the (Single)Resolver has
     # ignore_truncation set to false).
