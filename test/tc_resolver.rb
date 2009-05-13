@@ -45,8 +45,8 @@ class TestResolver < Test::Unit::TestCase
     m = Message.new("fgjkhsklfjedfiuaufewriuf.com")
     m.header.rd = true
     response, error = res.send_plain_message(m)
-    print "Response : #{response}\n"
-    print "Error : #{error}\n"
+#    print "Response : #{response}\n"
+#    print "Error : #{error}\n"
     assert(response.kind_of?(Message))
     assert(error)
     assert(error.kind_of?(NXDomain))

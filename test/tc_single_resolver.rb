@@ -59,7 +59,7 @@ class TestSingleResolver < Test::Unit::TestCase
       # Run a query which will not respond, and check that the timeout works
       begin
         res = SingleResolver.new("10.0.1.128")
-        res.port = port
+        res.port = 12345
         res.packet_timeout=1
         m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
         fail
