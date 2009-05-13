@@ -118,6 +118,10 @@ module Dnsruby
 
     def server
 #      @single_res_mutex.synchronize {
+      if (!@configured)
+        @config.get_ready
+        add_config_nameservers
+      end
         return @single_resolvers[0].server
 #      }
     end
