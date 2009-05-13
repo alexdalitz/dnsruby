@@ -48,6 +48,10 @@ require 'Dnsruby/TheLog'
 #
 #
 #== example
+#  res = Dnsruby::Resolver.new # System default
+#  ret = res.query("example.com")
+#  print "#{ret.anwer.length} answer records returned, #{ret.answer.rrsets.length} RRSets returned in aswer section\n"
+#
 #  p Dnsruby::Resolv.getaddress("www.ruby-lang.org")
 #  p Dnsruby::Resolv.getname("210.251.121.214")
 #
@@ -79,15 +83,14 @@ require 'Dnsruby/TheLog'
 #Support for EventMachine has been deprecated.
 #
 #== DNSSEC
-#Dnsruby supports DNSSEC and NSEC3. 
-#DNSSEC support is on by default, but applications which wish to verify
-#responses locally will need to make explicit verification calls.
+#Dnsruby supports DNSSEC and NSEC(3).
+#DNSSEC support is on by default - but no trust anchors are configured by default.
 #See Dnsruby::Dnssec for more details.
 #
 #== Bugs
 #* NIS is not supported.
 #* /etc/nsswitch.conf is not supported.
-#* IPv6 is not supported.
+#* NSEC3 validation still TBD
 module Dnsruby
   
   @@logger = Logger.new(STDOUT)

@@ -35,6 +35,9 @@ ret = rec.query("uk-dnssec.nic.uk", "NS")
 m.do_caching = false
 ret = res.send_message(m)
 
+# Ask Dnsruby to send a Message without doing any pre- or post-processing
+ret = res.send_plain_message(Message.new("example.com"))
+
 # Send a TSIG signed dynamic update to a resolver
 # and verify the response
 res = Dnsruby::Resolver.new("ns0.validation-test-servers.nominet.org.uk")

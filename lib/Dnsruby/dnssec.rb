@@ -33,13 +33,13 @@ module Dnsruby
 # verify() method to perform verification with of RRSets of Messages with
 # given keys. Alternatively, trusted keys may be added to this class (either
 # directly, or by loading the IANA TAR or the DLV ISC ZSK). Validation will then
-# be performed from these keuys (or the DLV registry, if configured). Negative
+# be performed from these keys (or the DLV registry, if configured). Negative
 # and positive responses are validation.
 #
 # Messages are tagged with the current security_level (Message::SecurityLevel).
 # UNCHECKED means Dnsruby has not attempted to validate the response.
 # BOGUS means the response has been checked, and is bogus.
-# INSECURE means the response has been validation to be insecure (e.g. in an unsigned zone)
+# INSECURE means the response has been validated to be insecure (e.g. in an unsigned zone)
 # SECURE means that the response has been verfied to be correct.
 #
 # Several validators are provided, with each maintaining its own cache of trusted keys.
