@@ -134,7 +134,7 @@ module Dnsruby
       if (arg==nil)
         # Get default config
         config = Config.new
-#        @server = config.nameserver[0]
+        #        @server = config.nameserver[0]
       elsif (arg.kind_of?String)
         @server=arg
       elsif (arg.kind_of?Name)
@@ -405,9 +405,11 @@ module Dnsruby
       #continue until we get one.
       if (@src_port[0] == 0)
         candidate = -1
-        while (!(Resolver.port_in_range(candidate)))
-          candidate = (rand(65535-1024) + 1024)
-        end
+        # better to construct an array of all the ports we *can* use, and then just pick one at random!
+        candidate = UNRESERVED_PORTS[rand(UNRESERVED_PORTS.length())]
+        #        while (!(Resolver.port_in_range(candidate)))
+        #          candidate = (rand(65535-1024) + 1024)
+        #        end
         return candidate
       end
       pos = rand(@src_port.length)
@@ -490,11 +492,7 @@ module Dnsruby
         
         elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
           #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
-          Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}.\n"}
-          # RFC 3225
-          optrr = RR::OPT.new(udp_packet_size)
-        
-          packet.add_additional(optrr)
+          add_opt_rr(packet)
         end
       end
       
@@ -502,6 +500,14 @@ module Dnsruby
         @tsig.apply(packet)
       end
       return packet.encode
+    end
+
+    def add_opt_rr(packet)
+      Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}.\n"}
+      # RFC 3225
+      optrr = RR::OPT.new(udp_packet_size)
+
+      packet.add_additional(optrr)
     end
 
     def prepare_for_dnssec(packet)
