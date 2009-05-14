@@ -82,7 +82,7 @@ module Dnsruby
         end
       end
       def to_s
-        return "#{qname.inspect} #{qclass} #{qtype}"
+        return "#{qname.inspect.downcase} #{qclass} #{qtype}"
       end
     end
     class CacheData

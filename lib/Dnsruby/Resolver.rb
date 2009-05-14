@@ -227,6 +227,11 @@ module Dnsruby
     # Incoming responses to the query are not cached or validated (although TCP
     # fallback will be performed if the TC bit is set and the (Single)Resolver has
     # ignore_truncation set to false).
+    # Note that the Message is left untouched - this means that no OPT records are
+    # added, even if the UDP transport for the server is specified at more than 512
+    # bytes. If it is desired to use EDNS for this packet, then you should call
+    # the Dnsruby::PacketSender#prepare_for_dnssec(msg), or
+    # Dnsruby::PacketSender#add_opt_rr(msg)
     # The return value from this method is the [response, error] tuple. Either of
     # these values may be nil - it is up to the client to check.
     #

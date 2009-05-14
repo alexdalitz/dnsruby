@@ -503,6 +503,7 @@ module Dnsruby
           validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
           validator.run
         else
+          PacketSender.cache(query, msg) # The validator won't cache it, so we'd better do it now
           client_queue.push([client_id, Resolver::EventType::VALIDATED, msg, err])
           notify_queue_observers(client_queue, client_id)
         end

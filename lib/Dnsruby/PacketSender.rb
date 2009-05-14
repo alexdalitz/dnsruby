@@ -20,6 +20,28 @@ module Dnsruby
     @@authoritative_cache = Cache.new
     @@recursive_cache = Cache.new
 
+
+    def PacketSender.cache(query, response)
+      return if response.cached
+      # ONLY cache the response if it is not an update response
+      question = query.question()[0]
+      if (query.do_caching && (query.class != Update) &&
+            (question.qtype != Types.AXFR) && (question.qtype != Types.IXFR) &&
+            (response.rcode == RCode.NOERROR) &&(!response.tsig) &&
+            (query.class != Update) &&
+            (response.header.ancount > 0))
+        ## @TODO@ What about TSIG-signed responses?
+        # Don't cache any packets with "*" in the query name! (RFC1034 sec 4.3.3)
+        if (!question.qname.to_s.include?"*")
+          # Now cache response RRSets
+          if (query.header.rd)
+            PacketSender.cache_recursive(response);
+          else
+            PacketSender.cache_authoritative(response);
+          end
+        end
+      end
+    end
     def PacketSender.cache_authoritative(answer)
       return if !answer.header.aa
       @@authoritative_cache.add(answer)
