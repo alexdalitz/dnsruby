@@ -138,6 +138,14 @@ module Dnsruby
       @query_timeout = t
     end
 
+    # Add the appropriate EDNS OPT RR for the specified packet. This is done
+    # automatically, unless you are using Resolver#send_plain_message
+    def add_opt_rr(m)
+      @single_res_mutex.synchronize {
+        @single_resolvers[0].add_opt_rr(m)
+      }
+    end
+
     alias :query_timeout :packet_timeout
     alias :query_timeout= :packet_timeout=
       end
