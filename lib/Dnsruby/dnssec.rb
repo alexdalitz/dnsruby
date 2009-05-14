@@ -123,6 +123,7 @@ module Dnsruby
       # Should really check the signatures here to make sure the keys are good!
       Net::FTP::open("ftp.iana.org") { |ftp|
         ftp.login("anonymous")
+        ftp.passive = true
         ftp.chdir("/itar")
         lastname=nil
         ftp.gettextfile("anchors.mf") {|line|

@@ -31,26 +31,24 @@ res = Dnsruby::Recursor.new
 #    res.add_server("b.ns.se")
 #    res.dnssec=true
 #    TheLog.level = Logger::DEBUG
-    ret = res.query("se.", Dnsruby::Types.A)
+    ret = res.query("frobbit.se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::INSECURE, "Level = #{ret.security_level.string}")
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
-    Dnssec.load_itar
     Dnsruby::PacketSender.clear_caches
-    ret = res.query("se.", Dnsruby::Types.A)
+    Dnssec.load_itar
+    ret = res.query("frobbit.se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
 
-    res = Dnsruby::Resolver.new("ns3.nic.se")
-    res.add_server("ns2.nic.se")
-    res.dnssec = true
-    ret = res.query("ns2.nic.se", Dnsruby::Types.A)
+    res = Dnsruby::Recursor.new
+#    res.dnssec = true
+    ret = res.query("ns2.nic.se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
   end
 
   def run_test_se(should_fail)
-    res = Dnsruby::Resolver.new("a.ns.se")
-    res.add_server("b.ns.se")
-    r = res.query("se", Dnsruby::Types.A)
+    res = Dnsruby::Recursor.new
+    r = res.query("frobbit.se.", Dnsruby::Types.A)
     if (!should_fail)
     assert(r.security_level == Dnsruby::Message::SecurityLevel::SECURE)
     else
