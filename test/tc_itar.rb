@@ -10,12 +10,13 @@ class TestItar < Test::Unit::TestCase
     run_test_se(true)
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
-
-    # Download the ITAR - add the DS records to dnssec
-    Dnssec.load_itar()
+    Dnsruby::Recursor.clear_caches
 
     # Then try to validate some records in the published zones
     Dnsruby::PacketSender.clear_caches
+    # Download the ITAR - add the DS records to dnssec
+    Dnssec.load_itar()
+
     run_test_se(false)
   end
 
@@ -23,25 +24,28 @@ class TestItar < Test::Unit::TestCase
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     Dnsruby::PacketSender.clear_caches
+    Dnsruby::Recursor.clear_caches
     # Make sure we don't have any other anchors configured!
     # @TODO@ Should use whole RRSet of authoritative NS for these resolvers,
     # not individual servers!
-#    res = Dnsruby::Resolver.new("a.ns.se")
-res = Dnsruby::Recursor.new
-#    res.add_server("b.ns.se")
-#    res.dnssec=true
-#    TheLog.level = Logger::DEBUG
+    #    res = Dnsruby::Resolver.new("a.ns.se")
+    res = Dnsruby::Recursor.new
+    #    res.add_server("b.ns.se")
+    #    res.dnssec=true
+    #    TheLog.level = Logger::DEBUG
     ret = res.query("frobbit.se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::INSECURE, "Level = #{ret.security_level.string}")
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     Dnsruby::PacketSender.clear_caches
+    Dnsruby::Recursor.clear_caches
     Dnssec.load_itar
+    res = Dnsruby::Recursor.new
     ret = res.query("frobbit.se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
 
     res = Dnsruby::Recursor.new
-#    res.dnssec = true
+    #    res.dnssec = true
     ret = res.query("ns2.nic.se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
   end
@@ -50,9 +54,9 @@ res = Dnsruby::Recursor.new
     res = Dnsruby::Recursor.new
     r = res.query("frobbit.se.", Dnsruby::Types.A)
     if (!should_fail)
-    assert(r.security_level == Dnsruby::Message::SecurityLevel::SECURE)
+      assert(r.security_level == Dnsruby::Message::SecurityLevel::SECURE)
     else
-    assert(r.security_level != Dnsruby::Message::SecurityLevel::SECURE)
+      assert(r.security_level != Dnsruby::Message::SecurityLevel::SECURE)
     end
     # Haven't configured key for this, so should fail
     begin

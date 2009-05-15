@@ -178,8 +178,11 @@ module Dnsruby
     #Normally these IPs can be obtained from the following location:
     #
     #  ftp://ftp.internic.net/domain/named.root
-    #  
+    #
     def hints=(hints)
+      Recursor.set_hints(hints, @resolver)
+    end
+    def Recursor.set_hints(hints, resolver)
       TheLog.debug(";; hints(#{hints.inspect})\n")
       if (!hints && @@nameservers)
         @@hints=(@@nameservers)
@@ -192,8 +195,8 @@ module Dnsruby
       # the (root) zone as a sanity check.
       # Nice idea.
           
-      @resolver.recurse=(1)
-      packet=@resolver.query(".", "NS", "IN")
+      resolver.recurse=(1)
+      packet=resolver.query(".", "NS", "IN")
       hints = Hash.new
       if (packet)
         if (ans = packet.answer)
@@ -255,7 +258,7 @@ module Dnsruby
       end
           
       # Disable recursion flag.
-      @resolver.recurse=(0)
+      resolver.recurse=(0)
           
       #  return $self->nameservers( map { @{ $_ } } values %{ $self->{'hints'} } );
       @@nameservers = @@hints.values
@@ -285,6 +288,12 @@ module Dnsruby
       return @callback
     end
 
+    def Recursor.clear_caches(resolver = Resolver.new)
+          Recursor.set_hints(Hash.new, resolver)
+          @@zones_cache = Hash.new # key zone_name, values Hash of servers and AddressCaches
+          @@zones_cache["."] = @@hints
+    end
+
     def query_no_validation_or_recursion(name, type=Types.A, klass=Classes.IN) # :nodoc: all
       return query(name, type, klass, true)
     end
@@ -311,8 +320,7 @@ module Dnsruby
       # TTLs are respected
       @@mutex.synchronize {
         if (!@@zones_cache)
-          @@zones_cache = Hash.new # key zone_name, values Hash of servers and AddressCaches
-          @@zones_cache["."] = @@hints
+          Recursor.clear_caches(@resolver)
         end
       }
 
