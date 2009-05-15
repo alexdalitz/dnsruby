@@ -242,7 +242,7 @@ class TestTSig < Test::Unit::TestCase
 
   def test_bad_tsig
     res = Resolver.new
-    res.query_timeout=5
+    res.query_timeout=10
     res.tsig=KEY_NAME, KEY
     begin
       ret = res.query("example.com")
