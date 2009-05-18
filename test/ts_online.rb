@@ -49,7 +49,7 @@ if (online)
   #  require "test/tc_inet6.rb"
   #  require "test/tc_recurse.rb"
   require "test/tc_tcp.rb"
-  require "test/tc_queue.rb"
+#  require "test/tc_queue.rb"
   require "test/tc_recur.rb"
   #  require "test/tc_soak.rb"
 

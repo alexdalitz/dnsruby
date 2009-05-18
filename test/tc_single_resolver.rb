@@ -155,7 +155,7 @@ class TestSingleResolver < Test::Unit::TestCase
   
   def test_truncated_response
     res = SingleResolver.new
-#    print "Dnssec = #{res.dnssec}\n"
+    #    print "Dnssec = #{res.dnssec}\n"
     res.server=('ns0.validation-test-servers.nominet.org.uk')
     res.packet_timeout = 15
     m = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", 'txt')
@@ -199,5 +199,49 @@ class TestSingleResolver < Test::Unit::TestCase
       end
     end
     assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])
+  end
+
+  def test_options_preserved_on_tcp_resend
+    # Send a very small EDNS message to trigger tcp resend.
+    # Can we do that without using send_raw and avoiding the case we want to test?
+    # Sure - just knock up a little server here, which simply returns the response with the
+    # TC bit set, and records both packets sent to it
+    # Need to listen once on UDP and once on TCP
+    udpPacket = nil
+    tcpPacket = nil
+    port = 59821
+    Thread.new {
+
+      u = UDPSocket.new()
+      u.bind("127.0.0.1", port)
+
+      s = u.recvfrom(65536)
+      received_query = s[0]
+      udpPacket = Message.decode(received_query)
+      u.connect(s[1][2], s[1][1])
+      udpPacket.header.tc = true
+      u.send(udpPacket.encode(),0)
+      u.close
+
+      ts = TCPServer.new(port)
+      t = ts.accept
+      packet = t.recvfrom(2)[0]
+      len = (packet[0]<<8)+packet[1]
+      packet = t.recvfrom(len)[0]
+      tcpPacket = Message.decode(packet)
+      tcpPacket.header.tc = true
+          lenmsg = [tcpPacket.encode.length].pack('n')
+          t.send(lenmsg, 0)
+      t.write(tcpPacket.encode)
+      t.close
+      ts.close
+    }
+    r = SingleResolver.new("127.0.0.1")
+    r.port = port
+    ret = r.query("example.com")
+    assert(tcpPacket && udpPacket)
+    assert(tcpPacket.header == udpPacket.header)
+    assert(tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0] == udpPacket.additional.rrsets('OPT', true)[0].rrs()[0])
+
   end
 end

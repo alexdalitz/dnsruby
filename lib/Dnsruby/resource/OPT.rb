@@ -24,6 +24,8 @@ module Dnsruby
       TypeValue = Types::OPT #:nodoc: all
       DO_BIT = 0x8000
 
+      # @TODO@ Add BADVERS to an XRCode CodeMapper object
+
       #Can be called with up to 3 arguments, none of which must be present
       #* OPT.new()
       #* OPT.new(size)

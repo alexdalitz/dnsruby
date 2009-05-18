@@ -465,6 +465,8 @@ module Dnsruby
       if (response.header.tc && !tcp && !@ignore_truncation)
         # Try to resend over tcp
         Dnsruby.log.debug{"Truncated - resending over TCP"}
+        # @TODO@ Are the query options used correctly here? DNSSEC in particular...
+#        query.send_raw = true # Make sure that the packet is not messed with.
         send_async(query, client_queue, client_query_id, true)
         return false
       end
@@ -508,7 +510,8 @@ module Dnsruby
         if (packet.header.opcode == OpCode.QUERY || @recurse)
           packet.header.rd=@recurse
         end
-      
+
+        # @TODO@ Only do this if the packet has not been prepared already!
         if (@dnssec)
           prepare_for_dnssec(packet)
         

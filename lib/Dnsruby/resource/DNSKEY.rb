@@ -116,9 +116,9 @@ module Dnsruby
         # Only three values allowed - 
         # Zone Key flag (bit 7)
         # Secure Entry Point flag (bit 15)
-        # Revoked but (bit 8) - RFC 5011
-        if ((f & ~ZONE_KEY & ~SEP_KEY && ~REVOKED_KEY) > 0)
-          TheLog.info("DNSKEY: Only zone key and secure entry point flags allowed for DNSKEY" +
+        # Revoked bit (bit 8) - RFC 5011
+        if ((f & ~ZONE_KEY & ~SEP_KEY & ~REVOKED_KEY) > 0)
+          TheLog.info("DNSKEY: Only zone key, secure entry point and revoked flags allowed for DNSKEY" +
               " (RFC4034 section 2.1.1) : #{f} entered as input")
         end
 
