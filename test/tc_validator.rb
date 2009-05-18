@@ -26,18 +26,6 @@ class TestValidator < Test::Unit::TestCase
     # @TODO@ Test other validation policies!!
   end
 
-  def test_validator
-    print "Test validation from built-in anchors!\n"
-    return
-    res = Resolver.new
-    res.dnssec=true
-    # @TODO@ Really need to load some kind of anchor in here
-    # Or rather, what should the configuration be for this?
-    ret = res.query("nic.se", Types.A)
-    assert(ret)
-    assert(ret.security_level == Message::SecurityLevel::SECURE)
-  end
-
   def test_resolver_cd_validation_fails
     # Should be able to check Nominet test-zone here - no keys point to it
     res = Resolver.new

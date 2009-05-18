@@ -13,7 +13,7 @@
 #and class can also be specified; if left blank they default
 #to A and IN.
 #The program firstly loads the DLV zone signing key. Then, the
-#requested DNS query is performed. The response is then validated
+#requested DNS query is performed recursively. The response is then validated
 #- the DLV registry is searched for the keys of the closest ancestor
 #of the query name, and the chain of trust is followed to prove
 #that the DNSSEC records are correct, or that we do not expect the
@@ -54,7 +54,7 @@ if (type.upcase == "AXFR")
     
 else
 
-  Dnsruby::TheLog.level=Logger::DEBUG
+#  Dnsruby::TheLog.level=Logger::DEBUG
   begin
     answer = nil
     answer = res.query(name, type, klass)

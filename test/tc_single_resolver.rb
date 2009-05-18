@@ -228,7 +228,7 @@ class TestSingleResolver < Test::Unit::TestCase
 
       len = (packet[0]<<8)+packet[1]
       if (RUBY_VERSION >= "1.9")
-        len = (packet[0].getbyte(0)<<8)+packet[1].getbyte(0)# @TODO@ Ruby 1.9
+        len = (packet[0].getbyte(0)<<8)+packet[1].getbyte(0)# Ruby 1.9
       end
       packet = t.recvfrom(len)[0]
       tcpPacket = Message.decode(packet)

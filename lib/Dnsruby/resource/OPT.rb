@@ -168,7 +168,7 @@ module Dnsruby
       end
       
       def to_s
-        ret = "OPT pseudo-record : payloadsize #{payloadsize}, xrcode #{xrcode}, version #{version}, flags #{flags}"
+        ret = "OPT pseudo-record : payloadsize #{payloadsize}, xrcode #{xrcode.code}, version #{version}, flags #{flags}"
         if @options
           @options.each do |opt|
             ret = ret + " " + opt.to_s
