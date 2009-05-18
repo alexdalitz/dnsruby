@@ -31,37 +31,24 @@ class TestDlv < Test::Unit::TestCase
     Dnsruby::PacketSender.clear_caches
 
 
-    res = Dnsruby::Resolver.new("ns3.nic.se")
-    res.add_server("ns2.nic.se")
-    res.dnssec = true
+    res = Dnsruby::Recursor.new()
     ret = res.query("ns2.nic.se", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
 
-    res = Dnsruby::Resolver.new("a.ns.se")
-    res.add_server("b.ns.se")
-    res.dnssec=true
-    ret = res.query("se.", Dnsruby::Types.ANY)
-    assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
-
-    res = Dnsruby::Resolver.new("a.ns.nic.cz")
-    res.add_server("b.ns.nic.cz")
     ret = res.query("b.ns.nic.cz", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
 
     # Test .gov
 #    Dnsruby::TheLog.level = Logger::DEBUG
-    res = Dnsruby::Recursor.new
     ret = res.query("nih.gov", "NS")
     assert(ret.security_level = Dnsruby::Message::SecurityLevel::SECURE)
   end
 
   def test_scrub_non_authoritative
 #    Dnssec.do_validation_with_recursor(true)
-    res = Dnsruby::Resolver.new("ns1.frobbit.se")
-    res.add_server("ns.cafax.se")
+    res = Dnsruby::Recursor.new()
     ret = res.query("frobbit.se")
-    r = Recursor.new
-      r.prune_rrsets_to_rfc5452(ret, "frobbit.se.")
+      res.prune_rrsets_to_rfc5452(ret, "frobbit.se.")
       Dnssec.validate(ret)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
   end

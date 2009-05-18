@@ -18,7 +18,7 @@ SPEC = Gem::Specification.new do |s|
                          item.include?("svn")
                 end
   s.autorequire="dnsruby"
-  s.test_file = "test/ts_dnsruby.rb"
+  s.test_file = "test/ts_offline.rb"
   s.has_rdoc = true
   s.extra_rdoc_files = ["DNSSEC", "EXAMPLES", "README", "EVENTMACHINE"]
 end
