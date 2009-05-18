@@ -210,12 +210,11 @@ class TestSingleResolver < Test::Unit::TestCase
     udpPacket = nil
     tcpPacket = nil
     port = 59821
-    Thread.new {
-
+    thread = Thread.new {
       u = UDPSocket.new()
       u.bind("127.0.0.1", port)
 
-      s = u.recvfrom(65536)
+      s = u.recvfrom(15000)
       received_query = s[0]
       udpPacket = Message.decode(received_query)
       u.connect(s[1][2], s[1][1])
@@ -226,19 +225,28 @@ class TestSingleResolver < Test::Unit::TestCase
       ts = TCPServer.new(port)
       t = ts.accept
       packet = t.recvfrom(2)[0]
+
       len = (packet[0]<<8)+packet[1]
+      if (RUBY_VERSION >= "1.9")
+        len = (packet[0].getbyte(0)<<8)+packet[1].getbyte(0)# @TODO@ Ruby 1.9
+      end
       packet = t.recvfrom(len)[0]
       tcpPacket = Message.decode(packet)
       tcpPacket.header.tc = true
-          lenmsg = [tcpPacket.encode.length].pack('n')
-          t.send(lenmsg, 0)
+      lenmsg = [tcpPacket.encode.length].pack('n')
+      t.send(lenmsg, 0)
       t.write(tcpPacket.encode)
       t.close
       ts.close
     }
+    ret = nil
+    thread2 = Thread.new {
     r = SingleResolver.new("127.0.0.1")
     r.port = port
     ret = r.query("example.com")
+    }
+    thread.join
+    thread2.join
     assert(tcpPacket && udpPacket)
     assert(tcpPacket.header == udpPacket.header)
     assert(tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0].ttl == udpPacket.additional.rrsets('OPT', true)[0].rrs()[0].ttl, "UDP : #{udpPacket.additional.rrsets('OPT', true)[0].rrs()[0]}, TCP #{tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0]}")
