@@ -92,11 +92,12 @@ module Dnsruby
       end
       
       def xrcode
-        return flags_from_ttl[0, 1].unpack("C")[0]
+        return ExtendedRCode.new(flags_from_ttl[0, 1].unpack("C")[0])
       end
       
-      def xrcode=(code)
-        @ttl = (code << 24) + (version() << 16) + flags()
+      def xrcode=(c)
+        code = ExtendedRCode.new(c)
+        @ttl = (code.code << 24) + (version() << 16) + flags()
       end
       
       def version
@@ -104,7 +105,7 @@ module Dnsruby
       end
       
       def version=(code)
-        @ttl = (xrcode() << 24) + (code << 16) + flags()
+        @ttl = (xrcode().code << 24) + (code << 16) + flags()
       end
       
       def flags
@@ -116,7 +117,7 @@ module Dnsruby
       end
       
       def set_flags(code) # Should always be zero
-        @ttl = (xrcode() << 24) + (version() << 16) + code
+        @ttl = (xrcode().code << 24) + (version() << 16) + code
       end
       
       def dnssec_ok

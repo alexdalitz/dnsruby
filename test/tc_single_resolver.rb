@@ -241,7 +241,7 @@ class TestSingleResolver < Test::Unit::TestCase
     ret = r.query("example.com")
     assert(tcpPacket && udpPacket)
     assert(tcpPacket.header == udpPacket.header)
-    assert(tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0] == udpPacket.additional.rrsets('OPT', true)[0].rrs()[0])
+    assert(tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0].ttl == udpPacket.additional.rrsets('OPT', true)[0].rrs()[0].ttl, "UDP : #{udpPacket.additional.rrsets('OPT', true)[0].rrs()[0]}, TCP #{tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0]}")
 
   end
 end

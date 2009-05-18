@@ -282,7 +282,7 @@ module Dnsruby
         exception = NotImp.new
       elsif (rcode==RCode.REFUSED)
         exception = Refused.new
-      elsif (rcode >= RCode.BADVERS && rcode <= RCode.BADALG)
+      elsif (rcode >= RCode.BADSIG && rcode <= RCode.BADALG)
         return VerifyError.new # @TODO@
       end
       return exception
@@ -464,7 +464,7 @@ module Dnsruby
       rcode = @header.get_header_rcode
       opt = get_opt
       if (opt != nil)
-        rcode = rcode.code + (opt.xrcode << 4)
+        rcode = rcode.code + (opt.xrcode.code << 4)
         rcode = RCode.new(rcode)
       end
       return rcode;

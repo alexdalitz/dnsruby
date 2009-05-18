@@ -125,7 +125,7 @@ module Dnsruby
     NOTAUTH = 9       # RFC 2136
     NOTZONE = 10       # RFC 2136
     
-    BADVERS = 16
+#    BADVERS = 16 # an EDNS ExtendedRCode
     BADSIG = 16
     BADKEY = 17
     BADTIME = 18
@@ -134,6 +134,11 @@ module Dnsruby
     BADALG = 21
     
     update()    
+  end
+
+  class ExtendedRCode < CodeMapper
+    BADVERS = 16
+    update()
   end
   
   class Classes < CodeMapper
