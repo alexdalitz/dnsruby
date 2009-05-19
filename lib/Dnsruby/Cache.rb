@@ -66,7 +66,7 @@ module Dnsruby
         @cache.delete(key)
       }
     end
-    class CacheKey
+    class CacheKey # :nodoc: all
       attr_accessor :qname, :qtype, :qclass
       def initialize(*args)
         self.qclass = Classes.IN
@@ -85,7 +85,7 @@ module Dnsruby
         return "#{qname.inspect.downcase} #{qclass} #{qtype}"
       end
     end
-    class CacheData
+    class CacheData # :nodoc: all
       attr_reader :expiration
       def message=(m)
         @expiration = get_expiration(m)

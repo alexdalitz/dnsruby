@@ -14,48 +14,6 @@
 #limitations under the License.
 #++
 module Dnsruby
-  class Recursor
-    class AddressCache # :nodoc: all
-      # Like an array, but stores the expiration of each record.
-      def initialize(*args)
-        @hash = Hash.new # stores addresses against their expiration
-        @mutex = Mutex.new # This class is thread-safe
-      end
-      def push(item)
-        address, ttl = item
-        expiration = Time.now + ttl
-        @mutex.synchronize {
-          @hash[address] = expiration
-        }
-      end
-      def values
-        ret =[]
-        keys_to_delete = []
-        @mutex.synchronize {
-          @hash.keys.each {|address|
-            if (@hash[address] > Time.now)
-              ret.push(address)
-            else
-              keys_to_delete.push(address)
-            end
-          }
-          keys_to_delete.each {|key|
-            @hash.delete(key)
-          }
-        }
-        return ret
-      end
-      def length
-        @mutex.synchronize {
-          return @hash.length
-        }
-      end
-      def each()
-        values.each {|v|
-          yield v
-        }
-      end
-    end
     #Dnsruby::Recursor - Perform recursive dns lookups
     #
     #  require 'Dnsruby'
@@ -152,6 +110,48 @@ module Dnsruby
     #;; Received 135 bytes from 139.134.2.18#53(sy-dns02.tmns.net.au) in 525 ms
     #  ;;; FINALLY, THE ANSWER!
     # Now,DNSSEC validation is performed (unless disabled).
+  class Recursor
+    class AddressCache # :nodoc: all
+      # Like an array, but stores the expiration of each record.
+      def initialize(*args)
+        @hash = Hash.new # stores addresses against their expiration
+        @mutex = Mutex.new # This class is thread-safe
+      end
+      def push(item)
+        address, ttl = item
+        expiration = Time.now + ttl
+        @mutex.synchronize {
+          @hash[address] = expiration
+        }
+      end
+      def values
+        ret =[]
+        keys_to_delete = []
+        @mutex.synchronize {
+          @hash.keys.each {|address|
+            if (@hash[address] > Time.now)
+              ret.push(address)
+            else
+              keys_to_delete.push(address)
+            end
+          }
+          keys_to_delete.each {|key|
+            @hash.delete(key)
+          }
+        }
+        return ret
+      end
+      def length
+        @mutex.synchronize {
+          return @hash.length
+        }
+      end
+      def each()
+        values.each {|v|
+          yield v
+        }
+      end
+    end
     attr_accessor :nameservers, :callback, :recurse, :ipv6_ok
     attr_reader :hints
     # The resolver to use for the queries
