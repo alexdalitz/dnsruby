@@ -99,6 +99,7 @@ ret = res.query("frobbit.se", "NS")
 print "Security level for signed zone from ITAR : #{ret.security_level}\n"
 
 # Query a name with no validation to be performed
+res = Dnsruby::Resolver.new
 m = Message.new("frobbit.se", "MX")
 m.do_validation = false
 ret = res.send_message(m)
