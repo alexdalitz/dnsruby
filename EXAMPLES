@@ -90,12 +90,13 @@ print "Error returned from non-existent name in signed zone : #{error}, security
 Dnsruby::Dnssec.clear_trusted_keys
 Dnsruby::Dnssec.clear_trust_anchors
 Dnsruby::PacketSender.clear_caches
-
+Dnsruby::Recursor.clear_caches
 
 # Load the IANA TAR and query some signed zones
 Dnssec.load_itar
+res = Recursor.new
 ret = res.query("frobbit.se", "NS")
-print "Security level for signed zone from DLV : #{ret.security_level}\n"
+print "Security level for signed zone from ITAR : #{ret.security_level}\n"
 
 # Query a name with no validation to be performed
 m = Message.new("frobbit.se", "MX")
@@ -107,6 +108,7 @@ print "Security level of secure domain with no validation : #{ret.security_level
 Dnsruby::Dnssec.clear_trusted_keys
 Dnsruby::Dnssec.clear_trust_anchors
 Dnsruby::PacketSender.clear_caches
+Dnsruby::Recursor.clear_caches
 
 # Load a specific trust anchor and query some signed zones
 trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
