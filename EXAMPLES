@@ -1,5 +1,6 @@
 # This file shows how to do common tasks with Dnsruby :
 
+require 'rubygems'
 require 'dnsruby'
 include Dnsruby
 
@@ -88,7 +89,7 @@ print "Error returned from non-existent name in signed zone : #{error}, security
 # Clear the keys and caches
 Dnsruby::Dnssec.clear_trusted_keys
 Dnsruby::Dnssec.clear_trust_anchors
-Dnsruby::InternalResolver.clear_caches
+Dnsruby::PacketSender.clear_caches
 
 
 # Load the IANA TAR and query some signed zones
@@ -105,7 +106,7 @@ print "Security level of secure domain with no validation : #{ret.security_level
 # Clear the keys and caches
 Dnsruby::Dnssec.clear_trusted_keys
 Dnsruby::Dnssec.clear_trust_anchors
-Dnsruby::InternalResolver.clear_caches
+Dnsruby::PacketSender.clear_caches
 
 # Load a specific trust anchor and query some signed zones
 trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",

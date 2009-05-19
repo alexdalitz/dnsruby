@@ -24,6 +24,7 @@
 #Michael Fuhr <mike@fuhr.org>
 #Alex D <alexd@nominet.org.uk>
 
+require 'rubygems'
 require 'dnsruby'
 include Dnsruby
 
