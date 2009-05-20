@@ -12,7 +12,7 @@ class Nsec3Test < Test::Unit::TestCase
     assert(nsec.opt_out?)
     assert_equal(12, nsec.iterations)
     assert_equal("aabbccdd", nsec.salt)
-    assert_equal(Dnsruby::Algorithms.RSAMD5, nsec.hash_alg)
+    assert_equal(Dnsruby::Nsec3HashAlgorithms.SHA_1, nsec.hash_alg)
     
     nsec2 = Dnsruby::RR.create(nsec.to_s)
     assert(nsec2.to_s == nsec.to_s)
@@ -42,16 +42,16 @@ class Nsec3Test < Test::Unit::TestCase
   
   def test_nsec_other_stuff
     nsec = Dnsruby::RR.create(INPUT)
-    begin
-      nsec.salt_length=256
-      fail
-    rescue DecodeError
-    end
-    begin
-      nsec.hash_length=256
-      fail
-    rescue DecodeError
-    end
+#    begin
+#      nsec.salt_length=256
+#      fail
+#    rescue DecodeError
+#    end
+#    begin
+#      nsec.hash_length=256
+#      fail
+#    rescue DecodeError
+#    end
     # Be liberal in what you accept...
 #    begin
 #      nsec.hash_alg = 8

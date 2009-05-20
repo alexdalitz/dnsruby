@@ -116,6 +116,15 @@ module Dnsruby
       return (labels[0].string == '*')
     end
 
+    # Return the canonical form of this name (RFC 4034 section 6.2)
+    def canonical
+      #
+      return MessageEncoder.new {|msg|
+              msg.put_name(self, true)
+      }.to_s
+
+    end
+
     def canonically_before(n)
       if (!(Name === n))
         n = Name.create(n)

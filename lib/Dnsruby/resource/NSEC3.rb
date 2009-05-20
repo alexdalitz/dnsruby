@@ -13,6 +13,7 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
+require 'digest/sha1'
 module Base32
   module_function
   def encode32hex(str)
@@ -96,6 +97,52 @@ module Dnsruby
         return false
       end
 
+      def calculate_hash
+        # RFC5155
+        #5.  Calculation of the Hash
+
+        #   Define H(x) to be the hash of x using the Hash Algorithm selected by
+        #   the NSEC3 RR, k to be the number of Iterations, and || to indicate
+        #   concatenation.  Then define:
+        #
+        #      IH(salt, x, 0) = H(x || salt), and
+        #
+        #      IH(salt, x, k) = H(IH(salt, x, k-1) || salt), if k > 0
+        #
+        #   Then the calculated hash of an owner name is
+        #
+        #      IH(salt, owner name, iterations),
+        #
+        #   where the owner name is in the canonical form, defined as:
+        #
+        #   The wire format of the owner name where:
+        #
+        #   1.  The owner name is fully expanded (no DNS name compression) and
+        #       fully qualified;
+        #   2.  All uppercase US-ASCII letters are replaced by the corresponding
+        #       lowercase US-ASCII letters;
+        #   3.  If the owner name is a wildcard name, the owner name is in its
+        #       original unexpanded form, including the "*" label (no wildcard
+        #       substitution);
+        #
+        #   This form is as defined in Section 6.2 of [RFC 4034].
+        #
+
+        out = @name.canonical
+        (0..@iterations).each  {
+          out =h(out + @salt);
+        }
+        return Base32.encode32hex(out).downcase
+      end
+
+      def h(x) # :nodoc: all
+        if Nsec3HashAlgorithms.SHA_1 == @hash_alg
+          return Digest::SHA1.digest(x)
+        end
+        TheLog.error("Unknown hash algorithm #{@hash_alg} used for NSEC3 hash")
+        return "Unknown NSEC3 hash algorithm"
+      end
+
       def hash_alg=(a)
         if (a.instance_of?String)
           if (a.length == 1)
@@ -103,7 +150,7 @@ module Dnsruby
           end
         end
         begin
-          alg = Algorithms.new(a)
+          alg = Nsec3HashAlgorithms.new(a)
           @hash_alg = alg
         rescue ArgumentError => e
           raise DecodeError.new(e)
@@ -118,27 +165,28 @@ module Dnsruby
         self.types=(@types + [t])
       end
       
+      OPT_OUT = 1
       def flags=(f)
-        if (f==0 || f==1)
+        if (f==0 || f==OPT_OUT)
           @flags=f
         else
           raise DecodeError.new("Unknown NSEC3 flags field - #{f}")
         end
       end
-      
+
       #If the Opt-Out flag is set, the NSEC3 record covers zero or more
       #unsigned delegations.
       def opt_out?
-        return (@flags==1)
+        return (@flags==OPT_OUT)
       end
       
-      def salt_length=(l)
-        if ((l < 0) || (l > 255))
-          raise DecodeError.new("NSEC3 salt length must be between 0 and 255")
-        end
-        @salt_length = l
-      end
-      
+      #      def salt_length=(l)
+      #        if ((l < 0) || (l > 255))
+      #          raise DecodeError.new("NSEC3 salt length must be between 0 and 255")
+      #        end
+      #        @salt_length = l
+      #      end
+      #
       def hash_length=(l)
         if ((l < 0) || (l > 255))
           raise DecodeError.new("NSEC3 hash length must be between 0 and 255")
@@ -151,26 +199,35 @@ module Dnsruby
         self.hash_alg=(hash_alg)
         self.flags=(flags)
         self.iterations=(iterations)
-        self.salt_length=(salt_length)
+#        self.salt_length=(salt_length)
         self.salt=(salt)
         self.hash_length=(hash_length)
         self.next_hashed=(next_hashed)
         self.types=(types)
       end
 
-      def decode_salt(input)
-        if (input == "-")
-          @salt = []
-        end
-        # @TODO@
-          @salt = input
+      def salt
+        return NSEC3.encode_salt(@salt)
       end
 
-      def encode_salt(s)
+      def salt=(s)
+        @salt = NSEC3.decode_salt(s)
+        @salt_length = @salt.length
+      end
+
+      def NSEC3.decode_salt(input)
+        if (input == "-")
+          return []
+        end
+        # @TODO@
+        return [input].pack("H*")
+      end
+
+      def NSEC3.encode_salt(s)
         if (s.length == 0)
           return "-"
         end
-        return s
+        return s.unpack("H*")[0]
       end
 
       def decode_next_hashed(input)
@@ -187,8 +244,9 @@ module Dnsruby
           self.hash_alg=(data[0]).to_i
           self.flags=(data[1]).to_i
           self.iterations=(data[2]).to_i
-          self.salt=decode_salt(data[3])
-          self.salt_length=(@salt.length)
+          #          self.salt=NSEC3.decode_salt(data[3])
+          self.salt=(data[3])
+          #          self.salt_length=(@salt.length)
 
           len = data[0].length + data[1].length + data[2].length + data[3].length + 4
           # There may or may not be brackets around next_hashed
@@ -203,9 +261,9 @@ module Dnsruby
           self.hash_length=(@next_hashed.length)
           len2 = data2[0].length + 1
           self.types = next_hashed_and_types[len2, next_hashed_and_types.length - len2]
-#          self.types=data2[1]
-#          #          len = data[0].length + data[1].length + data[2].length + data[3].length + data[5].length + 7
-#          #          self.types=(input[len, input.length-len])
+          #          self.types=data2[1]
+          #          #          len = data[0].length + data[1].length + data[2].length + data[3].length + data[5].length + 7
+          #          #          self.types=(input[len, input.length-len])
         end
       end
       
@@ -215,7 +273,8 @@ module Dnsruby
           @types.each do |t|
             type_strings.push(t.string)
           end
-          salt = encode_salt(@salt)
+          #          salt = NSEC3.encode_salt(@salt)
+          salt = salt()
           next_hashed = encode_next_hashed(@next_hashed)
           types = type_strings.join(" ")
           return "#{@hash_alg.code} #{@flags} #{@iterations} #{salt} ( #{next_hashed} #{types} )"
@@ -225,8 +284,15 @@ module Dnsruby
       end
       
       def encode_rdata(msg, canonical=false) #:nodoc: all
-        msg.put_pack("ccnc", @hash_alg.code, @flags, @iterations, @salt_length)
-        msg.put_bytes(@salt)
+        s = salt()
+        sl = s.length()
+        if (s == "-")
+          sl = 0
+        end
+        msg.put_pack("ccnc", @hash_alg.code, @flags, @iterations, sl)
+        if (sl > 0)
+          msg.put_bytes(s)
+        end
         msg.put_pack("c", @hash_length)
         msg.put_bytes(@next_hashed)
         types = NSEC.encode_types(self)

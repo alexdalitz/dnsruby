@@ -149,7 +149,7 @@ module Dnsruby
 
 
     @@do_validation_with_recursor = true # Many nameservers don't handle DNSSEC correctly yet
-    @@default_resolver = nil
+    @@default_resolver = Resolver.new
     # This method defines the choice of Resolver or Recursor, when the validator
     # is checking responses.
     # If set to true, then a Recursor will be used to query for the DNSSEC records.

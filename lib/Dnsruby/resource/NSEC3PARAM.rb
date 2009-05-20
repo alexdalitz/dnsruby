@@ -39,10 +39,18 @@ module Dnsruby
       #The Salt Length field defines the length of the Salt field in octets,
       #ranging in value from 0 to 255.
       attr_reader :salt_length
+
       #The Salt field is appended to the original owner name before hashing
       #in order to defend against pre-calculated dictionary attacks.
-      attr_accessor :salt
-      
+      def salt
+        return NSEC3.encode_salt(@salt)
+      end
+
+      def salt=(s)
+        @salt = NSEC3.decode_salt(s)
+        @salt_length = @salt.length
+      end
+
       def hash_alg=(a)
         if (a.instance_of?String)
           if (a.length == 1)
@@ -69,19 +77,19 @@ module Dnsruby
         end
       end
       
-      def salt_length=(l)
-        if ((l < 0) || (l > 255))
-          raise DecodeError.new("NSEC3 salt length must be between 0 and 255")
-        end
-        @salt_length = l
-      end
-      
+      #      def salt_length=(l) # :nodoc: all
+      #        if ((l < 0) || (l > 255))
+      #          raise DecodeError.new("NSEC3 salt length must be between 0 and 255")
+      #        end
+      #        @salt_length = l
+      #      end
+      #
       def from_data(data) #:nodoc: all
         hash_alg, flags, iterations, salt_length, salt = data
         self.hash_alg=(hash_alg)
         self.flags=(flags)
         self.iterations=(iterations)
-        self.salt_length=(salt_length)
+        #        self.salt_length=(salt_length)
         self.salt=(salt)
       end
       
@@ -92,21 +100,30 @@ module Dnsruby
           self.flags=(data[1]).to_i
           self.iterations=(data[2]).to_i
           self.salt=(data[3])
-          self.salt_length=(data[3].length)
+          #          self.salt_length=(data[3].length)
         end
       end
       
       def rdata_to_string #:nodoc: all
         if (@next_hashed!=nil)
-          return "#{@hash_alg.code} #{@flags} #{@iterations} #{@salt}"
+          s = salt()
+          return "#{@hash_alg.code} #{@flags} #{@iterations} #{s}"
         else
           return ""
         end
       end
       
       def encode_rdata(msg, canonical=false) #:nodoc: all
-        msg.put_pack("ccnc", @hash_alg.code, @flags, @iterations, @salt_length)
-        msg.put_bytes(@salt)
+        s = salt()
+        sl = s.length()
+        if (s == "-")
+          sl == 0
+        end
+        msg.put_pack("ccnc", @hash_alg.code, @flags, @iterations, sl)
+
+        if (sl > 0)
+          msg.put_bytes(s)
+        end
       end
       
       def self.decode_rdata(msg) #:nodoc: all

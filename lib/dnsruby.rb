@@ -377,7 +377,14 @@ module Dnsruby
     # Referred to as Algoriths.RSASHA1_NSEC3_SHA1
     add_pair("RSASHA1-NSEC3-SHA1", 7)
   end  
-  
+
+  # http://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml
+  class Nsec3HashAlgorithms < CodeMapper
+    RESERVED = 0
+    update()
+    add_pair("SHA-1", 1)
+  end
+
   #An error raised while querying for a resource
   class ResolvError < StandardError
   end
