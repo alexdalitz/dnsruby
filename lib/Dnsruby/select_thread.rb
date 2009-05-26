@@ -492,11 +492,10 @@ module Dnsruby
         #        push_to_client(client_id, client_queue, msg, err)
         client_queue.push([client_id, Resolver::EventType::RECEIVED, msg, err])
         notify_queue_observers(client_queue, client_id)
-        # @TODO@ Do we need to validate this? The response has come from the cache -
+        # Do we need to validate this? The response has come from the cache -
         # validate it only if it has not been validated already
         # So, if we need to validate it, send it to the validation thread
         # Otherwise, send VALIDATED to the requester.
-        # Should we really just be checking (level != SECURE) ?
         if (((msg.security_level == Message::SecurityLevel::UNCHECKED) ||
               (msg.security_level == Message::SecurityLevel::INDETERMINATE)) &&
             (ValidatorThread.requires_validation?(query, msg, err, res)))

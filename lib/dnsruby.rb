@@ -75,7 +75,17 @@ require 'Dnsruby/TheLog'
 #* NotImp < ResolvError
 #  
 #* Refused < ResolvError
+#
+#* NotZone < ResolvError
+#
+#* YXDomain < ResolvError
+#
+#* YXRRSet < ResolvError
 #  
+#* NXRRSet < ResolvError
+#
+#* NotAuth < ResolvError
+#
 #* OtherResolvError < ResolvError
 #  
 #== I/O
@@ -412,6 +422,27 @@ module Dnsruby
   #The requested operation was refused by the remote resolver
   class Refused < ResolvError
   end
+
+  #The update RR is outside the zone (in dynamic update)
+  class NotZone < ResolvError
+  end
+
+  #Some name that ought to exist, does not exist (in dynamic update)
+  class YXDomain < ResolvError
+  end
+
+  #Some RRSet that ought to exist, does not exist (in dynamic update)
+  class YXRRSet < ResolvError
+  end
+
+  #Some RRSet that ought not to exist, does exist (in dynamic update)
+  class NXRRSet < ResolvError
+  end
+
+  #The nameserver is not responsible for the zone (in dynamic update)
+  class NotAuth < ResolvError
+  end
+
   
   #Another kind of resolver error has occurred
   class OtherResolvError < ResolvError

@@ -25,6 +25,7 @@ class Nsec3ParamTest < Test::Unit::TestCase
     m2 = Dnsruby::Message.decode(data)
     nsec3 = m2.additional()[0]
     assert_equal(nsec.to_s, nsec3.to_s)
+
   end
   
 end

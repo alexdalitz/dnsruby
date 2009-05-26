@@ -282,6 +282,16 @@ module Dnsruby
         exception = NotImp.new
       elsif (rcode==RCode.REFUSED)
         exception = Refused.new
+      elsif (rcode==RCode.NOTZONE)
+        exception = NotZone.new
+      elsif (rcode==RCode.NOTAUTH)
+        exception = NotAuth.new
+      elsif (rcode==RCode.NXRRSET)
+        exception = NXRRSet.new
+      elsif (rcode==RCode.YXRRSET)
+        exception = YXRRSet.new
+      elsif (rcode==RCode.YXDOMAIN)
+        exception = YXDomain.new
       elsif (rcode >= RCode.BADSIG && rcode <= RCode.BADALG)
         return VerifyError.new # @TODO@
       end
