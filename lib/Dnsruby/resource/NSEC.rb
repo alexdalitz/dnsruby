@@ -75,6 +75,9 @@ module Dnsruby
           # from the wire, already decoded
           types =t
         elsif (t.instance_of?String)
+          if t[t.length-1, t.length]!=")"
+            t = t + " )"
+          end
           # List of mnemonics
           types=[]
           mnemonics = t.split(" ")

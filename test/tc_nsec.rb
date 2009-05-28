@@ -13,6 +13,11 @@ class NsecTest < Test::Unit::TestCase
     
     nsec2 = Dnsruby::RR.create(nsec.to_s)
     assert(nsec2.to_s == nsec.to_s)
+
+    s = "tjeb.nl.		3600	IN	NSEC	dragon.tjeb.nl. A NS SOA MX AAAA RRSIG NSEC DNSKEY"
+    nsec = Dnsruby::RR.create(s)
+    assert(nsec.types.include?(Types.A))
+    assert(nsec.types.include?(Types.DNSKEY))
   end
 
   def test_nsec_from_data

@@ -28,6 +28,7 @@ module Dnsruby
   #* Name#labels
   #
   class Name
+    include Comparable
     MaxNameLength=255
     #--
     # A Name is a collection of Labels. Each label is presentation-formatted
@@ -123,6 +124,15 @@ module Dnsruby
               msg.put_name(self, true)
       }.to_s
 
+    end
+
+    def <=>(other)
+      # return -1 if other less than us, +1 if greater than us
+      return 0 if (canonical == other.canonical)
+      if (canonically_before(other))
+        return +1
+      end
+      return -1
     end
 
     def canonically_before(n)

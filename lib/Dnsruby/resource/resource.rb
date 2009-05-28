@@ -23,6 +23,7 @@ module Dnsruby
   # (RRSet)."
   # This class also stores the RRSIG records which cover the RRSet
   class RRSet
+    include Comparable
     # The number of RRSIGs stored in this RRSet
     attr_reader :num_sigs
     def initialize(rrs = [])
@@ -92,7 +93,17 @@ module Dnsruby
         return privateAdd(r)
       return true
     end
-    
+
+    def <=>(other)
+#      return 1 if ((!other) || !(other.name) || !(other.type))
+#      return -1 if (!@name)
+      if (@name.canonical == other.name.canonical)
+        return @type.code <=> other.type.code
+      else
+        return @name <=> other.name
+      end
+    end
+
     def sort_canonical
       #Make a list, for all the RRs, where each RR contributes
       #the canonical RDATA encoding
