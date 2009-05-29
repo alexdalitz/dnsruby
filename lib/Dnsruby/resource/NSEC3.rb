@@ -98,6 +98,10 @@ module Dnsruby
       end
 
       def calculate_hash
+        return NSEC3.calculate_hash(@name, @iterations, @salt, @hash_alg)
+      end
+
+      def NSEC3.calculate_hash(name, iterations, salt, hash_alg)
         # RFC5155
         #5.  Calculation of the Hash
 
@@ -128,18 +132,22 @@ module Dnsruby
         #   This form is as defined in Section 6.2 of [RFC 4034].
         #
 
-        out = @name.canonical
-        (0..@iterations).each  {
-          out =h(out + @salt);
+        out = name.canonical
+        (0..iterations).each  {
+          out =NSEC3.h(out + salt, hash_alg);
         }
         return Base32.encode32hex(out).downcase
       end
 
       def h(x) # :nodoc: all
-        if Nsec3HashAlgorithms.SHA_1 == @hash_alg
+        return NSEC3.h(x, @hash_alg)
+      end
+
+      def NSEC3.h(x, hash_alg) # :nodoc: all
+        if Nsec3HashAlgorithms.SHA_1 == hash_alg
           return Digest::SHA1.digest(x)
         end
-        TheLog.error("Unknown hash algorithm #{@hash_alg} used for NSEC3 hash")
+        TheLog.error("Unknown hash algorithm #{hash_alg} used for NSEC3 hash")
         return "Unknown NSEC3 hash algorithm"
       end
 
