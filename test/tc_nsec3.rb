@@ -39,7 +39,32 @@ class Nsec3Test < Test::Unit::TestCase
     nsec3 = m2.additional()[0]
     assert_equal(nsec.to_s, nsec3.to_s)
   end
-  
+
+  def test_calculate_hash
+    input = [
+[   "example"       , "0p9mhaveqvm6t7vbl5lop2u3t2rp3tom"],
+[   "a.example"     , "35mthgpgcu1qg68fab165klnsnk3dpvl"],
+[   "ai.example"    , "gjeqe526plbf1g8mklp59enfd789njgi"],
+[   "ns1.example"   , "2t7b4g4vsa5smi47k61mv5bv1a22bojr"],
+[   "ns2.example"   , "q04jkcevqvmu85r014c7dkba38o0ji5r"],
+[   "w.example"     , "k8udemvp1j2f7eg6jebps17vp3n8i58h"],
+[   "*.w.example"   , "r53bq7cc2uvmubfu5ocmm6pers9tk9en"],
+[   "x.w.example"   , "b4um86eghhds6nea196smvmlo4ors995"],
+[   "y.w.example"   , "ji6neoaepv8b5o6k4ev33abha8ht9fgc"],
+[   "x.y.w.example" , "2vptu5timamqttgl4luu9kg21e0aor3s"],
+[   "xx.example"    , "t644ebqk9bibcna874givr6joj62mlhv"],
+[   "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example" , "kohar7mbb8dc2ce8a9qvl8hon4k53uhi"]
+    ]
+    input.each {|name, hash|
+      nsec3 = Dnsruby::RR.create({:type => Dnsruby::Types.NSEC3, :name => name, :salt => "aabbccdd", :iterations => 12, :hash_alg  => 1})
+      n = nsec3.calculate_hash
+      assert_equal(n, hash, "Expected #{hash} but got #{n} for #{name}")
+      c = Dnsruby::RR::NSEC3.calculate_hash(name, 12, Dnsruby::RR::NSEC3.decode_salt("aabbccdd"), 1)
+      assert_equal(c, hash, "Expected #{hash} but got #{c} for #{name}")
+    }
+    #
+  end
+
   def test_nsec_other_stuff
     nsec = Dnsruby::RR.create(INPUT)
 #    begin

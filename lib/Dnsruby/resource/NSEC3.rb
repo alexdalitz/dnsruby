@@ -132,7 +132,8 @@ module Dnsruby
         #   This form is as defined in Section 6.2 of [RFC 4034].
         #
 
-        out = name.canonical
+        n = Name.create(name)
+        out = n.canonical
         (0..iterations).each  {
           out =NSEC3.h(out + salt, hash_alg);
         }
@@ -227,7 +228,6 @@ module Dnsruby
         if (input == "-")
           return []
         end
-        # @TODO@
         return [input].pack("H*")
       end
 
