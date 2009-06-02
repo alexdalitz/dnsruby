@@ -239,11 +239,19 @@ module Dnsruby
       end
 
       def decode_next_hashed(input)
-        @next_hashed = Base32.decode32hex(input)
+        @next_hashed = NSEC3.decode_next_hashed(input)
+        end
+
+      def NSEC3.decode_next_hashed(input)
+        return Base32.decode32hex(input)
       end
 
       def encode_next_hashed(n)
-        return Base32.encode32hex(n)
+        return NSEC3.encode_next_hashed(n)
+      end
+
+      def NSEC3.encode_next_hashed(n)
+        return Base32.encode32hex(n).downcase
       end
       
       def from_string(input)
