@@ -252,8 +252,8 @@ module Dnsruby
         resource = RR.create("#{args[0]} #{ttl} #{klass} #{args[1]} #{rdata}")
         add_update(resource)      
       when 3 # name, type, rdata
-        klass = Classes.NONE
-        resource = RR.create("#{args[0]} #{ttl} #{klass} #{args[1]} #{args[2]}")
+        resource = RR.create("#{args[0]} #{ttl} IN #{args[1]} #{args[2]}")
+        resource.klass = Classes.NONE
         add_update(resource)      
       end
       return resource
