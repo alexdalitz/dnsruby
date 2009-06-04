@@ -8,7 +8,7 @@ class Nsec3ParamTest < Test::Unit::TestCase
   def test_nsec_from_string
     nsec = Dnsruby::RR.create(INPUT)
 
-    assert_equal(Dnsruby::Algorithms.RSAMD5, nsec.hash_alg)
+    assert_equal(Dnsruby::Nsec3HashAlgorithms.SHA_1, nsec.hash_alg)
     assert_equal(0, nsec.flags)
     assert_equal(12, nsec.iterations)
     assert_equal("aabbccdd", nsec.salt)
@@ -26,6 +26,13 @@ class Nsec3ParamTest < Test::Unit::TestCase
     nsec3 = m2.additional()[0]
     assert_equal(nsec.to_s, nsec3.to_s)
 
+  end
+
+  def test_from_real_string
+    r = Dnsruby::RR.create("tjeb.nl.		 3600		 IN		 NSEC3PARAM		 1 0 5 beef")
+    assert_equal(Dnsruby::Name.create("tjeb.nl."), r.name)
+    assert_equal("beef", r.salt)
+    assert_equal(Dnsruby::Nsec3HashAlgorithms.SHA_1, r.hash_alg)
   end
   
 end

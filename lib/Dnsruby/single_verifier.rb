@@ -641,7 +641,7 @@ module Dnsruby
 
         sigrecs.each {|sig|
           if ((key.key_tag == sig.key_tag) && (key.algorithm == sig.algorithm))
-            #            print "Found key #{key.key_tag}\n"
+#                        print "Found key #{key.key_tag}\n"
             return key, sig
           end
         }
@@ -654,10 +654,8 @@ module Dnsruby
     #
     # Returns true if the RRSet verified, false otherwise.
     def verify_rrset(rrset, keys = nil)
-      # @TODO@ Finer-grained reporting than "false".
       #      print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
       sigrecs = rrset.sigs
-      #      return false if (rrset.num_sigs == 0)
       if (rrset.rrs.length == 0)
         raise VerifyError.new("No RRSet to veryify")
       end
@@ -755,7 +753,7 @@ module Dnsruby
       expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
       rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl,
           expiration_diff].sort)[0]
-      #      print "VERIFIED OK\n"
+#            print "VERIFIED OK\n"
       return true
     end
 

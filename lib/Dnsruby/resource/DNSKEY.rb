@@ -52,6 +52,7 @@ module Dnsruby
         self.protocol=3
         self.flags=ZONE_KEY
         @algorithm=Algorithms.RSASHA1
+        @public_key = nil
       end
       
       def protocol=(p)
@@ -149,6 +150,7 @@ module Dnsruby
           # until we come to " )" at the end, and then gsub
           # the white space out
           # Also, brackets may or may not be present
+          # Not to mention comments! ";"
           buf = ""
           index = 3
           end_index = data.length - 1
@@ -157,7 +159,13 @@ module Dnsruby
             index = 4
           end
           (index..end_index).each {|i|
-            buf += data[i]
+            if (comment_index = data[i].index(";"))
+              buf += data[i].slice(0, comment_index)
+              # @TODO@ We lose the comments here - we should really keep them for when we write back to string format?
+              break
+            else
+              buf += data[i]
+            end
           }
           self.key=(buf)
         end
@@ -238,7 +246,7 @@ module Dnsruby
       end
       
       def public_key
-        if (@public_key.nil?)
+        if (!@public_key)
           if [Algorithms.RSASHA1,
               Algorithms.RSASHA1_NSEC3_SHA1].include?(@algorithm)
             @public_key = rsa_key

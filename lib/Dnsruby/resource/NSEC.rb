@@ -174,7 +174,7 @@ module Dnsruby
         0.step(65536,256) { |step|
           # Gather up the RR types for this set of 256
           types_to_go = []
-          while (type_codes[0] < step)
+          while (!type_codes.empty? && type_codes[0] < step)
             types_to_go.push(type_codes[0])
             # And delete them from type_codes
             type_codes=type_codes.last(type_codes.length-1)

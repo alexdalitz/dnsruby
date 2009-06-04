@@ -165,7 +165,13 @@ module Dnsruby
           # the white space out 
           buf=""
           (index+3..end_index).each {|i|
+            if (comment_index = data[i].index(";"))
+              buf += data[i].slice(0, comment_index)
+              # @TODO@ We lose the comments here - we should really keep them for when we write back to string format?
+              break
+            else
             buf += data[i]
+            end
           }
           buf.gsub!(/\n/, "")
           buf.gsub!(/ /, "")

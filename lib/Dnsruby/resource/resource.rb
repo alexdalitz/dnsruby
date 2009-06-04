@@ -91,7 +91,7 @@ module Dnsruby
       end
       
         return privateAdd(r)
-      return true
+#      return true
     end
 
     def <=>(other)

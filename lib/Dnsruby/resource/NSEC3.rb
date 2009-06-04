@@ -74,9 +74,6 @@ module Dnsruby
       #The Salt Length field defines the length of the Salt field in octets,
       #ranging in value from 0 to 255.
       attr_reader :salt_length
-      #The Salt field is appended to the original owner name before hashing
-      #in order to defend against pre-calculated dictionary attacks.
-      attr_accessor :salt
       #The Hash Length field defines the length of the Next Hashed Owner
       #Name field, ranging in value from 1 to 255 octets.
       attr_reader :hash_length
@@ -215,6 +212,8 @@ module Dnsruby
         self.types=(types)
       end
 
+      #The Salt field is appended to the original owner name before hashing
+      #in order to defend against pre-calculated dictionary attacks.
       def salt
         return NSEC3.encode_salt(@salt)
       end
@@ -232,7 +231,7 @@ module Dnsruby
       end
 
       def NSEC3.encode_salt(s)
-        if (s.length == 0)
+        if (!s || s.length == 0)
           return "-"
         end
         return s.unpack("H*")[0]

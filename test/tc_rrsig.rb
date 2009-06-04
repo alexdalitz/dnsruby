@@ -29,4 +29,9 @@ class RrsigTest < Test::Unit::TestCase
     rrsig2 = Dnsruby::RR.create(rrsig.to_s)
     assert(rrsig2.to_s == rrsig.to_s)
   end
+
+  def test_string_with_comments
+    r = Dnsruby::RR.create("tjeb.nl.		 3600		 IN		 RRSIG		 NSEC3PARAM 7 2 3600 20090630164649 20090602164649 53177 tjeb.nl. Fw70WQMviRFGyeze3MUpfafaAcWIvHRpnq4ZK3lxexrR1p+rLxK5C4qVKU71XYrPYR7XEBxgUG1oyKNOhFOVyx31EjC462dz7Vxn6UDpD1LIwNnD28+oHfS9AFzGKcn4zUZqT+8IvOO1jiS9c3Y8WAkOloN9AwGIIKWU8zAp1n4= ;{id = 53177}")
+    assert_equal("Fw70WQMviRFGyeze3MUpfafaAcWIvHRpnq4ZK3lxexrR1p+rLxK5C4qVKU71XYrPYR7XEBxgUG1oyKNOhFOVyx31EjC462dz7Vxn6UDpD1LIwNnD28+oHfS9AFzGKcn4zUZqT+8IvOO1jiS9c3Y8WAkOloN9AwGIIKWU8zAp1n4=", ([r.signature].pack("m*")).gsub(/\n/,"").chomp)
+  end
 end

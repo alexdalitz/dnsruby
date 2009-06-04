@@ -58,11 +58,11 @@ module Dnsruby
           end
         end
         begin
-          alg = Algorithms.new(a)
+          alg = Nsec3HashAlgorithms.new(a)
           @hash_alg = alg
         rescue ArgumentError => e
           raise DecodeError.new(e)
-        end        
+        end
       end
       
       def types=(t)
@@ -105,12 +105,8 @@ module Dnsruby
       end
       
       def rdata_to_string #:nodoc: all
-        if (@next_hashed!=nil)
           s = salt()
           return "#{@hash_alg.code} #{@flags} #{@iterations} #{s}"
-        else
-          return ""
-        end
       end
       
       def encode_rdata(msg, canonical=false) #:nodoc: all

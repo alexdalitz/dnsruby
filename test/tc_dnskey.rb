@@ -34,6 +34,11 @@ class DnskeyTest < Test::Unit::TestCase
     assert(dnskey2.to_s == dnskey.to_s, "#{dnskey.to_s} not equal to \n#{dnskey2.to_s}")
   end
 
+  def test_from_string_with_comments
+    k = Dnsruby::RR.create("tjeb.nl.		 3600		 IN		 DNSKEY		 256 3 7 AwEAAcglEOS7bECRK5fqTuGTMJycmDhTzmUu/EQbAhKJOYJxDb5SG/RYqsJgzG7wgtGy0W1aP7I4k6SPtHmwcqjLaZLVUwRNWCGr2adjb9JTFyBR7F99Ngi11lEGM6Uiw/eDRk66lhoSGzohjj/rmhRTV6gN2+0ADPnafv3MBkPgryA3 ;{id = 53177 (zsk), size = 1024b}")
+    assert_equal(53177, k.key_tag)
+  end
+
   def test_dnskey_from_data
     dnskey = Dnsruby::RR.create(INPUT)
     m = Dnsruby::Message.new
