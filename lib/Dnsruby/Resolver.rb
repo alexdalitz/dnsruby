@@ -574,7 +574,7 @@ module Dnsruby
     end
 
     def Resolver.port_in_range(p)
-      if ((p == 0) || ((IANA_PORTS.index(p)) == nil &&
+      if ((p == 0) || ((Iana::IANA_PORTS.index(p)) == nil &&
               (p > 1024) && (p < 65535)))
         return true
       end

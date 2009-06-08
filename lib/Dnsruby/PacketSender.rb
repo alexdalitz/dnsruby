@@ -428,7 +428,7 @@ module Dnsruby
       if (@src_port[0] == 0)
         candidate = -1
         # better to construct an array of all the ports we *can* use, and then just pick one at random!
-        candidate = UNRESERVED_PORTS[rand(UNRESERVED_PORTS.length())]
+        candidate = Iana::UNRESERVED_PORTS[rand(Iana::UNRESERVED_PORTS.length())]
         #        while (!(Resolver.port_in_range(candidate)))
         #          candidate = (rand(65535-1024) + 1024)
         #        end
