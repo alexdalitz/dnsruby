@@ -114,7 +114,7 @@ module Dnsruby
     # Check that the RRSet and RRSIG record are compatible
     def check_rr_data(rrset, sigrec)#:nodoc: all
       #Each RR MUST have the same owner name as the RRSIG RR;
-      if (rrset.name.to_s.downcase != sigrec.name.to_s.downcase)
+      if (rrset.name.canonical != sigrec.name.canonical)
         raise VerifyError.new("RRSET should have same owner name as RRSIG for verification (rrsert=#{rrset.name}, sigrec=#{sigrec.name}")
       end
 
@@ -280,7 +280,7 @@ module Dnsruby
               #              if (all_delegate && rrset.sigs.length == 0)
               #                next
               #              end
-              if ((rrset.name.to_s.downcase == msg.question()[0].qname.to_s.downcase) && (rrset.sigs.length == 0))
+              if ((rrset.name.canonical == msg.question()[0].qname.canonical) && (rrset.sigs.length == 0))
                 next
               end
             end
@@ -866,11 +866,12 @@ module Dnsruby
       # If we get to root, then return false
       n = Name.create(name)
       root = Name.create(".")
-      while (n != root)
+      while (true) # n != root)
         # Try the trusted keys first, then the DS set
         (@trust_anchors.keys + @trusted_keys.keys + @configured_ds_store + @discovered_ds_store).each {|key|
-          return key if key.name.to_s.downcase == n.to_s.downcase
+          return key if key.name.canonical == n.canonical
         }
+        break if (n == root)
         # strip the name
         n = n.strip_label
       end
@@ -1095,7 +1096,7 @@ module Dnsruby
       if (!ns_rrset || ns_rrset.length == 0)
         ns_rrset = ns_ret.authority.rrset(name, Types.NS) # @TOO@ Is ths OK?
       end
-      if (!ns_rrset || ns_rrset.length == 0 || ns_rrset.name.to_s != name.to_s)
+      if (!ns_rrset || ns_rrset.length == 0 || ns_rrset.name.canonical != name.canonical)
         return nil
       end
       if (ns_rrset.sigs.length > 0)
@@ -1132,7 +1133,7 @@ module Dnsruby
         #   and see if we can find any of the names in the A/AAAA records in ns_additional
         found_addr = false
         ns_additional.each {|addr_rr|
-          if (ns_rr.nsdname.to_s == addr_rr.name.to_s)
+          if (ns_rr.nsdname.canonical == addr_rr.name.canonical)
             #            print "Found address #{addr_rr.address} for #{ns_rr.nsdname}\n"
             nameservers.push(addr_rr.address.to_s)
             found_addr = true

@@ -55,7 +55,7 @@ module Dnsruby
         return Name.new(split_escaped(arg), /\.\z/ =~ arg ? true : false)
         #        return Name.new(Label.split(arg), /\.\z/ =~ arg ? true : false)
       when Array
-        return Name.new(arg, /\.\z/ =~ ((arg.last.kind_of?String)?arg.last : arg.last.string) ? true : false)
+        return Name.new(arg, /\.\z/ =~ (arg.last ? ((arg.last.kind_of?String)?arg.last : arg.last.string) : arg.last) ? true : false)
       else        
         raise ArgumentError.new("cannot interpret as DNS name: #{arg.inspect}")
       end
