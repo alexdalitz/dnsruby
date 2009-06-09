@@ -209,7 +209,13 @@ module Dnsruby
             index = 4
           end
           (index..end_index).each {|i|
-            buf += data[i]
+            if (comment_index = data[i].index(";"))
+              buf += data[i].slice(0, comment_index)
+              # @TODO@ We lose the comments here - we should really keep them for when we write back to string format?
+              break
+            else
+              buf += data[i]
+            end
           } 
 #          self.digest=Base64.decode64(buf)
           buf.gsub!(/\n/, "")

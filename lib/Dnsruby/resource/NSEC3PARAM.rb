@@ -90,7 +90,8 @@ module Dnsruby
         self.flags=(flags)
         self.iterations=(iterations)
         #        self.salt_length=(salt_length)
-        self.salt=(salt)
+#        self.salt=(salt)
+        @salt=salt
       end
       
       def from_string(input)
@@ -110,7 +111,8 @@ module Dnsruby
       end
       
       def encode_rdata(msg, canonical=false) #:nodoc: all
-        s = salt()
+#        s = salt()
+        s = @salt
         sl = s.length()
         if (s == "-")
           sl == 0
