@@ -982,7 +982,8 @@ module Dnsruby
     
     def get_label
       begin
-        label = Name::Label.new(Name::decode(self.get_string))
+#        label = Name::Label.new(Name::decode(self.get_string))
+label = Name::Label.new(self.get_string)
         return label
         #         return Name::Label::Str.new(self.get_string)
       rescue ResolvError => e
@@ -1082,7 +1083,8 @@ module Dnsruby
     
     
     def put_label(d)
-      s, = Name.encode(d)
+#      s, = Name.encode(d)
+s = d
       raise RuntimeError, "length of #{s} is #{s.string.length} (larger than 63 octets)" if s.string.length > 63
       self.put_string(s.string)
     end
@@ -1122,7 +1124,7 @@ module Dnsruby
       # If the name looks like an IP address then do an appropriate
       # PTR query.
       @qname=args[0]
-      case @qname
+      case @qname.class
       when IPv4::Regex
         @qname = IPv4.create(@qname).to_name
         @qtype = Types.PTR
@@ -1130,6 +1132,7 @@ module Dnsruby
         @qname = IPv6.create(@qname).to_name
         @qtype = Types.PTR
       when Name
+        print "WAS NAME\n"
       when IPv6
         @qtype = Types.PTR
       when IPv4

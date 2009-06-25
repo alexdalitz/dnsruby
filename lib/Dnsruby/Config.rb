@@ -144,7 +144,7 @@ module Dnsruby
         if !dom.kind_of?(String)
           raise ArgumentError.new("invalid domain config: #{@domain.inspect}")
         end
-        @domain = Name::Label.split(dom)
+        @domain = Name::split(dom)
       else
         @domain=nil
       end
@@ -165,14 +165,14 @@ module Dnsruby
       @search=s
       if @search
         if @search.class == Array
-          @search = @search.map {|arg| Name::Label.split(arg) }
+          @search = @search.map {|arg| Name::split(arg) }
         else
           raise ArgumentError.new("invalid search config: search must be an array!")
         end
       else
         hostname = Socket.gethostname
         if /\./ =~ hostname
-          @search = [Name::Label.split($')]
+          @search = [Name.split($')]
         else
           @search = [[]]
         end

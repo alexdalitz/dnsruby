@@ -63,7 +63,13 @@ module Dnsruby
     
     def self.split_escaped(arg) #:nodoc: all
       encodedlabels = name2encodedlabels(arg)
-      return encodedlabels2name(encodedlabels).labels
+      return encodedlabels
+    end
+
+    def self.split(name)
+      encodedlabels = name2encodedlabels(name)
+      labels = encodedlabels.each  {|el| Name.decode(el.to_s)}
+      return labels
     end
     
     attr_reader :labels
@@ -88,7 +94,7 @@ module Dnsruby
     def downcase
       labels = []
       @labels.each do |label| labels << Label.new(label.downcase) end
-      return Name.create(labels)
+      return Name.new(labels)
     end
     
     def inspect # :nodoc:
@@ -121,7 +127,7 @@ module Dnsruby
     def canonical
       #
       return MessageEncoder.new {|msg|
-              msg.put_name(self, true)
+        msg.put_name(self, true)
       }.to_s
 
     end
@@ -139,7 +145,7 @@ module Dnsruby
       if (!(Name === n))
         n = Name.create(n)
       end
-      # @TODO@ Work out whether this name is canonically before the passed Name
+      # Work out whether this name is canonically before the passed Name
       # RFC 4034 section 6.1
       # For the purposes of DNS security, owner names are ordered by treating
       #individual labels as unsigned left-justified octet strings.  The
@@ -216,7 +222,14 @@ module Dnsruby
     #   p Resolv::Name.create("x.y.z").to_s #=> "x.y.z"
     #
     def to_s
-      return @labels.collect{|l| (l.kind_of?String) ? l : l.string}.join('.')    
+      return to_str(@labels)
+    end
+
+    def to_str(labels) # :nodoc: all
+      ls =[]
+      labels.each {|el| ls.push(Name.decode(el.to_s))}
+      return ls.join('.')
+      #      return @labels.collect{|l| (l.kind_of?String) ? l : l.string}.join('.')
     end
     
     # Utility function
@@ -236,14 +249,6 @@ module Dnsruby
       
       return names
     end
-    
-    def self.encodedlabels2name(labels) #:nodoc: all
-      ls = []
-      labels.each do |l|
-        ls.push(Name.decode(l.string))
-      end
-      return Name.new(ls)
-    end    
     
     def self.decode(wire) #:nodoc: all
       presentation=""
@@ -279,8 +284,9 @@ module Dnsruby
         end
         i=i+1
       end
-      
-      return Label.new(presentation)
+
+      return presentation
+      #      return Label.new(presentation)
     end
     
     
@@ -349,10 +355,7 @@ module Dnsruby
       @@max_length=MaxLabelLength
       # Split a Name into its component Labels
       def self.split(arg)
-        labels = []
-        #        arg.scan(/[^\.]+/) {labels << Str.new($&)}
-        arg.scan(/[^\.]+/) {labels << new($&)}
-        return labels
+        return Name.split(arg)
       end
       
       def self.set_max_length(l)
@@ -383,14 +386,15 @@ module Dnsruby
       def ==(other)
         return @downcase == other.downcase
       end
-      
+
       def eql?(other)
         return self == other
       end
-      
+
       def hash
         return @downcase.hash
       end
+
     end
   end
 end

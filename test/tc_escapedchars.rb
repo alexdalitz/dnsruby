@@ -182,7 +182,8 @@ class TestEscapedChars < Test::Unit::TestCase
       labels = Name.name2encodedlabels(testinput[0])
       
       #	assert_equal(testinput[1], Net::labels2name(labels), "consistent name2labels labels2name for " + testinput[0])
-      name_from_labels = Name.encodedlabels2name(labels)
+#      name_from_labels = Name.encodedlabels2name(labels)
+      name_from_labels = Name.new(labels)
       assert_equal(name.to_s, name_from_labels.to_s, "Name->Labels->Name for " + testinput[0])      
       
       # test number of labels
@@ -201,7 +202,7 @@ class TestEscapedChars < Test::Unit::TestCase
         msg.put_name(name, true)}.to_s
       
       wireinhex=wire.unpack("H*")[0]
-      assert_equal( testinput[4], wireinhex,"Wireinhex for " + testinput[0] )
+      assert_equal( testinput[4].to_s, wireinhex.to_s,"Wireinhex for " + testinput[0] )
       # And now call DN_EXPAND
       #      name,offset=Name.dn_expand(wire,0)    
       
