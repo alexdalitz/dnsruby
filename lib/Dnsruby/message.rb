@@ -986,7 +986,7 @@ module Dnsruby
         return label
         #         return Name::Label::Str.new(self.get_string)
       rescue ResolvError => e
-        raise DecodeError(e) # Turn it into something more suitable
+        raise DecodeError.new(e) # Turn it into something more suitable
       end
     end
     
