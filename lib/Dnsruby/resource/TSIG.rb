@@ -145,7 +145,7 @@ module Dnsruby
         key = @key.gsub(" ", "")
  #       key = Base64::decode64(key)
         key = key.unpack("m*")[0]
-        if (algorithm == HMAC_MD5)
+        if (algorithm.to_s.downcase == HMAC_MD5.to_s.downcase)
           mac = OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, key, data)
         elsif (algorithm == HMAC_SHA1)
           mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA1.new, key, data)

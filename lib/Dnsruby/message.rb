@@ -1124,7 +1124,7 @@ s = d
       # If the name looks like an IP address then do an appropriate
       # PTR query.
       @qname=args[0]
-      case @qname.class
+      case @qname.to_s
       when IPv4::Regex
         @qname = IPv4.create(@qname).to_name
         @qtype = Types.PTR
@@ -1132,7 +1132,6 @@ s = d
         @qname = IPv6.create(@qname).to_name
         @qtype = Types.PTR
       when Name
-        print "WAS NAME\n"
       when IPv6
         @qtype = Types.PTR
       when IPv4
