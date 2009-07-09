@@ -129,7 +129,7 @@ module Dnsruby
               else
                 next
               end
-#              next if ((rr.type_covered != type) || (type != Types.RRSIG))
+              #              next if ((rr.type_covered != type) || (type != Types.RRSIG))
             elsif (rr.type != type)
               next
             end
@@ -933,7 +933,7 @@ module Dnsruby
       if (len.class == String)
         len = len.getbyte(0)
       end
-      raise DecodeError.new("limit exceeded\nlimit = #{@limit}, index = #{@index}, len = #{len}\n") if @limit < @index + 1 + (len ? len:0)
+      raise DecodeError.new("limit exceeded\nlimit = #{@limit}, index = #{@index}, len = #{len}\n") if @limit < @index + 1 + (len ? len : 0)
       d = @data[@index + 1, len]
       @index += 1 + len
       return d
@@ -982,8 +982,8 @@ module Dnsruby
     
     def get_label
       begin
-#        label = Name::Label.new(Name::decode(self.get_string))
-label = Name::Label.new(self.get_string)
+        #        label = Name::Label.new(Name::decode(self.get_string))
+        label = Name::Label.new(self.get_string)
         return label
         #         return Name::Label::Str.new(self.get_string)
       rescue ResolvError => e
@@ -1083,8 +1083,8 @@ label = Name::Label.new(self.get_string)
     
     
     def put_label(d)
-#      s, = Name.encode(d)
-s = d
+      #      s, = Name.encode(d)
+      s = d
       raise RuntimeError, "length of #{s} is #{s.string.length} (larger than 63 octets)" if s.string.length > 63
       self.put_string(s.string)
     end

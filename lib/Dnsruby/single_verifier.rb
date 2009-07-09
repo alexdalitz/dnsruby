@@ -129,11 +129,11 @@ module Dnsruby
         raise VerifyError.new("RRSET should have same type as RRSIG for verification")
       end
 
-      #Each RR in the RRset MUST have the TTL listed in the
-      #RRSIG Original TTL Field;
-      if (rrset.ttl  != sigrec.ttl)
-        raise VerifyError.new("RRSET should have same ttl as RRSIG for verification")
-      end
+#      #Each RR in the RRset MUST have the TTL listed in the
+#      #RRSIG Original TTL Field;
+#      if (rrset.ttl  != sigrec.original_ttl)
+#        raise VerifyError.new("RRSET should have same ttl as RRSIG original_ttl for verification (should be #{sigrec.original_ttl} but was #{rrset.ttl}")
+#      end
 
       # Now check that we are in the validity period for the RRSIG
       now = Time.now.to_i
@@ -669,7 +669,7 @@ module Dnsruby
       keyrec = nil
       sigrec = nil
       if (rrset.type == Types.DNSKEY)
-        if (keys && ((keys.type == Types.DS) || ((keys.type == Types.DLV) && (@verifier_type == VerifierType::DLV))))
+        if (keys && !(Array === keys) && ((keys.type == Types.DS) || ((keys.type == Types.DLV) && (@verifier_type == VerifierType::DLV))))
           rrset.rrs.each do |key|
             keys.rrs.each do |ds|
               if (ds.check_key(key))
@@ -681,7 +681,7 @@ module Dnsruby
           check_ds_stores(rrset)
         end
       end
-      if ((keys.nil?) || ((keys.type == Types.DS) || ((keys.type == Types.DLV) && (@verifier_type == VerifierType::DLV))))
+      if ((keys.nil?) || ((keys.class != Array) && ((keys.type == Types.DS) || ((keys.type == Types.DLV) && (@verifier_type == VerifierType::DLV)))))
         keyrec, sigrec = get_matching_key(get_keys_to_check, sigrecs)
       else
         keyrec, sigrec = get_matching_key(keys, sigrecs)

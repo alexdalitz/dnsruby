@@ -210,6 +210,7 @@ module Dnsruby
           hour=input[8,2]
           min=input[10,2]
           sec=input[12,2]
+          # @TODO@ REPLACE THIS BY LOCAL CODE - Time.gm DOG SLOW!
           return Time.gm(year, mon, day, hour, min, sec).to_i
         else
           raise DecodeError.new("RRSIG : Illegal time value #{input} - see RFC 4034 section 3.2")

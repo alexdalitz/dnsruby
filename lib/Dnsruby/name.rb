@@ -238,16 +238,25 @@ module Dnsruby
     # array of "wire-format" labels.        
     # in: dName a string with a domain name in presentation format (1035
     # sect 5.1)
-    # out: an array of labels in wire format.        
+    # out: an array of labels in wire format.
     def self.name2encodedlabels (dName) #:nodoc: all
-      names=[]
-      j=0;
-      while (dName && dName.length > 0)
-        names[j],dName = encode(dName)
-        j+=1
-      end
+      # Check for "/" in the name  : If there, then decode properly - otherwise, cheat and split on "."
+      if (dName.index("\\"))
+        names=[]
+        j=0;
+        while (dName && dName.length > 0)
+          names[j],dName = encode(dName)
+          j+=1
+        end
       
-      return names
+        return names
+      else
+        labels = []
+        dName.split(".").each {|l|
+          labels.push(Label.new(l))
+        }
+        return labels
+      end
     end
     
     def self.decode(wire) #:nodoc: all
@@ -276,7 +285,7 @@ module Dnsruby
         elsif ( c.chr == "@" )
           presentation=presentation +  "\\@"
         elsif ( c.chr == "\\" )
-          presentation=presentation + "\\\\" 
+          presentation=presentation + "\\\\"
         elsif ( c.chr == ".")
           presentation=presentation +  "\\."
         else
@@ -291,17 +300,17 @@ module Dnsruby
     
     
     
-    # wire,leftover=presentation2wire(leftover)    
+    # wire,leftover=presentation2wire(leftover)
     # Will parse the input presentation format and return everything before
     # the first non-escaped "." in the first element of the return array and
-    # all that has not been parsed yet in the 2nd argument.        
+    # all that has not been parsed yet in the 2nd argument.
     def self.encode(presentation) #:nodoc: all
       presentation=presentation.to_s
       wire="";
       length=presentation.length;
-      
+    
       i=0;
-      
+    
       while (i < length )
         c=presentation.unpack("x#{i}C1") [0]
         if (c == 46) # ord('.')
@@ -339,7 +348,7 @@ module Dnsruby
         end
         i=i+1
       end
-      
+    
       return Label.new(wire)
     end
     
@@ -351,6 +360,7 @@ module Dnsruby
     #(RFC1035, section 3.1)
     #
     class Label
+      include Comparable
       MaxLabelLength = 63
       @@max_length=MaxLabelLength
       # Split a Name into its component Labels
@@ -382,6 +392,11 @@ module Dnsruby
       def inspect
         return "#<#{self.class} #{self.to_s}>"
       end
+
+      def <=>(other)
+        return (@downcase <=> other.downcase)
+      end
+
       
       def ==(other)
         return @downcase == other.downcase

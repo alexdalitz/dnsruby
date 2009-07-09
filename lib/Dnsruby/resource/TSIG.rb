@@ -336,7 +336,6 @@ module Dnsruby
               m.put_bytes(tsig.mac)
             }.to_s
             @buf = mac_bytes
-          else
           end
           return ok
         end
