@@ -172,7 +172,11 @@ module Dnsruby
       }
     end
     def name
+      if (@rrs[0])
       return @rrs[0].name
+      else
+        return nil
+      end
     end
     def to_s
       ret = ""
