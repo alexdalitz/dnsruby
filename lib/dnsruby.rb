@@ -382,9 +382,9 @@ module Dnsruby
     PRIVATEDNS = 253
     PRIVATEOID = 254
     update()
-    # Referred to as Algoriths.DSA_NSEC3_SHA1
+    # Referred to as Algorithms.DSA_NSEC3_SHA1
     add_pair("DSA-NSEC3-SHA1", 6)
-    # Referred to as Algoriths.RSASHA1_NSEC3_SHA1
+    # Referred to as Algorithms.RSASHA1_NSEC3_SHA1
     add_pair("RSASHA1-NSEC3-SHA1", 7)
   end  
 

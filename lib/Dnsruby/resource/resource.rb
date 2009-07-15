@@ -61,13 +61,24 @@ module Dnsruby
     end
 
     #Add the RR to this RRSet
-    def add(r)
-      if (r.instance_of?RRSet)
+    #Takes a copy of the RR by default. To suppress this, pass false
+    #as the second parameter.
+    def add(rin, do_clone = true)
+      if (rin.instance_of?RRSet)
         ret = false
-        [r.rrs, r.sigs].each {|rr| ret = add(rr)}
+        [rin.rrs, rin.sigs].each {|rr| ret = add(rr)}
         return ret
       end
-      r = RR.create(r.to_s) # clone the record
+      #      r = RR.create(r.to_s) # clone the record
+      r = nil
+      if do_clone
+        Message::MessageDecoder.new(MessageEncoder.new {|msg|
+            msg.put_rr(rin, true)}.to_s) {|msg|
+          r = msg.get_rr
+        }
+      else
+        r = rin
+      end
       if (@rrs.size() == 0) #  && !(r.type == Types.RRSIG))
         return privateAdd(r)
       end
@@ -75,7 +86,7 @@ module Dnsruby
       first = @rrs[0]
       if (!r.sameRRset(first))
         return false
-#        raise ArgumentError.new("record does not match rrset")
+        #        raise ArgumentError.new("record does not match rrset")
       end
       
       if (!(r.type == Types.RRSIG) && (!(first.type == Types.RRSIG)))
@@ -90,13 +101,13 @@ module Dnsruby
         end
       end
       
-        return privateAdd(r)
-#      return true
+      return privateAdd(r)
+      #      return true
     end
 
     def <=>(other)
-#      return 1 if ((!other) || !(other.name) || !(other.type))
-#      return -1 if (!@name)
+      #      return 1 if ((!other) || !(other.name) || !(other.type))
+      #      return -1 if (!@name)
       if (@name.canonical == other.name.canonical)
         return @type.code <=> other.type.code
       else
@@ -152,7 +163,7 @@ module Dnsruby
     #Return the type of this RRSet
     def type
       if (@rrs[0])
-      return @rrs[0].type
+        return @rrs[0].type
       end
       return nil
     end
@@ -173,7 +184,7 @@ module Dnsruby
     end
     def name
       if (@rrs[0])
-      return @rrs[0].name
+        return @rrs[0].name
       else
         return nil
       end
@@ -191,23 +202,23 @@ module Dnsruby
   end
   
   #Superclass for all Dnsruby resource records.
-  # 
+  #
   #Represents a DNS RR (resource record) [RFC1035, section 3.2]
-  # 
-  #Use Dnsruby::RR::create(...) to create a new RR record. 
-  # 
+  #
+  #Use Dnsruby::RR::create(...) to create a new RR record.
+  #
   #   mx = Dnsruby::RR.create("example.com. 7200 MX 10 mailhost.example.com.")
-  #   
-  #   rr = Dnsruby::RR.create({:name => "example.com", :type => "MX", :ttl => 7200, 
+  #
+  #   rr = Dnsruby::RR.create({:name => "example.com", :type => "MX", :ttl => 7200,
   #                                  :preference => 10, :exchange => "mailhost.example.com"})
-  #                                  
+  #
   #   s = rr.to_s # Get a String representation of the RR (in zone file format)
   #   rr_again = Dnsruby::RR.create(s)
-  # 
+  #
   class RR
     
     # A regular expression which catches any valid resource record.
-    @@RR_REGEX = Regexp.new("^\\s*(\\S+)\\s*(\\d+)?\\s*(#{Classes.regexp + 
+    @@RR_REGEX = Regexp.new("^\\s*(\\S+)\\s*(\\d+)?\\s*(#{Classes.regexp +
       "|CLASS\\d+"})?\\s*(#{Types.regexp + '|TYPE\\d+'})?\\s*([\\s\\S]*)\$") #:nodoc: all
     
     #The Resource's domain name
@@ -239,13 +250,13 @@ module Dnsruby
     alias :rr_type :type
     
     def klass=(klass)
-      if (@type != Types.OPT) 
+      if (@type != Types.OPT)
         @klass= Classes.new(klass)
       else
-         if (klass.class == Classes)
-            @klass = klass
+        if (klass.class == Classes)
+          @klass = klass
         else
-            @klass = Classes.new("CLASS#{klass}")
+          @klass = Classes.new("CLASS#{klass}")
         end
       end
     end
@@ -278,7 +289,7 @@ module Dnsruby
           return
         else
           @rdata = args[0]
-#          print "Loading RR from #{args[0]}, class : #{args[0].class}\n"
+          #          print "Loading RR from #{args[0]}, class : #{args[0].class}\n"
           if (args[0].class == String)
             from_string(args[0])
             return
@@ -301,7 +312,7 @@ module Dnsruby
     #Create a new RR from the hash. The name is required; all other fields are optional.
     #Type defaults to ANY and the Class defaults to IN. The TTL defaults to 0.
     #
-    #If the type is specified, then it is necessary to provide ALL of the resource record fields which 
+    #If the type is specified, then it is necessary to provide ALL of the resource record fields which
     #are specific to that record; i.e. for
     #an MX record, you would need to specify the exchange and the preference
     #
@@ -309,7 +320,7 @@ module Dnsruby
     #   rr = Dnsruby::RR.new_from_hash({:name => "example.com"})
     #   rr = Dnsruby::RR.new_from_hash({:name => "example.com", :type => Types.MX, :ttl => 10, :preference => 5, :exchange => "mx1.example.com"})
     def RR.new_from_hash(inhash)
-      hash = inhash.clone        
+      hash = inhash.clone
       type = hash[:type] || Types::ANY
       klass = hash[:klass] || Classes::IN
       ttl = hash[:ttl] || 0
@@ -340,7 +351,7 @@ module Dnsruby
     #
     #All names must be fully qualified.  The trailing dot (.) is optional.
     #
-    # 
+    #
     #   a     = Dnsruby::RR.new_from_string("foo.example.com. 86400 A 10.1.2.3")
     #   mx    = Dnsruby::RR.new_from_string("example.com. 7200 MX 10 mailhost.example.com.")
     #   cname = Dnsruby::RR.new_from_string("www.example.com 300 IN CNAME www1.example.com")
@@ -365,7 +376,7 @@ module Dnsruby
       rrtype  = $4 || '';
       rdata   = $5 || '';
       
-      if rdata 
+      if rdata
         rdata.gsub!(/\s+$/o, "")
       end
       
@@ -397,7 +408,7 @@ module Dnsruby
         rdata =~ /\\\#\s+(\d+)\s+(.*)$/o;
         
         rdlength = $1.to_i;
-        hexdump  = $2;		
+        hexdump  = $2;
         hexdump.gsub!(/\s*/, "");
         
         if hexdump.length() != rdlength*2
@@ -412,7 +423,7 @@ module Dnsruby
         raise Exception, 'Expected RFC3597 representation of RDATA' unless rdata =~/\\\#\s+(\d+)\s+(.*)$/o;
         
         rdlength = $1.to_i;
-        hexdump  = $2;		
+        hexdump  = $2;
         hexdump.gsub!(/\s*/o, "");
         
         if hexdump.length() != rdlength*2
@@ -439,7 +450,7 @@ module Dnsruby
       offset = args[6]
       rdata = []
       if (data != nil)
-         rdata = data[offset, rdlength]
+        rdata = data[offset, rdlength]
       end
       
       record = nil
@@ -449,7 +460,7 @@ module Dnsruby
       record.name = Name.create(name)
       record.ttl = ttl
       record.type = rrtype
-      record.klass = rrclass        
+      record.klass = rrclass
       
       return record
     end
@@ -461,14 +472,14 @@ module Dnsruby
     
     private
     def RR._get_subclass(name, rrtype, rrclass, ttl, rdata) #:nodoc: all
-      return unless (rrtype!=nil)        
-      record = get_class(rrtype, rrclass).new(rdata)        
+      return unless (rrtype!=nil)
+      record = get_class(rrtype, rrclass).new(rdata)
       record.name = Name.create(name)
       record.ttl = ttl
       record.type = rrtype
-      record.klass = rrclass   
+      record.klass = rrclass
       return record
-    end	
+    end
     public
     
     #Returns a string representation of the RR in zone file format
@@ -480,7 +491,7 @@ module Dnsruby
     def rdata_to_string
       if (@rdata && @rdata.length > 0)
         return @rdata
-      else 
+      else
         return "no rdata"
       end
     end
@@ -497,12 +508,12 @@ module Dnsruby
     
     def encode_rdata(msg, canonical=false) #:nodoc: all
       # to be implemented by subclasses
-      raise EncodeError.new("#{self.class} is RR.") 
+      raise EncodeError.new("#{self.class} is RR.")
     end
     
     def self.decode_rdata(msg) #:nodoc: all
       # to be implemented by subclasses
-      raise DecodeError.new("#{self.class} is RR.") 
+      raise DecodeError.new("#{self.class} is RR.")
     end
     
     def ==(other)
@@ -520,7 +531,7 @@ module Dnsruby
       o_ivars.delete "@ttl" # RFC 2136 section 1.1
       
       return s_ivars == o_ivars &&
-        s_ivars.collect {|name| self.instance_variable_get name} == 
+        s_ivars.collect {|name| self.instance_variable_get name} ==
         o_ivars.collect {|name| other.instance_variable_get name}
     end
     
@@ -529,7 +540,7 @@ module Dnsruby
     end
     
     def hash # :nodoc:
-      h = 0      
+      h = 0
       vars = self.instance_variables
       vars.delete "@ttl"
       vars.each {|name|
@@ -541,7 +552,7 @@ module Dnsruby
     #Get an RR of the specified type and class
     def self.get_class(type_value, class_value) #:nodoc: all
       if (type_value == Types.OPT)
-         return Class.new(OPT)
+        return Class.new(OPT)
       end
       if (type_value.class == Class)
         type_value = type_value.const_get(:TypeValue)
@@ -559,10 +570,10 @@ module Dnsruby
           class_value = Classes.new(class_value).code
         end
         return ClassHash[[type_value, class_value]] ||
-           Generic.create(type_value, class_value)
+          Generic.create(type_value, class_value)
       end
       return ret
-    end  
+    end
     
     
     #Create a new RR from the arguments, which can be either a String or a Hash.
@@ -572,17 +583,17 @@ module Dnsruby
     #   mx    = Dnsruby::RR.create("example.com. 7200 MX 10 mailhost.example.com.")
     #   cname = Dnsruby::RR.create("www.example.com 300 IN CNAME www1.example.com")
     #   txt   = Dnsruby::RR.create('baz.example.com 3600 HS TXT "text record"')
-    #   
+    #
     #   rr = Dnsruby::RR.create({:name => "example.com"})
-    #   rr = Dnsruby::RR.create({:name => "example.com", :type => "MX", :ttl => 10, 
+    #   rr = Dnsruby::RR.create({:name => "example.com", :type => "MX", :ttl => 10,
     #                                  :preference => 5, :exchange => "mx1.example.com"})
-    #   
+    #
     def RR.create(*args)
-      if (args.length == 1) && (args[0].class == String) 
+      if (args.length == 1) && (args[0].class == String)
         return new_from_string(args[0])
-      elsif (args.length == 1) && (args[0].class == Hash) 
+      elsif (args.length == 1) && (args[0].class == Hash)
         return new_from_hash(args[0])
-      else 
+      else
         return new_from_data(args)
       end
     end

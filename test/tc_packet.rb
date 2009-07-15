@@ -188,12 +188,11 @@ f4 00 31 04 64 6e 73 31 05 69 63 61 6e 6e 03 6f
       #      print "section = #{section}, rrsets = #{rrsets.length}\n"
     end
     assert(packet.authority.rrsets.length == 1)
-    assert(packet.question.rrsets.length == 1)
+    assert(packet.question().length == 1)
     assert(packet.answer.rrsets.length == 1)
     assert(packet.additional.rrsets.length == 0)
     assert(packet.authority.rrsets[0].length == 3)
     #    assert(packet.additional.rrsets[0].length == 0)
-    assert(packet.question.rrsets[0].length == 1)
     assert(packet.answer.rrsets[0].length == 1)
   end
 
