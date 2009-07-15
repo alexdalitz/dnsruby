@@ -346,6 +346,12 @@ module Dnsruby
       end
       Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
       #            print "#{Time.now} : Sending packet to #{@server} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
+      # Listen for the response before we send the packet (to avoid any race conditions)
+      query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
+      # The select thread will now wait for the response and send that or a timeout
+      # back to the client_queue.
+      st.add_to_select(query_settings)
+      # Now that we're listening for the response, send the query!
       begin
         if (use_tcp)
           lenmsg = [query_bytes.length].pack('n')
@@ -353,18 +359,13 @@ module Dnsruby
         end
         socket.send(query_bytes, 0)
       rescue Exception => e
+        st.push_exception_to_select(client_query_id, client_queue, err, nil)
         socket.close
         err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
         Dnsruby.log.error{"#{err}"}
-        st.push_exception_to_select(client_query_id, client_queue, err, nil)
         return
       end
       
-      # Then listen for the response
-      query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
-      # The select thread will now wait for the response and send that or a timeout
-      # back to the client_queue.
-      st.add_to_select(query_settings)
       Dnsruby.log.debug{"Packet sent to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
       #      print "Packet sent to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
     end

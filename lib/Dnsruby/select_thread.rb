@@ -156,6 +156,8 @@ module Dnsruby
         rescue SelectWakeup
           # If SelectWakeup, then just restart this loop - the select call will be made with the new data
           next
+        rescue IOError # Don't worry if the socket was closed already
+          next
         end
         if (ready == nil)
           # proces the timeouts
@@ -267,7 +269,10 @@ module Dnsruby
         @@sockets.delete(socket) # @TODO@ Not if persistent!
       }
       Dnsruby.log.debug{"Closing socket #{socket}"}
+      begin
       socket.close # @TODO@ Not if persistent!
+      rescue IOError # Don't worry if the socket was closed already
+      end
     end
     
     def process_timeouts

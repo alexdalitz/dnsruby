@@ -365,6 +365,8 @@ module Dnsruby
                 @config.set_config_info(args[0][:config_info])
               elsif (key==:nameserver)
                 set_config_nameserver(args[0][:nameserver])
+              elsif (key==:nameservers)
+                set_config_nameserver(args[0][:nameservers])
               else
                 send(key.to_s+"=", args[0][key])
               end
@@ -479,7 +481,10 @@ module Dnsruby
         res.send(param.to_s+"=", instance_variable_get("@"+param.to_s))
       end
     end
-    
+
+    def nameservers=(ns)
+      self.nameserver=(n)
+    end
     def nameserver=(n)
       @configured = true
             @single_res_mutex.synchronize {
