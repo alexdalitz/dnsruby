@@ -26,16 +26,23 @@ module Dnsruby
   class CodeMapper # :nodoc: all
     include Comparable
     
-    @@strings = {}
-    @@stringsdown = {}
-    @@values = {}
-    @@maxcode = {}
+    @@arrays = {}
     
     attr_accessor :string, :code
     alias to_code code
     alias to_i code
     alias to_string string
     alias to_s string
+
+    class Arrays
+      attr_accessor :strings, :stringsdown, :values, :maxcode
+      def initialize
+        @strings = {}
+        @stringsdown = {}
+        @values = {}
+        @maxcode = 0
+      end
+    end
     
     def CodeMapper.maxcode
       return @maxcode
@@ -43,30 +50,28 @@ module Dnsruby
     
     # Creates the CodeMapper from the defined constants
     def CodeMapper.update
-      
-      @@strings[self] = {}
-      @@stringsdown[self] = {}
-      @@values[self] = {}
-      @@maxcode[self] = 0
+
+      @@arrays[self] = Arrays.new
       
       constants = self.constants - CodeMapper.constants
       constants.each do |i|
-        @@strings[self].store(i.to_s, const_get(i))
+        @@arrays[self].strings.store(i.to_s, const_get(i))
       end 
-      @@maxcode[self] = constants.length
-      @@values[self] = @@strings[self].invert
-      @@stringsdown[self] = Hash.new
-      @@strings[self].keys.each do |s|
-        @@stringsdown[self].store(s.downcase, @@strings[self][s])    
+      @@arrays[self].maxcode = constants.length
+      @@arrays[self].values = @@arrays[self].strings.invert
+      @@arrays[self].stringsdown = Hash.new
+      @@arrays[self].strings.keys.each do |s|
+        @@arrays[self].stringsdown.store(s.downcase, @@arrays[self].strings[s])
       end
     end
     
     # Add new a code to the CodeMapper
     def CodeMapper.add_pair(string, code)
-      @@strings[self].store(string, code)
-      @@values[self]=@@strings[self].invert
-      @@stringsdown[self].store(string.downcase, code)
-      @@maxcode[self]+=1
+      array = @@arrays[self]
+      array.strings.store(string, code)
+      array.values=array.strings.invert
+      array.stringsdown.store(string.downcase, code)
+      array.maxcode+=1
     end
     
     def unknown_string(arg) #:nodoc: all
@@ -75,7 +80,7 @@ module Dnsruby
     
     def unknown_code(arg) #:nodoc: all
       # Be liberal in what you accept...
-#      raise ArgumentError.new("Code #{arg} not a member of #{self.class}")
+      #      raise ArgumentError.new("Code #{arg} not a member of #{self.class}")
       Classes.add_pair(arg.to_s, arg)
       set_code(arg)
     end
@@ -86,36 +91,42 @@ module Dnsruby
     end
     
     def initialize(arg) #:nodoc: all
+      array = @@arrays[self.class]
       if (arg.kind_of?String)
         arg.gsub!("_", "-")
-        if (@@stringsdown[self.class][arg.downcase] != nil)
-          set_string(arg)
+        code = array.stringsdown[arg.downcase]
+        if (code != nil)
+          @code = code
+          @string = array.strings.invert[@code]
         else 
           unknown_string(arg)
         end
       elsif (arg.kind_of?Fixnum)
-        if (@@values[self.class][arg] != nil)
-          set_code(arg)
+        if (array.values[arg] != nil)
+          @code = arg
+          @string = array.values[@code]
         else 
           unknown_code(arg)
         end
       elsif (arg.kind_of?self.class)
-        set_code(arg.code)
+        @code = arg.code
+        @string = array.values[@code]
       else
         raise ArgumentError.new("Unknown argument #{arg} for #{self.class}")
       end
     end
     
+    def set_string(arg)
+      array = @@arrays[self.class]
+      @code = array.stringsdown[arg.downcase]
+      @string = array.strings.invert[@code]
+    end
+
     def set_code(arg)
       @code = arg
-      @string = @@values[self.class][@code]
+      @string = @@arrays[self.class].values[@code]
     end
-    
-    def set_string(arg)
-      @code = @@stringsdown[self.class][arg.downcase]
-      @string = @@strings[self.class].invert[@code]
-    end
-    
+        
     def inspect
       return @string
     end    
@@ -124,7 +135,7 @@ module Dnsruby
       if (arg.kind_of?String) 
         return arg
       else
-        return @@values[self][arg]
+        return @@arrays[self].values[arg]
       end
     end
     
@@ -132,7 +143,7 @@ module Dnsruby
       if (arg.kind_of?Fixnum)
         return arg
       else
-        return @@stringsdown[self][arg.downcase]
+        return @@arrays[self].stringsdown[arg.downcase]
       end
     end
     
@@ -145,16 +156,16 @@ module Dnsruby
     end
     
     def ==(other)
-      if other.kind_of?CodeMapper
-        if other.string == @string && other.code == @code
-          return true 
+      if Fixnum === other
+        if other == @code
+          return true
         end
-      elsif other.kind_of?String
+      elsif String === other
         if other == @string
           return true
         end
-      elsif other.kind_of?Fixnum
-        if other == @code
+      elsif CodeMapper === other
+        if other.string == @string && other.code == @code
           return true
         end
       end
@@ -165,7 +176,7 @@ module Dnsruby
     # Return a regular expression which matches any codes or strings from the CodeMapper.
     def self.regexp
       # Longest ones go first, so the regex engine will match AAAA before A, etc.
-      return @@strings[self].keys.sort { |a, b| b.length <=> a.length }.join('|')
+      return @@arrays[self].strings.keys.sort { |a, b| b.length <=> a.length }.join('|')
     end
     
   end

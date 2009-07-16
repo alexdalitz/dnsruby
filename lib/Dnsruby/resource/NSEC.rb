@@ -145,7 +145,7 @@ module Dnsruby
                   type = Types.new((256 * window_number) + (8 * index) + i)
                   #Bits representing pseudo-types MUST be clear, as they do not appear
                   #in zone data.  If encountered, they MUST be ignored upon being read.
-                  if (!([Types.OPT, Types.TSIG].include?(type)))
+                  if (!([Types::OPT, Types::TSIG].include?(type)))
                     types.push(type)
                   end
                 end               

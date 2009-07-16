@@ -52,7 +52,7 @@ module Dnsruby
           return false
         end
       end
-      if (r.type == Types.RRSIG)
+      if (r.type == Types::RRSIG)
         new_pos = @rrs.length
         @num_sigs += 1
       end
@@ -89,7 +89,7 @@ module Dnsruby
         #        raise ArgumentError.new("record does not match rrset")
       end
       
-      if (!(r.type == Types.RRSIG) && (!(first.type == Types.RRSIG)))
+      if (!(r.type == Types::RRSIG) && (!(first.type == Types::RRSIG)))
         if (r.ttl != first.ttl) # RFC2181, section 5.2
           if (r.ttl > first.ttl)
             r.ttl=(first.ttl)
@@ -128,7 +128,7 @@ module Dnsruby
 
       return_rrs = RRSet.new
       canonical_rrs.keys.sort.each { |rdata|
-        return_rrs.add(canonical_rrs[rdata])
+        return_rrs.add(canonical_rrs[rdata], false)
       }
       return return_rrs
     end
@@ -221,6 +221,8 @@ module Dnsruby
     @@RR_REGEX = Regexp.new("^\\s*(\\S+)\\s*(\\d+)?\\s*(#{Classes.regexp +
       "|CLASS\\d+"})?\\s*(#{Types.regexp + '|TYPE\\d+'})?\\s*([\\s\\S]*)\$") #:nodoc: all
     
+    @@implemented_rr_map = nil
+
     #The Resource's domain name
     attr_reader :name
     #The Resource type
@@ -250,7 +252,7 @@ module Dnsruby
     alias :rr_type :type
     
     def klass=(klass)
-      if (@type != Types.OPT)
+      if (@type != Types::OPT)
         @klass= Classes.new(klass)
       else
         if (klass.class == Classes)
@@ -269,7 +271,7 @@ module Dnsruby
         return false
       end
       [rec, self].each { |rr|
-        if (rr.type == Types.RRSIG)
+        if (rr.type == Types::RRSIG)
           return ((@type == rr.type_covered) || (rec.type == rr.type_covered))
         end
       }
@@ -467,7 +469,10 @@ module Dnsruby
     
     #Return an array of all the currently implemented RR types
     def RR.implemented_rrs
-      return ClassHash.keys.map {|k| Dnsruby::Types.to_string(k[0])}
+      if (!@@implemented_rr_map)
+        @@implemented_rr_map = ClassHash.keys.map {|k| Dnsruby::Types.to_string(k[0])}
+      end
+      return @@implemented_rr_map
     end
     
     private
@@ -551,7 +556,7 @@ module Dnsruby
     
     #Get an RR of the specified type and class
     def self.get_class(type_value, class_value) #:nodoc: all
-      if (type_value == Types.OPT)
+      if (type_value == Types::OPT)
         return Class.new(OPT)
       end
       if (type_value.class == Class)

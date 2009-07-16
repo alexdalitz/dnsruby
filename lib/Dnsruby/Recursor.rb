@@ -202,7 +202,7 @@ module Dnsruby
         if (ans = packet.answer)
           ans.each do |rr|
             if (rr.name.to_s =~ /^\.?$/ and
-                  rr.type == Types.NS)
+                  rr.type == Types::NS)
               # Found root authority
               server = rr.nsdname.to_s.downcase
               server.sub!(/\.$/,"")
@@ -215,14 +215,14 @@ module Dnsruby
             server = rr.name.to_s.downcase
             server.sub!(/\.$/,"")
             if (server)
-              if ( rr.type == Types.A)
+              if ( rr.type == Types::A)
                 #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
                 if (hints[server]!=nil)
                   TheLog.debug(";; STORING IP: #{server} IN A "+rr.address.to_s+"\n")
                   hints[server].push([rr.address.to_s, rr.ttl])
                 end
               end
-              if ( rr.type == Types.AAAA)
+              if ( rr.type == Types::AAAA)
                 #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
                 if (hints[server])
                   TheLog.debug(";; STORING IP6: #{server} IN AAAA "+rr.address.to_s+"\n")
@@ -455,7 +455,7 @@ module Dnsruby
               ans.each do |rr_arr|
                 rr_arr.each do |rr|
                   TheLog.debug(";; RR:" + rr.inspect + "")
-                  if (rr.type == Types.CNAME)
+                  if (rr.type == Types::CNAME)
                     # Follow CNAME
                     server = rr.name.to_s.downcase
                     if (server)
@@ -471,7 +471,7 @@ module Dnsruby
                         next
                       end
                     end
-                  elsif (rr.type == Types.A || rr.type == Types.AAAA )
+                  elsif (rr.type == Types::A || rr.type == Types::AAAA )
                     server = rr.name.to_s.downcase
                     if (server)
                       server.sub!(/\.*$/, ".")
@@ -561,7 +561,7 @@ module Dnsruby
             #	 foreach my $rr (@authority) {
             authority.each do |rr|
               if (rr.type.to_s =~ /^(NS|SOA)$/)
-                server = (rr.type == Types.NS ? rr.nsdname : rr.mname).to_s.downcase
+                server = (rr.type == Types::NS ? rr.nsdname : rr.mname).to_s.downcase
                 server.sub!(/\.*$/, ".")
                 of = rr.name.to_s.downcase
                 of.sub!(/\.*$/, ".")
@@ -572,8 +572,8 @@ module Dnsruby
                 elsif (of =~ /#{known_zone}/)
                   TheLog.debug(";; _dorecursion() FOUND closer authority for [#{of}] at [#{server}].")
                   auth[server] ||= AddressCache.new #[] @TODO@ If there is no additional record for this, then we want to use the authority!
-                  if ((packet.additional.rrset(rr.nsdname, Types.A).length == 0) &&
-                      (packet.additional.rrset(rr.nsdname, Types.AAAA).length == 0))
+                  if ((packet.additional.rrset(rr.nsdname, Types::A).length == 0) &&
+                      (packet.additional.rrset(rr.nsdname, Types::AAAA).length == 0))
                     auth[server].push([rr.nsdname, rr.ttl])
                   end
                 else
@@ -586,7 +586,7 @@ module Dnsruby
             end
             #	 foreach my $rr ($packet->additional)
             packet.additional.each do |rr|
-              if (rr.type == Types.CNAME)
+              if (rr.type == Types::CNAME)
                 # Store this CNAME into %auth too
                 server = rr.name.to_s.downcase
                 if (server)
@@ -601,15 +601,15 @@ module Dnsruby
                   end
                         
                 end
-              elsif (rr.type == Types.A || rr.type == Types.AAAA)
+              elsif (rr.type == Types::A || rr.type == Types::AAAA)
                 server = rr.name.to_s.downcase
                 if (server)
                   server.sub!(/\.*$/, ".")
                   if (auth[server]!=nil)
-                    if (rr.type == Types.A)
+                    if (rr.type == Types::A)
                       TheLog.debug(";; _dorecursion() STORING: #{server} IN A    " + rr.address.to_s)
                     end
-                    if (rr.type == Types.AAAA)
+                    if (rr.type == Types::AAAA)
                       TheLog.debug(";; _dorecursion() STORING: #{server} IN AAAA " + rr.address.to_s)
                     end
                     auth[server].push([rr.address.to_s, rr.ttl])
@@ -653,7 +653,7 @@ module Dnsruby
           n.absolute = true
           if ((n.to_s == zone) || (n.to_s == Name.create(zone).to_s) ||
                 (n.subdomain_of?(Name.create(zone))) ||
-                (rrset.type == Types.OPT))
+                (rrset.type == Types::OPT))
 #            # @TODO@ Leave in the response if it is an SOA, NSEC or RRSIGfor the parent zone
 ##          elsif ((query_name.subdomain_of?rrset.name) &&
 #          elsif  ((rrset.type == Types.SOA) || (rrset.type == Types.NSEC) || (rrset.type == Types.NSEC3)) #)

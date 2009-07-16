@@ -138,7 +138,7 @@ module Dnsruby
             line = lastname.to_s + ((lastname.absolute?)?".":"") + " " + line
           end
           ds = RR.create(line)
-          if ((ds.type == Types.DS) || (ds.type == Types.DNSKEY))
+          if ((ds.type == Types::DS) || (ds.type == Types::DNSKEY))
             #            assert(ds.name.absolute?)
             Dnssec.add_trust_anchor(ds)
           end
@@ -189,7 +189,7 @@ module Dnsruby
       # First, just check there is something to validate!
       found_sigs = false
       msg.each_resource {|rr|
-        if (rr.type == Types.RRSIG)
+        if (rr.type == Types::RRSIG)
           found_sigs = true
         end
       }

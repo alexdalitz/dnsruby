@@ -96,7 +96,7 @@ module Dnsruby
       def rrset(name, type=Types.A, klass=Classes::IN)
         rrs = select{|rr| 
           type_ok = (rr.type==type)
-          if (rr.type == Types.RRSIG)
+          if (rr.type == Types::RRSIG)
             type_ok = (rr.type_covered == type)
           end
           type_ok && (rr.klass == klass) && (rr.name.to_s.downcase == name.to_s.downcase)
@@ -115,7 +115,7 @@ module Dnsruby
         end
         ret = []
         each do |rr|
-          next if (!include_opt && (rr.type == Types.OPT))
+          next if (!include_opt && (rr.type == Types::OPT))
           #          if (type)
           #            next if ((rr.type == Types.RRSIG) && (type != Types.RRSIG) && (rr.type_covered != type))
           #            next if (rr.type != type)
@@ -124,8 +124,8 @@ module Dnsruby
             # if this is an rrsig type, then :
             #    only include it if the type_covered is the type requested,
             #    OR if the type requested is an RRSIG
-            if (rr.type == Types.RRSIG)
-              if ((rr.type_covered == type) || (type == Types.RRSIG))
+            if (rr.type == Types::RRSIG)
+              if ((rr.type_covered == type) || (type == Types::RRSIG))
               else
                 next
               end
@@ -162,10 +162,10 @@ module Dnsruby
         # update the counts itself, rather than the section worrying about it?
         rrs_to_delete = []
         each do |rr|
-          next if rr.rr_type == Types.OPT
+          next if rr.rr_type == Types::OPT
           if ((rr.name.to_s.downcase == name.to_s.downcase) &&
                 ((rr.type == type) ||
-                  ((rr.type == Types.RRSIG) && (rr.type_covered == type)) ))
+                  ((rr.type == Types::RRSIG) && (rr.type_covered == type)) ))
             rrs_to_delete.push(rr)
           end
         end
@@ -200,8 +200,8 @@ module Dnsruby
       @security_level = SecurityLevel.UNCHECKED
       @security_error = nil
       @cached = false
-      type = Types.A
-      klass = Classes.IN
+      type = Types::A
+      klass = Classes::IN
       if (args.length > 0)
         name = args[0]
         if (args.length > 1)
@@ -463,7 +463,7 @@ module Dnsruby
     
     def get_opt
       each_additional do |r|
-        if (r.type == Types.OPT)
+        if (r.type == Types::OPT)
           return r
         end
       end
@@ -531,7 +531,7 @@ module Dnsruby
         retval = retval + "\n";
         retval = retval + ";; ADDITIONAL SECTION (#{@header.arcount}  record#{@header.arcount == 1 ? '' : 's'})\n";
         each_additional { |rr|
-          if (rr.type != Types.OPT)
+          if (rr.type != Types::OPT)
             retval = retval + rr.to_s+ "\n"
           end
         }
@@ -602,7 +602,7 @@ module Dnsruby
         o.header.arcount.times { |count|
           start = msg.index
           rr = msg.get_rr
-          if (rr.type == Types.TSIG)
+          if (rr.type == Types::TSIG)
             if (count!=o.header.arcount-1)
               Dnsruby.log.Error("Incoming message has TSIG record before last record")
               raise DecodeError.new("TSIG record present before last record")
@@ -1109,8 +1109,8 @@ module Dnsruby
     #
     #If an IPv4 or IPv6 object is used then the type is set to PTR.
     def initialize(*args)
-      @qtype = Types.A
-      @qclass = Classes.IN
+      @qtype = Types::A
+      @qclass = Classes::IN
       if (args.length > 0)
         if (args.length > 1)
           @qtype = Types.new(args[1])

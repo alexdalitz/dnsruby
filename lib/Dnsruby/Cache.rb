@@ -100,7 +100,7 @@ module Dnsruby
         # Fix up TTLs!!
         offset = (Time.now - @time_stored).to_i
         m.each_resource {|rr|
-          next if rr.type == Types.OPT
+          next if rr.type == Types::OPT
           rr.ttl = rr.ttl - offset
         }
         return m

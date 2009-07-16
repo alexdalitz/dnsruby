@@ -89,7 +89,7 @@ module Dnsruby
       
       def init_defaults
         @algorithm=Algorithms.RSASHA1
-        @type_covered = Types.A
+        @type_covered = Types::A
         @original_ttl = 3600
         @inception = Time.now.to_i
         @expiration = Time.now.to_i

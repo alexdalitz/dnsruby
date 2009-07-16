@@ -26,8 +26,8 @@ module Dnsruby
       # ONLY cache the response if it is not an update response
       question = query.question()[0]
       if (query.do_caching && (query.class != Update) &&
-            (question.qtype != Types.AXFR) && (question.qtype != Types.IXFR) &&
-            (response.rcode == RCode.NOERROR) &&(!response.tsig) &&
+            (question.qtype != Types::AXFR) && (question.qtype != Types::IXFR) &&
+            (response.rcode == RCode::NOERROR) &&(!response.tsig) &&
             (query.class != Update) &&
             (response.header.ancount > 0))
         ## @TODO@ What about TSIG-signed responses?
@@ -495,7 +495,7 @@ module Dnsruby
       return true
     end
     
-    def make_query(name, type = Types.A, klass = Classes.IN, set_cd=@dnssec)
+    def make_query(name, type = Types::A, klass = Classes::IN, set_cd=@dnssec)
       msg = Message.new
       msg.header.rd = 1
       msg.add_question(name, type, klass)
@@ -542,7 +542,7 @@ module Dnsruby
       optrr = RR::OPT.new(udp_packet_size)   # Decimal UDPpayload
       optrr.dnssec_ok=true
 
-      if (packet.additional.rrset(packet.question()[0].qname, Types.OPT).rrs.length == 0)
+      if (packet.additional.rrset(packet.question()[0].qname, Types::OPT).rrs.length == 0)
         packet.add_additional(optrr)
       end
 
