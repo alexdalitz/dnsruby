@@ -56,6 +56,7 @@ module Dnsruby
         @@queued_exceptions=[]
         @@queued_responses=[]
         @@queued_validation_responses=[]
+        @@wakeup_sockets = get_socket_pair
         #    end
         # Now start the select thread
         @@select_thread = Thread.new {
@@ -66,6 +67,21 @@ module Dnsruby
       }
     end
     
+    def get_socket_pair
+       begin
+         pair =  Socket::socketpair(Socket::AF_LOCAL, Socket::SOCK_DGRAM, 0)
+         return pair
+
+         # Emulate socketpair on platforms which don't support it
+       rescue Exception
+         srv = TCPServer.new('localhost', 0)
+         rsock = TCPSocket.new(srv.addr[3], srv.addr[1])
+         lsock = srv.accept
+         srv.close
+         return [lsock, rsock]
+       end
+     end
+
     class QuerySettings
       attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue, 
         :client_query_id, :socket, :dest_server, :dest_port, :endtime, :udp_packet_size,
@@ -98,6 +114,7 @@ module Dnsruby
         @@timeouts[query_settings.client_query_id]=query_settings.endtime
         @@sockets.push(query_settings.socket)
       }
+      @@wakeup_sockets[0].send("wakeup!", 0)
     end
     
     def check_select_thread_synchronized
@@ -137,6 +154,7 @@ module Dnsruby
           timeouts = @@timeouts.values
           has_observer = !@@observers.empty?
         }
+        sockets << @@wakeup_sockets[1]
         if (timeouts.length > 0)
           timeouts.sort!
           timeout = timeouts[0] - Time.now
@@ -158,6 +176,10 @@ module Dnsruby
           next
         rescue IOError # Don't worry if the socket was closed already
           next
+        end
+        if ready && ready.include?(@@wakeup_sockets[1])
+          ready.delete(@@wakeup_sockets[1])
+          wakeup_msg = @@wakeup_sockets[1].recv(20)
         end
         if (ready == nil)
           # proces the timeouts
