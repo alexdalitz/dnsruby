@@ -72,7 +72,7 @@ module Dnsruby
       #      r = RR.create(r.to_s) # clone the record
       r = nil
       if do_clone
-        Message::MessageDecoder.new(MessageEncoder.new {|msg|
+        MessageDecoder.new(MessageEncoder.new {|msg|
             msg.put_rr(rin, true)}.to_s) {|msg|
           r = msg.get_rr
         }
