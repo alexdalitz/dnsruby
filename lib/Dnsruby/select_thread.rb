@@ -52,6 +52,7 @@ module Dnsruby
         @@query_hash = Hash.new
         @@socket_hash = Hash.new
         @@observers = Hash.new
+        @@tcp_buffers=Hash.new
         @@tick_observers = []
         @@queued_exceptions=[]
         @@queued_responses=[]
@@ -68,19 +69,19 @@ module Dnsruby
     end
     
     def get_socket_pair
-       begin
-         pair =  Socket::socketpair(Socket::AF_LOCAL, Socket::SOCK_DGRAM, 0)
-         return pair
+      begin
+        pair =  Socket::socketpair(Socket::AF_LOCAL, Socket::SOCK_DGRAM, 0)
+        return pair
 
-         # Emulate socketpair on platforms which don't support it
-       rescue Exception
-         srv = TCPServer.new('localhost', 0)
-         rsock = TCPSocket.new(srv.addr[3], srv.addr[1])
-         lsock = srv.accept
-         srv.close
-         return [lsock, rsock]
-       end
-     end
+        # Emulate socketpair on platforms which don't support it
+      rescue Exception
+        srv = TCPServer.new('localhost', 0)
+        rsock = TCPSocket.new(srv.addr[3], srv.addr[1])
+        lsock = srv.accept
+        srv.close
+        return [lsock, rsock]
+      end
+    end
 
     class QuerySettings
       attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue, 
@@ -114,7 +115,11 @@ module Dnsruby
         @@timeouts[query_settings.client_query_id]=query_settings.endtime
         @@sockets.push(query_settings.socket)
       }
-      @@wakeup_sockets[0].send("wakeup!", 0)
+      begin
+        @@wakeup_sockets[0].send("wakeup!", 0)
+      rescue Exception => e
+        #         do nothing
+      end
     end
     
     def check_select_thread_synchronized
@@ -174,12 +179,20 @@ module Dnsruby
         rescue SelectWakeup
           # If SelectWakeup, then just restart this loop - the select call will be made with the new data
           next
-        rescue IOError # Don't worry if the socket was closed already
+        rescue IOError => e# Don't worry if the socket was closed already
+          #          print "IO Error  =: #{e}\n"
           next
         end
         if ready && ready.include?(@@wakeup_sockets[1])
           ready.delete(@@wakeup_sockets[1])
-          wakeup_msg = @@wakeup_sockets[1].recv(20)
+          wakeup_msg = "loop"
+          begin
+            while wakeup_msg && wakeup_msg.length > 0
+              wakeup_msg = @@wakeup_sockets[1].recv_nonblock(20)
+            end
+          rescue
+            # do nothing
+          end
         end
         if (ready == nil)
           # proces the timeouts
@@ -224,8 +237,8 @@ module Dnsruby
           answerfrom = msg.answerfrom.downcase
           dest_server = query_settings.dest_server
           if (dest_server && (dest_server != '0.0.0.0') &&
-              (answerip != query_settings.dest_server.downcase) &&
-                 (answerfrom != query_settings.dest_server.downcase))
+                (answerip != query_settings.dest_server.downcase) &&
+                (answerfrom != query_settings.dest_server.downcase))
             Dnsruby.log.warn("Unsolicited response received from #{answerip} instead of #{query_settings.dest_server}")
           else 
             send_response_to_client(msg, bytes, socket)
@@ -292,7 +305,7 @@ module Dnsruby
       }
       Dnsruby.log.debug{"Closing socket #{socket}"}
       begin
-      socket.close # @TODO@ Not if persistent!
+        socket.close # @TODO@ Not if persistent!
       rescue IOError # Don't worry if the socket was closed already
       end
     end
@@ -310,17 +323,56 @@ module Dnsruby
       end
     end
     
-    def tcp_read(socket, len)
+    def tcp_read(socket)
+      # Keep buffer for all TCP sockets, and return
+      # to select after reading available data. Once all data has been received,
+      # then process message.
       buf=""
-      while (buf.length < len) do
-        input = socket.recv(len-buf.length) 
+      expected_length = 0
+      @@mutex.synchronize {
+        buf, expected_length = @@tcp_buffers[socket]
+        if (!buf)
+          buf = ""
+          expected_length = 2
+          @@tcp_buffers[socket]=[buf, expected_length]
+        end
+      }
+      if (buf.length() < expected_length)
+        begin
+        input, = socket.recv_nonblock(expected_length-buf.length)
         if (input=="")
           TheLog.info("Bad response from server - no bytes read - ignoring")
+          # @TODO@ Should we do anything about this?
           return false
         end
         buf += input
+        rescue
+          # Oh well - better luck next time!
+          return false
+        end
       end
-      return buf
+      # If data is complete, then return it.
+      if (buf.length == expected_length)
+        if (expected_length == 2)
+          # We just read the data_length field. Now we need to start reading that many bytes.
+          @@mutex.synchronize {
+            answersize = buf.unpack('n')[0]
+            @@tcp_buffers[socket] = ["", answersize]
+          }
+          return tcp_read(socket)
+        else
+          # We just read the data - now return it
+          @@mutex.synchronize {
+            @@tcp_buffers.delete(socket)
+          }
+          return buf
+        end
+      else
+        @@mutex.synchronize {
+          @@tcp_buffers[socket]=[buf, expected_length]
+        }
+        return false
+      end
     end
     
     def get_incoming_data(socket, packet_size)
@@ -340,15 +392,12 @@ module Dnsruby
             answerip = answerfrom
             answerport = @@query_hash[client_id].dest_port
           }
-          buf = tcp_read(socket, 2)
-          if (!buf)
-            handle_recvfrom_failure(socket, "")          
-            return
-          end
-          answersize = buf.unpack('n')[0]
-          buf = tcp_read(socket,answersize)
-          if (!buf)
-            handle_recvfrom_failure(socket, "")          
+
+          # Call TCP read here - that will take care of reading the 2 byte length,
+          # and then the full packet - without blocking select.
+          buf = tcp_read(socket)
+          if (!buf) # Wait for the buffer to comletely fill
+            #            handle_recvfrom_failure(socket, "")
             return
           end
         else
@@ -375,7 +424,7 @@ module Dnsruby
       begin
         ans = Message.decode(buf)
       rescue Exception => e
-#        print "DECODE ERROR\n"
+        #        print "DECODE ERROR\n"
         Dnsruby.log.error{"Decode error! #{e.class}, #{e}\nfor msg (length=#{buf.length}) : #{buf}"}
         # @TODO@ Should know this from the socket!
         client_id=get_client_id_from_answerfrom(socket, answerip, answerport)
@@ -524,8 +573,8 @@ module Dnsruby
         # So, if we need to validate it, send it to the validation thread
         # Otherwise, send VALIDATED to the requester.
         if (((msg.security_level == Message::SecurityLevel::UNCHECKED) ||
-              (msg.security_level == Message::SecurityLevel::INDETERMINATE)) &&
-            (ValidatorThread.requires_validation?(query, msg, err, res)))
+                (msg.security_level == Message::SecurityLevel::INDETERMINATE)) &&
+              (ValidatorThread.requires_validation?(query, msg, err, res)))
           validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
           validator.run
         else
@@ -560,13 +609,13 @@ module Dnsruby
       notify_queue_observers(client_queue, client_id)
 
       if (!err || (err.instance_of?(NXDomain)))
-      #
-      # This method now needs to push the response to the validator,
-      # which will then take responsibility for delivering it to the client.
-      # The validator will need access to the queue observers -
-      validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
-      validator.run
-      #      @@validator.add_to_queue([client_id, client_queue, msg, err, query, self, res])
+        #
+        # This method now needs to push the response to the validator,
+        # which will then take responsibility for delivering it to the client.
+        # The validator will need access to the queue observers -
+        validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
+        validator.run
+        #      @@validator.add_to_queue([client_id, client_queue, msg, err, query, self, res])
       end
     end
 

@@ -234,7 +234,7 @@ module Dnsruby
       #      @nameserver = ['0.0.0.0'] if (@nameserver.class != Array || @nameserver.empty?)
       # Now go through and ensure that all ns point to IP addresses, not domain names
       @nameserver=ns
-      Dnsruby.log.debug{"Nameservers = #{@nameserver.join(", ")}"}
+      Dnsruby.log.debug{'Nameservers = #{@nameserver.join(", ")}'}
     end
     
     def Config.resolve_server(ns) #:nodoc: all

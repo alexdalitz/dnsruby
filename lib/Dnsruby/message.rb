@@ -148,9 +148,9 @@ module Dnsruby
       end
       def ==(other)
         return false unless (other.instance_of?Message::Section)
-        return false if (other.rrsets(true).length != self.rrsets(true).length)
-        otherrrsets = other.rrsets(true)
-        self.rrsets(true).each {|rrset|
+        return false if (other.rrsets(nil, true).length != self.rrsets(nil, true).length)
+        otherrrsets = other.rrsets(nil, true)
+        self.rrsets(nil, true).each {|rrset|
           return false unless otherrrsets.include?rrset
         }
         return true
@@ -185,7 +185,8 @@ module Dnsruby
     #
     def initialize(*args)
       @header = Header.new()
-      @question = Section.new(self)
+      #      @question = Section.new(self)
+      @question = []
       @answer = Section.new(self)
       @authority = Section.new(self)
       @additional = Section.new(self)
@@ -302,7 +303,7 @@ module Dnsruby
       ret = false
       if (other.kind_of?Message)
         ret = @header == other.header &&
-          @question == other.question &&
+          @question[0] == other.question[0] &&
           @answer == other.answer &&
           @authority == other.authority &&
           @additional == other.additional

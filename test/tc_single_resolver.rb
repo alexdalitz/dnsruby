@@ -55,23 +55,60 @@ class TestSingleResolver < Test::Unit::TestCase
   end
   
   def test_timeout
-    if (!RUBY_PLATFORM=~/darwin/)
-      # Run a query which will not respond, and check that the timeout works
-      begin
-        res = SingleResolver.new("10.0.1.128")
-        res.port = 12345
-        res.packet_timeout=1
-        m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
-        fail
-      rescue ResolvTimeout
-      end
+    #    if ((RUBY_PLATFORM=~/darwin/) == nil)
+    # Run a query which will not respond, and check that the timeout works
+    start_time = 0
+    begin
+   udps = UDPSocket.new
+  udps.bind("127.0.0.1", 0)
+  port = *udps.addr.values_at(3,1)
+
+    begin
+      Dnsruby::PacketSender.clear_caches
+      res = SingleResolver.new("127.0.0.1")
+      res.port = port
+      res.packet_timeout=1
+      start_time = Time.now.to_i
+      m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
+      fail "Got response when should have got none"
+    rescue ResolvTimeout
+      stop_time = Time.now.to_i
+      assert((stop_time - start_time) <= (res.packet_timeout * 2),
+      "UDP timeout too long : #{stop_time - start_time}" +
+      ", should be #{res.packet_timeout}")
     end
+    begin
+      Dnsruby::PacketSender.clear_caches
+      res = SingleResolver.new("127.0.0.1")
+      res.port = port
+      res.use_tcp = true
+      res.packet_timeout=1
+      start_time = Time.now.to_i
+#      TheLog.level = Logger::DEBUG
+      m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
+      fail "TCP timeouts"
+    rescue ResolvTimeout
+      #        print "Got Timeout for TCP\n"
+      stop_time = Time.now.to_i
+      assert((stop_time - start_time) <= (res.packet_timeout * 2),
+        "TCP timeout too long : #{stop_time - start_time}, should be #{res.packet_timeout}")
+    rescue Exception => e
+      fail(e)
+    end
+      TheLog.level = Logger::ERROR
+    rescue
+      udps.close
+        end
   end
   
   def test_queue_timeout
     port = 46129
-    if (!RUBY_PLATFORM=~/darwin/)
-      res = SingleResolver.new("10.0.1.128")
+#    if (!RUBY_PLATFORM=~/darwin/)
+    begin
+   udps = UDPSocket.new
+  udps.bind("127.0.0.1", 0)
+  port = *udps.addr.values_at(3,1)
+      res = SingleResolver.new("127.0.0.1")
       res.port = port
       res.packet_timeout=1
       q = Queue.new
@@ -81,7 +118,10 @@ class TestSingleResolver < Test::Unit::TestCase
       assert(id==msg)
       assert(ret==nil)
       assert(error.class == ResolvTimeout)
+    rescue
+      udps.close
     end
+#    end
   end
   
   def test_queries
@@ -241,9 +281,9 @@ class TestSingleResolver < Test::Unit::TestCase
     }
     ret = nil
     thread2 = Thread.new {
-    r = SingleResolver.new("127.0.0.1")
-    r.port = port
-    ret = r.query("example.com")
+      r = SingleResolver.new("127.0.0.1")
+      r.port = port
+      ret = r.query("example.com")
     }
     thread.join
     thread2.join

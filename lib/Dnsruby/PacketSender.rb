@@ -232,6 +232,9 @@ module Dnsruby
         msg = Message.new(msg)
         if (@dnssec)
           msg.header.cd = @dnssec # we'll do our own validation by default
+          if (Dnssec.no_keys?)
+            msg.header.cd = false
+          end
         end
       end
       if (args.length > 1)
@@ -303,7 +306,7 @@ module Dnsruby
           if (use_tcp)
             begin
               socket = TCPSocket.new(@server, @port, @src_address, src_port)
-            rescue Errno::EBADF=> e
+            rescue Errno::EBADF, Errno::ENETUNREACH => e
               # Can't create a connection
               err=IOError.new("TCP connection error to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
               Dnsruby.log.error{"#{err}"}
@@ -467,7 +470,7 @@ module Dnsruby
         # Try to resend over tcp
         Dnsruby.log.debug{"Truncated - resending over TCP"}
         # @TODO@ Are the query options used correctly here? DNSSEC in particular...
-#        query.send_raw = true # Make sure that the packet is not messed with.
+        #        query.send_raw = true # Make sure that the packet is not messed with.
         send_async(query, client_queue, client_query_id, true)
         return false
       end
@@ -551,6 +554,9 @@ module Dnsruby
       # SHOULD SET CD HERE!!!
       if (packet.do_validation)
         packet.header.cd = true
+      end
+      if (Dnssec.no_keys?)
+        packet.header.cd = false
       end
 
     end

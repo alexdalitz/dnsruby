@@ -116,6 +116,17 @@ module Dnsruby
         v.clear_trusted_keys
       }
     end
+
+    def self.no_keys?
+      no_keys = true
+      [@@anchor_verifier, @@root_verifier, @@dlv_verifier].each {|v|
+        if (v.trusted_keys.length() > 0 ||
+            v.trust_anchors.length() > 0)
+          no_keys = false
+        end
+      }
+      return no_keys
+    end
     # Load the IANA TAR.
     # THIS METHOD IS NOT SECURE!!!
     def self.load_itar
