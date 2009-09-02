@@ -43,6 +43,12 @@ module Dnsruby
         @maxcode = 0
       end
     end
+
+    def CodeMapper.strings
+      strings = []
+      @@arrays[self].strings.keys.each {|s| strings.push(s)}
+      return strings
+    end
     
     def CodeMapper.maxcode
       return @maxcode
