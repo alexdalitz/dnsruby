@@ -77,7 +77,6 @@ module Dnsruby
       end
       
       def revoked=(on)
-        print "setting revoke"
         if (on)
           @flags |= REVOKED_KEY
         else
@@ -193,13 +192,32 @@ module Dnsruby
         return self.new(
           [flags, protocol, algorithm, key])
       end
-      
+
+      # Return the the key tag this key would have had before it was revoked
+      # If the key is not revoked, then the current key_tag will be returned
+      def key_tag_pre_revoked
+        if (!revoked?)
+          return key_tag
+        end
+        new_key = RR.create(:name => @name, :type => @type, :ttl => @ttl,
+           :key => [@key.to_s].pack("m*").gsub("\n", ""), :flags => @flags,
+           :protocol => @protocol, :algorithm => @algorithm)
+        new_key.revoked = false
+        return new_key.key_tag
+      end
+
+      # Return the tag for this key
       def key_tag
-        tag=0
         rdata = MessageEncoder.new {|msg|
           encode_rdata(msg)
         }.to_s
-        if (@algorithm == Algorithms.RSAMD5)
+        tag = generate_key_tag(rdata, @algorithm)
+        return tag
+      end
+
+      def generate_key_tag(rdata, algorithm)
+        tag=0
+        if (algorithm == Algorithms.RSAMD5)
           #The key tag for algorithm 1 (RSA/MD5) is defined differently from the
           #key tag for all other algorithms, for historical reasons.
           d1 = rdata[rdata.length - 3] & 0xFF
@@ -215,7 +233,7 @@ module Dnsruby
 
             d1 = d1.getbyte(0) if d1.class == String # Ruby 1.9
             d2 = d2.getbyte(0) if d2.class == String # Ruby 1.9
-          
+
             d1 = d1  & 0xFF
             d2 = d2  & 0xFF
 
@@ -223,12 +241,12 @@ module Dnsruby
           }
           last+=2
           if (last < rdata.length)
-            d1 = rdata[last] 
-            
+            d1 = rdata[last]
+
             if (d1.class == String) # Ruby 1.9
               d1 = d1.getbyte(0)
             end
-            
+
             d1 = d1 & 0xFF
             tag += (d1 << 8)
           end
