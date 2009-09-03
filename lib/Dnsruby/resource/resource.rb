@@ -72,10 +72,7 @@ module Dnsruby
       #      r = RR.create(r.to_s) # clone the record
       r = nil
       if do_clone
-        MessageDecoder.new(MessageEncoder.new {|msg|
-            msg.put_rr(rin, true)}.to_s) {|msg|
-          r = msg.get_rr
-        }
+        r = rin.clone
       else
         r = rin
       end
@@ -261,6 +258,15 @@ module Dnsruby
           @klass = Classes.new("CLASS#{klass}")
         end
       end
+    end
+
+    def clone
+      MessageDecoder.new(MessageEncoder.new {|msg|
+          msg.put_rr(self, true)}.to_s) {|msg|
+        r = msg.get_rr
+        return r
+      }
+
     end
     
     # Determines if two Records could be part of the same RRset.

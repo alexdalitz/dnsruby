@@ -879,6 +879,9 @@ module Dnsruby
     end
 
     # @TODO@ Handle REVOKED keys! (RFC 5011)
+    # Remember that revoked keys will have a different key_tag than pre-revoked.
+    # So, if we see a revoked key, we should go through our key store for
+    # that authority and remove any keys with the pre-revoked key_tag.
 
     def follow_chain(anchor, name) # :nodoc:
       # Follow the chain from the anchor to name, returning the appropriate

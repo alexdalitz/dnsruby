@@ -199,9 +199,7 @@ module Dnsruby
         if (!revoked?)
           return key_tag
         end
-        new_key = RR.create(:name => @name, :type => @type, :ttl => @ttl,
-           :key => [@key.to_s].pack("m*").gsub("\n", ""), :flags => @flags,
-           :protocol => @protocol, :algorithm => @algorithm)
+        new_key = clone
         new_key.revoked = false
         return new_key.key_tag
       end
