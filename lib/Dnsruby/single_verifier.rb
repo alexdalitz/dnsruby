@@ -146,11 +146,11 @@ module Dnsruby
         raise VerifyError.new("RRSET should have same type as RRSIG for verification")
       end
 
-#      #Each RR in the RRset MUST have the TTL listed in the
-#      #RRSIG Original TTL Field;
-#      if (rrset.ttl  != sigrec.original_ttl)
-#        raise VerifyError.new("RRSET should have same ttl as RRSIG original_ttl for verification (should be #{sigrec.original_ttl} but was #{rrset.ttl}")
-#      end
+      #      #Each RR in the RRset MUST have the TTL listed in the
+      #      #RRSIG Original TTL Field;
+      #      if (rrset.ttl  != sigrec.original_ttl)
+      #        raise VerifyError.new("RRSET should have same ttl as RRSIG original_ttl for verification (should be #{sigrec.original_ttl} but was #{rrset.ttl}")
+      #      end
 
       # Now check that we are in the validity period for the RRSIG
       now = Time.now.to_i
@@ -240,7 +240,7 @@ module Dnsruby
       # Return true if we can verify the whole message.
 
       msg.each_section do |section|
-#        print "Checking section : #{section}\n"
+        #        print "Checking section : #{section}\n"
         ds_rrsets = section.rrsets(Types.DS)
         if ((!ds_rrsets || ds_rrsets.length == 0) && (@verifier_type == VerifierType::DLV))
           ds_rrsets = section.rrsets(Types.DLV)
@@ -374,14 +374,14 @@ module Dnsruby
       return if (msg.rcode == RCode.NOERROR && ((qtype == Types.ANY) || (qtype == Types.NSEC) || (qtype == Types.NSEC3)))
       if ((msg.rrsets('NSEC').length > 0) || (msg.rrsets('NSEC3').length > 0))
         if (msg.rcode == RCode.NXDOMAIN)
-#          print "Checking NSECs for Name Error\n"
+          #          print "Checking NSECs for Name Error\n"
           #Name error - NSEC wil prove i) no exact match for <SNAME, SCLASS>, and ii) no RRSets that could match through wildcard expansion
           #           - this may be proved in one or more NSECs (and associated RRSIGs)
           check_name_in_nsecs(msg)
           return check_no_wildcard_expansion(msg)
         elsif (msg.rcode == RCode.NOERROR)
           if (msg.answer.length > 0)
-#            print "Checking NSECs for wildcard expansion\n"
+            #            print "Checking NSECs for wildcard expansion\n"
             # wildcard expansion answer - check NSECs!
             # We want to make sure that the NSEC tells us that there is no closer match for this name
             # @TODO@ We need to make replace the RRSIG name with the wildcard name before we can verify it correctly.
@@ -395,7 +395,7 @@ module Dnsruby
             [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
               nsec_rrsets.each {|nsec_rrset|
                 nsec_rrset.rrs.each {|nsec|
-#                  print "Checking nsec to see if wildcard : #{nsec}\n"
+                  #                  print "Checking nsec to see if wildcard : #{nsec}\n"
                   if (nsec.name.wild? ||(nsec.name.labels.length < msg.question()[0].qname.labels.length))
                     isWildcardNoData = true
                   end
@@ -404,14 +404,14 @@ module Dnsruby
             }
 
             if (isWildcardNoData)
-#              print "Checking NSECs for wildcard no data\n"
+              #              print "Checking NSECs for wildcard no data\n"
               # Check NSECs -
               #         i) NSEC proving no RRSets matching STYPE at wildcard owner name that matched <SNAME, SCLASS> via wildcard expansion
               check_name_not_in_wildcard_nsecs(msg)
               #         ii) NSEC proving no RRSets in zone that would have been closer match for <SNAME, SCLASS>
               return check_name_in_and_type_not_in_nsecs(msg)
             else # (isNoData)
-#              print "Checking NSECs for No data\n"
+              #              print "Checking NSECs for No data\n"
               # Check NSEC types covered to make sure this type not present.
               return check_name_in_and_type_not_in_nsecs(msg)
             end
@@ -442,7 +442,7 @@ module Dnsruby
       [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
         nsec_rrsets.each {|nsecs|
           nsecs.rrs.each {|nsec|
-#            print "Checking NSEC : #{nsec}\n"
+            #            print "Checking NSEC : #{nsec}\n"
             next if (nsec.name.wild?)
             if (check_record_proves_no_wildcard(msg, nsec))
               proven_no_wildcards = true
@@ -451,7 +451,7 @@ module Dnsruby
         }
       }
       if (!proven_no_wildcards)
-#        print "No proof that no RRSets could match through wildcard expansion\n"
+        #        print "No proof that no RRSets could match through wildcard expansion\n"
         raise VerifyError.new("No proof that no RRSets could match through wildcard expansion")
       end
 
@@ -459,12 +459,12 @@ module Dnsruby
     
     def check_record_proves_no_wildcard(msg, nsec) # :nodoc:
       # Check that the NSEC goes from the SOA to a zone canonically after a wildcard
-#      print "Checking wildcard proof for #{nsec.name}\n"
+      #      print "Checking wildcard proof for #{nsec.name}\n"
       soa_rrset = msg.authority.rrset(nsec.name, 'SOA')
       if (soa_rrset.length > 0)
-#        print "Found SOA for #{nsec.name}\n"
+        #        print "Found SOA for #{nsec.name}\n"
         wildcard_name = Name.create("*." + nsec.name.to_s)
-#        print "Checking #{wildcard_name}\n"
+        #        print "Checking #{wildcard_name}\n"
         if (wildcard_name.canonically_before(nsec.next_domain))
           return true
         end
@@ -481,7 +481,7 @@ module Dnsruby
       [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
         nsec_rrsets.each {|nsecs|
           nsecs.rrs.each {|nsec|
-#            print "Checking NSEC : #{nsec}\n"
+            #            print "Checking NSEC : #{nsec}\n"
             next if (nsec.name.wild?)
             if nsec.check_name_in_range(name)
               proven_name_in_nsecs = true
@@ -491,7 +491,7 @@ module Dnsruby
                   qtype_present = true
                 end
                 if (qtype_present != expected_qtype)
-#                  print "#{nsec.type} record #{nsec} does #{expected_qtype ? 'not ' : ''} include #{qtype} type\n"
+                  #                  print "#{nsec.type} record #{nsec} does #{expected_qtype ? 'not ' : ''} include #{qtype} type\n"
                   raise VerifyError.new("#{nsec.type} record #{nsec} does #{expected_qtype ? 'not ' : ''}include #{qtype} type")
                   #              return false
                 end
@@ -502,11 +502,11 @@ module Dnsruby
         }
       }
       if (!proven_name_in_nsecs)
-#        print "No proof for non-existence for #{name}\n"
+        #        print "No proof for non-existence for #{name}\n"
         raise VerifyError.new("No proof for non-existence for #{name}")
       end
       if (qtype && !type_covered_checked)
-#        print "Tyes covered wrong for #{name}\n"
+        #        print "Tyes covered wrong for #{name}\n"
         raise VerifyError.new("Types covered wrong for #{name}")
       end
     end
@@ -522,18 +522,18 @@ module Dnsruby
       [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
         nsec_rrsets.each {|nsecs|
           nsecs.rrs.each {|nsec|
-#            print "Checking NSEC : #{nsec}\n"
+            #            print "Checking NSEC : #{nsec}\n"
             next if !nsec.name.wild?
             # Check the wildcard expansion
             # We want to see that the name is in the wildcard range, and that the type
             # is not in the types for the NSEC
             if nsec.check_name_in_wildcard_range(name)
-#              print "Wildcard expansion in #{nsec} includes #{name}\n"
+              #              print "Wildcard expansion in #{nsec} includes #{name}\n"
               raise VerifyError.new("Wildcard expansion in #{nsec} includes #{name}")
               #            return false
             end
             if (nsec.types.include?qtype)
-#              print "#{qtype} present in wildcard #{nsec}\n"
+              #              print "#{qtype} present in wildcard #{nsec}\n"
               raise VerifyError.new("#{qtype} present in wildcard #{nsec}")
               #            return false
             end
@@ -542,7 +542,7 @@ module Dnsruby
         }
       }
       return if done
-#      print("Expected wildcard expansion in #{msg}\n")
+      #      print("Expected wildcard expansion in #{msg}\n")
       raise VerifyError.new("Expected wildcard expansion in #{msg}")
       #      return false
     end
@@ -658,7 +658,7 @@ module Dnsruby
 
         sigrecs.each {|sig|
           if ((key.key_tag == sig.key_tag) && (key.algorithm == sig.algorithm))
-#                        print "Found key #{key.key_tag}\n"
+            #                        print "Found key #{key.key_tag}\n"
             return key, sig
           end
         }
@@ -745,8 +745,10 @@ module Dnsruby
       if [Algorithms.RSASHA1,
           Algorithms.RSASHA1_NSEC3_SHA1].include?(sigrec.algorithm)
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA1.new, sigrec.signature, sig_data)
-        #      elsif (sigrec.algorithm == Algorithms.RSASHA256)
-        #        verified = keyrec.public_key.verify(Digest::SHA256.new, sigrec.signature, sig_data)
+      elsif (sigrec.algorithm == Algorithms.RSASHA256)
+        verified = keyrec.public_key.verify(Digest::SHA256.new, sigrec.signature, sig_data)
+      elsif (sigrec.algorithm == Algorithms.RSASHA512)
+        verified = keyrec.public_key.verify(Digest::SHA512.new, sigrec.signature, sig_data)
       elsif [Algorithms.DSA,
           Algorithms.DSA_NSEC3_SHA1].include?(sigrec.algorithm)
         # we are ignoring T for now
@@ -770,7 +772,7 @@ module Dnsruby
       expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
       rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl,
           expiration_diff].sort)[0]
-#            print "VERIFIED OK\n"
+      #            print "VERIFIED OK\n"
       return true
     end
 
@@ -1102,7 +1104,7 @@ module Dnsruby
         if (Dnssec.default_resolver)
           return Dnssec.default_resolver
         else
-            return Resolver.new
+          return Resolver.new
         end
       end
     end
@@ -1172,22 +1174,22 @@ module Dnsruby
     end
 
     def validate_no_rrsigs(msg) # :nodoc:
-#      print "Validating unsigned response\n"
+      #      print "Validating unsigned response\n"
       # WHAT IF THERE ARE NO RRSIGS IN MSG?
       # Then we need to check that we do not expect any RRSIGs
       if (!msg.question()[0] && msg.answer.length == 0)
-#        print "Returning Message insecure OK\n"
+        #        print "Returning Message insecure OK\n"
         msg.security_level = Message::SecurityLevel.INSECURE
         return true
       end
       qname = msg.question()[0].qname
       closest_anchor = find_closest_anchor_for(qname)
-#      print "Found closest anchor :#{closest_anchor}\n"
+      #      print "Found closest anchor :#{closest_anchor}\n"
       if (closest_anchor)
         actual_anchor = follow_chain(closest_anchor, qname)
-#        print "Actual anchor : #{actual_anchor}\n"
+        #        print "Actual anchor : #{actual_anchor}\n"
         if (actual_anchor)
-#          print("Anchor exists for #{qname}, but no signatures in #{msg}\n")
+          #          print("Anchor exists for #{qname}, but no signatures in #{msg}\n")
           TheLog.error("Anchor exists for #{qname}, but no signatures in #{msg}")
           msg.security_level = Message::SecurityLevel.BOGUS
           return false
@@ -1196,14 +1198,14 @@ module Dnsruby
       if ((@verifier_type == VerifierType::DLV) &&
             @added_dlv_key)
         # Remember to check DLV registry as well (if appropriate!)
-#        print "Checking DLV for closest anchor\n"
+        #        print "Checking DLV for closest anchor\n"
         dlv_anchor = find_closest_dlv_anchor_for(qname)
-#        print "Found DLV closest anchor :#{dlv_anchor}\n"
+        #        print "Found DLV closest anchor :#{dlv_anchor}\n"
         if (dlv_anchor)
           actual_anchor = follow_chain(dlv_anchor, qname)
-#          print "Actual anchor : #{actual_anchor}\n"
+          #          print "Actual anchor : #{actual_anchor}\n"
           if (actual_anchor)
-#            print("DLV Anchor exists for #{qname}, but no signatures in #{msg}\n")
+            #            print("DLV Anchor exists for #{qname}, but no signatures in #{msg}\n")
             TheLog.error("DLV Anchor exists for #{qname}, but no signatures in #{msg}")
             msg.security_level = Message::SecurityLevel.BOGUS
             return false
@@ -1211,7 +1213,7 @@ module Dnsruby
 
         end
       end
-#      print "Returning Message insecure OK\n"
+      #      print "Returning Message insecure OK\n"
       msg.security_level = Message::SecurityLevel.INSECURE
       return true
     end
