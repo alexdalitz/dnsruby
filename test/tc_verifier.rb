@@ -18,6 +18,40 @@ require 'test/unit'
 require 'dnsruby'
 
 class VerifierTest < Test::Unit::TestCase
+
+  def test_sha256
+    key256 = Dnsruby::RR.create("example.net.     3600  IN  DNSKEY  (256 3 8 AwEAAcFcGsaxxdgiuuGmCkVI
+                    my4h99CqT7jwY3pexPGcnUFtR2Fh36BponcwtkZ4cAgtvd4Qs8P
+                    kxUdp6p/DlUmObdk= );{id = 9033 (zsk), size = 512b}")
+    a = Dnsruby::RR.create("www.example.net. 3600  IN  A  192.0.2.91")
+    sig = Dnsruby::RR.create("www.example.net. 3600  IN  RRSIG  (A 8 3 3600 20300101000000
+                    20000101000000 9033 example.net. kRCOH6u7l0QGy9qpC9
+                    l1sLncJcOKFLJ7GhiUOibu4teYp5VE9RncriShZNz85mwlMgNEa
+                    cFYK/lPtPiVYP4bwg==) ;{id = 9033}")
+    rrset = Dnsruby::RRSet.new(a)
+    rrset.add(sig)
+    verifier = Dnsruby::SingleVerifier.new(nil)
+    verifier.verify_rrset(rrset, key256)
+  end
+
+  def test_sha512
+    key512 = Dnsruby::RR.create("example.net.    3600  IN  DNSKEY  (256 3 10 AwEAAdHoNTOW+et86KuJOWRD
+                   p1pndvwb6Y83nSVXXyLA3DLroROUkN6X0O6pnWnjJQujX/AyhqFD
+                   xj13tOnD9u/1kTg7cV6rklMrZDtJCQ5PCl/D7QNPsgVsMu1J2Q8g
+                   pMpztNFLpPBz1bWXjDtaR7ZQBlZ3PFY12ZTSncorffcGmhOL
+                   );{id = 3740 (zsk), size = 1024b}")
+    a = Dnsruby::RR.create("www.example.net. 3600  IN  A  192.0.2.91")
+    sig =  Dnsruby::RR.create("www.example.net. 3600  IN  RRSIG  (A 10 3 3600 20300101000000
+                    20000101000000 3740 example.net. tsb4wnjRUDnB1BUi+t
+                    6TMTXThjVnG+eCkWqjvvjhzQL1d0YRoOe0CbxrVDYd0xDtsuJRa
+                    eUw1ep94PzEWzr0iGYgZBWm/zpq+9fOuagYJRfDqfReKBzMweOL
+                    DiNa8iP5g9vMhpuv6OPlvpXwm9Sa9ZXIbNl1MBGk0fthPgxdDLw
+                    =);{id = 3740}")
+    rrset = Dnsruby::RRSet.new(a)
+    rrset.add(sig)
+    verifier = Dnsruby::SingleVerifier.new(nil)
+    verifier.verify_rrset(rrset, key512)
+  end
   
   def test_se_query
     # Run some queries on the .se zone

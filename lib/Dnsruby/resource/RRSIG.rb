@@ -101,7 +101,7 @@ module Dnsruby
       
       def algorithm=(a)
         if (a.instance_of?String)
-          if (a.length == 1)
+          if (a.to_i > 0)
             a = a.to_i
           end
         end

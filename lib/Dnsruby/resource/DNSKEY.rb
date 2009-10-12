@@ -64,7 +64,7 @@ module Dnsruby
       
       def algorithm=(a)
         if (a.instance_of?String)
-          if (a.length == 1)
+          if (a.to_i > 0)
             a = a.to_i
           end
         end
@@ -264,6 +264,8 @@ module Dnsruby
       def public_key
         if (!@public_key)
           if [Algorithms.RSASHA1,
+              Algorithms.RSASHA256,
+              Algorithms.RSASHA512,
               Algorithms.RSASHA1_NSEC3_SHA1].include?(@algorithm)
             @public_key = rsa_key
           elsif [Algorithms.DSA,

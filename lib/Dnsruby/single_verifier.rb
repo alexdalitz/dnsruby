@@ -746,9 +746,9 @@ module Dnsruby
           Algorithms.RSASHA1_NSEC3_SHA1].include?(sigrec.algorithm)
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA1.new, sigrec.signature, sig_data)
       elsif (sigrec.algorithm == Algorithms.RSASHA256)
-        verified = keyrec.public_key.verify(Digest::SHA256.new, sigrec.signature, sig_data)
+        verified = keyrec.public_key.verify(OpenSSL::Digest::SHA256.new, sigrec.signature, sig_data)
       elsif (sigrec.algorithm == Algorithms.RSASHA512)
-        verified = keyrec.public_key.verify(Digest::SHA512.new, sigrec.signature, sig_data)
+        verified = keyrec.public_key.verify(OpenSSL::Digest::SHA512.new, sigrec.signature, sig_data)
       elsif [Algorithms.DSA,
           Algorithms.DSA_NSEC3_SHA1].include?(sigrec.algorithm)
         # we are ignoring T for now

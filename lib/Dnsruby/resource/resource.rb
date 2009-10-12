@@ -386,6 +386,8 @@ module Dnsruby
       
       if rdata
         rdata.gsub!(/\s+$/o, "")
+        rdata.gsub!("(", "")
+        rdata.gsub!(")", "")
       end
       
       # RFC3597 tweaks
