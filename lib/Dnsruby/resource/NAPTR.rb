@@ -52,16 +52,16 @@ module Dnsruby
           values = input.split(" ")
           @order = values [0].to_i
           @preference = values [1].to_i
-          @flags = values [2]
-          @service = values [3]
-          @regexp = values [4]
+          @flags = values [2].gsub!("\"", "")
+          @service = values [3].gsub!("\"", "")
+          @regexp = values [4].gsub!("\"", "")
           @replacement = Name.create(values[5])
         end
       end
       
       def rdata_to_string #:nodoc: all
         if (@order!=nil)
-          return "#{@order} #{@preference} #{@flags} #{@service} #{@regexp} #{@replacement}"
+          return "#{@order} #{@preference} \"#{@flags}\" \"#{@service}\" \"#{@regexp}\" #{@replacement}"
         else
           return ""
         end

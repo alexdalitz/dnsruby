@@ -71,7 +71,7 @@ if (type.upcase == "AXFR")
     
 else
 
-#  Dnsruby::TheLog.level=Logger::DEBUG
+  Dnsruby::TheLog.level=Logger::DEBUG
   begin
     answer = nil
     answer = res.query(name, type, klass)
