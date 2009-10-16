@@ -20,6 +20,8 @@ require 'dnsruby'
 class Nsec3Test < Test::Unit::TestCase
   INPUT = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd ( " + 
     "2vptu5timamqttgl4luu9kg21e0aor3s A RRSIG )"
+  INPUT2 = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd " +
+    "2vptu5timamqttgl4luu9kg21e0aor3s"
   include Dnsruby
   def test_nsec_from_string
     nsec = Dnsruby::RR.create(INPUT)
@@ -30,6 +32,16 @@ class Nsec3Test < Test::Unit::TestCase
     assert_equal("aabbccdd", nsec.salt)
     assert_equal(Dnsruby::Nsec3HashAlgorithms.SHA_1, nsec.hash_alg)
     
+    nsec2 = Dnsruby::RR.create(nsec.to_s)
+    assert(nsec2.to_s == nsec.to_s)
+
+    nsec = Dnsruby::RR.create(INPUT2)
+    assert_equal([], nsec.types)
+    assert(nsec.opt_out?)
+    assert_equal(12, nsec.iterations)
+    assert_equal("aabbccdd", nsec.salt)
+    assert_equal(Dnsruby::Nsec3HashAlgorithms.SHA_1, nsec.hash_alg)
+
     nsec2 = Dnsruby::RR.create(nsec.to_s)
     assert(nsec2.to_s == nsec.to_s)
   end

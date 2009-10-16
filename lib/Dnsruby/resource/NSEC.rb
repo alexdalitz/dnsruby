@@ -66,7 +66,11 @@ module Dnsruby
       end
 
       def types=(t)
+        if (t && t.length > 0)
         @types = NSEC.get_types(t)
+        else
+          @types = []
+        end
       end
       
       def self.get_types(t)
