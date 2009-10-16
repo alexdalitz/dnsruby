@@ -79,9 +79,9 @@ module Dnsruby
       def self.decode_rdata(msg) #:nodoc: all
         order, = msg.get_unpack('n')
         preference, = msg.get_unpack('n')
-        flags, = msg.get_string
-        service, = msg.get_string
-        regexp, = msg.get_string
+        flags = msg.get_string
+        service = msg.get_string
+        regexp = msg.get_string
         replacement = msg.get_name
         return self.new([order, preference, flags, service, regexp, replacement])
       end
