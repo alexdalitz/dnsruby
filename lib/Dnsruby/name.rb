@@ -72,7 +72,7 @@ module Dnsruby
       return labels
     end
     
-    attr_reader :labels
+    attr_accessor :labels
     
     #This method should only be called internally.
     #Use Name::create to create a new Name
