@@ -19,7 +19,7 @@ module Dnsruby
       NS, CNAME, DNAME, DNSKEY, SOA, PTR, HINFO, MINFO, MX, TXT,
       ISDN, MB, MG, MR, NAPTR, NSAP, OPT, RP, RT, X25,
       SPF, CERT, LOC, TSIG, TKEY, ANY, RRSIG, NSEC, DS, NSEC3,
-      NSEC3PARAM, DLV, SSHFP
+      NSEC3PARAM, DLV, SSHFP, IPSECKEY
     ] #:nodoc: all
     
     # module IN contains ARPA Internet specific RRs
