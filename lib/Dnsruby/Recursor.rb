@@ -384,7 +384,7 @@ module Dnsruby
 
         # Make sure that known_authorities still contains some authorities!
         # If not, remove the zone from zones_cache, and start again
-        if (known_authorities.values.length > 0)
+        if (known_authorities && known_authorities.values.length > 0)
           done = true
         else
           @@mutex.synchronize{
