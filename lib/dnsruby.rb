@@ -269,6 +269,7 @@ module Dnsruby
     DHCID     = 49      # RFC 4701
     NSEC3     = 50      # RFC still pending at time of writing
     NSEC3PARAM= 51      # RFC still pending at time of writing
+    HIP       = 55      # RFC 5205
     SPF       = 99      # RFC 4408
     UINFO     = 100     # non-standard
     UID       = 101     # non-standard
