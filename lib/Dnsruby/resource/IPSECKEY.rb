@@ -20,7 +20,7 @@ module Dnsruby
       ClassValue = nil #:nodoc: all
       TypeValue = Types::IPSECKEY #:nodoc: all
 
-      #An 8-but precedence for this field. Lower values are preferred.
+      #An 8-bit precedence for this field. Lower values are preferred.
       attr_accessor :precedence
       #Specifies the type of gateway :
       # 0 - no gateway present
@@ -95,11 +95,7 @@ module Dnsruby
 
           @gateway = load_gateway_from_string(@gateway_type, split[3])
 
-#          if (!@gateway)
-#            @public_key = public_key_from_string(split[3])
-#          else
-            @public_key = public_key_from_string(split[4])
-#          end
+          @public_key = public_key_from_string(split[4])
         end
       end
 
@@ -118,7 +114,7 @@ module Dnsruby
           msg.put_bytes(@gateway.address)
         end
         if (@gateway_type == 3)
-          msg.put_name(@gateway)
+          msg.put_name(@gateway, true) # gateway MUST NOT be compressed
         end
         msg.put_bytes(@public_key)
       end
