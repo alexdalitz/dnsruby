@@ -51,9 +51,7 @@ class TestIPSECKEY < Test::Unit::TestCase
       assert(ipseckey.precedence == data[2])
       assert(ipseckey.gateway_type == data[3])
       assert(ipseckey.algorithm == data[4])
-        print "Checking #{ipseckey.gateway}\n"
       assert(ipseckey.gateway.to_s == data[0])
-      print "#{ipseckey.public_key_string}\n"
       assert(ipseckey.public_key_string == data[1])
 
       m = Dnsruby::Message.new
