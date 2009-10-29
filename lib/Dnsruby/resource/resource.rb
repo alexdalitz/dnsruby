@@ -537,6 +537,9 @@ module Dnsruby
       s_ivars.sort!
       s_ivars.delete "@ttl" # RFC 2136 section 1.1
       s_ivars.delete "@rdata"
+      if (self.type == Types.DS)
+        s_ivars.delete "@digest"
+      end
       
       ivars = other.instance_variables
       o_ivars = []
@@ -544,6 +547,9 @@ module Dnsruby
       o_ivars.sort!
       o_ivars.delete "@ttl" # RFC 2136 section 1.1
       o_ivars.delete "@rdata"
+      if (other.type == Types.DS)
+        o_ivars.delete "@digest"
+      end
       
       return s_ivars == o_ivars &&
         s_ivars.collect {|name| self.instance_variable_get name} ==
