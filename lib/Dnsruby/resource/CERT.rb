@@ -65,7 +65,11 @@ module Dnsruby
           names = input.split(" ")
           @certtype = CertificateTypes::new(names[0])
           @keytag = names[1].to_i
-          @alg = Dnsruby::Algorithms.new(names[2])
+          begin
+            @alg = Dnsruby::Algorithms.new(names[2])
+          rescue ArgumentError
+            @alg = Dnsruby::Algorithms.new(names[2].to_i)
+          end
           @cert = names[3]
         end
       end

@@ -373,6 +373,7 @@ module Dnsruby
   
   # http://www.iana.org/assignments/dns-sec-alg-numbers/
   class Algorithms < CodeMapper
+    RESERVED   = 0
     RSAMD5     = 1
     DH         = 2
     DSA        = 3
