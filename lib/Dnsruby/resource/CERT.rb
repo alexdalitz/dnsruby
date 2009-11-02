@@ -63,7 +63,11 @@ module Dnsruby
       def from_string(input) #:nodoc: all
         if (input != "")
           names = input.split(" ")
-          @certtype = CertificateTypes::new(names[0])
+          begin
+            @certtype = CertificateTypes::new(names[0])
+          rescue ArgumentError
+            @certtype = CertificateTypes::new(names[0].to_i)
+          end
           @keytag = names[1].to_i
           begin
             @alg = Dnsruby::Algorithms.new(names[2])
