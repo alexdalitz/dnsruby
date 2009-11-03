@@ -53,7 +53,7 @@ module Dnsruby
         end
         
         def encode_rdata(msg, canonical=false) #:nodoc: all
-          msg.put_pack("n", @subtype)
+          msg.put_pack("n", @subtype.to_i)
           msg.put_name(@hostname, canonical)
         end
         
