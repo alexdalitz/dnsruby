@@ -143,9 +143,17 @@ module Dnsruby
           # What to do for other versions?
           version = 0;
           
+          horiz_pre = DEFAULT_HORIZ_PRE
+          vert_pre  = DEFAULT_VERT_PRE
           latdeg, latmin, latsec, lathem = $1.to_i, $3.to_i, $5.to_i, $6;
           londeg, lonmin, lonsec, lonhem = $7.to_i, $9.to_i, $11.to_i, $12
-          alt, size, horiz_pre, vert_pre = $13.to_i, $15.to_i, $17.to_i, $19.to_i
+          alt, size = $13.to_i, $15.to_i
+          if ($17)
+          horiz_pre = $17.to_i
+          end
+          if ($19)
+            vert_pre = $19.to_i
+          end
           
           latmin    = DEFAULT_MIN       unless latmin;
           latsec    = DEFAULT_SEC       unless latsec;
@@ -156,9 +164,7 @@ module Dnsruby
           lonhem    = lonhem.upcase
           
           size      = DEFAULT_SIZE      unless size;
-          horiz_pre = DEFAULT_HORIZ_PRE unless horiz_pre;
-          vert_pre  = DEFAULT_VERT_PRE  unless vert_pre;
-          
+
           @version   = version;
           @size      = size * 100;
           @horiz_pre = horiz_pre * 100;

@@ -277,4 +277,10 @@ class TestRR < Test::Unit::TestCase
 #    rr = RR.create("all.rr.org.             IN      WKS             128.32.0.10 UDP who route timed domain")
     rr = RR.create('selector._domainkey.all.rr.org. IN      TXT             "v=DKIM1; n=Use=20DKIM; p=AwEAAZfbYw8SffZwsbrCLbC+JLErREIF6Yfe9aqsa1Pz6tpGWiLxm9rSL6/YoBvNP3UWX91YDF0JMo6lhu3UIZjITvIwDhx+RJYko9vLzaaJKXGf3ygy6z+deWoZJAV1lTY0Ltx9genboe88CSCHw9aSLkh0obN9Ck8R6zAMYR19ciM/; t=s"')
   end
+
+  def test_loc
+    rr = RR.create("all.rr.org.		IN	LOC		42 21 54 N 71 06 18 W -24m 30m")
+    assert(rr.vert_pre == 1000)
+    assert(rr.horiz_pre == 1000000)
+  end
 end
