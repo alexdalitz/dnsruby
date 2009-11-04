@@ -30,7 +30,11 @@ module Dnsruby
       end
       
       def from_string(input) #:nodoc: all
-        @cpu, @os = input.split(" ")
+        cpu, os = input.split(" ")
+        cpu.sub!(/^\"/, "")
+        @cpu = cpu.sub(/\"$/, "")
+        os.sub!(/^\"/, "")
+        @os = os.sub(/\"$/, "")
       end
       
       def rdata_to_string #:nodoc: all

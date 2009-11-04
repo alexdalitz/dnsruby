@@ -29,7 +29,9 @@ module Dnsruby
       end
       
       def from_string(input)
-        @address = input
+        address = input
+        address.sub!(/^\"/, "")
+        @address = address.sub(/\"$/, "")
       end
       
       def rdata_to_string

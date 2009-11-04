@@ -32,7 +32,15 @@ module Dnsruby
       end
       
       def from_string(input) #:nodoc: all
-        @address, @subaddress = input.split(" ")
+        address, subaddress = input.split(" ")
+        address.sub!(/^\"/, "")
+        @address = address.sub(/\"$/, "")
+        if (subaddress)
+          subaddress.sub!(/^\"/, "")
+          @subaddress = subaddress.sub(/\"$/, "")
+        else
+          @subaddress = nil
+        end
       end
       
       def rdata_to_string #:nodoc: all
