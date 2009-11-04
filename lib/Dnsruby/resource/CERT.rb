@@ -79,7 +79,7 @@ module Dnsruby
 
           buf.gsub!(/\n/, "")
           buf.gsub!(/ /, "")
-          @cert = [buf].pack("H*")
+          @cert = buf.unpack("m*").first
         end
       end
       
