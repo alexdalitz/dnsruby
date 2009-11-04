@@ -278,9 +278,27 @@ class TestRR < Test::Unit::TestCase
     rr = RR.create('selector._domainkey.all.rr.org. IN      TXT             "v=DKIM1; n=Use=20DKIM; p=AwEAAZfbYw8SffZwsbrCLbC+JLErREIF6Yfe9aqsa1Pz6tpGWiLxm9rSL6/YoBvNP3UWX91YDF0JMo6lhu3UIZjITvIwDhx+RJYko9vLzaaJKXGf3ygy6z+deWoZJAV1lTY0Ltx9genboe88CSCHw9aSLkh0obN9Ck8R6zAMYR19ciM/; t=s"')
   end
 
+  def test_dhcid
+    rr = RR.create("all.rr.org.		IN	DHCID		AAIBY2/AuCccgoJbsaxcQc9TUapptP69lOjxfNuVAA2kjEA=")
+      m = Dnsruby::Message.new
+      m.add_additional(rr)
+      data = m.encode
+      m2 = Dnsruby::Message.decode(data)
+      rr2 = m2.additional()[0]
+      assert(rr == rr2)
+  end
+
   def test_loc
     rr = RR.create("all.rr.org.		IN	LOC		42 21 54 N 71 06 18 W -24m 30m")
     assert(rr.vert_pre == 1000)
     assert(rr.horiz_pre == 1000000)
+    lon = rr.longitude
+#    rr2 = RR.create("all.rr.org.	1209600	IN	LOC	42 21 54.000 N 71 06 18.000 W 4294967272m 30m 10000m 10m")
+#    print rr2.longitude
+#    assert(rr2.longitude = lon)
+#    print rr.to_s + "\n"
+#    print rr2.to_s + "\n"
+#    assert(rr.longitude == rr2.longitude)
+#    assert(rr == rr2)
   end
 end

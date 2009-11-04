@@ -88,12 +88,12 @@ module Dnsruby
       end
       
       def encode_rdata(msg, canonical=false) #:nodoc: all
-        msg.put_pack('nnn', @certtype.code, @keytag, @alg.code)
+        msg.put_pack('NNn', @certtype.code, @keytag, @alg.code)
         msg.put_bytes(@cert)
       end
       
       def self.decode_rdata(msg) #:nodoc: all
-        certtype, keytag, alg = msg.get_unpack('nnn')
+        certtype, keytag, alg = msg.get_unpack('NNn')
         cert = msg.get_bytes
         return self.new([certtype, keytag, alg, cert])
       end
