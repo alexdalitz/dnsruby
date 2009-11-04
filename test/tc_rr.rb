@@ -173,6 +173,11 @@ class TestRR < Test::Unit::TestCase
       :type         => Types.SPF,
       :strings      => 'txt-txtdata',
     },
+        {
+      :type         => Types.KX,
+      :preference   => 10,
+      :exchange     => 'kx-exchange.example.com',
+    },
     ]
     
     

@@ -17,7 +17,7 @@ module Dnsruby
   class RR
     ClassInsensitiveTypes = [
       NS, CNAME, DNAME, DNSKEY, SOA, PTR, HINFO, MINFO, MX, TXT,
-      ISDN, MB, MG, MR, NAPTR, NSAP, OPT, RP, RT, X25,
+      ISDN, MB, MG, MR, NAPTR, NSAP, OPT, RP, RT, X25, KX,
       SPF, CERT, LOC, TSIG, TKEY, ANY, RRSIG, NSEC, DS, NSEC3,
       NSEC3PARAM, DLV, SSHFP, IPSECKEY, HIP
     ] #:nodoc: all
