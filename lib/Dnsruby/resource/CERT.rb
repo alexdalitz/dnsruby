@@ -74,12 +74,17 @@ module Dnsruby
           rescue ArgumentError
             @alg = Dnsruby::Algorithms.new(names[2].to_i)
           end
-          @cert = names[3]
+          buf = names[3]
+
+
+          buf.gsub!(/\n/, "")
+          buf.gsub!(/ /, "")
+          @cert = [buf].pack("H*")
         end
       end
       
       def rdata_to_string #:nodoc: all
-        return "#{@certtype.string} #{@keytag} #{@alg.string} #{@cert}"
+        return "#{@certtype.string} #{@keytag} #{@alg.string} #{[@cert.to_s].pack("m*").gsub("\n", "")}"
       end
       
       def encode_rdata(msg, canonical=false) #:nodoc: all

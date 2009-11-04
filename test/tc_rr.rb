@@ -167,7 +167,7 @@ class TestRR < Test::Unit::TestCase
       :certtype   => 3,
       :keytag			 => 1,
       :alg    => 1,
-      :cert  => '123456789abcdefghijklmnopqrstuvwxyz',
+      :cert  => 'ffsayw1dvk7higuvhn56r26uwjx/',
     },
     {	#[25]
       :type         => Types.SPF,
