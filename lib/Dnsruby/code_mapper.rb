@@ -103,7 +103,7 @@ module Dnsruby
         code = array.stringsdown[arg.downcase]
         if (code != nil)
           @code = code
-          @string = array.strings.invert[@code]
+          @string = array.values[@code]
         else 
           unknown_string(arg)
         end
@@ -125,7 +125,7 @@ module Dnsruby
     def set_string(arg)
       array = @@arrays[self.class]
       @code = array.stringsdown[arg.downcase]
-      @string = array.strings.invert[@code]
+      @string = array.values[@code]
     end
 
     def set_code(arg)
