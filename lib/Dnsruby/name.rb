@@ -267,9 +267,10 @@ module Dnsruby
       # I start looking forward and do the magic.
       
       i=0;
-      
+
+      unpacked = wire.unpack("C*")
       while (i < length )
-        c=wire.unpack("x#{i}C1") [0]
+        c = unpacked[i]
         if ( c < 33 || c > 126 )
           presentation=presentation + sprintf("\\%03u" ,c)
         elsif ( c.chr ==  "\"" )
