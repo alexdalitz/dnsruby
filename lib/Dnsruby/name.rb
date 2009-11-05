@@ -172,7 +172,7 @@ module Dnsruby
     end
     
     def ==(other) # :nodoc:
-      return false unless Name === other
+      return false if other.class != Name
       return @labels == other.labels && @absolute == other.absolute?
     end
     alias eql? == # :nodoc:
