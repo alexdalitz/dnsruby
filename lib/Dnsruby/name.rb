@@ -378,6 +378,7 @@ module Dnsruby
         end
         @downcase = string.downcase
         @string = string
+        @string_length = string.length
       end
       attr_reader :string, :downcase
       
@@ -386,7 +387,7 @@ module Dnsruby
       end
       
       def length
-        return @string.length
+        return @string_length
       end
       
       def inspect
