@@ -162,7 +162,11 @@ module Dnsruby
     end
     
     def ==(other)
-      [@code, @string].include?other
+      return true if [@code, @string].include?other
+      if (CodeMapper === other)
+        return true if ((other.code == @code) || (other.string == @string))
+      end
+      return false
     end
     alias eql? == # :nodoc:
 
