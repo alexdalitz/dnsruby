@@ -570,6 +570,7 @@ module Dnsruby
     require 'Dnsruby/update'
     require 'Dnsruby/zone_transfer'
     require 'Dnsruby/dnssec'
+    require 'Dnsruby/zone_reader'
     
     #Default Resolver to use for Dnsruby class methods
     DefaultResolver = self.new
