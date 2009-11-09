@@ -19,6 +19,11 @@
 # records.
 module Dnsruby
   class ZoneReader
+    class ParseException < Exception
+
+    end
+    # Create a new ZoneReader. The zone origin is required. If the desired SOA minimum
+    # and TTL are passed in, then they are used as default values.
     def initialize(origin, soa_minimum = nil, soa_ttl = nil)
       @origin = origin
 
@@ -37,17 +42,31 @@ module Dnsruby
       @in_quoted_section = false
     end
 
-    def process_line(line)
-      @line_num += 1
-      begin
-        # @TODO@ Call Dnsruby::ZoneReader.process_line(line)
-      rescue Exception => e
-        print "ERROR parsing line #{@line_num} : #{line}\n"
-        return "\n", Types::ANY
-      end
+    # Takes a filename string and attempts to load a zone. Returns a list
+    # of RRs if successful, nil otherwise.
+    def process_file(file)
+      line_num = 0
+      zone = nil
+      IO.foreach(file) { |line|
+        begin
+        ret = process_line(line)
+        if (ret)
+          rr = RR.create(ret)
+          if (!zone)
+            zone = []
+          end
+          zone.push(rr)
+        end
+        rescue Exception => e
+          raise ParseException.new("Error reading line #{line_num} of #{file} : [#{line}]")
+        end
+      }
+      return zone
     end
 
-    def process_line(line)
+    # Process the next line of the file
+    # Returns a string representing the normalised line.
+    def process_line(line, do_prefix_hack = false)
       return nil if (line.index(';') == 0)
       return nil if (line.strip.length == 0)
       return nil if (!line || (line.length == 0))
@@ -92,7 +111,7 @@ module Dnsruby
 
       # If SOA, then replace "3h" etc. with expanded seconds
       #      begin
-      return normalise_line(line, true)
+      return normalise_line(line, do_prefix_hack)
       #      rescue Exception => e
       #        print "ERROR parsing line #{@line_num} : #{line}\n"
       #        return "\n", Types::ANY
