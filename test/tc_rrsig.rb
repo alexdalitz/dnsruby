@@ -49,7 +49,6 @@ class RrsigTest < Test::Unit::TestCase
   def test_unknown_types
     rr = Dnsruby::RR.create("a.unknown.rr.org.       16070400        IN      RRSIG   TYPE731 7 4 16070400 20110220190432 20091112142325 59079 unknown.rr.org. a/iqriTleD/pkiXhH2HunBzbJ113JliHu8MrN30hwR5U8uR+FQ9UwoyqFVKmMFvhr66Q+Bn2leJhszJVLHM0GZpEP3yU9Kiux5z2sWxdNZY1phuVfe7vQhzPCG9a/gaNtOd/p42OaQRIvDpdp7Ey4m+2Lq/PfovuAa8jl1HBBSxYbt2sZ4Qh9IrP7qkabGzuF3iK8Kf+QTV+ty9enMRhv2zbGVJv0/KjfeOmLBpDnLxDtNN23ObqO2y31Ci434bWYbHRZJMofUWw/0cJHdw4qlnfraLHiXQSW/tT71mS/7CgHJcSZ89hdDFv8drAy/8py0MLT9nLrsvzH5F/knU/oA== ;{id = 59079}")
     assert(rr.type_covered == Dnsruby::Types.TYPE731)
-    print rr.to_s
   end
 
   def test_string_with_comments
