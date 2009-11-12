@@ -1,0 +1,17 @@
+NEW FOR DNSRUBY 1.40 :
+
+o Zone file reading support added (Dnsruby::ZoneReader)
+o Name and Label speed-ups
+o CodeMapper speed-ups
+o DHCID RR added
+o LOC presentation format parsing fixed
+o KX RR added
+o Quotations now allowed in text representation for ISDN, X25 and HINFO
+o AFSDB from_string fixes
+o Fixing CERT types and from_string
+o CERT now allows algorithm 0
+o Fix for DS record comparison
+o HIP RR added
+o Minor bug fixes
+o IPSECKEY RR added
+o Clients can now manipulate Name::Labels
