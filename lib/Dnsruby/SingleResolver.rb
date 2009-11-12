@@ -72,6 +72,7 @@ module Dnsruby
       @retry_delay = 0
       @single_resolvers = []
       @configured = false
+      @do_caching = true
         @config = Config.new
 
       if (arg==nil)
