@@ -52,52 +52,6 @@ class VerifierTest < Test::Unit::TestCase
     verifier = Dnsruby::SingleVerifier.new(nil)
     verifier.verify_rrset(rrset, key512)
   end
-
-  def test_sha2_zone
-    key1 = Dnsruby::RR.create("example.com.    3600    IN      DNSKEY  256 3 8 AwEAAeTXG9RkEnPqrs1gTA
-+7R2YdovW5HrObuMcsgIjfgAupTXX7NHBVUVX0oF2x8fJIeYt9pTuogTuUhw9/
-kJrCI43VWa7xbsMkTbyj1/
-wrfZB25nZnt4DQiqpYm8AZ3XmRBilibsGubVvrzWiQLC1gGXKUJ7JyQyL98G9ODUH2bmnb
-  ;{id = 43938 (zsk), size = 1024b}")
-    key2 = Dnsruby::RR.create("example.com.    3600    IN      DNSKEY  257 3 8
-AwEAAeLAE37+XYbieMtOqPRMbimhCjcyc/bSTbMQtKioxzjzgBPu/gVgHTeITJa
-+IBFOD763HkzmG6ZIEcNAagCLg6+xeTnp017CBWWgnU+ksXdjgQ5KLfM/g4d2TL/Xf/BZJP
-+JcIYqx3BNDT//bJpuwXqk6WkMtHGDSfSugel26TvgxG9X9xTaJh0u/
-QMFpm9H4IyQ8557cYAG04z8Yx3PszE5niE6JGho7Qpv2YhpsuLh7dneUTtdqFajdyqU0lZ3iDHnrfm7ve75LorIMPB0FqIo8Q
-+hqV/U44QB/gTuXiBPjxje6D6WLWJdisIKflYZjUBD0FxuOXZQ5+RFVMV5RSc= ;{id =
-18976 (ksk), size = 2048b}")
-    rrset = Dnsruby::RRSet.new(key1)
-    rrset.add(key2)
-    sig2 = Dnsruby::RR.create("example.com.    3600    IN      RRSIG   DNSKEY 8 2 3600 20091109083537
-20091012083537 18976 example.com. 0S/8cNh9otTenbcqQ2C5fxglGLrkI/EHp/
-8Y3NDbJ5M50xUzrXd91wjDCE2X/z7UNGeBtyFRqm2ZeId4MygBIBsFaqOr98X8qQo3qpZ/
-ZtudmSSlk8X77bnKzsBxdLQgtE/REiT6j556zJJ9LtQ/
-yHgdMmJa5BNPYbQDpJdzJGIYLe1Gx8edOqcPt0LAc3FmjB096Gmlt7JpIWJXrh2Q82eDTkLiEpv7ePAimduKh14
-+ERi6mLKFDaQjnfkwZ7/zjw6Ekp3a7L9Pa4S/OKUis/TarEQJf
-+w9yAVKKL8HCIFKOXfn1rOWZ8LIEzlmUmOVOV03F1Paww+9fJaG+WDhpQ== ;{id =
-18976}")
-    rrset.add(sig2)
-    verifier = Dnsruby::SingleVerifier.new(nil)
-    verifier.verify_rrset(rrset, key2)
-    sig = Dnsruby::RR.create("example.com.    3600    IN      RRSIG   DNSKEY 8 2 3600 20091109083537  
-20091012083537 43938 example.com. TXaNGZ4QklUIlPtXaGhNegER 
-+uwJAvM9fSmnSt55FiMrMgkJDb6b/ 
-GTyOF6INgKopO1wZRZI0iWaPUI0SRow6 
-+X8Idpk05uG7Two5R9uMGX0hu8PWc8BzuAxgeyawCYkXwXQ6Ah0PF9xkc/ 
-Xlieo6T34XsoeHmKjmjMWs1KdFkU= ;{id = 43938}")
-    rrset.add(sig)
-    verifier.verify_rrset(rrset, key1)
-    txt = Dnsruby::RR.create('example.com.    86400   IN      TXT     "v=spf1 -all"')
-    rrset = Dnsruby::RRSet.new(txt)
-    txt_sig = Dnsruby::RR.create("example.com.    86400   IN      RRSIG   TXT 8 2 86400 20091109083536
-20091012083536 43938 example.com. rZcuxDZ7QO1oBSqwlV
-+1ar7RTvwWOCYpgZy6oxXQMWkxONXnHVQO32yl
-+3WzROW4tYHfFpsdyvo1BCT1PRRXLcLFGJd/
-T3Y6ciiq5ZzsesfYV0aChOUhseX7MnMjsaLGbmDDVmGqW78nsoBjv9g
-+0YshQa7E1ctz2aQ2sorWN+E= ;{id = 43938}")
-    rrset.add(txt_sig)
-    verifier.verify_rrset(rrset, key1)
-  end
   
   def test_se_query
     # Run some queries on the .se zone
