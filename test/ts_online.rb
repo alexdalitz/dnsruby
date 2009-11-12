@@ -52,6 +52,7 @@ if (online)
 #  require "test/tc_queue.rb"
   require "test/tc_recur.rb"
   #  require "test/tc_soak.rb"
+ require "test/tc_cache.rb"
 
   # Check if we can contact the server - if we can't, then abort the test 
   # (but tell user that test has not been run due to connectivity problems)
