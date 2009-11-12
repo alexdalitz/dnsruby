@@ -437,6 +437,7 @@ module Dnsruby
     end
 
     def check_no_wildcard_expansion(msg) # :nodoc:
+      # @TODO@ Do this for NSEC3 records!!!
       proven_no_wildcards = false
       name = msg.question()[0].qname
       [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
@@ -475,6 +476,7 @@ module Dnsruby
     def check_name_in_nsecs(msg, qtype=nil, expected_qtype = false) # :nodoc:
       # Check these NSECs to make sure that this name cannot be in the zone
       # and that no RRSets could match through wildcard expansion
+      # @TODO@ Get this right for NSEC3 too!
       name = msg.question()[0].qname
       proven_name_in_nsecs = false
       type_covered_checked = false
@@ -516,6 +518,7 @@ module Dnsruby
     end
 
     def check_name_not_in_wildcard_nsecs(msg) # :nodoc:
+      # @TODO@ Do this for NSEC3 records too!
       name = msg.question()[0].qname
       qtype = msg.question()[0].qtype
       done= false
