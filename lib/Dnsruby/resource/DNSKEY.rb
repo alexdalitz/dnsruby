@@ -49,10 +49,13 @@ module Dnsruby
       attr_reader :key
       
       def init_defaults
+        @make_new_key_tag = false
         self.protocol=3
         self.flags=ZONE_KEY
         @algorithm=Algorithms.RSASHA1
         @public_key = nil
+        @key_tag = nil
+        @make_new_key_tag = true
       end
       
       def protocol=(p)
@@ -60,6 +63,7 @@ module Dnsruby
           raise DecodeError.new("DNSKEY protocol field set to #{p}, contrary to RFC4034 section 2.1.2")
         else @protocol = p
         end
+        get_new_key_tag
       end
       
       def algorithm=(a)
@@ -74,6 +78,7 @@ module Dnsruby
         rescue ArgumentError => e
           raise DecodeError.new(e)
         end        
+        get_new_key_tag
       end
       
       def revoked=(on)
@@ -82,6 +87,7 @@ module Dnsruby
         else
           @flags &= (~REVOKED_KEY)
         end
+        get_new_key_tag
       end
       
       def revoked?
@@ -94,6 +100,7 @@ module Dnsruby
         else
           @flags &= (~ZONE_KEY)
         end
+        get_new_key_tag
       end
       
       def zone_key?
@@ -106,6 +113,7 @@ module Dnsruby
         else
           @flags &= (~SEP_KEY)
         end
+        get_new_key_tag
       end
       
       def sep_key?
@@ -123,6 +131,7 @@ module Dnsruby
         end
 
         @flags = f
+        get_new_key_tag
       end
       
       #      def bad_flags?
@@ -134,13 +143,26 @@ module Dnsruby
       #
       def from_data(data) #:nodoc: all
         flags, protocol, algorithm, @key = data
+        @make_new_key_tag = false
         self.flags=(flags)
         self.protocol=(protocol)
         self.algorithm=(algorithm)
+        @make_new_key_tag = true
+        get_new_key_tag
       end
       
-      def from_string(input)
+    def from_hash(hash) #:nodoc: all
+      @make_new_key_tag = false
+      hash.keys.each do |param|
+        send(param.to_s+"=", hash[param])
+      end
+      @make_new_key_tag = true
+      get_new_key_tag
+    end
+
+    def from_string(input)
         if (input.length > 0)
+          @make_new_key_tag = false
           data = input.split(" ")
           self.flags=(data[0].to_i)
           self.protocol=(data[1].to_i)
@@ -167,6 +189,8 @@ module Dnsruby
             end
           }
           self.key=(buf)
+          @make_new_key_tag = true
+          get_new_key_tag
         end
       end
       
@@ -204,13 +228,23 @@ module Dnsruby
         return new_key.key_tag
       end
 
+      def get_new_key_tag
+        if (@make_new_key_tag)
+          rdata = MessageEncoder.new {|msg|
+            encode_rdata(msg)
+          }.to_s
+          tag = generate_key_tag(rdata, @algorithm)
+          @key_tag = tag
+        end
+      end
+
       # Return the tag for this key
       def key_tag
-        rdata = MessageEncoder.new {|msg|
-          encode_rdata(msg)
-        }.to_s
-        tag = generate_key_tag(rdata, @algorithm)
-        return tag
+        if (!@key_tag)
+          @make_new_key_tag = true
+          get_new_key_tag
+        end
+        return @key_tag
       end
 
       def generate_key_tag(rdata, algorithm)
@@ -259,6 +293,7 @@ module Dnsruby
         key_text.gsub!(/ /, "")
         #        @key=Base64.decode64(key_text)        
         @key=key_text.unpack("m*")[0]
+        get_new_key_tag
       end
       
       def public_key
