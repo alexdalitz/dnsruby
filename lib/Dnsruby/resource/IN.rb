@@ -15,18 +15,51 @@
 #++
 module Dnsruby
   class RR
-    ClassInsensitiveTypes = [
-      NS, CNAME, DNAME, DNSKEY, SOA, PTR, HINFO, MINFO, MX, TXT,
-      ISDN, MB, MG, MR, NAPTR, NSAP, OPT, RP, RT, X25, KX,
-      SPF, CERT, LOC, TSIG, TKEY, ANY, RRSIG, NSEC, DS, NSEC3,
-      NSEC3PARAM, DLV, SSHFP, IPSECKEY, HIP, DHCID
-    ] #:nodoc: all
+    ClassInsensitiveTypes = {
+      Types::NS => NS,
+      Types::CNAME => CNAME,
+      Types::DNAME => DNAME,
+      Types::DNSKEY => DNSKEY,
+      Types::SOA => SOA,
+      Types::PTR => PTR,
+      Types::HINFO => HINFO,
+      Types::MINFO => MINFO,
+      Types::MX => MX,
+      Types::TXT => TXT,
+      Types::ISDN => ISDN,
+      Types::MB => MB,
+      Types::MG => MG,
+      Types::MR => MR,
+      Types::NAPTR => NAPTR,
+      Types::NSAP => NSAP,
+      Types::OPT => OPT,
+      Types::RP => RP,
+      Types::RT => RT,
+      Types::X25 => X25,
+      Types::KX => KX,
+      Types::SPF => SPF,
+      Types::CERT => CERT,
+      Types::LOC => LOC,
+      Types::TSIG => TSIG,
+      Types::TKEY => TKEY,
+      Types::ANY => ANY,
+      Types::RRSIG => RRSIG,
+      Types::NSEC => NSEC,
+      Types::DS => DS,
+      Types::NSEC3 => NSEC3,
+      Types::NSEC3PARAM => NSEC3PARAM,
+      Types::DLV => DLV,
+      Types::SSHFP => SSHFP,
+      Types::IPSECKEY => IPSECKEY,
+      Types::HIP => HIP,
+      Types::DHCID => DHCID
+    } #:nodoc: all
     
     # module IN contains ARPA Internet specific RRs
     module IN
       ClassValue = Classes::IN
       
-      ClassInsensitiveTypes::each {|s|
+      ClassInsensitiveTypes::values::each {|s|
         c = Class.new(s)
         #          c < Record
         c.const_set(:TypeValue, s::TypeValue)

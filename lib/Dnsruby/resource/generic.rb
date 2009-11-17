@@ -122,6 +122,14 @@ module Dnsruby
     class ANY < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::ANY #:nodoc: all
+      def encode_rdata(msg, canonical=false) #:nodoc: all
+        return ""
+      end
+      def self.decode_rdata(msg) #:nodoc: all
+        return self.new([])
+      end
+      def from_data(data)
+      end
     end
   end  
 end

@@ -241,7 +241,7 @@ class TestRR < Test::Unit::TestCase
       
       assert(rr,                         "#{type} - RR defined");    
       assert_equal(name,       	rr.name.to_s,    "#{type} - name() correct");         
-      assert_equal(klass,      	Classes.to_string(rr.class::ClassValue),   "#{type} - class() correct");  
+      assert_equal(klass,      	rr.klass.to_s,   "#{type} - class() correct");
       assert_equal(ttl,        	rr.ttl,     "#{type} - ttl() correct");                
       
       #	foreach my $meth (keys %{data}) {

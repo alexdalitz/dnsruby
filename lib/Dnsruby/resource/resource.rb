@@ -569,6 +569,20 @@ module Dnsruby
       }
       return h
     end
+
+    def self.find_class(type_value, class_value) # :nodoc: all
+      klass = nil
+      if (ret = ClassHash[[type_value, class_value]])
+        return ret
+      elsif (val = ClassInsensitiveTypes[type_value])
+        klass = Class.new(val)
+        klass.const_set(:TypeValue, type_value)
+        klass.const_set(:ClassValue, class_value)
+        return klass
+      else
+        return Generic.create(type_value, class_value)
+      end
+    end
     
     #Get an RR of the specified type and class
     def self.get_class(type_value, class_value) #:nodoc: all
@@ -577,8 +591,7 @@ module Dnsruby
       end
       if (type_value.class == Class)
         type_value = type_value.const_get(:TypeValue)
-        return ClassHash[[type_value, Classes.to_code(class_value)]] ||
-          Generic.create(type_value, Classes.to_code(class_value))
+        return find_class(type_value, Classes.to_code(class_value))
       else
         if (type_value.class == Types)
           type_value = type_value.code
@@ -590,8 +603,7 @@ module Dnsruby
         else
           class_value = Classes.new(class_value).code
         end
-        return ClassHash[[type_value, class_value]] ||
-          Generic.create(type_value, class_value)
+        return find_class(type_value, class_value)
       end
       return ret
     end
@@ -629,7 +641,7 @@ module Dnsruby
       return ret
     end
   end
-end  
+end
 require 'Dnsruby/resource/domain_name'
 require 'Dnsruby/resource/generic'
 require 'Dnsruby/resource/IN'

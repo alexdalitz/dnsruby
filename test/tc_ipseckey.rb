@@ -62,6 +62,7 @@ class TestIPSECKEY < Test::Unit::TestCase
       assert(ipseckey.gateway_type == ipseckey2.gateway_type)
       assert(ipseckey.algorithm == ipseckey2.algorithm)
       assert(ipseckey.gateway == ipseckey2.gateway)
+      assert(ipseckey.klass == ipseckey2.klass)
       assert(ipseckey == ipseckey2)
     }
     }

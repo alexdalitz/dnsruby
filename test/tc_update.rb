@@ -31,7 +31,7 @@ class TestUpdate < Test::Unit::TestCase
     
     zone	= "example.com";
     name	= "foo.example.com";
-    klass	= "HS";
+    klass	= Classes.CLASS32;
     klass2  = Classes.CH;
     type	= Types.A;
     ttl	    = 43200;
@@ -48,7 +48,7 @@ class TestUpdate < Test::Unit::TestCase
     assert(update,                                'new() returned packet');  #2
     assert_equal(update.header.opcode, OpCode.UPDATE,      'header opcode correct');  #3 
     assert_equal(z.zname.to_s,  zone,                      'zname correct');          #4
-    assert_equal(z.zclass.to_s, klass,                     'zclass correct');         #5
+    assert_equal(z.zclass.to_s, klass.to_s,                     'zclass correct');         #5
     assert_equal(z.ztype,  Types.SOA,                      'ztype correct');          #6       
     
     #------------------------------------------------------------------------------
