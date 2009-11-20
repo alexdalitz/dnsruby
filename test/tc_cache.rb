@@ -29,7 +29,7 @@ class TestCache < Test::Unit::TestCase
     cache.add(m1)
     ret = cache.find("example.com", "A")
     assert(ret.cached)
-    assert(ret.answer == m1.answer, "#{m1.answer}end\n#{ret.answer}end" )
+    assert(ret.answer.to_s == m1.answer.to_s, "#{m1.answer}end\n#{ret.answer}end" )
     assert(ret.answer.to_s == m1.answer.to_s, "#{m1.answer.to_s}end\n#{ret.answer.to_s}end" )
     assert(ret.header.aa == false)
     assert(ret.answer.rrsets()[0].ttl == 3)

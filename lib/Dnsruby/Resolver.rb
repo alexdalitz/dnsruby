@@ -327,7 +327,14 @@ module Dnsruby
         @resolver_ruby = ResolverRuby.new(self)
       end
       #      }
-      return @resolver_ruby.send_async(*args)
+      client_query_id = @resolver_ruby.send_async(*args)
+      if (@single_resolvers.length == 0)
+        Thread.start {
+          sleep(@query_timeout)
+          args[1].push([client_query_id, nil, ResolvTimeout])
+        }
+      end
+      return client_query_id
     end
     
     # Close the Resolver. Unfinished queries are terminated with OtherResolvError.
