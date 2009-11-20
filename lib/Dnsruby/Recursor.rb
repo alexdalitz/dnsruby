@@ -14,102 +14,102 @@
 #limitations under the License.
 #++
 module Dnsruby
-    #Dnsruby::Recursor - Perform recursive dns lookups
-    #
-    #  require 'Dnsruby'
-    #  rec = Dnsruby::Recursor.new()
-    #  answer = rec.recurse("rob.com.au")
-    #
-      #This module uses a Dnsruby::Resolver to perform recursive queries.
-    #
-    #=== AUTHOR
-    #
-    #Rob Brown, bbb@cpan.org
-    #Alex Dalitz, alexd@nominet.org.uk
-    #
-    #=== SEE ALSO
-    #
-    #Dnsruby::Resolver,
-    #
-    #=== COPYRIGHT
-    #
-    #Copyright (c) 2002, Rob Brown.  All rights reserved.
-    #Portions Copyright (c) 2005, Olaf M Kolkman.
-    #Ruby version with caching and validation Copyright (c) 2008, AlexD (Nominet UK)
-    #
-    #Example lookup process:
-    #
-    #[root@box root]# dig +trace www.rob.com.au.
-    #
-    #; <<>> DiG 9.2.0 <<>> +trace www.rob.com.au.
-    #;; global options:  printcmd
-    #.                       507343  IN      NS      C.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      D.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      E.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      F.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      G.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      H.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      I.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      J.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      K.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      L.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      M.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      A.ROOT-SERVERS.NET.
-    #.                       507343  IN      NS      B.ROOT-SERVERS.NET.
-    #;; Received 436 bytes from 127.0.0.1#53(127.0.0.1) in 9 ms
-    #  ;;; But these should be hard coded as the hints
-    #
-    #  ;;; Ask H.ROOT-SERVERS.NET gave:
-    #au.                     172800  IN      NS      NS2.BERKELEY.EDU.
-    #au.                     172800  IN      NS      NS1.BERKELEY.EDU.
-    #au.                     172800  IN      NS      NS.UU.NET.
-    #au.                     172800  IN      NS      BOX2.AUNIC.NET.
-    #au.                     172800  IN      NS      SEC1.APNIC.NET.
-    #au.                     172800  IN      NS      SEC3.APNIC.NET.
-    #;; Received 300 bytes from 128.63.2.53#53(H.ROOT-SERVERS.NET) in 322 ms
-    #  ;;; A little closer than before
-    #
-    #  ;;; Ask NS2.BERKELEY.EDU gave:
-    #com.au.                 259200  IN      NS      ns4.ausregistry.net.
-    #com.au.                 259200  IN      NS      dns1.telstra.net.
-    #com.au.                 259200  IN      NS      au2ld.CSIRO.au.
-    #com.au.                 259200  IN      NS      audns01.syd.optus.net.
-    #com.au.                 259200  IN      NS      ns.ripe.net.
-    #com.au.                 259200  IN      NS      ns1.ausregistry.net.
-    #com.au.                 259200  IN      NS      ns2.ausregistry.net.
-    #com.au.                 259200  IN      NS      ns3.ausregistry.net.
-    #com.au.                 259200  IN      NS      ns3.melbourneit.com.
-    #;; Received 387 bytes from 128.32.206.12#53(NS2.BERKELEY.EDU) in 10312 ms
-    #  ;;; A little closer than before
-    #
-    #  ;;; Ask ns4.ausregistry.net gave:
-    #com.au.                 259200  IN      NS      ns1.ausregistry.net.
-    #com.au.                 259200  IN      NS      ns2.ausregistry.net.
-    #com.au.                 259200  IN      NS      ns3.ausregistry.net.
-    #com.au.                 259200  IN      NS      ns4.ausregistry.net.
-    #com.au.                 259200  IN      NS      ns3.melbourneit.com.
-    #com.au.                 259200  IN      NS      dns1.telstra.net.
-    #com.au.                 259200  IN      NS      au2ld.CSIRO.au.
-    #com.au.                 259200  IN      NS      ns.ripe.net.
-    #com.au.                 259200  IN      NS      audns01.syd.optus.net.
-    #;; Received 259 bytes from 137.39.1.3#53(ns4.ausregistry.net) in 606 ms
-    #  ;;; Uh... yeah... I already knew this
-    #  ;;; from what NS2.BERKELEY.EDU told me.
-    #  ;;; ns4.ausregistry.net must have brain damage
-    #
-    #  ;;; Ask ns1.ausregistry.net gave:
-    #rob.com.au.             86400   IN      NS      sy-dns02.tmns.net.au.
-    #rob.com.au.             86400   IN      NS      sy-dns01.tmns.net.au.
-    #;; Received 87 bytes from 203.18.56.41#53(ns1.ausregistry.net) in 372 ms
-    #  ;;; Ah, much better.  Something more useful.
-    #
-    #  ;;; Ask sy-dns02.tmns.net.au gave:
-    #www.rob.com.au.         7200    IN      A       139.134.5.123
-    #rob.com.au.             7200    IN      NS      sy-dns01.tmns.net.au.
-    #rob.com.au.             7200    IN      NS      sy-dns02.tmns.net.au.
-    #;; Received 135 bytes from 139.134.2.18#53(sy-dns02.tmns.net.au) in 525 ms
-    #  ;;; FINALLY, THE ANSWER!
-    # Now,DNSSEC validation is performed (unless disabled).
+  #Dnsruby::Recursor - Perform recursive dns lookups
+  #
+  #  require 'Dnsruby'
+  #  rec = Dnsruby::Recursor.new()
+  #  answer = rec.recurse("rob.com.au")
+  #
+  #This module uses a Dnsruby::Resolver to perform recursive queries.
+  #
+  #=== AUTHOR
+  #
+  #Rob Brown, bbb@cpan.org
+  #Alex Dalitz, alexd@nominet.org.uk
+  #
+  #=== SEE ALSO
+  #
+  #Dnsruby::Resolver,
+  #
+  #=== COPYRIGHT
+  #
+  #Copyright (c) 2002, Rob Brown.  All rights reserved.
+  #Portions Copyright (c) 2005, Olaf M Kolkman.
+  #Ruby version with caching and validation Copyright (c) 2008, AlexD (Nominet UK)
+  #
+  #Example lookup process:
+  #
+  #[root@box root]# dig +trace www.rob.com.au.
+  #
+  #; <<>> DiG 9.2.0 <<>> +trace www.rob.com.au.
+  #;; global options:  printcmd
+  #.                       507343  IN      NS      C.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      D.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      E.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      F.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      G.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      H.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      I.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      J.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      K.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      L.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      M.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      A.ROOT-SERVERS.NET.
+  #.                       507343  IN      NS      B.ROOT-SERVERS.NET.
+  #;; Received 436 bytes from 127.0.0.1#53(127.0.0.1) in 9 ms
+  #  ;;; But these should be hard coded as the hints
+  #
+  #  ;;; Ask H.ROOT-SERVERS.NET gave:
+  #au.                     172800  IN      NS      NS2.BERKELEY.EDU.
+  #au.                     172800  IN      NS      NS1.BERKELEY.EDU.
+  #au.                     172800  IN      NS      NS.UU.NET.
+  #au.                     172800  IN      NS      BOX2.AUNIC.NET.
+  #au.                     172800  IN      NS      SEC1.APNIC.NET.
+  #au.                     172800  IN      NS      SEC3.APNIC.NET.
+  #;; Received 300 bytes from 128.63.2.53#53(H.ROOT-SERVERS.NET) in 322 ms
+  #  ;;; A little closer than before
+  #
+  #  ;;; Ask NS2.BERKELEY.EDU gave:
+  #com.au.                 259200  IN      NS      ns4.ausregistry.net.
+  #com.au.                 259200  IN      NS      dns1.telstra.net.
+  #com.au.                 259200  IN      NS      au2ld.CSIRO.au.
+  #com.au.                 259200  IN      NS      audns01.syd.optus.net.
+  #com.au.                 259200  IN      NS      ns.ripe.net.
+  #com.au.                 259200  IN      NS      ns1.ausregistry.net.
+  #com.au.                 259200  IN      NS      ns2.ausregistry.net.
+  #com.au.                 259200  IN      NS      ns3.ausregistry.net.
+  #com.au.                 259200  IN      NS      ns3.melbourneit.com.
+  #;; Received 387 bytes from 128.32.206.12#53(NS2.BERKELEY.EDU) in 10312 ms
+  #  ;;; A little closer than before
+  #
+  #  ;;; Ask ns4.ausregistry.net gave:
+  #com.au.                 259200  IN      NS      ns1.ausregistry.net.
+  #com.au.                 259200  IN      NS      ns2.ausregistry.net.
+  #com.au.                 259200  IN      NS      ns3.ausregistry.net.
+  #com.au.                 259200  IN      NS      ns4.ausregistry.net.
+  #com.au.                 259200  IN      NS      ns3.melbourneit.com.
+  #com.au.                 259200  IN      NS      dns1.telstra.net.
+  #com.au.                 259200  IN      NS      au2ld.CSIRO.au.
+  #com.au.                 259200  IN      NS      ns.ripe.net.
+  #com.au.                 259200  IN      NS      audns01.syd.optus.net.
+  #;; Received 259 bytes from 137.39.1.3#53(ns4.ausregistry.net) in 606 ms
+  #  ;;; Uh... yeah... I already knew this
+  #  ;;; from what NS2.BERKELEY.EDU told me.
+  #  ;;; ns4.ausregistry.net must have brain damage
+  #
+  #  ;;; Ask ns1.ausregistry.net gave:
+  #rob.com.au.             86400   IN      NS      sy-dns02.tmns.net.au.
+  #rob.com.au.             86400   IN      NS      sy-dns01.tmns.net.au.
+  #;; Received 87 bytes from 203.18.56.41#53(ns1.ausregistry.net) in 372 ms
+  #  ;;; Ah, much better.  Something more useful.
+  #
+  #  ;;; Ask sy-dns02.tmns.net.au gave:
+  #www.rob.com.au.         7200    IN      A       139.134.5.123
+  #rob.com.au.             7200    IN      NS      sy-dns01.tmns.net.au.
+  #rob.com.au.             7200    IN      NS      sy-dns02.tmns.net.au.
+  #;; Received 135 bytes from 139.134.2.18#53(sy-dns02.tmns.net.au) in 525 ms
+  #  ;;; FINALLY, THE ANSWER!
+  # Now,DNSSEC validation is performed (unless disabled).
   class Recursor
     class AddressCache # :nodoc: all
       # Like an array, but stores the expiration of each record.
@@ -289,9 +289,9 @@ module Dnsruby
     end
 
     def Recursor.clear_caches(resolver = Resolver.new)
-          Recursor.set_hints(Hash.new, resolver)
-          @@zones_cache = Hash.new # key zone_name, values Hash of servers and AddressCaches
-          @@zones_cache["."] = @@hints
+      Recursor.set_hints(Hash.new, resolver)
+      @@zones_cache = Hash.new # key zone_name, values Hash of servers and AddressCaches
+      @@zones_cache["."] = @@hints
     end
 
     def query_no_validation_or_recursion(name, type=Types.A, klass=Classes.IN) # :nodoc: all
@@ -423,7 +423,7 @@ module Dnsruby
           
       if (ns.length == 0)
         found_auth = 0
-#        @@mutex.synchronize { # @TODO@ Lock access to @@known_authorities
+        #        @@mutex.synchronize { # @TODO@ Lock access to @@known_authorities
         TheLog.debug(";; _dorecursion() Failed to extract nameserver IPs:")
         TheLog.debug(known_authorities.inspect + cache.inspect)
         known_authorities.keys.each do |ns_rec|
@@ -434,20 +434,32 @@ module Dnsruby
             ans=[]
                 
             # Don't query for V6 if its not there.
-            if ( @ipv6_ok)
-              auth_packet = _dorecursion(ns_rec,"AAAA", klass,  # packet
+            # Do this in parallel
+            ip_mutex = Mutex.new
+            ip6_thread = Thread.start {
+              if ( @ipv6_ok)
+                auth_packet = _dorecursion(ns_rec,"AAAA", klass,  # packet
+                  ".",               # known_zone
+                  @@hints,  # known_authorities
+                  depth+1);         # depth
+                ip_mutex.synchronize {
+                  ans.push(auth_packet.answer) if auth_packet
+                }
+              end
+            }
+
+            ip4_thread = Thread.start {
+              auth_packet = _dorecursion(ns_rec,"A",klass,  # packet
                 ".",               # known_zone
                 @@hints,  # known_authorities
                 depth+1);         # depth
-              ans = auth_packet.answer if auth_packet
-            end
                 
-            auth_packet = _dorecursion(ns_rec,"A",klass,  # packet
-              ".",               # known_zone
-              @@hints,  # known_authorities
-              depth+1);         # depth
-                
-            ans.push(auth_packet.answer ) if auth_packet
+              ip_mutex.synchronize {
+                ans.push(auth_packet.answer ) if auth_packet
+              }
+            }
+            ip6_thread.join
+            ip4_thread.join
                 
             if ( ans.length > 0 )
               TheLog.debug(";; _dorecursion() Answers found for [#{ns_rec}]")
@@ -499,7 +511,7 @@ module Dnsruby
         end
         TheLog.debug(";; _dorecursion() No authority information could be obtained.")
         return nil
-#        }
+        #        }
       end
           
       # Cut the deck of IPs in a random place.
@@ -573,7 +585,7 @@ module Dnsruby
                   TheLog.debug(";; _dorecursion() FOUND closer authority for [#{of}] at [#{server}].")
                   auth[server] ||= AddressCache.new #[] @TODO@ If there is no additional record for this, then we want to use the authority!
                   if ((packet.additional.rrset(rr.nsdname, Types::A).length == 0) &&
-                      (packet.additional.rrset(rr.nsdname, Types::AAAA).length == 0))
+                        (packet.additional.rrset(rr.nsdname, Types::AAAA).length == 0))
                     auth[server].push([rr.nsdname, rr.ttl])
                   end
                 else
@@ -654,9 +666,9 @@ module Dnsruby
           if ((n.to_s == zone) || (n.to_s == Name.create(zone).to_s) ||
                 (n.subdomain_of?(Name.create(zone))) ||
                 (rrset.type == Types::OPT))
-#            # @TODO@ Leave in the response if it is an SOA, NSEC or RRSIGfor the parent zone
-##          elsif ((query_name.subdomain_of?rrset.name) &&
-#          elsif  ((rrset.type == Types.SOA) || (rrset.type == Types.NSEC) || (rrset.type == Types.NSEC3)) #)
+            #            # @TODO@ Leave in the response if it is an SOA, NSEC or RRSIGfor the parent zone
+            ##          elsif ((query_name.subdomain_of?rrset.name) &&
+            #          elsif  ((rrset.type == Types.SOA) || (rrset.type == Types.NSEC) || (rrset.type == Types.NSEC3)) #)
           else
             TheLog.debug"Removing #{rrset.name}, #{rrset.type} from response from server for #{zone}"
             packet.send(section).remove_rrset(rrset.name, rrset.type)
