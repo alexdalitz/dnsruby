@@ -25,10 +25,10 @@ module Dnsruby
     # Create a new ZoneReader. The zone origin is required. If the desired SOA minimum
     # and TTL are passed in, then they are used as default values.
     def initialize(origin, soa_minimum = nil, soa_ttl = nil)
-      @origin = origin
+      @origin = origin.to_s
 
       if (!Name.create(@origin).absolute?)
-        @origin = @origin + "."
+        @origin = @origin.to_s + "."
       end
       @soa_ttl = soa_ttl
       if (soa_minimum && !@last_explicit_ttl)
