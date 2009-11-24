@@ -21,6 +21,9 @@ require 'dnsruby'
 
 res = Dnsruby::Recursor.new
 Dnsruby::TheLog.level = Logger::DEBUG
+name, type, klass = ARGV
+type  ||= "A"
+klass ||= "IN"
 res.hints=("198.41.0.4") # A.ROOT-SERVER.NET.
-packet = res.query_dorecursion("www.rob.com.au.", "A")
+packet = res.query(name, type, klass)
 print packet.to_s
