@@ -647,7 +647,7 @@ module Dnsruby
       if ((keys == nil) || (sigrecs == nil))
         return nil, nil
       end
-      if ((RR::DNSKEY === keys) || (RR::DS == keys))
+      if ((RR::DNSKEY === keys) || (RR::DS === keys))
         keys = [keys]
       end
       enumerator = keys
