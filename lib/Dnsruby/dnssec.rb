@@ -286,14 +286,14 @@ module Dnsruby
       return @@dlv_verifier.validate(msg, query)
     end
 
-    def self.verify(msg)
+    def self.verify(msg, keys=nil)
       begin
-        return true if @@anchor_verifier.verify(msg)
+        return true if @@anchor_verifier.verify(msg, keys=nil)
       rescue VerifyError
         begin
-          return true if @@root_verifier.verify(msg)
+          return true if @@root_verifier.verify(msg, keys=nil)
         rescue VerifyError
-          return true if @@dlv_verifier.verify(msg) # Will carry error to client
+          return true if @@dlv_verifier.verify(msg, keys=nil) # Will carry error to client
         end
       end
     end
