@@ -284,7 +284,7 @@ module Dnsruby
         msg.add_question(candidate, type, klass)
         @resolver.send_async(msg, q)
         id, ret, exception = q.pop
-        if (exception == nil && ret.rcode == RCode.NOERROR)
+        if (exception == nil && ret && ret.rcode == RCode.NOERROR)
           return ret, ret.question[0].qname
         end
       end
