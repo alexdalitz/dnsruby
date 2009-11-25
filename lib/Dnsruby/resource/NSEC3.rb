@@ -230,7 +230,7 @@ module Dnsruby
 
       def NSEC3.decode_salt(input)
         if (input == "-")
-          return []
+          return ""
         end
         return [input].pack("H*")
       end
