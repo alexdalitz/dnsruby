@@ -196,7 +196,7 @@ module Dnsruby
       # Nice idea.
           
       resolver.recurse=(1)
-      packet=resolver.query(".", "NS", "IN")
+      packet=resolver.query_no_validation_or_recursion(".", "NS", "IN")
       hints = Hash.new
       if (packet)
         if (ans = packet.answer)
@@ -525,8 +525,7 @@ module Dnsruby
       ns.each do |nss|
         nss.each {|n| nameservers.push(n)}
       end
-      resolver = Resolver.new() # {:nameserver=>"127.0.0.1"})
-      resolver.nameserver = nameservers
+      resolver = Resolver.new({:nameserver=>nameservers})
       servers = []
       resolver.single_resolvers.each {|s|
         servers.push(s.server)
