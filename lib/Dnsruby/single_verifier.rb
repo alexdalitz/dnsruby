@@ -647,7 +647,8 @@ module Dnsruby
       if ((keys == nil) || (sigrecs == nil))
         return nil, nil
       end
-      if ((RR::DNSKEY === keys) || (RR::DS === keys))
+      if ((RR::DNSKEY === keys) || (RR::DS === keys) ||
+            ((RR::DLV === keys) && (@verifier_type == VerifierType::DLV)))
         keys = [keys]
       end
       enumerator = keys
@@ -677,7 +678,7 @@ module Dnsruby
       #      print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
       sigrecs = rrset.sigs
       if (rrset.rrs.length == 0)
-        raise VerifyError.new("No RRSet to veryify")
+        raise VerifyError.new("No RRSet to verify")
       end
       if (rrset.num_sigs == 0)
         raise VerifyError.new("No signatures in the RRSet : #{rrset.name}, #{rrset.type}")
