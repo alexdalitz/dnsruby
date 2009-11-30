@@ -330,7 +330,7 @@ module Dnsruby
       client_query_id = @resolver_ruby.send_async(*args)
       if (@single_resolvers.length == 0)
         Thread.start {
-          sleep(@query_timeout)
+          sleep(@query_timeout == 0 ? 1 : @query_timeout)
           args[1].push([client_query_id, nil, ResolvTimeout.new])
         }
       end
