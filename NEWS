@@ -1,3 +1,18 @@
+NEW FOR DNSRUBY 1.41 :
+
+o RFC3597 unknown classes (e.g. CLASS32) now handled correctly
+    in RRSIGs
+o Resolver#do_caching flag added for Resolver-level caching
+o DNSKEY#key_tag now cached - only recalculated when key data
+    changes
+o Bugfix where Resolver would not time queries out if no 
+    nameservers were configured
+o Recursor now performs A and AAAA queries in parallel
+o Fix for zero length salt
+o Fixing priming for signed root
+o Fixes for DLV verification
+o Other minor fixes
+
 NEW FOR DNSRUBY 1.40 :
 
 o Zone file reading support added (Dnsruby::ZoneReader)
