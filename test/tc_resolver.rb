@@ -171,7 +171,7 @@ class TestResolver < Test::Unit::TestCase
       rescue ResolvTimeout
         stop=Time.now
         time = stop-start
-        assert(time <= expected *1.1 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")        
+        assert(time <= expected *1.2 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")
       end    #
   end
   
