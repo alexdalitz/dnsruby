@@ -19,7 +19,24 @@ require 'dnsruby'
 
 class VerifierTest < Test::Unit::TestCase
 
-  def test_sha256
+  def test_sha2
+    # @TODO@ Check if OpenSSL supports SHA2
+    have_sha2 = false
+    begin
+      OpenSSL::Digest::SHA256.new
+      have_sha2 = true
+    rescue Exception
+    end
+    if (have_sha2)
+#      print "OpenSSL supports SHA2\n"
+      do_test_sha256
+      do_test_sha512
+    else
+      print "OpenSSL doesn't support SHA2 - disabling SHA256/SHA512 tests. DNSSEC validation will not work with these type of signatures.\n"
+    end
+  end
+    
+  def do_test_sha256
     key256 = Dnsruby::RR.create("example.net.     3600  IN  DNSKEY  (256 3 8 AwEAAcFcGsaxxdgiuuGmCkVI
                     my4h99CqT7jwY3pexPGcnUFtR2Fh36BponcwtkZ4cAgtvd4Qs8P
                     kxUdp6p/DlUmObdk= );{id = 9033 (zsk), size = 512b}")
@@ -34,7 +51,7 @@ class VerifierTest < Test::Unit::TestCase
     verifier.verify_rrset(rrset, key256)
   end
 
-  def test_sha512
+  def do_test_sha512
     key512 = Dnsruby::RR.create("example.net.    3600  IN  DNSKEY  (256 3 10 AwEAAdHoNTOW+et86KuJOWRD
                    p1pndvwb6Y83nSVXXyLA3DLroROUkN6X0O6pnWnjJQujX/AyhqFD
                    xj13tOnD9u/1kTg7cV6rklMrZDtJCQ5PCl/D7QNPsgVsMu1J2Q8g
