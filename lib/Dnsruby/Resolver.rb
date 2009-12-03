@@ -331,7 +331,7 @@ module Dnsruby
       if (@single_resolvers.length == 0)
         Thread.start {
           sleep(@query_timeout == 0 ? 1 : @query_timeout)
-          args[1].push([client_query_id, nil, ResolvTimeout.new])
+          args[1].push([client_query_id, nil, ResolvTimeout.new("Query timed out - no nameservers configured")])
         }
       end
       return client_query_id
