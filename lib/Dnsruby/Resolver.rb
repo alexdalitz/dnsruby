@@ -98,6 +98,9 @@ module Dnsruby
     
     # The current Config
     attr_reader :config
+
+    # Does this Resolver cache answers, and attempt to retrieve answer from the cache?
+    attr_reader :do_caching
     
     # The array of SingleResolvers used for sending query messages
     #    attr_accessor :single_resolvers # :nodoc:
@@ -625,7 +628,8 @@ module Dnsruby
     #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
     #Pass in nil to stop tsig signing.
     #* res.tsig=(tsig_rr)
-    #* res.tsig=(key_name, key)
+    #* res.tsig=(key_name, key) # defaults to hmac-md5
+    #* res.tsig=(key_name, key, alg) # e.g. alg = "hmac-sha1"
     #* res.tsig=nil # Stop the resolver from signing
     def tsig=(t)
       @tsig=t
@@ -639,7 +643,11 @@ module Dnsruby
           if (args[0].instance_of?RR::TSIG)
             tsig = args[0]
           elsif (args[0].instance_of?Array)
-            tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1]})
+            if (args[0].length > 2)
+              tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1], :algorithm => args[0][2]})
+            else
+              tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1]})
+            end
           end
         else
           #          Dnsruby.log.debug{"TSIG signing switched off"}
@@ -647,6 +655,8 @@ module Dnsruby
         end
       elsif (args.length ==2)
         tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0], :key => args[1]})
+      elsif (args.length ==3)
+        tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0], :key => args[1], :algorithm => args[2]})
       else
         raise ArgumentError.new("Wrong number of arguments to tsig=")
       end
