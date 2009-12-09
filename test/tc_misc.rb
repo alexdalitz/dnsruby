@@ -125,9 +125,9 @@ class TestMisc < Test::Unit::TestCase
     assert_equal("736f7274206f66202220746578743b20616e642062696e61727920002064617461", temp,"Second Char string in TXT RR read from wireformat")
     
     
-    txtRr2=Dnsruby::RR.create('txt2.t.dnsruby.validation-test-servers.nominet.org.uk.	60	IN	TXT  "Test1 \" \ more stuff"  "Test2"')
+    txtRr2=Dnsruby::RR.create('txt2.t.dnsruby.validation-test-servers.nominet.org.uk.	60	IN	TXT  "Test1 \" \; more stuff"  "Test2"')
     
-    assert_equal((txtRr2.strings)[0],'Test1 "  more stuff', "First arg string in TXT RR read from zonefileformat")
+    assert_equal((txtRr2.strings)[0],'Test1 " ; more stuff', "First arg string in TXT RR read from zonefileformat")
     assert_equal((txtRr2.strings)[1],'Test2',"Second Char string in TXT RR read from zonefileformat")
     
     

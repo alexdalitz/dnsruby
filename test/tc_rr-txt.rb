@@ -134,4 +134,9 @@ class TestRrTest < Test::Unit::TestCase
     
     
   end
+
+  def test_nasty_txt
+   t = RR.create('txt2.t.net-dns.org. 60 IN TXT "Net-DNS\; complicated $tuff" "sort of \" text\; and binary \000 data"')
+   assert(t.rdata.to_s == '"Net-DNS\; complicated $tuff" "sort of \" text\; and binary \000 data"', t.to_s)
+  end
 end
