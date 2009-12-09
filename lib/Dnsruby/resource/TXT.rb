@@ -13,7 +13,7 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-require 'shellwords'
+require 'jcode'
 module Dnsruby
   class RR
     #Class for DNS Text (TXT) resource records.
