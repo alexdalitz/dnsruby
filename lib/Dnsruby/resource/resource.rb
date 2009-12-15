@@ -386,8 +386,6 @@ module Dnsruby
       
       if rdata
         rdata.gsub!(/\s+$/o, "")
-        rdata.gsub!("(", "")
-        rdata.gsub!(")", "")
       end
       
       # RFC3597 tweaks
@@ -409,6 +407,14 @@ module Dnsruby
       
       if (rrtype == '')
         rrtype = 'ANY';
+      end
+
+      if ((rrtype == "NAPTR") || (rrtype == "TXT"))
+      else
+        if (rdata)
+        rdata.gsub!("(", "")
+        rdata.gsub!(")", "")
+        end
       end
       
       if (implemented_rrs.include?(rrtype) && rdata !~/^\s*\\#/o )
