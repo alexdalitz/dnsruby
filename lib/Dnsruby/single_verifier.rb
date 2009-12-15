@@ -275,10 +275,10 @@ module Dnsruby
             if ((msg.answer.size == 0) && (!dsrrset) && (rrset.type == Types.NS)) # (isDelegation)
               # Now check NSEC(3) records for absence of DS and SOA
               nsec = msg.authority.rrsets('NSEC')[0]
-              if (nsec.length == 0)
+              if (!nsec || (nsec.length == 0))
                 nsec = msg.authority.rrsets('NSEC3')[0]
               end
-              if (nsec.rrs.length > 0)
+              if (nsec && (nsec.rrs.length > 0))
                 if (!(nsec.rrs()[0].types.include?'DS') || !(nsec.rrs()[0].types.include?'SOA'))
                   next # delegation which we expect to be unsigned - so don't verify it!
                 end

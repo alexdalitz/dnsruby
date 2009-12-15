@@ -323,13 +323,15 @@ module Dnsruby
     
     # Return the rrsets of the specified type in the message
     def rrsets(type, klass=Classes::IN)
-      rrsets = []
+      rrsetss = []
       [@answer, @authority, @additional].each do |section|
-        if ((rrset = section.rrsets(type, klass)).length > 0)
-          rrsets.push(rrset)
+        if ((rrsets = section.rrsets(type, klass)).length > 0)
+          rrsets.each {|rrset|
+            rrsetss.push(rrset)
+          }
         end
       end
-      return rrsets
+      return rrsetss
     end
     
     # Return a hash, with the section as key, and the RRSets in that

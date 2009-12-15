@@ -57,7 +57,8 @@ module Dnsruby
           re = values [4].gsub!("\"", "")
           @regexp = ""
           escaped = false
-          re.each_char {|c|
+          re.each_byte {|b|
+            c = b.chr
             if (!escaped)
               if (c == "\\")
                 escaped = true
@@ -81,7 +82,8 @@ module Dnsruby
         if (@order!=nil)
           ret =  "#{@order} #{@preference} \"#{@flags}\" \"#{@service}\" \""
           ##{@regexp}
-          @regexp.each_char {|c|
+          @regexp.each_byte {|b|
+            c = b.chr
             if (c == "\\")
               ret += "\\"
             end

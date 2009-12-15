@@ -260,6 +260,7 @@ module Dnsruby
     CERT      = 37      # RFC 2538
     DNAME     = 39      # RFC 2672
     OPT       = 41      # RFC 2671
+#    APL       = 42      # RFC 3123
     DS        = 43      # RFC 4034
     SSHFP     = 44      # RFC 4255
     IPSECKEY  = 45      # RFC 4025
