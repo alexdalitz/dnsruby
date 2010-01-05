@@ -55,29 +55,12 @@ module Dnsruby
           @flags = values [2].gsub!("\"", "")
           @service = values [3].gsub!("\"", "")
           re = values [4].gsub!("\"", "")
-          @regexp = ""
-          escaped = false
-          re.each_byte {|b|
-            c = b.chr
-            if (!escaped)
-              if (c == "\\")
-                escaped = true
-              else
-                @regexp += c
-              end
-            else
-              if (c != "\\")
-                TheLog.error("NAPTR parsing failure : #{re} for regexp")
-              else
-                @regexp+=c
-              end
-              escaped = false
-            end
-          }
+          re.gsub!("\\\\", "\\")
+          @regexp = re
           @replacement = Name.create(values[5])
         end
       end
-      
+
       def rdata_to_string #:nodoc: all
         if (@order!=nil)
           ret =  "#{@order} #{@preference} \"#{@flags}\" \"#{@service}\" \""
@@ -102,7 +85,7 @@ module Dnsruby
         msg.put_string(@flags)
         msg.put_string(@service)
         msg.put_string(@regexp)
-        msg.put_name(@replacement, canonical)
+        msg.put_name(@replacement, true)
       end
       
       def self.decode_rdata(msg) #:nodoc: all
