@@ -49,14 +49,15 @@ module Dnsruby
       zone = nil
       IO.foreach(file) { |line|
         begin
-        ret = process_line(line)
-        if (ret)
-          rr = RR.create(ret)
-          if (!zone)
-            zone = []
+
+          ret = process_line(line)
+          if (ret)
+            rr = RR.create(ret)
+            if (!zone)
+              zone = []
+            end
+            zone.push(rr)
           end
-          zone.push(rr)
-        end
         rescue Exception => e
           raise ParseException.new("Error reading line #{line_num} of #{file} : [#{line}]")
         end
@@ -161,8 +162,6 @@ module Dnsruby
         line = @last_name + " " + line
       end
       line.chomp!
-      line.sub!("(", "")
-      line.sub!(")", "")
       line.sub!("@ ", "#{@origin} ")
       line.sub!("@\t", "#{@origin} ")
       line.strip!
@@ -239,6 +238,11 @@ module Dnsruby
 
       type_string=prefix_for_rrset_order(type, type_was)
       @last_name = name
+
+      if !([Types::NAPTR, Types::TXT].include?type_was)
+        line.sub!("(", "")
+        line.sub!(")", "")
+      end
 
       if (is_soa)
         if (@soa_ttl)
