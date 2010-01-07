@@ -171,6 +171,14 @@ module Dnsruby
       # o We need to identify the domain name in the record, and then
       split = line.split(' ') # split on whitespace
       name = split[0].strip
+      if (name.index"\\")
+        old_name = name
+        name = Name.create(name).to_s
+        if (/\.\z/ =~ old_name)
+          name += "."
+        end
+        line.sub!(old_name, name)
+      end
       # o add $ORIGIN to it if it is not absolute
       if !(/\.\z/ =~ name)
         new_name = name + "." + @origin
