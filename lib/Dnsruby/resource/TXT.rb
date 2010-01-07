@@ -104,6 +104,9 @@ module Dnsruby
                 elsif (ESCAPE_CHARS[c])
                   in_escaped=false
                   strings[count]+=ESCAPE_CHARS[c].chr
+                elsif (c<="0" || c>="9")
+                  in_escaped = false
+                  strings[count]+=c
                 else
                   # Must be building up three digit string to identify binary value?
                   current_binary += c
