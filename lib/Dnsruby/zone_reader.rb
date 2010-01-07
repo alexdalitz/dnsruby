@@ -162,9 +162,9 @@ module Dnsruby
         line = @last_name + " " + line
       end
       line.chomp!
-      line.sub!(" @$", "#{@origin} ") # IN CNAME @
-      line.sub!("@ ", "#{@origin} ")
-      line.sub!("@\t", "#{@origin} ")
+      line.sub!(/\s+@$/, " #{@origin}") # IN CNAME @
+      line.sub!(/^@\s+/, "#{@origin} ") # IN CNAME @
+      line.sub!(/\s+@\s+/, " #{@origin} ")
       line.strip!
 
 
