@@ -1,3 +1,12 @@
+NEW FOR DNSRUBY 1.42 :
+
+o Complicated TXT and NAPTR records now handled correctly
+o ZoneReader now handles odd escape characters correctly
+o Warns when immediate timeout occurs because no nameservers are configured
+o Easy hmac-sha1/256 options to Resolver#tsig=
+o ZoneReader fixed for "IN CNAME @" notations
+o ZoneReader supports wildcards
+
 NEW FOR DNSRUBY 1.41 :
 
 o RFC3597 unknown classes (e.g. CLASS32) now handled correctly
