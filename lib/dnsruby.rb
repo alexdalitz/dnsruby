@@ -102,6 +102,12 @@ require 'Dnsruby/TheLog'
 #* /etc/nsswitch.conf is not supported.
 #* NSEC3 validation still TBD
 module Dnsruby
+
+  # @TODO@ Remember to update version in dnsruby.gemspec!
+  VERSION = 1.42
+  def Dnsruby.version
+    return VERSION
+  end
   
   @@logger = Logger.new(STDOUT)
   @@logger.level = Logger::FATAL
