@@ -6,6 +6,7 @@ o Warns when immediate timeout occurs because no nameservers are configured
 o Easy hmac-sha1/256 options to Resolver#tsig=
 o ZoneReader fixed for "IN CNAME @" notations
 o ZoneReader supports wildcards
+o Dnsruby.version method added - currently returns 1.42
 
 NEW FOR DNSRUBY 1.41 :
 
