@@ -125,6 +125,10 @@ module Dnsruby
       # Does a quoted section begin or end in this line?
       # Are there any semi-colons?
       # Ary any of the semi-colons inside a quoted section?
+      # Handle escape characters
+      if (line.index"\\")
+        return strip_comments_meticulously(line)
+      end
       while (next_index = line.index(";", last_index + 1))
         # Have there been any quotes since we last looked?
         process_quotes(line[last_index, next_index - last_index])
@@ -139,6 +143,44 @@ module Dnsruby
       # Check out the quote situation to the end of the line
       process_quotes(line[last_index, line.length-1])
 
+      return line
+    end
+
+    def strip_comments_meticulously(line)
+      # We have escape characters in the text. Go through it character by
+      # character and work out what's escaped and quoted and what's not
+      escaped = false
+      quoted = false
+      pos = 0
+      line.each_char {|c|
+        if (c == "\\")
+          if (!escaped)
+            escaped = true
+          else
+            escaped = false
+          end
+        else
+          if (escaped)
+            escaped = false
+            next
+          else
+            if (c == "\"")
+              if (quoted)
+                quoted = false
+              else
+                quoted = true
+              end
+            else
+              if (c == ";")
+                if (!quoted)
+                  return line[0, pos]
+                end
+              end
+            end
+          end
+        end
+        pos +=1
+      }
       return line
     end
 
