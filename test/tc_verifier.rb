@@ -256,6 +256,39 @@ class VerifierTest < Test::Unit::TestCase
     verifier.verify_rrset(rrset, key_rrset)
   end
 
+  def test_txt_rr
+    txt = 'txt2.all.rr.org.        86400   IN      TXT     "Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"'
+    rr = Dnsruby::RR.create(txt)
+    assert(rr.to_s.index('"Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"'), rr.to_s)
+
+    key = Dnsruby::RR.create("all.rr.org.	2678400	IN	DNSKEY	256 3 7 AwEAAcW1ZJxnMxZAAfsQ0JJQPHOlVNeGzs/AWVSGXiIYsg9UUSsvRTiK/Wy2wD7XC6osZpgy4Blhm846wktPbCwHpkxxbjxpaMABjbhH14gRol1Gpzf+gOr8vpdii8c2y6VMN9kIXZyaZUWcshLii19ysSGlqY1a1g2XZjogFtvzDHjH ;{id = 43068 (zsk), size = 1024b}")
+     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+     key_rrset = Dnsruby::RRSet.new(key)
+    verifier.add_trusted_key(key_rrset);
+    sig = Dnsruby::RR.create("txt2.all.rr.org.        86400   IN      RRSIG   TXT 7 4 86400 20100813002344 20091006093439 43068 all.rr.org. LJv/ccd2JHyT6TK74Dtu/zH4jdeR4ScyrB8cGwaqeCjwxG4H5FY88Sk/U0JUQyxnUificnyZQwcyXAItn7QjBMHQO4ftVxl/gDCyt6MEXy9JKK/rfvXcAceo5prmlVrb8WxT5YnvPha3CxjK7f+YIs5cqppRVaZTQTxsAsJyJ20= ;{id = 43068}")
+    txt = Dnsruby::RR.create('txt2.all.rr.org.        86400   IN      TXT     "Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"')
+    rrset = Dnsruby::RRSet.new(txt)
+    rrset.add(sig)
+    verifier.verify_rrset(rrset, key_rrset)
+  end
+
+#  def test_txt_from_zone
+#    reader = Dnsruby::ZoneReader.new("all.rr.org.")
+#    zone = reader.process_file("zone.txt")
+#    rrset = Dnsruby::RRSet.new
+#    key_rrset = Dnsruby::RRSet.new
+#    zone.each {|rr|
+#      if ( (rr.type == Dnsruby::Types.TXT) || ((rr.type == Dnsruby::Types.RRSIG) && (rr.type_covered == Dnsruby::Types.TXT)))
+#        rrset.add(rr)
+#      end
+#      if (rr.type == Dnsruby::Types.DNSKEY)
+#        key_rrset.add(rr)
+#      end
+#    }
+#     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+#    verifier.verify_rrset(rrset, key_rrset)
+#  end
+
 #  def test_naptr_from_zone
 #    reader = Dnsruby::ZoneReader.new("all.rr.org.")
 #    zone = reader.process_file("zone.txt")
