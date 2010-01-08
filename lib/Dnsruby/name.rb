@@ -240,7 +240,7 @@ module Dnsruby
     # sect 5.1)
     # out: an array of labels in wire format.
     def self.name2encodedlabels (dName) #:nodoc: all
-      # Check for "/" in the name  : If there, then decode properly - otherwise, cheat and split on "."
+      # Check for "\" in the name  : If there, then decode properly - otherwise, cheat and split on "."
       if (dName.index("\\"))
         names=[]
         j=0;
@@ -311,7 +311,7 @@ module Dnsruby
       length=presentation.length;
     
       i=0;
-    
+
       while (i < length )
         c=presentation.unpack("x#{i}C1") [0]
         if (c == 46) # ord('.')
