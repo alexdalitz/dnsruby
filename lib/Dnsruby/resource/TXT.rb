@@ -104,7 +104,7 @@ module Dnsruby
                 elsif (ESCAPE_CHARS[c])
                   in_escaped=false
                   strings[count]+=ESCAPE_CHARS[c].chr
-                elsif (c<="0" || c>="9")
+                elsif (c<"0" || c>"9")
                   in_escaped = false
                   strings[count]+=c
                 else
@@ -135,7 +135,7 @@ module Dnsruby
             # Make sure to remember to escape binary characters.
             # Go through copying to output, and adding "\" characters as necessary?
             str.each_byte {|c|
-              if (c == 34) || (c == 59)
+              if (c == 34) || (c == 92) # || (c == 59)
                 output+='\\'
                 output+=c.chr
               elsif (c < 32) # c is binary
