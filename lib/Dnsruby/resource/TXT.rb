@@ -13,7 +13,10 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
+begin
 require 'jcode'
+rescue LoadError => e
+end
 module Dnsruby
   class RR
     #Class for DNS Text (TXT) resource records.
