@@ -14,7 +14,7 @@
 #limitations under the License.
 #++
 begin
-require 'jcode'
+  require 'jcode'
 rescue LoadError => e
 end
 module Dnsruby
@@ -46,6 +46,10 @@ module Dnsruby
       ESCAPE_CODES = ESCAPE_CHARS.invert
       
       def from_string(input)
+        @strings = TXT.parse(input)
+      end
+
+      def TXT.parse(input)
         # Need to look out for special characters.
         # Need to split the input up into strings (which are defined by non-escaped " characters)
         # Then need to fix up any \ escape characters (should just be " and ; and binary?)
@@ -112,8 +116,10 @@ module Dnsruby
                   strings[count]+=c
                 else
                   # Must be building up three digit string to identify binary value?
-                  current_binary += c
-                  if (current_binary.length == 3)
+#                  if (c >= "0" && c <= "9")
+                    current_binary += c
+#                  end
+                  if ((current_binary.length == 3) ) # || (c < "0" || c > "9"))
                     strings[count]+=current_binary.to_i.chr
                     in_escaped = false
                     current_binary = ""
@@ -126,38 +132,43 @@ module Dnsruby
           end
           pos += 1
         }
-        @strings=strings
+        return strings
+      end
+
+      def TXT.display(str)
+        output = "\""
+        # Probably need to scan through each string manually
+        # Make sure to remember to escape binary characters.
+        # Go through copying to output, and adding "\" characters as necessary?
+        str.each_byte {|c|
+          if (c == 34) || (c == 92) # || (c == 59)
+            output+='\\'
+            output+=c.chr
+          elsif (c < 32) # c is binary
+            if (ESCAPE_CODES[c])
+              output +=  c.chr
+            else
+              output+= '\\'
+              num = c.to_i.to_s
+              (3-num.length).times {|i|
+                num="0"+num
+              }
+              output+= num # Need a 3 digit number here.
+            end
+
+          else
+            output += c.chr
+          end
+        }
+        output+="\""
+        return output
       end
       
       def rdata_to_string
         if (defined?@strings)
           temp = []
           @strings.each {|str|
-            output = "\""
-            # Probably need to scan through each string manually
-            # Make sure to remember to escape binary characters.
-            # Go through copying to output, and adding "\" characters as necessary?
-            str.each_byte {|c|
-              if (c == 34) || (c == 92) # || (c == 59)
-                output+='\\'
-                output+=c.chr
-              elsif (c < 32) # c is binary
-                if (ESCAPE_CODES[c])
-                  output +=  c.chr
-                else
-                output+= '\\'
-                num = c.to_i.to_s
-                (3-num.length).times {|i|
-                  num="0"+num
-                }
-                output+= num # Need a 3 digit number here.
-                end
-
-              else
-                output += c.chr
-              end
-            }
-            output+="\""
+            output = TXT.display(str)
             temp.push(output)
           }
           return temp.join(' ')

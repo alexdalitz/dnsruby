@@ -142,6 +142,12 @@ module Dnsruby
       
       def calculate_mac(algorithm, data)
         mac=nil
+#+ if (key_size > max_digest_len) {
+#+   EVP_DigestInit(&ectx, digester);
+#+   EVP_DigestUpdate(&ectx, (const void*) key_bytes, key_size);
+#+   EVP_DigestFinal(&ectx, key_bytes, NULL);
+#+   key_size = max_digest_len;
+#+ }
         key = @key.gsub(" ", "")
  #       key = Base64::decode64(key)
         key = key.unpack("m*")[0]

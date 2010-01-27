@@ -46,6 +46,10 @@ module Dnsruby
       def from_data(data) #:nodoc: all
         @order,  @preference, @flags, @service, @regexp, @replacement = data
       end
+
+      def regexp=(s)
+        @regexp = TXT.parse(s)[0]
+      end
       
       def from_string(input) #:nodoc: all
         if (input.length > 0)
@@ -54,25 +58,17 @@ module Dnsruby
           @preference = values [1].to_i
           @flags = values [2].gsub!("\"", "")
           @service = values [3].gsub!("\"", "")
-          re = values [4].gsub!("\"", "")
-          re.gsub!("\\\\", "\\")
-          @regexp = re
+          @regexp = TXT.parse(values[4])[0]
           @replacement = Name.create(values[5])
         end
       end
 
       def rdata_to_string #:nodoc: all
         if (@order!=nil)
-          ret =  "#{@order} #{@preference} \"#{@flags}\" \"#{@service}\" \""
-          ##{@regexp}
-          @regexp.each_byte {|b|
-            c = b.chr
-            if (c == "\\")
-              ret += "\\"
-            end
-            ret += c
-          }
-          ret += "\" #{@replacement}"
+          ret =  "#{@order} #{@preference} \"#{@flags}\" \"#{@service}\" "
+          ret += TXT.display(@regexp)
+          ret += " #{@replacement}"
+
           return ret
         else
           return ""

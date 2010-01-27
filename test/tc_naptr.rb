@@ -46,9 +46,15 @@ class TestNAPTR < Test::Unit::TestCase
   end
 
   def test_string
-    txt = 'all.rr.org. 7200 IN NAPTR 100 10 "" "" "/urn:cid:.+@([^\\.]+\\.)(.*)$/\\2/i" .'
+    txt = 'all.rr.org. 7200 IN NAPTR 100 10 "" "" "/urn:cid:.+@([^\\\\.]+\\\\.)(.*)$/\\\\2/i" .'
     rr = RR.create(txt)
     assert(rr.to_s.index('"/urn:cid:.+@([^\\\\.]+\\\\.)(.*)$/\\\\2/i"'), '"/urn:cid:.+@([^\\\\.]+\\\\.)(.*)$/\\\\2/i"' + "\n" + rr.to_s)
+  end
+
+  def test_bad_string
+    txt = 'all.rr.binary.org.		IN	NAPTR		100   10   ""  ""  "/urn:cid:.+@([^\\.]+\\.)(.*)$/\\\\2/i"    .'
+    rr = RR.create(txt)
+    assert(rr.to_s.index('"/urn:cid:.+@([^.]+.)(.*)$/\\\\2/i"'), '"/urn:cid:.+@([^.]+.)(.*)$/\\\\2/i"' + "\n" + rr.to_s)
   end
 
 end

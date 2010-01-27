@@ -259,7 +259,7 @@ class TestRR < Test::Unit::TestCase
           end
         end
       end
-      
+
       rr2 = RR.new_from_string(rr.to_s)
       assert_equal(rr.to_s,   rr2.to_s, "#{type} - Parsing from string works")
     end
