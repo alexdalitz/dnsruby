@@ -161,6 +161,9 @@ module Dnsruby
           end
         else
           if (escaped)
+            if (c >= "0" && c <= "9") # rfc 1035 5.1 \DDD
+              pos = pos + 2
+            end
             escaped = false
             next
           else
