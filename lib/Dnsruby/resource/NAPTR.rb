@@ -65,9 +65,9 @@ module Dnsruby
 
       def rdata_to_string #:nodoc: all
         if (@order!=nil)
-          ret =  "#{@order} #{@preference} \"#{@flags}\" \"#{@service}\" "
+          ret =  "#{@order} #{@preference} \"#{@flags}\" \"#{@service}\" \""
           ret += TXT.display(@regexp)
-          ret += " #{@replacement}"
+          ret += "\" #{@replacement}"
 
           return ret
         else

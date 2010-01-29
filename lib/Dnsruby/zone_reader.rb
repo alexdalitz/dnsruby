@@ -215,11 +215,19 @@ module Dnsruby
       name = split[0].strip
       if (name.index"\\")
         old_name = name
-        name = Name.create(name).to_s
+
+        ls =[]
+        Name.create(name).labels.each {|el| ls.push(Name.decode(RR::TXT.display(el.to_s, false)))}
+        name = ls.join('.')
+
+
         if (/\.\z/ =~ old_name)
           name += "."
         end
-        line.sub!(old_name, name)
+        line = name + " "
+        (split.length - 1).times {|i| line += "#{split[i+1]} "}
+        line += "\n"
+        split = line.split
       end
       # o add $ORIGIN to it if it is not absolute
       if !(/\.\z/ =~ name)

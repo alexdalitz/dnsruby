@@ -135,14 +135,16 @@ module Dnsruby
         return strings
       end
 
-      def TXT.display(str)
-        output = "\""
+      def TXT.display(str, do_escapes = true)
+        output = ""
         # Probably need to scan through each string manually
         # Make sure to remember to escape binary characters.
         # Go through copying to output, and adding "\" characters as necessary?
         str.each_byte {|c|
           if (c == 34) || (c == 92) # || (c == 59)
+            if (do_escapes)
             output+='\\'
+            end
             output+=c.chr
           elsif (c < 32) # c is binary
             if (ESCAPE_CODES[c])
@@ -160,7 +162,6 @@ module Dnsruby
             output += c.chr
           end
         }
-        output+="\""
         return output
       end
       
@@ -169,7 +170,7 @@ module Dnsruby
           temp = []
           @strings.each {|str|
             output = TXT.display(str)
-            temp.push(output)
+            temp.push("\"#{output}\"")
           }
           return temp.join(' ')
         end
