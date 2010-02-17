@@ -2,7 +2,7 @@ require 'rubygems'
 SPEC = Gem::Specification.new do |s|
   s.name = "dnsruby"
 # @TODO@ Remember to update version in Dnsruby.rb as well!
-  s.version = "1.43"
+  s.version = "1.44"
   s.authors = ["AlexD"]
   s.email = "alexd@nominet.org.uk"
   s.homepage = "http://rubyforge.org/projects/dnsruby/"
@@ -13,7 +13,8 @@ SPEC = Gem::Specification.new do |s|
   candidateslib = Dir.glob("lib/**/*")
   candidatesdoc = Dir.glob("html**/*")
   candidatesdemo = Dir.glob("demo/**/*")
-   candidates = candidatestest + candidateslib + candidatesdoc + candidatesdemo
+  rakefile = ['Rakefile']
+   candidates = rakefile + candidatestest + candidateslib + candidatesdoc + candidatesdemo
   s.files = candidates.delete_if do |item|
                       item.include?("CVS") || item.include?("rdoc") ||
                          item.include?("svn")
