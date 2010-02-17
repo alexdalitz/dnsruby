@@ -68,7 +68,7 @@ module Dnsruby
     # Process the next line of the file
     # Returns a string representing the normalised line.
     def process_line(line, do_prefix_hack = false)
-      return nil if (line.index(';') == 0)
+      return nil if (line[0,1] == ";")
       return nil if (line.strip.length == 0)
       return nil if (!line || (line.length == 0))
       @in_quoted_section = false if !@continued_line
