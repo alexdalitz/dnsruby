@@ -445,10 +445,10 @@ module Dnsruby
     def check_response(response, response_bytes, query, client_queue, client_query_id, tcp)
       # @TODO@ Should send_raw avoid this?
       if (!query.send_raw)
-        if (!check_tsig(query, response, response_bytes))
+        sig_value = check_tsig(query, response, response_bytes)
+        if (sig_value != :okay)
           # Should send error back up to Resolver here, and then NOT QUERY AGAIN!!!
-          return TsigError.new
-          #          return false
+          return sig_value
         end
         # Should check that question section is same as question that was sent! RFC 5452
         # If it's not an update...
@@ -483,19 +483,21 @@ module Dnsruby
           if !query.tsig.verify(query, response, response_bytes)
             # Discard packet and wait for correctly signed response
             Dnsruby.log.error{"TSIG authentication failed!"}
-            return false
+            return TsigError.new
           end
         else
           # Treated as having format error and discarded (RFC2845, 4.6)
+          # but return a different error code, because some servers fail at
+          # this
           Dnsruby.log.error{"Expecting TSIG signed response, but got unsigned response - discarding"}
-          return false
+          return TsigNotSignedResponseError.new
         end
       elsif (response.tsig)
         # Error - signed response to unsigned query
         Dnsruby.log.error{"Signed response to unsigned query"}
-        return false
+        return TsigError.new
       end
-      return true
+      return :okay
     end
     
     def make_query(name, type = Types::A, klass = Classes::IN, set_cd=@dnssec)

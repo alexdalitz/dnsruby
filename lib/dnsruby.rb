@@ -462,6 +462,10 @@ module Dnsruby
   class TsigError < OtherResolvError
   end
   
+  # Sent a signed packet, got an unsigned response
+  class TsigNotSignedResponseError < TsigError
+  end
+
   #Indicates an error in decoding an incoming DNS message
   class DecodeError < ResolvError
   end

@@ -276,7 +276,7 @@ module Dnsruby
           if (ret = res.check_response(msg, bytes, query, client_queue, id, tcp))
             remove_id(id)
             exception = msg.get_exception
-            if (ret.instance_of?TsigError)
+            if (ret.kind_of?TsigError)
               exception = ret
             end
             Dnsruby.log.debug{"Pushing response to client queue"}
