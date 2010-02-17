@@ -179,8 +179,8 @@ module Dnsruby
           self.signature=buf.unpack("m*")[0]
         end
       end
-      
-      def get_time(input)
+
+      def RRSIG.get_time(input)
         if (input.kind_of?Fixnum)
           return input
         end
@@ -215,6 +215,10 @@ module Dnsruby
         else
           raise DecodeError.new("RRSIG : Illegal time value #{input} - see RFC 4034 section 3.2")
         end
+      end
+      
+      def get_time(input)
+        return RRSIG.get_time(input)
       end
       
       def format_time(time)
