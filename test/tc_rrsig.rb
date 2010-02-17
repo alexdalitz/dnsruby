@@ -32,8 +32,8 @@ class RrsigTest < Test::Unit::TestCase
     assert_equal(Dnsruby::Algorithms::RSASHA1, rrsig.algorithm)
     assert_equal(3, rrsig.labels)
     assert_equal(86400, rrsig.original_ttl)
-    assert_equal(Time.mktime(2003,03,22,17,31, 03).to_i, rrsig.expiration)
-    assert_equal(Time.mktime(2003,02,20,17,31,03).to_i, rrsig.inception)
+    assert_equal(Time.gm(2003,03,22,17,31, 03).to_i, rrsig.expiration)
+    assert_equal(Time.gm(2003,02,20,17,31,03).to_i, rrsig.inception)
     assert_equal(2642, rrsig.key_tag)
     assert_equal(Dnsruby::Name.create("example.com."), rrsig.signers_name)
     assert_equal("oJB1W6WNGv+ldvQ3WDG0MQkg5IEhjRip8WTr" +
