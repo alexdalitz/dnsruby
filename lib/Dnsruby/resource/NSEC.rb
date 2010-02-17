@@ -82,6 +82,9 @@ module Dnsruby
           if t[t.length-1, t.length]!=")"
             t = t + " )"
           end
+          if (index = t.index";")
+            t = t[0, index]
+          end
           # List of mnemonics
           types=[]
           mnemonics = t.split(" ")
@@ -261,6 +264,7 @@ module Dnsruby
             len = len + data[1].length
           end
           self.types=(input[len, input.length-len])
+          @types = NSEC.get_types(input[len, input.length-len])
         end
       end
       
