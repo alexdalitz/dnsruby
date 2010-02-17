@@ -185,7 +185,6 @@ module Dnsruby
             msg.put_pack('n', opt.data.length)
             msg.put_bytes(opt.data)
           end
-          msg.put_array(@options)
         end
       end
       
