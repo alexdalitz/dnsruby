@@ -131,10 +131,15 @@ module Dnsruby
 
         n = Name.create(name)
         out = n.canonical
+        begin
         (0..iterations).each  {
           out =NSEC3.h(out + salt, hash_alg);
         }
         return Base32.encode32hex(out).downcase
+        rescue ArgumentError
+        TheLog.error("Unknown hash algorithm #{hash_alg} used for NSEC3 hash")
+        return "Unknown NSEC3 hash algorithm"
+        end
       end
 
       def h(x) # :nodoc: all
@@ -142,11 +147,10 @@ module Dnsruby
       end
 
       def NSEC3.h(x, hash_alg) # :nodoc: all
-        if Nsec3HashAlgorithms.SHA_1 == hash_alg
+        if (Nsec3HashAlgorithms.SHA_1 == hash_alg)
           return Digest::SHA1.digest(x)
         end
-        TheLog.error("Unknown hash algorithm #{hash_alg} used for NSEC3 hash")
-        return "Unknown NSEC3 hash algorithm"
+        raise ArgumentError.new("Unknown hash algorithm")
       end
 
       def hash_alg=(a)
@@ -264,9 +268,7 @@ module Dnsruby
           self.hash_alg=(data[0]).to_i
           self.flags=(data[1]).to_i
           self.iterations=(data[2]).to_i
-          #          self.salt=NSEC3.decode_salt(data[3])
           self.salt=(data[3])
-          #          self.salt_length=(@salt.length)
 
           len = data[0].length + data[1].length + data[2].length + data[3].length + 4
           # There may or may not be brackets around next_hashed
