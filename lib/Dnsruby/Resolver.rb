@@ -600,8 +600,10 @@ module Dnsruby
     end
 
     def Resolver.port_in_range(p)
-      if ((p == 0) || ((Iana::IANA_PORTS.index(p)) == nil &&
-              (p > 1024) && (p < 65535)))
+      if ((p == 0) || ((p >= 50000) && (p <= 65535)))
+        # @TODO@ IANA port bitmap - use 50000 - 65535 for now
+#            ((Iana::IANA_PORTS.index(p)) == nil &&
+#              (p > 1024) && (p < 65535)))
         return true
       end
       return false

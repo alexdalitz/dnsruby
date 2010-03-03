@@ -14,7 +14,7 @@
 #limitations under the License.
 #++
 require 'Dnsruby/select_thread'
-require 'Dnsruby/iana_ports'
+#require 'Dnsruby/iana_ports'
 module Dnsruby
   class PacketSender # :nodoc: all
     @@authoritative_cache = Cache.new
@@ -431,11 +431,13 @@ module Dnsruby
       #continue until we get one.
       if (@src_port[0] == 0)
         candidate = -1
-        # better to construct an array of all the ports we *can* use, and then just pick one at random!
-        candidate = Iana::UNRESERVED_PORTS[rand(Iana::UNRESERVED_PORTS.length())]
-        #        while (!(Resolver.port_in_range(candidate)))
-        #          candidate = (rand(65535-1024) + 1024)
-        #        end
+        #        # better to construct an array of all the ports we *can* use, and then just pick one at random!
+        #        candidate = Iana::UNRESERVED_PORTS[rand(Iana::UNRESERVED_PORTS.length())]
+        #        #        while (!(Resolver.port_in_range(candidate)))
+        #        #          candidate = (rand(65535-1024) + 1024)
+        #        #        end
+        # @TODO@ Should probably construct a bitmap of the IANA ports...
+        candidate = 50000 + (rand(15535)) # pick one over 50000
         return candidate
       end
       pos = rand(@src_port.length)
