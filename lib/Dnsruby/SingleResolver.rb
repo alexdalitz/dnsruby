@@ -63,7 +63,7 @@ module Dnsruby
       @use_tcp = false
       @tsig = nil
       @ignore_truncation = false
-      @src_address        = '0.0.0.0'
+      @src_address        = nil
       @src_port        = [0]
       @recurse = true
       @persistent_udp = false
@@ -77,30 +77,46 @@ module Dnsruby
 
       if (arg==nil)
         # Get default config
-#        @config = Config.new
-##        @server = config.nameserver[0]
+        @config = Config.new
+        @config.get_ready
+        @server = @config.nameserver[0]
       elsif (arg.kind_of?String)
         @config.get_ready
         @configured= true
-        @server=arg
+        @config.nameserver=[arg]
+        @server = @config.nameserver[0]
+#        @server=arg
       elsif (arg.kind_of?Name)
         @config.get_ready
         @configured= true
-        @server=arg
+        @config.nameserver=arg
+        @server = @config.nameserver[0]
+#        @server=arg
       elsif (arg.kind_of?Hash)
         arg.keys.each do |attr|
+          if (attr == :server)
+                    @config.get_ready
+        @configured= true
+        @config.nameserver=[arg[attr]]
+        @server = @config.nameserver[0]
+
+          else
           begin
             send(attr.to_s+"=", arg[attr])
           rescue Exception
             Dnsruby.log.error{"Argument #{attr} not valid\n"}
           end
-          #        end
+                  end
         end
       end
-            #Check server is IP
-#            @server=Config.resolve_server(@server)
-      isr = PacketSender.new(*args)
-#      isr.server = @server
+
+      isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
+                :use_tcp=>@use_tcp, :packet_timeout=>@packet_timeout,
+                :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
+                :src_address=>@src_address, :src_port=>@src_port,
+                :do_caching=>@do_caching,
+                :recurse=>@recurse, :udp_size=>@udp_size})
+
       @single_resolvers = [isr]
 
       #      ResolverRegister::register_single_resolver(self)

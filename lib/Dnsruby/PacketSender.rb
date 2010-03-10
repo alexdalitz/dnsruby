@@ -14,6 +14,7 @@
 #limitations under the License.
 #++
 require 'Dnsruby/select_thread'
+require 'ipaddr'
 #require 'Dnsruby/iana_ports'
 module Dnsruby
   class PacketSender # :nodoc: all
@@ -76,7 +77,7 @@ module Dnsruby
     # The source address to send queries from
     # 
     # Defaults to localhost
-    attr_accessor :src_address
+    attr_reader :src_address
     
     # should the Recursion Desired bit be set on queries?
     # 
@@ -95,6 +96,24 @@ module Dnsruby
     # dnssec defaults to ON
     attr_reader :dnssec
     
+    # Set the source address. If the arg is nil, do nothing
+    def src_address=(arg)
+      if (not arg.nil?)
+        @src_address = arg
+      end
+      # Do some verification to make sure that the source address
+      # is of the same type as the server address
+      if (@server.nil?)
+        return
+      else
+        si = IPAddr.new(@src_address)
+        i = IPAddr.new(@server)
+        if (i.ipv4? and si.ipv6?) or (i.ipv6? and si.ipv4?)
+          raise ArgumentError.new("Invalid address specified (address family does not match)")
+        end
+      end
+    end
+
     #Sets the TSIG to sign outgoing messages with.
     #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
     #Pass in nil to stop tsig signing.
@@ -174,6 +193,14 @@ module Dnsruby
       #Check server is IP
       @server=Config.resolve_server(@server)
 
+      i = IPAddr.new(@server)
+      if (i.ipv4?)
+        @src_address = '0.0.0.0'
+      elsif (i.ipv6?)
+        @src_address = '::'
+      else
+        Dnsruby.log.error{"Server is neither IPv4 or IPv6!\n"}
+      end
       #      ResolverRegister::register_single_resolver(self)
     end
     
@@ -320,7 +347,7 @@ module Dnsruby
               socket = UDPSocket.new()
             else
               ipv6 = @src_address =~ /:/
-              socket = UDPSocket.new(ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
+              socket = UDPSocket.new(ipv6.nil? ? Socket::AF_INET : Socket::AF_INET6)
             end
             socket.bind(@src_address, src_port)
             socket.connect(@server, @port)

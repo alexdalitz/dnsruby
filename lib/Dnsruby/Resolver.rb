@@ -460,7 +460,7 @@ module Dnsruby
       @tsig = nil
       @ignore_truncation = false
       @config = Config.new()
-      @src_address        = '0.0.0.0'
+      @src_address        = nil
       @src_port        = [0]
       @recurse = true
       @single_res_mutex.synchronize {
