@@ -20,12 +20,11 @@ include Dnsruby
 
 class TestItar < Test::Unit::TestCase
   def test_itar
-    Dnsruby::Dnssec.clear_trusted_keys
-    Dnsruby::Dnssec.clear_trust_anchors
+    Dnsruby::Dnssec.reset
     Dnsruby::PacketSender.clear_caches
+    Dnsruby::Recursor.clear_caches
     run_test_se(true)
-    Dnsruby::Dnssec.clear_trusted_keys
-    Dnsruby::Dnssec.clear_trust_anchors
+    Dnsruby::Dnssec.reset
     Dnsruby::Recursor.clear_caches
 
     # Then try to validate some records in the published zones
@@ -37,16 +36,14 @@ class TestItar < Test::Unit::TestCase
   end
 
   def test_with_no_dlv_anchor
-    Dnsruby::Dnssec.clear_trusted_keys
-    Dnsruby::Dnssec.clear_trust_anchors
+    Dnsruby::Dnssec.reset
     Dnsruby::PacketSender.clear_caches
     Dnsruby::Recursor.clear_caches
     # Make sure we don't have any other anchors configured!
     res = Dnsruby::Recursor.new
     ret = res.query("frobbit.se.", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::INSECURE, "Level = #{ret.security_level.string}")
-    Dnsruby::Dnssec.clear_trusted_keys
-    Dnsruby::Dnssec.clear_trust_anchors
+    Dnsruby::Dnssec.reset
     Dnsruby::PacketSender.clear_caches
     Dnsruby::Recursor.clear_caches
     Dnssec.load_itar

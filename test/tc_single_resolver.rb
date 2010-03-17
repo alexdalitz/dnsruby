@@ -186,11 +186,11 @@ class TestSingleResolver < Test::Unit::TestCase
     
     res.server=('a.t.dnsruby.validation-test-servers.nominet.org.uk')
     ip = res.server
-    assert_equal('10.0.1.128', ip, 'nameserver() looks up IP.')
+    assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up IP.')
     
     res.server=('cname.t.dnsruby.validation-test-servers.nominet.org.uk')
     ip = res.server
-    assert_equal(ip, '10.0.1.128', 'nameserver() looks up cname.')
+    assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up cname.')
   end
   
   def test_truncated_response

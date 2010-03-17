@@ -19,31 +19,31 @@ require 'Dnsruby/key_cache'
 require 'Dnsruby/single_verifier'
 module Dnsruby
 
-# RFC4033, section 7
-#   "There is one more step that a security-aware stub resolver can take
-#   if, for whatever reason, it is not able to establish a useful trust
-#   relationship with the recursive name servers that it uses: it can
-#   perform its own signature validation by setting the Checking Disabled
-#   (CD) bit in its query messages.  A validating stub resolver is thus
-#   able to treat the DNSSEC signatures as trust relationships between
-#   the zone administrators and the stub resolver itself. "
-#
-# Dnsruby is configured to validate responses by default. However, it is not
-# configured with any trusted keys by default. Applications may use the
-# verify() method to perform verification with of RRSets of Messages with
-# given keys. Alternatively, trusted keys may be added to this class (either
-# directly, or by loading the IANA TAR or the DLV ISC ZSK). Validation will then
-# be performed from these keys (or the DLV registry, if configured). Negative
-# and positive responses are validation.
-#
-# Messages are tagged with the current security_level (Message::SecurityLevel).
-# UNCHECKED means Dnsruby has not attempted to validate the response.
-# BOGUS means the response has been checked, and is bogus.
-# INSECURE means the response has been validated to be insecure (e.g. in an unsigned zone)
-# SECURE means that the response has been verfied to be correct.
-#
-# Several validators are provided, with each maintaining its own cache of trusted keys.
-# If validators are added or removed, the caches of the other validators are not affected.
+  # RFC4033, section 7
+  #   "There is one more step that a security-aware stub resolver can take
+  #   if, for whatever reason, it is not able to establish a useful trust
+  #   relationship with the recursive name servers that it uses: it can
+  #   perform its own signature validation by setting the Checking Disabled
+  #   (CD) bit in its query messages.  A validating stub resolver is thus
+  #   able to treat the DNSSEC signatures as trust relationships between
+  #   the zone administrators and the stub resolver itself. "
+  #
+  # Dnsruby is configured to validate responses by default. However, it is not
+  # configured with any trusted keys by default. Applications may use the
+  # verify() method to perform verification with of RRSets of Messages with
+  # given keys. Alternatively, trusted keys may be added to this class (either
+  # directly, or by loading the IANA TAR or the DLV ISC ZSK). Validation will then
+  # be performed from these keys (or the DLV registry, if configured). Negative
+  # and positive responses are validation.
+  #
+  # Messages are tagged with the current security_level (Message::SecurityLevel).
+  # UNCHECKED means Dnsruby has not attempted to validate the response.
+  # BOGUS means the response has been checked, and is bogus.
+  # INSECURE means the response has been validated to be insecure (e.g. in an unsigned zone)
+  # SECURE means that the response has been verfied to be correct.
+  #
+  # Several validators are provided, with each maintaining its own cache of trusted keys.
+  # If validators are added or removed, the caches of the other validators are not affected.
   class Dnssec
     # A class to cache trusted keys
 
@@ -117,11 +117,23 @@ module Dnsruby
       }
     end
 
+    def self.reset
+      @@validation_policy = ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT
+      @@root_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ROOT)
+
+      @@dlv_verifier = SingleVerifier.new(SingleVerifier::VerifierType::DLV)
+
+      # @TODO@ Could add a new one of these for each anchor.
+      @@anchor_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ANCHOR)
+      @@do_validation_with_recursor = true # Many nameservers don't handle DNSSEC correctly yet
+      @@default_resolver = Resolver.new
+    end
+
     def self.no_keys?
       no_keys = true
       [@@anchor_verifier, @@root_verifier, @@dlv_verifier].each {|v|
         if (v.trusted_keys.length() > 0 ||
-            v.trust_anchors.length() > 0)
+              v.trust_anchors.length() > 0)
           no_keys = false
         end
       }
@@ -143,7 +155,7 @@ module Dnsruby
           if (first.class == String)
             first = first.getbyte(0) # Ruby 1.9
           end
-#            print "Reading ITAR : #{line}, first : #{first}\n"
+          #            print "Reading ITAR : #{line}, first : #{first}\n"
           next if (first==59) # ";")
           if (line.strip=~(/^DS /) || line.strip=~(/^DNSKEY /))
             line = lastname.to_s + ((lastname.absolute?)?".":"") + " " + line

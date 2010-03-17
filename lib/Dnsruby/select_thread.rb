@@ -401,6 +401,8 @@ module Dnsruby
             return
           end
         else
+          # @TODO@ Can we get recvfrom to stop issuing PTR queries when we already
+          # know both the FQDN and the IP address?
           if (ret = socket.recvfrom(packet_size))
             buf = ret[0]
             answerport=ret[1][1]

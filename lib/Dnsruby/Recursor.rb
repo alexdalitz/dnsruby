@@ -292,6 +292,8 @@ module Dnsruby
       Recursor.set_hints(Hash.new, resolver)
       @@zones_cache = Hash.new # key zone_name, values Hash of servers and AddressCaches
       @@zones_cache["."] = @@hints
+
+    @@authority_cache = Hash.new
     end
 
     def query_no_validation_or_recursion(name, type=Types.A, klass=Classes.IN) # :nodoc: all

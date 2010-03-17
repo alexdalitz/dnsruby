@@ -193,13 +193,16 @@ module Dnsruby
       #Check server is IP
       @server=Config.resolve_server(@server)
 
-      i = IPAddr.new(@server)
-      if (i.ipv4?)
+      begin
+        i = IPv4.create(@server)
         @src_address = '0.0.0.0'
-      elsif (i.ipv6?)
-        @src_address = '::'
-      else
-        Dnsruby.log.error{"Server is neither IPv4 or IPv6!\n"}
+      rescue Exception
+        begin
+          i = IPv6.create(@server)
+          @src_address = '::'
+        rescue Exception
+          Dnsruby.log.error{"Server is neither IPv4 or IPv6!\n"}
+        end
       end
       #      ResolverRegister::register_single_resolver(self)
     end

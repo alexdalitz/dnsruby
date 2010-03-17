@@ -55,15 +55,15 @@ module Dnsruby
     end
 
     def get_dlv_resolver # :nodoc:
-      if (Dnssec.do_validation_with_recursor?)
-        return Recursor.new
-      else
+#      if (Dnssec.do_validation_with_recursor?)
+#        return Recursor.new
+#      else
         if (Dnssec.default_resolver)
           return Dnssec.default_resolver
         else
           return Resolver.new
         end
-      end
+#      end
     end
     def add_dlv_key(key)
       # Is this a ZSK or a KSK?
@@ -168,6 +168,7 @@ module Dnsruby
     # Wipes the cache of trusted keys
     def clear_trusted_keys
       @trusted_keys = KeyCache.new
+      @res = nil
       @discovered_ds_store = []
       @configured_ds_store = []
     end
@@ -1061,7 +1062,7 @@ module Dnsruby
             if (!k.zone_key?)
               #              print "Discovered DNSKEY is not a zone key - ignoring\n"
               TheLog.debug("Discovered DNSKEY is not a zone key - ignoring")
-              return false, new_res
+              return false, child_res
             end
           }
           begin
@@ -1120,7 +1121,7 @@ module Dnsruby
 
       ns_rrset = ns_ret.answer.rrset(name, Types.NS)
       if (!ns_rrset || ns_rrset.length == 0)
-        ns_rrset = ns_ret.authority.rrset(name, Types.NS) # @TOO@ Is ths OK?
+        ns_rrset = ns_ret.authority.rrset(name, Types.NS) # @TODO@ Is ths OK?
       end
       if (!ns_rrset || ns_rrset.length == 0 || ns_rrset.name.canonical != name.canonical)
         return nil

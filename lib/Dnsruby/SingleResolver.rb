@@ -73,7 +73,7 @@ module Dnsruby
       @single_resolvers = []
       @configured = false
       @do_caching = true
-        @config = Config.new
+      @config = Config.new
 
       if (arg==nil)
         # Get default config
@@ -85,37 +85,37 @@ module Dnsruby
         @configured= true
         @config.nameserver=[arg]
         @server = @config.nameserver[0]
-#        @server=arg
+        #        @server=arg
       elsif (arg.kind_of?Name)
         @config.get_ready
         @configured= true
         @config.nameserver=arg
         @server = @config.nameserver[0]
-#        @server=arg
+        #        @server=arg
       elsif (arg.kind_of?Hash)
         arg.keys.each do |attr|
           if (attr == :server)
-                    @config.get_ready
-        @configured= true
-        @config.nameserver=[arg[attr]]
-        @server = @config.nameserver[0]
+            @config.get_ready
+            @configured= true
+            @config.nameserver=[arg[attr]]
+            @server = @config.nameserver[0]
 
           else
-          begin
-            send(attr.to_s+"=", arg[attr])
-          rescue Exception
-            Dnsruby.log.error{"Argument #{attr} not valid\n"}
+            begin
+              send(attr.to_s+"=", arg[attr])
+            rescue Exception
+              Dnsruby.log.error{"Argument #{attr} not valid\n"}
+            end
           end
-                  end
         end
       end
 
       isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
-                :use_tcp=>@use_tcp, :packet_timeout=>@packet_timeout,
-                :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
-                :src_address=>@src_address, :src_port=>@src_port,
-                :do_caching=>@do_caching,
-                :recurse=>@recurse, :udp_size=>@udp_size})
+          :use_tcp=>@use_tcp, :packet_timeout=>@packet_timeout,
+          :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
+          :src_address=>@src_address, :src_port=>@src_port,
+          :do_caching=>@do_caching,
+          :recurse=>@recurse, :udp_size=>@udp_size})
 
       @single_resolvers = [isr]
 
@@ -125,22 +125,28 @@ module Dnsruby
     def server=(s)
       if (!@configured)
         @config.get_ready
-        add_config_nameservers
       end
-      isr = PacketSender.new(s)
-            @single_res_mutex.synchronize {
-      @single_resolvers = [isr]
-            }
+      @server = Config.resolve_server(s).to_s
+      isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
+          :use_tcp=>@use_tcp, :packet_timeout=>@packet_timeout,
+          :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
+          :src_address=>@src_address, :src_port=>@src_port,
+          :do_caching=>@do_caching,
+          :recurse=>@recurse, :udp_size=>@udp_size})
+
+      @single_res_mutex.synchronize {
+        @single_resolvers = [isr]
+      }
     end
 
     def server
-#      @single_res_mutex.synchronize {
+      #      @single_res_mutex.synchronize {
       if (!@configured)
         @config.get_ready
         add_config_nameservers
       end
-        return @single_resolvers[0].server
-#      }
+      return @single_resolvers[0].server
+      #      }
     end
 
     def retry_times=(n) # :nodoc:
@@ -165,5 +171,5 @@ module Dnsruby
 
     alias :query_timeout :packet_timeout
     alias :query_timeout= :packet_timeout=
-      end
+  end
 end

@@ -43,7 +43,7 @@ module Dnsruby
       @address = address
     end
     
-    # A String representation of thi IPv4 address.
+    # A String representation of the IPv4 address.
     attr_reader :address
     
     def to_s #:nodoc:

@@ -255,8 +255,36 @@ module Dnsruby
         rescue Exception
           begin
             # try to resolve server to address
-            addr = TCPSocket.gethostbyname(ns)[3] # @TODO@ Replace this with Dnsruby call when lookups work
-            server = addr
+            if ns == "localhost"
+              server = "127.0.0.1"
+            else
+              # Use Dnsruby to resolve the servers
+              # First, try the default resolvers
+              resolver = Resolver.new
+              found = false
+              begin
+                ret = resolver.query(ns)
+                ret.answer.each {|rr|
+                  if ([Types::A, Types::AAAA].include?rr.type)
+                    addr = rr.address.to_s
+                    server = addr
+                    found = true
+                  end
+                }
+              rescue Exception
+              end
+              if (!found)
+                # That didn't work - try recursing from the root
+                recursor = Recursor.new
+                ret = recursor.query(ns)
+                ret.answer.each {|rr|
+                  if ([Types::A, Types::AAAA].include?rr.type)
+                    addr = rr.address.to_s
+                    server = addr
+                  end
+                }
+              end
+            end
           rescue Exception => e
             Dnsruby.log.error{"Can't make sense of nameserver : #{server}, exception : #{e}"}
             #            raise ArgumentError.new("Can't make sense of nameserver : #{server}, exception : #{e}")
@@ -416,7 +444,7 @@ module Dnsruby
           if (name.length == 1)
             candidates.concat([Name.create(name.to_a)])
           end
-        end          
+        end
       end
       return candidates
     end
