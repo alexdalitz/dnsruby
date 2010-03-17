@@ -47,6 +47,8 @@ module Dnsruby
       attr_reader :algorithm
       #The public key
       attr_reader :key
+      #The length (in bits) of the key - NOT key.length
+      attr_reader :key_length
       
       def init_defaults
         @make_new_key_tag = false
@@ -293,6 +295,7 @@ module Dnsruby
         key_text.gsub!(/ /, "")
         #        @key=Base64.decode64(key_text)        
         @key=key_text.unpack("m*")[0]
+        public_key
         get_new_key_tag
       end
       
@@ -311,7 +314,7 @@ module Dnsruby
         # @TODO@ Support other key encodings!
         return @public_key
       end
-      
+
       def rsa_key
         exponentLength = @key[0]
         if (exponentLength.class == String)
@@ -330,6 +333,7 @@ module Dnsruby
         pos += exponentLength
 
         modulus = RR::get_num(@key[pos, @key.length])
+        @key_length = (@key.length - pos) * 8
 
         pkey = OpenSSL::PKey::RSA.new
         pkey.e = exponent
@@ -350,6 +354,7 @@ module Dnsruby
         pos += pgy_len
         y = RR::get_num(@key[pos, pgy_len])
         pos += pgy_len
+        @key_length = (pgy_len * 8)
         
         pkey = OpenSSL::PKey::DSA.new
         pkey.p = p
