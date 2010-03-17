@@ -90,6 +90,7 @@ class TestCache < Test::Unit::TestCase
   def test_online
     # Get the records back from the test zone
     Dnsruby::PacketSender.clear_caches
+    Dnsruby::Recursor.clear_caches
     res = SingleResolver.new("ns0.validation-test-servers.nominet.org.uk.")
     res.udp_size = 4096
     query = Message.new("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
