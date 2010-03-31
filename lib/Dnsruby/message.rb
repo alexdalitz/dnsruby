@@ -1063,8 +1063,10 @@ module Dnsruby
       put_length16 {rr.encode_rdata(self, canonical)}
     end
 
-    def put_name(d, canonical=false)
-      if (canonical)
+    def put_name(d, canonical=false, downcase = canonical)
+      # DNSSEC requires some records (e.g. NSEC, RRSIG) to be canonicalised, but
+      # not downcased. YUK!
+      if (downcase)
         d = d.downcase
       end
       put_labels(d.to_a, canonical)

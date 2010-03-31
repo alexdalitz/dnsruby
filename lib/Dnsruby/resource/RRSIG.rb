@@ -243,7 +243,7 @@ module Dnsruby
         msg.put_pack('ncc', @type_covered.to_i, @algorithm.to_i, @labels)
         msg.put_pack("NNN", @original_ttl, @expiration, @inception)
         msg.put_pack("n", @key_tag)
-        msg.put_name(@signers_name, canonical)
+        msg.put_name(@signers_name, canonical, false)
         msg.put_bytes(@signature)
       end
       

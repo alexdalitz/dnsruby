@@ -273,7 +273,7 @@ module Dnsruby
     # This compares the name, type, and class of the Records; the ttl and
     # rdata are not compared.
     def sameRRset(rec)
-      if (@klass != rec.klass || @name != rec.name)
+      if (@klass != rec.klass || @name.downcase != rec.name.downcase)
         return false
       end
       [rec, self].each { |rr|

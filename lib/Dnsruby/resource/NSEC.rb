@@ -282,7 +282,7 @@ module Dnsruby
       
       def encode_rdata(msg, canonical=false) #:nodoc: all
         # Canonical
-        msg.put_name(@next_domain, true)
+        msg.put_name(@next_domain, canonical, false) # dnssec-bis-updates says NSEC should not be downcased
         types = encode_types
         msg.put_bytes(types)
       end

@@ -28,7 +28,7 @@ class VerifierTest < Test::Unit::TestCase
     rescue Exception
     end
     if (have_sha2)
-#      print "OpenSSL supports SHA2\n"
+      #      print "OpenSSL supports SHA2\n"
       do_test_sha256
       do_test_sha512
     else
@@ -244,10 +244,30 @@ class VerifierTest < Test::Unit::TestCase
     assert(verified > 0)
   end
 
+  def test_nsec
+    begin
+      require 'rubygems'
+      require 'timecop'
+    rescue LoadError
+      return
+    end
+    Timecop.travel(2010, 03, 24, 0, 0, 0) {
+      key = Dnsruby::RR.create("in-addr-servers.arpa.          3600            IN              DNSKEY          256 3 8 AwEAAcoEdjN6PM57REYLqLCBNfjCbQQU8pSNOz/kRwP75YQzidnaQpCO4+rjOYSAPH5lAjtT+AxuUB33DkOhQHPDSO87JLt1pm65eNNsz10COEExfuokM98qiURN76kv3N1n/gRG2693tpkmVdvSTRCbReyq6BlzKuYABGLD3V3MUB4j ;{id = 12033 (zsk), size = 1024b}")
+      verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+      key_rrset = Dnsruby::RRSet.new(key)
+      verifier.add_trusted_key(key_rrset);
+      sig = Dnsruby::RR.create("b.in-addr-servers.arpa.                3600            IN              RRSIG           NSEC 8 3 3600 20100325113758 20100318052509 12033 in-addr-servers.arpa. uy5aUIhq3eKc24gcoyBoLYaR6kKtG957zpR0G2pf1XPCO2ESzwdIkXK0/XeUkRMmPRnKfGOhwNYIBK26kX3PYxaIPsDZVc5ZAC3uc/+EpCosMn3FJQQDiNx/gznEQZk0JRxTUMMMucCNW2HVU18NVtTQhT0MaAsLyG8OduWuMCI= ;{id = 12033}")
+      nsec = Dnsruby::RR.create("B.in-addr-servers.arpa.          3600            IN              NSEC            C.in-addr-servers.arpa. A AAAA RRSIG NSEC")
+      rrset = Dnsruby::RRSet.new(nsec)
+      rrset.add(sig)
+      verifier.verify_rrset(rrset, key_rrset)
+    }
+  end
+
   def test_naptr
     key = Dnsruby::RR.create("all.rr.org.	2678400	IN	DNSKEY	256 3 7 AwEAAcW1ZJxnMxZAAfsQ0JJQPHOlVNeGzs/AWVSGXiIYsg9UUSsvRTiK/Wy2wD7XC6osZpgy4Blhm846wktPbCwHpkxxbjxpaMABjbhH14gRol1Gpzf+gOr8vpdii8c2y6VMN9kIXZyaZUWcshLii19ysSGlqY1a1g2XZjogFtvzDHjH ;{id = 43068 (zsk), size = 1024b}")
-     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
-     key_rrset = Dnsruby::RRSet.new(key)
+    verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+    key_rrset = Dnsruby::RRSet.new(key)
     verifier.add_trusted_key(key_rrset);
     sig = Dnsruby::RR.create("all.rr.org.	86400	IN	RRSIG	NAPTR 7 3 86400 20100727230632 20090919145743 43068 all.rr.org. RpyBsaLiaZ/OqX5twE0SoMhlVZVAHuAlS4FZqmnAg+udF3EwrY6N/POt3nPCtgwf7tczaxrMK6zWkOldfv37iyIgXIxDQvhoCb7IoffI5TsBL5CWl5n7pg8BNAMpLxd8HIu1DShWvlplpFbBWIaC6tZCR6ft/iP+uhU7dYcqTHg= ;{id = 43068}")
     naptr = Dnsruby::RR.create('all.rr.org.	86400	IN	NAPTR	100 10 "" "" "!^urn:cid:.+@([^\\\\.]+\\\\.)(.*)$!\\\\2!i" .')
@@ -262,8 +282,8 @@ class VerifierTest < Test::Unit::TestCase
     assert(rr.to_s.index('"Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"'), rr.to_s)
 
     key = Dnsruby::RR.create("all.rr.org.	2678400	IN	DNSKEY	256 3 7 AwEAAcW1ZJxnMxZAAfsQ0JJQPHOlVNeGzs/AWVSGXiIYsg9UUSsvRTiK/Wy2wD7XC6osZpgy4Blhm846wktPbCwHpkxxbjxpaMABjbhH14gRol1Gpzf+gOr8vpdii8c2y6VMN9kIXZyaZUWcshLii19ysSGlqY1a1g2XZjogFtvzDHjH ;{id = 43068 (zsk), size = 1024b}")
-     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
-     key_rrset = Dnsruby::RRSet.new(key)
+    verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+    key_rrset = Dnsruby::RRSet.new(key)
     verifier.add_trusted_key(key_rrset);
     sig = Dnsruby::RR.create("txt2.all.rr.org.        86400   IN      RRSIG   TXT 7 4 86400 20100813002344 20091006093439 43068 all.rr.org. LJv/ccd2JHyT6TK74Dtu/zH4jdeR4ScyrB8cGwaqeCjwxG4H5FY88Sk/U0JUQyxnUificnyZQwcyXAItn7QjBMHQO4ftVxl/gDCyt6MEXy9JKK/rfvXcAceo5prmlVrb8WxT5YnvPha3CxjK7f+YIs5cqppRVaZTQTxsAsJyJ20= ;{id = 43068}")
     txt = Dnsruby::RR.create('txt2.all.rr.org.        86400   IN      TXT     "Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"')
@@ -272,37 +292,37 @@ class VerifierTest < Test::Unit::TestCase
     verifier.verify_rrset(rrset, key_rrset)
   end
 
-#  def test_txt_from_zone
-#    reader = Dnsruby::ZoneReader.new("all.rr.org.")
-#    zone = reader.process_file("zone.txt")
-#    rrset = Dnsruby::RRSet.new
-#    key_rrset = Dnsruby::RRSet.new
-#    zone.each {|rr|
-#      if ( (rr.type == Dnsruby::Types.TXT) || ((rr.type == Dnsruby::Types.RRSIG) && (rr.type_covered == Dnsruby::Types.TXT)))
-#        rrset.add(rr)
-#      end
-#      if (rr.type == Dnsruby::Types.DNSKEY)
-#        key_rrset.add(rr)
-#      end
-#    }
-#     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
-#    verifier.verify_rrset(rrset, key_rrset)
-#  end
+  #  def test_txt_from_zone
+  #    reader = Dnsruby::ZoneReader.new("all.rr.org.")
+  #    zone = reader.process_file("zone.txt")
+  #    rrset = Dnsruby::RRSet.new
+  #    key_rrset = Dnsruby::RRSet.new
+  #    zone.each {|rr|
+  #      if ( (rr.type == Dnsruby::Types.TXT) || ((rr.type == Dnsruby::Types.RRSIG) && (rr.type_covered == Dnsruby::Types.TXT)))
+  #        rrset.add(rr)
+  #      end
+  #      if (rr.type == Dnsruby::Types.DNSKEY)
+  #        key_rrset.add(rr)
+  #      end
+  #    }
+  #     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+  #    verifier.verify_rrset(rrset, key_rrset)
+  #  end
 
-#  def test_naptr_from_zone
-#    reader = Dnsruby::ZoneReader.new("all.rr.org.")
-#    zone = reader.process_file("zone.txt")
-#    rrset = Dnsruby::RRSet.new
-#    key_rrset = Dnsruby::RRSet.new
-#    zone.each {|rr|
-#      if ((rr.type == Dnsruby::Types.NAPTR) || ((rr.type == Dnsruby::Types.RRSIG) && (rr.type_covered == Dnsruby::Types.NAPTR)))
-#        rrset.add(rr)
-#      end
-#      if (rr.type == Dnsruby::Types.DNSKEY)
-#        key_rrset.add(rr)
-#      end
-#    }
-#     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
-#    verifier.verify_rrset(rrset, key_rrset)
-#  end
+  #  def test_naptr_from_zone
+  #    reader = Dnsruby::ZoneReader.new("all.rr.org.")
+  #    zone = reader.process_file("zone.txt")
+  #    rrset = Dnsruby::RRSet.new
+  #    key_rrset = Dnsruby::RRSet.new
+  #    zone.each {|rr|
+  #      if ((rr.type == Dnsruby::Types.NAPTR) || ((rr.type == Dnsruby::Types.RRSIG) && (rr.type_covered == Dnsruby::Types.NAPTR)))
+  #        rrset.add(rr)
+  #      end
+  #      if (rr.type == Dnsruby::Types.DNSKEY)
+  #        key_rrset.add(rr)
+  #      end
+  #    }
+  #     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+  #    verifier.verify_rrset(rrset, key_rrset)
+  #  end
 end
