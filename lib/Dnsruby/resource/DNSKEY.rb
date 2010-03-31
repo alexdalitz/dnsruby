@@ -153,16 +153,16 @@ module Dnsruby
         get_new_key_tag
       end
       
-    def from_hash(hash) #:nodoc: all
-      @make_new_key_tag = false
-      hash.keys.each do |param|
-        send(param.to_s+"=", hash[param])
+      def from_hash(hash) #:nodoc: all
+        @make_new_key_tag = false
+        hash.keys.each do |param|
+          send(param.to_s+"=", hash[param])
+        end
+        @make_new_key_tag = true
+        get_new_key_tag
       end
-      @make_new_key_tag = true
-      get_new_key_tag
-    end
 
-    def from_string(input)
+      def from_string(input)
         if (input.length > 0)
           @make_new_key_tag = false
           data = input.split(" ")
@@ -291,12 +291,16 @@ module Dnsruby
       end
       
       def key=(key_text)
-        key_text.gsub!(/\n/, "")
-        key_text.gsub!(/ /, "")
-        #        @key=Base64.decode64(key_text)        
-        @key=key_text.unpack("m*")[0]
-        public_key
-        get_new_key_tag
+        begin
+          key_text.gsub!(/\n/, "")
+          key_text.gsub!(/ /, "")
+          #        @key=Base64.decode64(key_text)
+          @key=key_text.unpack("m*")[0]
+          public_key
+          get_new_key_tag
+        rescue Exception
+          raise ArgumentError.new("Key #{key_text} invalid")
+        end
       end
       
       def public_key
