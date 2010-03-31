@@ -687,7 +687,8 @@ module Dnsruby
       sigrecs.each do |sigrec|
         check_rr_data(rrset, sigrec)
       end
-      raise ArgumentError.new("Expecting DNSKEY, DLV, DS, RRSet or nil for keys : got #{keys.class} instead") if (keys && (![RR::IN::DNSKEY, RR::IN::DLV, RR::IN::DS].include?keys.class) && (keys.class != RRSet))
+      raise ArgumentError.new("Expecting DNSKEY, DLV, DS, RRSet, Array or nil for keys : got #{keys.class} instead") if
+          (keys && (![Array, RR::IN::DNSKEY, RR::IN::DLV, RR::IN::DS].include?keys.class) && (keys.class != RRSet))
 
       keyrec = nil
       sigrec = nil
