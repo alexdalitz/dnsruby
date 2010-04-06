@@ -59,9 +59,9 @@ class TestName < Test::Unit::TestCase
     names.push(Name.create("Z.a.example"))
     names.push(Name.create("zABC.a.EXAMPLE"))
     names.push(Name.create("z.example"))
-#    names.push(Name.create("\001.z.example")) # @TODO@ Binary labels in strings
+    names.push(Name.create("\001.z.example"))
     names.push(Name.create("*.z.example"))
-#    names.push(Name.create("\200.z.example")) # @TODO@ Binary labels in strings
+    names.push(Name.create("\200.z.example"))
     names.each_index {|i|
       if (i < (names.length() - 1))
         assert(names[i].canonically_before(names[i+1]))
@@ -70,5 +70,11 @@ class TestName < Test::Unit::TestCase
     }
     assert(Name.create("x.w.example").canonically_before(Name.create("z.w.example")))
     assert(Name.create("x.w.example").canonically_before(Name.create("a.z.w.example")))
+  end
+
+  def test_escapes
+    n1 = Name.create("\\nall.all.")
+    n2 = Name.create("nall.all.")
+    assert(n1 == n2, n1)
   end
 end

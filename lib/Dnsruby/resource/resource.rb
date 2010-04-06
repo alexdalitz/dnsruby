@@ -542,6 +542,7 @@ module Dnsruby
       ivars.each {|i| s_ivars << i.to_s} # Ruby 1.9
       s_ivars.delete "@ttl" # RFC 2136 section 1.1
       s_ivars.delete "@rdata"
+      s_ivars.delete "@name"
       if (self.type == Types.DS)
         s_ivars.delete "@digest"
       end
@@ -552,12 +553,14 @@ module Dnsruby
       ivars.each {|i| o_ivars << i.to_s} # Ruby 1.9
       o_ivars.delete "@ttl" # RFC 2136 section 1.1
       o_ivars.delete "@rdata"
+      o_ivars.delete "@name"
       if (other.type == Types.DS)
         o_ivars.delete "@digest"
       end
       o_ivars.sort!
       
       return s_ivars == o_ivars &&
+        @name.to_s == other.name.to_s &&
         s_ivars.collect {|name| self.instance_variable_get name} ==
         o_ivars.collect {|name| other.instance_variable_get name}
     end

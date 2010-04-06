@@ -217,23 +217,22 @@ module Dnsruby
       split = line.split(' ') # split on whitespace
       name = split[0].strip
       if (name.index"\\")
-        old_name = name
 
         ls =[]
-        Name.create(name).labels.each {|el| ls.push(Name.decode(RR::TXT.display(el.to_s, false)))}
-        name = ls.join('.')
+        Name.create(name).labels.each {|el| ls.push(Name.decode(el.to_s))}
+        new_name = ls.join('.')
 
 
-        if (/\.\z/ =~ old_name)
-          name += "."
+        if (!(/\.\z/ =~ name))
+          new_name += "." + @origin
         end
-        line = name + " "
+        line = new_name + " "
         (split.length - 1).times {|i| line += "#{split[i+1]} "}
         line += "\n"
+        name = new_name
         split = line.split
-      end
-      # o add $ORIGIN to it if it is not absolute
-      if !(/\.\z/ =~ name)
+        # o add $ORIGIN to it if it is not absolute
+      elsif !(/\.\z/ =~ name)
         new_name = name + "." + @origin
         line.sub!(name, new_name)
         name = new_name
