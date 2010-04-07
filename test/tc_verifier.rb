@@ -31,6 +31,7 @@ class VerifierTest < Test::Unit::TestCase
       #      print "OpenSSL supports SHA2\n"
       do_test_sha256
       do_test_sha512
+      do_test_nsec
     else
       print "OpenSSL doesn't support SHA2 - disabling SHA256/SHA512 tests. DNSSEC validation will not work with these type of signatures.\n"
     end
@@ -244,7 +245,7 @@ class VerifierTest < Test::Unit::TestCase
     assert(verified > 0)
   end
 
-  def test_nsec
+  def do_test_nsec
     begin
       require 'rubygems'
       require 'timecop'
