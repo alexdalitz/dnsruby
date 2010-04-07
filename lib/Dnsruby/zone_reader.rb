@@ -225,6 +225,8 @@ module Dnsruby
 
         if (!(/\.\z/ =~ name))
           new_name += "." + @origin
+        else
+          new_name += "."
         end
         line = new_name + " "
         (split.length - 1).times {|i| line += "#{split[i+1]} "}
