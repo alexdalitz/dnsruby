@@ -44,7 +44,6 @@ if (online)
   require "test/tc_rr-opt.rb"
   require "test/tc_res_config.rb"
   require "test/tc_resolver.rb"
-  require "test/tc_dns.rb"
   require "test/tc_dnsruby.rb"
   #  require "test/tc_inet6.rb"
   #  require "test/tc_recurse.rb"
@@ -73,6 +72,7 @@ if (online)
     require "test/tc_single_resolver.rb"
     require "test/tc_axfr.rb"
     require "test/tc_cache.rb"
+    require "test/tc_dns.rb"
 
     have_openssl = false
     begin
