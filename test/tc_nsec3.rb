@@ -129,9 +129,9 @@ class Nsec3Test < Test::Unit::TestCase
 
   def test_types
      rr = RR.create("tfkha3ph6qs16qu3oqtmnfc5tbckpjl7.archi.amt. 1209600 IN NSEC3 1 1 5 -  1tmmto81uc71moj44cli3m6avs5l44l3 NSEC3 CNAME RRSIG    ; flags: optout")
-     assert(rr.types.include?Types::NSEC3)
-     assert(rr.types.include?Types::CNAME)
-     assert(rr.types.include?Types::RRSIG)
+     assert(rr.types.include?(Types::NSEC3))
+     assert(rr.types.include?(Types::CNAME))
+     assert(rr.types.include?(Types::RRSIG))
      rr = RR.create("929p027vb26s89h6fv5j7hmsis4tcr1p.tjeb.nl.		 3600		 IN		 NSEC3		 1 0 5 beef  9rs4nbe7128ap5i6v196ge2iag5b7rcq A AAAA RRSIG
        ")
   end
