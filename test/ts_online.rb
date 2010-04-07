@@ -41,8 +41,6 @@ if (online)
   print "Running online tests. These tests send UDP packets - some may be lost.\n"
   print "If you get the odd timeout error with these tests, try running them again.\n"
   print "It may just be that some UDP packets got lost the first time...\n"
-  require "test/tc_rr-opt.rb"
-  require "test/tc_res_config.rb"
   require "test/tc_resolver.rb"
   require "test/tc_dnsruby.rb"
   #  require "test/tc_inet6.rb"
@@ -73,6 +71,8 @@ if (online)
     require "test/tc_axfr.rb"
     require "test/tc_cache.rb"
     require "test/tc_dns.rb"
+    require "test/tc_rr-opt.rb"
+    require "test/tc_res_config.rb"
 
     have_openssl = false
     begin
