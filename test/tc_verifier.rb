@@ -247,7 +247,10 @@ class VerifierTest < Test::Unit::TestCase
 
   def do_test_nsec
     begin
-      require 'rubygems'
+      begin
+        require 'rubygems'
+      rescue LoadError
+      end
       require 'timecop'
     rescue LoadError
       return

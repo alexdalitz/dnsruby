@@ -13,7 +13,10 @@
 #See the License for the specific language governing permissions and
 #limitations under the License.
 #++
+begin
 require 'rubygems'
+rescue LoadError
+end
 require 'test/unit'
 require 'dnsruby'
 include Dnsruby

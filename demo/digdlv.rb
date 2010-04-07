@@ -40,7 +40,10 @@
 #Michael Fuhr <mike@fuhr.org>
 #Alex D <alexd@nominet.org.uk>
 
+begin
 require 'rubygems'
+rescue LoadError
+end
 require 'dnsruby'
 include Dnsruby
 
