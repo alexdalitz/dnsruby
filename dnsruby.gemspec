@@ -2,7 +2,7 @@ require 'rubygems'
 SPEC = Gem::Specification.new do |s|
   s.name = "dnsruby"
 # @TODO@ Remember to update version in Dnsruby.rb as well!
-  s.version = "1.45"
+  s.version = "1.46"
   s.authors = ["AlexD"]
   s.email = "alexd@nominet.org.uk"
   s.homepage = "http://rubyforge.org/projects/dnsruby/"
