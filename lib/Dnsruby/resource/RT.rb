@@ -46,7 +46,7 @@ module Dnsruby
       
       def rdata_to_string #:nodoc: all
         if (@preference!=nil)
-          return "#{@preference} #{@intermediate}"
+          return "#{@preference} #{@intermediate.to_s(true)}"
         else
           return ""
         end

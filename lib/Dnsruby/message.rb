@@ -99,7 +99,10 @@ module Dnsruby
           if (rr.type == Types::RRSIG)
             type_ok = (rr.type_covered == type)
           end
-          type_ok && (rr.klass == klass) && (rr.name.to_s.downcase == name.to_s.downcase)
+          if (!(/\.\z/ =~ name.to_s))
+            name = name.to_s + "."
+          end
+          type_ok && (rr.klass == klass) && (rr.name.to_s(true).downcase == name.to_s().downcase)
         }
         rrset = RRSet.new()
         rrs.each do |rr|

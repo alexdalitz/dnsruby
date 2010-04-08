@@ -71,7 +71,7 @@ module Dnsruby
       
       def rdata_to_string #:nodoc: all
         if (@mname!=nil)
-          return "#{@mname} #{@rname} #{@serial} #{@refresh} #{@retry} #{@expire} #{@minimum}"
+          return "#{@mname.to_s(true)} #{@rname.to_s(true)} #{@serial} #{@refresh} #{@retry} #{@expire} #{@minimum}"
         else
           return ""
         end

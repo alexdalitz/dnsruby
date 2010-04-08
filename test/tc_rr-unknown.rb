@@ -66,9 +66,9 @@ class TestRrUnknown < Test::Unit::TestCase
     
     
     rr = RR.new_from_string('e.example IN TYPE4555 \# 4  0A0000 01  ')
-    assert_equal('e.example.	0	IN	TYPE4555	\# 4 0a000001', rr.to_s, 'Fully unknown RR parsed correctly')
+    assert_equal('e.example	0	IN	TYPE4555	\# 4 0a000001', rr.to_s, 'Fully unknown RR parsed correctly')
     
-    rr4 = RR.new_from_string('e.example CLASS122 TYPE4555 \# 4  0A0000 01  ')
+    rr4 = RR.new_from_string('e.example. CLASS122 TYPE4555 \# 4  0A0000 01  ')
     assert_equal('e.example.	0	CLASS122	TYPE4555	\# 4 0a000001', rr4.to_s, 'Fully unknown RR in unknown CLASS parsed correctly')
   end
   

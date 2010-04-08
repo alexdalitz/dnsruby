@@ -47,7 +47,7 @@ module Dnsruby
         
         def rdata_to_string #:nodoc: all
           if (@preference!=nil)
-            return "#{@preference} #{@map822} #{@mapx400}"
+            return "#{@preference} #{@map822.to_s(true)} #{@mapx400.to_s(true)}"
           else
             return ""
           end

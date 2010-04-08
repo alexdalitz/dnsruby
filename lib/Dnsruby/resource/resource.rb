@@ -503,7 +503,7 @@ module Dnsruby
     
     #Returns a string representation of the RR in zone file format
     def to_s
-      return (@name ? @name.to_s():"") + ".\t" +(@ttl ? @ttl.to_s():"") + "\t" + (klass() ? klass.to_s():"") + "\t" + (type() ? type.to_s():"") + "\t" + rdata_to_string
+      return (@name ? @name.to_s(true):"") + "\t" +(@ttl ? @ttl.to_s():"") + "\t" + (klass() ? klass.to_s():"") + "\t" + (type() ? type.to_s():"") + "\t" + rdata_to_string
     end
     
     #Get a string representation of the data section of the RR (in zone file format)

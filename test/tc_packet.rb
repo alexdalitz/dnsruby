@@ -22,7 +22,7 @@ require 'dnsruby'
 include Dnsruby
 class TestPacket < Test::Unit::TestCase
   def test_packet
-    domain = "example.com"
+    domain = "example.com."
     type = "MX"
     klass = "IN"
       
@@ -48,43 +48,43 @@ class TestPacket < Test::Unit::TestCase
     assert(additional.length == 0, 'additional() works when empty'); #9
       
     packet.add_answer(RR.create(   { 
-          :name    => "a1.example.com", 
+          :name    => "a1.example.com.",
           :type    => Types.A,  
           :address => "10.0.0.1"}));
     assert_equal(1, packet.header.ancount, 'First push into answer section worked');      #10
       
       
-    ret = packet.answer.rrset("example.com", 'NSEC')
+    ret = packet.answer.rrset("example.com.", 'NSEC')
     assert_equal(ret.rrs.length, 0, "#{ret.rrs.length}")
     ret = packet.answer.rrset("a1.example.com", 'A')
     assert_equal(ret.rrs.length, 1, "#{ret.rrs.length}")
     ret = packet.answer.rrsets()
     assert_equal(ret.length, 1, "#{ret.length}")
     
-    packet.add_answer(RR.create({:name    => "a2.example.com",
+    packet.add_answer(RR.create({:name    => "a2.example.com.",
           :type    => "A", :address => "10.0.0.2"}));
     assert_equal(packet.header.ancount, 2, 'Second push into answer section worked');     #11
           
-    packet.add_authority(RR.create({:name    => "a3.example.com",
+    packet.add_authority(RR.create({:name    => "a3.example.com.",
           :type    => "A",
           :address => "10.0.0.3"}));
     assert_equal(1, packet.header.nscount, 'First push into authority section worked');   #12
       
       
     packet.add_authority(RR.create( {
-          :name    => "a4.example.com",
+          :name    => "a4.example.com.",
           :type    => "A",
           :address => "10.0.0.4"}));
     assert_equal(2, packet.header.nscount, 'Second push into authority section worked');  #13
       
     packet.add_additional(RR.create({
-          :name    => "a5.example.com",
+          :name    => "a5.example.com.",
           :type    => "A",
           :address => "10.0.0.5"}));
     assert_equal(1, packet.header.adcount, 'First push into additional section worked');  #14
       
     packet.add_additional(RR.create(  {
-          :name    => "a6.example.com",
+          :name    => "a6.example.com.",
           :type    => Types.A,
           :address => "10.0.0.6"}));
     assert_equal(2, packet.header.adcount, 'Second push into additional section worked'); #15
@@ -162,13 +162,13 @@ f4 00 31 04 64 6e 73 31 05 69 63 61 6e 6e 03 6f
   end    
   
   def get_test_packet
-    packet=Message.new("254.9.11.10.in-addr.arpa","PTR","IN")
+    packet=Message.new("254.9.11.10.in-addr.arpa.","PTR","IN")
       
-    packet.add_answer(RR.create(%q[254.9.11.10.in-addr.arpa 86400 IN PTR host-84-11-9-254.customer.example.com]));
+    packet.add_answer(RR.create(%q[254.9.11.10.in-addr.arpa. 86400 IN PTR host-84-11-9-254.customer.example.com.]));
       
-    packet.add_authority(RR.create("9.11.10.in-addr.arpa 86400 IN NS autons1.example.com"));
-    packet.add_authority(RR.create("9.11.10.in-addr.arpa 86400 IN NS autons2.example.com"));
-    packet.add_authority(RR.create("9.11.10.in-addr.arpa 86400 IN NS autons3.example.com"));
+    packet.add_authority(RR.create("9.11.10.in-addr.arpa. 86400 IN NS autons1.example.com."));
+    packet.add_authority(RR.create("9.11.10.in-addr.arpa. 86400 IN NS autons2.example.com."));
+    packet.add_authority(RR.create("9.11.10.in-addr.arpa. 86400 IN NS autons3.example.com."));
     return packet
   end
       

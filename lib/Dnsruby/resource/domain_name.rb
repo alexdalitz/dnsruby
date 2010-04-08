@@ -39,7 +39,7 @@ module Dnsruby
       end
       
       def rdata_to_string #:nodoc: all
-        return @domainname.to_s
+        return @domainname.to_s(true)
       end
       
       def encode_rdata(msg, canonical=false) #:nodoc: all

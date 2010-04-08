@@ -232,7 +232,7 @@ module Dnsruby
           # @TODO@ Display the expiration and inception as 
           return "#{@type_covered.string} #{@algorithm.string} #{@labels} #{@original_ttl} " + 
             "#{format_time(@expiration)} ( #{format_time(@inception)} " + 
-            "#{@key_tag} #{@signers_name} #{signature} )"
+            "#{@key_tag} #{@signers_name.to_s(true)} #{signature} )"
         else
           return ""
         end

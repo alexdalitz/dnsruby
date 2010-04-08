@@ -550,7 +550,7 @@ module Dnsruby
         if (@algorithm!=nil)
           error = @error
           error = "UNDEFINED" unless error!=nil
-          rdatastr = "#{@original_id} #{@time_signed} #{@algorithm}. #{error}";
+          rdatastr = "#{@original_id} #{@time_signed} #{@algorithm.to_s(true)} #{error}";
           if (@other_size > 0 && @other_data!=nil)
             rdatastr += " #{@other_data}"
           end

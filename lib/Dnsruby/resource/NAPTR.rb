@@ -67,7 +67,7 @@ module Dnsruby
         if (@order!=nil)
           ret =  "#{@order} #{@preference} \"#{@flags}\" \"#{@service}\" \""
           ret += TXT.display(@regexp)
-          ret += "\" #{@replacement}"
+          ret += "\" #{@replacement.to_s(true)}"
 
           return ret
         else

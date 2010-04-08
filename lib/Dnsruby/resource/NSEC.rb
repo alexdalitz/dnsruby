@@ -274,7 +274,7 @@ module Dnsruby
             type_strings.push(t.string)
           end
           types = type_strings.join(" ")
-          return "#{@next_domain} ( #{types} )"
+          return "#{@next_domain.to_s(true)} ( #{types} )"
         else
           return ""
         end

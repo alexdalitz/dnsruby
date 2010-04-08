@@ -86,7 +86,7 @@ module Dnsruby
         
         def rdata_to_string
           if (@target!=nil)
-            return "#{@priority} #{@weight} #{@port} #{@target}"
+            return "#{@priority} #{@weight} #{@port} #{@target.to_s(true)}"
           else
             return ""
           end

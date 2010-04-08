@@ -221,8 +221,12 @@ module Dnsruby
     #   p Resolv::Name.create("x.y.z.").to_s #=> "x.y.z"
     #   p Resolv::Name.create("x.y.z").to_s #=> "x.y.z"
     #
-    def to_s
-      return to_str(@labels)
+    def to_s(include_absolute=false)
+      ret = to_str(@labels)
+      if (@absolute && include_absolute)
+        ret += "."
+      end
+      return ret
     end
 
     def to_str(labels) # :nodoc: all

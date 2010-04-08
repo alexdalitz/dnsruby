@@ -105,7 +105,7 @@ module Dnsruby
       def rdata_to_string #:nodoc: all
         ret = "#{@pk_algorithm} #{hit_string} #{public_key_string}"
         @rsvs.each {|rsv|
-          ret += " #{rsv}"
+          ret += " #{rsv.to_s(true)}"
         }
         return ret
       end
