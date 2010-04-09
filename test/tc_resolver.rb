@@ -121,7 +121,7 @@ class TestResolver < Test::Unit::TestCase
     id, m, err = q.pop
     assert(id==1)
     assert(m.rcode == RCode.NXDOMAIN)
-    assert(err.kind_of?(NXDomain))
+    assert(NXDomain === err)
   end
   
   def test_timeouts

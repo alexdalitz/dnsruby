@@ -21,7 +21,7 @@ module Dnsruby
   class ValidatorThread # :nodoc: all
     #    include Singleton
     def initialize(*args)
-      @client_id, @client_queue, @response, @err, @query, @st, @res = args
+      @client_id, @client_queue, @response, @error, @query, @st, @res = args
       # Create the validation thread, and a queue to receive validation requests
       # Actually, need to have a thread per validator, as they make recursive calls.
       #      @@mutex = Mutex.new
@@ -59,7 +59,7 @@ module Dnsruby
       #        client_id, client_queue, response, err, query, st, res = item
       validated_ok = validate(@query, @response, @res)
 
-      validated_ok = false if @error
+      validated_ok = false if (@error && !(NXDomain === @error))
 
       cache_if_valid(@query, @response)
 

@@ -392,10 +392,10 @@ module Dnsruby
         end
         socket.send(query_bytes, 0)
       rescue Exception => e
-        st.push_exception_to_select(client_query_id, client_queue, err, nil)
-        socket.close
         err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
         Dnsruby.log.error{"#{err}"}
+        st.push_exception_to_select(client_query_id, client_queue, err, nil)
+        socket.close
         return
       end
       

@@ -516,7 +516,11 @@ module Dnsruby
       # to send it out from its normal loop.
       Dnsruby.log.debug{"Pushing response to client queue direct from resolver or validator"}
       @@mutex.synchronize{
-        @@queued_responses.push([client_id, client_queue, msg, nil, query, res])
+        err = nil
+        if (msg.rcode == RCode.NXDOMAIN)
+          err = NXDomain.new
+        end
+        @@queued_responses.push([client_id, client_queue, msg, err, query, res])
       }
       # Make sure select loop is running!
       if (@@select_thread && @@select_thread.alive?)
