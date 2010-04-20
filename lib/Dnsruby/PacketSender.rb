@@ -555,6 +555,7 @@ module Dnsruby
         
         elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
           #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
+          # @TODO@ What if an existing OPT RR is not big enough? Should we replace it?
           add_opt_rr(packet)
         end
       end
@@ -570,7 +571,10 @@ module Dnsruby
       # RFC 3225
       optrr = RR::OPT.new(udp_packet_size)
 
-      packet.add_additional(optrr)
+      # Only one OPT RR allowed per packet - do we already have one?
+      if (packet.additional.rrset(packet.question()[0].qname, Types::OPT).rrs.length == 0)
+        packet.add_additional(optrr)
+      end
     end
 
     def prepare_for_dnssec(packet)
