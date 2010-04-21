@@ -78,7 +78,12 @@ module Dnsruby
     attr_reader :port
     
     # Should TCP be used as a transport rather than UDP?
+    # If use_tcp==true, then ONLY TCP will be used as a transport.
     attr_reader :use_tcp
+
+    # If no_tcp==true, then ONLY UDP will be used as a transport.
+    # This should not generally be used, but is provided as a debugging aid.
+    attr_reader :no_tcp
     
     
     attr_reader :tsig
@@ -288,7 +293,7 @@ module Dnsruby
     #* msg - the message to send
     #* client_queue - a Queue to push the response to, when it arrives
     #* client_query_id - an optional ID to identify the query to the client
-    #* use_tcp - whether to use TCP (defaults to SingleResolver.use_tcp)
+    #* use_tcp - whether to use only TCP (defaults to SingleResolver.use_tcp)
     #
     #Returns :
     # 
@@ -418,7 +423,7 @@ module Dnsruby
         # Add the Config nameservers
         @config.nameserver.each do |ns|
           @single_resolvers.push(PacketSender.new({:server=>ns, :dnssec=>@dnssec,
-                :use_tcp=>@use_tcp, :packet_timeout=>@packet_timeout,
+                :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
                 :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
                 :src_address=>@src_address, :src_port=>@src_port,
                 :do_caching=>@do_caching,
@@ -457,6 +462,7 @@ module Dnsruby
       @dnssec = DefaultDnssec
       @do_caching= true
       @use_tcp = false
+      @no_tcp = false
       @tsig = nil
       @ignore_truncation = false
       @config = Config.new()
@@ -495,7 +501,7 @@ module Dnsruby
     end
 
     def update_internal_res(res)
-      [:port, :use_tcp, :tsig, :ignore_truncation, :packet_timeout,
+      [:port, :use_tcp, :no_tcp, :tsig, :ignore_truncation, :packet_timeout,
         :src_address, :src_port, :recurse,
         :udp_size, :dnssec].each do |param|
 
@@ -623,6 +629,11 @@ module Dnsruby
 
     def use_tcp=(on)
       @use_tcp = on
+      update
+    end
+
+    def no_tcp=(on)
+      @no_tcp=on
       update
     end
     

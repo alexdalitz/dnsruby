@@ -58,6 +58,8 @@ module Dnsruby
         @@queued_responses=[]
         @@queued_validation_responses=[]
         @@wakeup_sockets = get_socket_pair
+        # Suppress reverse lookups
+        BasicSocket.do_not_reverse_lookup = true
         #    end
         # Now start the select thread
         @@select_thread = Thread.new {

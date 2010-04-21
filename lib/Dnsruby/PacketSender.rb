@@ -65,6 +65,11 @@ module Dnsruby
     # 
     # Defaults to false
     attr_accessor :use_tcp
+
+    # Use UDP only - don't use TCP
+    # For test/debug purposes only
+    # Defaults to false
+    attr_accessor :no_tcp
     
     # The TSIG record to sign/verify messages with
     attr_reader :tsig
@@ -152,6 +157,7 @@ module Dnsruby
     # * :server
     # * :port
     # * :use_tcp
+    # * :no_tcp
     # * :ignore_truncation
     # * :src_address
     # * :src_port
@@ -166,6 +172,7 @@ module Dnsruby
       @udp_size = Resolver::DefaultUDPSize
       @dnssec = Resolver::DefaultDnssec
       @use_tcp = false
+      @no_tcp = false
       @tsig = nil
       @ignore_truncation = false
       @src_address        = '0.0.0.0'
@@ -499,12 +506,16 @@ module Dnsruby
         end
       end
       if (response.header.tc && !tcp && !@ignore_truncation)
-        # Try to resend over tcp
-        Dnsruby.log.debug{"Truncated - resending over TCP"}
-        # @TODO@ Are the query options used correctly here? DNSSEC in particular...
-        #        query.send_raw = true # Make sure that the packet is not messed with.
-        send_async(query, client_queue, client_query_id, true)
-        return false
+        if (@no_tcp)
+          Dnsruby.log.debug{"Truncated response - not resending over TCP as no_tcp==true"}
+        else
+          # Try to resend over tcp
+          Dnsruby.log.debug{"Truncated - resending over TCP"}
+          # @TODO@ Are the query options used correctly here? DNSSEC in particular...
+          #        query.send_raw = true # Make sure that the packet is not messed with.
+          send_async(query, client_queue, client_query_id, true)
+          return false
+        end
       end
       return true
     end
@@ -549,10 +560,9 @@ module Dnsruby
           packet.header.rd=@recurse
         end
 
-        # @TODO@ Only do this if the packet has not been prepared already!
+        # Only do this if the packet has not been prepared already!
         if (@dnssec)
           prepare_for_dnssec(packet)
-        
         elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
           #      if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
           # @TODO@ What if an existing OPT RR is not big enough? Should we replace it?

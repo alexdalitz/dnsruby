@@ -43,6 +43,7 @@ module Dnsruby
     # * :server
     # * :port
     # * :use_tcp
+    # * :no_tcp
     # * :ignore_truncation
     # * :src_address
     # * :src_port
@@ -61,6 +62,7 @@ module Dnsruby
       @udp_size = Resolver::DefaultUDPSize
       @dnssec = Resolver::DefaultDnssec
       @use_tcp = false
+      @no_tcp = false
       @tsig = nil
       @ignore_truncation = false
       @src_address        = nil
@@ -111,7 +113,7 @@ module Dnsruby
       end
 
       isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
-          :use_tcp=>@use_tcp, :packet_timeout=>@packet_timeout,
+          :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
           :src_address=>@src_address, :src_port=>@src_port,
           :do_caching=>@do_caching,
@@ -128,7 +130,7 @@ module Dnsruby
       end
       @server = Config.resolve_server(s).to_s
       isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
-          :use_tcp=>@use_tcp, :packet_timeout=>@packet_timeout,
+          :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
           :src_address=>@src_address, :src_port=>@src_port,
           :do_caching=>@do_caching,
