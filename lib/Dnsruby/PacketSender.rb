@@ -319,6 +319,13 @@ module Dnsruby
       end
       # Otherwise, run the query
       if (udp_packet_size < query_packet.length)
+        if (@no_tcp)
+          # Can't send the message - abort!
+              err=IOError.new("Can't send message - too big for UDP and no_tcp=true")
+              Dnsruby.log.error{"#{err}"}
+              st.push_exception_to_select(client_query_id, client_queue, err, nil)
+              return
+        end
         Dnsruby.log.debug{"Query packet length exceeds max UDP packet size - using TCP"}
         use_tcp = true
       end
