@@ -671,10 +671,7 @@ module Dnsruby
     attr_accessor :cd
     
     #The Authenticated Data flag
-    attr_accessor :ad
-    
     #Relevant in DNSSEC context.
-    #
     #(The AD bit is only set on answers where signatures have been
     #cryptographically verified or the server is authoritative for the data
     #and is allowed to set the bit by policy.)
