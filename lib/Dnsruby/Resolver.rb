@@ -422,12 +422,13 @@ module Dnsruby
       @single_res_mutex.synchronize {
         # Add the Config nameservers
         @config.nameserver.each do |ns|
-          @single_resolvers.push(PacketSender.new({:server=>ns, :dnssec=>@dnssec,
+          res = PacketSender.new({:server=>ns, :dnssec=>@dnssec,
                 :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
                 :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
                 :src_address=>@src_address, :src_port=>@src_port,
                 :do_caching=>@do_caching,
-                :recurse=>@recurse, :udp_size=>@udp_size}))
+                :recurse=>@recurse, :udp_size=>@udp_size})
+          @single_resolvers.push(res) if res
         end
       }
     end
@@ -478,6 +479,7 @@ module Dnsruby
     def update #:nodoc: all
       #Update any resolvers we have with the latest config
       @single_res_mutex.synchronize {
+        @single_resolvers.delete(nil) # Just in case...
         @single_resolvers.each do |res|
           update_internal_res(res)
         end
@@ -494,6 +496,7 @@ module Dnsruby
     def add_server(server)# :nodoc:
       @configured = true
       res = PacketSender.new(server)
+      raise ArgumentError.new("Can't create server #{server}") if !res
       update_internal_res(res)
       @single_res_mutex.synchronize {
         @single_resolvers.push(res)
@@ -743,11 +746,10 @@ module Dnsruby
         if (retry_count>0)
           retry_delay *= 2
         end
-        #          servers=[]
-        #          @single_resolvers.each do |r| servers.push(r.server) end
+
+        @single_resolvers.delete(nil) # Just in case...
         @single_resolvers.each_index do |i|
           res= @single_resolvers[i]
-          next if !res # @TODO@ WHY?1
           offset = (i*@retry_delay.to_f/@single_resolvers.length)
           if (retry_count==0)
             timeouts[base+offset]=[res, retry_count]
