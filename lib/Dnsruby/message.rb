@@ -591,33 +591,41 @@ module Dnsruby
     #Decode the encoded message
     def Message.decode(m)
       o = Message.new()
-      MessageDecoder.new(m) {|msg|
-        o.header = Header.new(msg)
-        o.header.qdcount.times {
-          question = msg.get_question
-          o.question << question
-        }
-        o.header.ancount.times {
-          rr = msg.get_rr
-          o.answer << rr
-        }
-        o.header.nscount.times {
-          rr = msg.get_rr
-          o.authority << rr
-        }
-        o.header.arcount.times { |count|
-          start = msg.index
-          rr = msg.get_rr
-          if (rr.type == Types::TSIG)
-            if (count!=o.header.arcount-1)
-              Dnsruby.log.Error("Incoming message has TSIG record before last record")
-              raise DecodeError.new("TSIG record present before last record")
+      begin
+        MessageDecoder.new(m) {|msg|
+          o.header = Header.new(msg)
+          o.header.qdcount.times {
+            question = msg.get_question
+            o.question << question
+          }
+          o.header.ancount.times {
+            rr = msg.get_rr
+            o.answer << rr
+          }
+          o.header.nscount.times {
+            rr = msg.get_rr
+            o.authority << rr
+          }
+          o.header.arcount.times { |count|
+            start = msg.index
+            rr = msg.get_rr
+            if (rr.type == Types::TSIG)
+              if (count!=o.header.arcount-1)
+                Dnsruby.log.Error("Incoming message has TSIG record before last record")
+                raise DecodeError.new("TSIG record present before last record")
+              end
+              o.tsigstart = start # needed for TSIG verification
             end
-            o.tsigstart = start # needed for TSIG verification
-          end
-          o.additional << rr
+            o.additional << rr
+          }
         }
-      }
+      rescue DecodeError => e
+        # So we got a decode error
+        # However, we might have been able to fill in many parts of the message
+        # So let's raise the DecodeError, but add the partially completed message
+        e.partial_message = o
+        raise e
+      end
       return o
     end
     
