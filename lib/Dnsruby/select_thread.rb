@@ -241,7 +241,7 @@ module Dnsruby
           answeripaddr = IPAddr.new(answerip)
           dest_server = IPAddr.new("0.0.0.0")
           begin
-          destserveripaddr = IPAddr.new(dest_server)
+            destserveripaddr = IPAddr.new(dest_server)
           rescue ArgumentError
             # Host name not IP address
           end
@@ -348,13 +348,13 @@ module Dnsruby
       }
       if (buf.length() < expected_length)
         begin
-        input, = socket.recv_nonblock(expected_length-buf.length)
-        if (input=="")
-          TheLog.info("Bad response from server - no bytes read - ignoring")
-          # @TODO@ Should we do anything about this?
-          return false
-        end
-        buf += input
+          input, = socket.recv_nonblock(expected_length-buf.length)
+          if (input=="")
+            TheLog.info("Bad response from server - no bytes read - ignoring")
+            # @TODO@ Should we do anything about this?
+            return false
+          end
+          buf += input
         rescue
           # Oh well - better luck next time!
           return false
@@ -435,14 +435,45 @@ module Dnsruby
       begin
         ans = Message.decode(buf)
       rescue Exception => e
-        #        print "DECODE ERROR\n"
         Dnsruby.log.error{"Decode error! #{e.class}, #{e}\nfor msg (length=#{buf.length}) : #{buf}"}
-        # @TODO@ Should know this from the socket!
         client_id=get_client_id_from_answerfrom(socket, answerip, answerport)
-        if (client_id != nil) 
+        if (client_id == nil)
+          Dnsruby.log.error{"Decode error from #{answerip} but can't determine packet id"}
+        end
+        # We should check if the TC bit is set (if we can get that far)
+        if ((DecodeError === e) && (e.partial_message.header.tc))
+          Dnsruby.log.error{"Decode error (from {answerip})! Header shows truncation, so trying again over TCP"}
+          # If it is, then we should retry over TCP
+          sent = false
+          @@mutex.synchronize{
+            client_ids = @@socket_hash[socket]
+            # get the queries associated with them
+            client_ids.each do |id|
+              query_header_id=nil
+              query_header_id = @@query_hash[id].query.header.id
+              if (query_header_id == e.partial_message.header.id)
+                # process the response
+                client_queue = nil
+                res = nil
+                query=nil
+                client_queue = @@query_hash[id].client_queue
+                res = @@query_hash[id].single_resolver
+                query = @@query_hash[id].query
+
+                # NOW RESEND OVER TCP!
+                Thread.new {
+                  res.send_async(query, client_queue, id, true)
+                }
+                sent = true
+              end
+            end
+          }
+          if !sent
           send_exception_to_client(e, socket, client_id)
+          end
+
         else
-          Dnsruby.log.error{"Decode error from #{answerfrom} but can't determine packet id"}
+          send_exception_to_client(e, socket, client_id)
         end
         return
       end
@@ -486,7 +517,6 @@ module Dnsruby
           query_settings = @@query_hash[id]
           if (answerip == query_settings.dest_server && answerport == query_settings.dest_port)
             # We have a match
-            # - @TODO@ as long as we're not speaking to the same server on two ports!
             client_id = id
             break
           end
