@@ -89,7 +89,7 @@ module Dnsruby
         # Add the next line until we see a ")"
         # REMEMBER TO STRIP OFF COMMENTS!!!
         @continued_line = strip_comments(@continued_line)
-        line = @continued_line.strip.chomp + " " + line
+        line = @continued_line.rstrip.chomp + " " + line
         if (line.index(")"))
           # OK
           @continued_line = false
