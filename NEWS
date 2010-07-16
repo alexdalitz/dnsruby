@@ -1,3 +1,10 @@
+NEW FOR DNSRUBY 1.48 :
+
+o DNSSEC validation now disabled by default
+o Signed root DS record can be added to validator
+o ITAR support removed
+o multi-line DS/RRSIG reading bug fixed (thanks Marco Davids!)
+
 NEW FOR DNSRUBY 1.42 :
 
 o Complicated TXT and NAPTR records now handled correctly
