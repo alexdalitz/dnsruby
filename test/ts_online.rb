@@ -93,7 +93,6 @@ if (online)
       puts "Running DNSSEC test - may fail if OpenSSL not complete"
       puts "------------------------------------------------------"      
       require "test/tc_verifier.rb"
-      require "test/tc_itar.rb"
       require "test/tc_dlv.rb"
       require "test/tc_validator.rb"
     end
