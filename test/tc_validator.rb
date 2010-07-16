@@ -25,6 +25,7 @@ class TestValidator < Test::Unit::TestCase
     Dnsruby::Dnssec.clear_trust_anchors
     res = Dnsruby::Resolver.new("dnssec.nominet.org.uk")
     res.dnssec=true
+    res.do_validation = true
     Dnsruby::Dnssec.do_validation_with_recursor(false)
     Dnsruby::Dnssec.default_resolver=(res) # This is a closed zone (not reachable by recursion)
 
