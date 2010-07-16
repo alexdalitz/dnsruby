@@ -525,7 +525,9 @@ module Dnsruby
           
       nameservers = []
       ns.each do |nss|
-        nss.each {|n| nameservers.push(n)}
+        nss.each {|n|
+          nameservers.push(n.to_s)
+        }
       end
       resolver = Resolver.new({:nameserver=>nameservers})
       servers = []
