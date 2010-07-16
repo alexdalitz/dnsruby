@@ -165,6 +165,10 @@ module Dnsruby
       @trusted_keys.add(k)
     end
 
+    def add_root_ds(ds)
+      @configured_ds_store.push(ds)
+    end
+
     # Wipes the cache of trusted keys
     def clear_trusted_keys
       @trusted_keys = KeyCache.new
