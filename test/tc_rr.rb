@@ -295,13 +295,22 @@ class TestRR < Test::Unit::TestCase
     rr = RR.create("all.rr.org.		IN	LOC		42 21 54 N 71 06 18 W -24m 30m")
     assert(rr.vert_pre == 1000)
     assert(rr.horiz_pre == 1000000)
-    lon = rr.longitude
-#    rr2 = RR.create("all.rr.org.	1209600	IN	LOC	42 21 54.000 N 71 06 18.000 W 4294967272m 30m 10000m 10m")
-#    print rr2.longitude
-#    assert(rr2.longitude = lon)
-#    print rr.to_s + "\n"
-#    print rr2.to_s + "\n"
-#    assert(rr.longitude == rr2.longitude)
-#    assert(rr == rr2)
+    assert(rr.to_s.index("21"))
+    assert(rr.to_s.index("71"))
+    assert(rr.to_s.index("54"))
+    assert(rr.to_s.index("71"))
+    assert(rr.to_s.index("06"))
+    assert(rr.to_s.index("18"))
+
+    r2 = RR.create("helium				IN LOC	51 49 17.9 N 4 39 22.9 E 0m")
+    assert(r2.size == 100)
+    assert(r2.to_s.index("17.9"))
+    assert(r2.to_s.index("22.9"))
+  end
+
+  def test_hinfo
+    rr = RR.create('helium				IN HINFO	"Shuttle-ST61G4 Intel PIV3000" "FreeBSD 7.0-STABLE"')
+    assert rr.to_s.index('"Shuttle-ST61G4 Intel PIV3000"')
+    assert rr.to_s.index('"FreeBSD 7.0-STABLE"')
   end
 end
