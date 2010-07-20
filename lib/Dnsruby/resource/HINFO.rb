@@ -30,7 +30,15 @@ module Dnsruby
       end
       
       def from_string(input) #:nodoc: all
-        cpu, os = input.split(" ")
+        strings = TXT.parse(input)
+        cpu = ""
+        os = ""
+        if (strings.length == 1)
+          cpu, os = input.split(" ")
+        else
+          cpu = strings[0]
+          os = strings[1]
+        end
         cpu.sub!(/^\"/, "")
         @cpu = cpu.sub(/\"$/, "")
         os.sub!(/^\"/, "")
@@ -38,7 +46,15 @@ module Dnsruby
       end
       
       def rdata_to_string #:nodoc: all
-        return "#{@cpu} #{@os}"
+        if (defined?@cpu)
+          temp = []
+          [@cpu, @os].each {|str|
+            output = TXT.display(str)
+            temp.push("\"#{output}\"")
+          }
+          return temp.join(' ')
+        end
+        return ''
       end
       
       def encode_rdata(msg, canonical=false) #:nodoc: all
