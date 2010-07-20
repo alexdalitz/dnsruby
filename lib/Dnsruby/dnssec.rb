@@ -79,8 +79,8 @@ module Dnsruby
 
     # #NOTE# You may wish to import these via a secure channel yourself, if
     # using Dnsruby for validation.
-    root_key = RR.create(". IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5")
-    @@root_verifier.add_root_ds(root_key)
+    @@root_key = RR.create(". IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5")
+    @@root_verifier.add_root_ds(@@root_key)
 
     @@dlv_verifier = SingleVerifier.new(SingleVerifier::VerifierType::DLV)
 
@@ -124,6 +124,7 @@ module Dnsruby
     def self.reset
       @@validation_policy = ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT
       @@root_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ROOT)
+      @@root_verifier.add_root_ds(@@root_key)
 
       @@dlv_verifier = SingleVerifier.new(SingleVerifier::VerifierType::DLV)
 
