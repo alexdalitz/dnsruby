@@ -426,7 +426,6 @@ module Dnsruby
                 :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
                 :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
                 :src_address=>@src_address, :src_port=>@src_port,
-                :do_caching=>@do_caching,
                 :recurse=>@recurse, :udp_size=>@udp_size})
           @single_resolvers.push(res) if res
         end
