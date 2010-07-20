@@ -89,7 +89,7 @@ module Dnsruby
       def dms2latlon(deg, min, sec, hem)
         retval=0
         
-        retval = (deg * CONV_DEG) + (min * CONV_MIN) + (sec * CONV_SEC);
+        retval = (deg * CONV_DEG) + (min * CONV_MIN) + (sec * CONV_SEC).round;
         retval = -retval if ((hem != nil) && ((hem == "S") || (hem == "W")));
         retval += REFERENCE_LATLON;
         return retval;
@@ -138,23 +138,28 @@ module Dnsruby
          (\s+ ([\d.]+) m?)?	# size
          (\s+ ([\d.]+) m?)?	# horiz precision
          (\s+ ([\d.]+) m?)? 	# vert precision
-          /ix)  # 
+          /ix)  #
+
+          size = DEFAULT_SIZE
           
           # What to do for other versions?
           version = 0;
           
           horiz_pre = DEFAULT_HORIZ_PRE
           vert_pre  = DEFAULT_VERT_PRE
-          latdeg, latmin, latsec, lathem = $1.to_i, $3.to_i, $5.to_i, $6;
-          londeg, lonmin, lonsec, lonhem = $7.to_i, $9.to_i, $11.to_i, $12
-          alt, size = $13.to_i, $15.to_i
+          latdeg, latmin, latsec, lathem = $1.to_i, $3.to_i, $5.to_f, $6;
+          londeg, lonmin, lonsec, lonhem = $7.to_i, $9.to_i, $11.to_f, $12
+          alt = $13.to_i
+          if ($15)
+            size = $15.to_f
+          end
           if ($17)
-          horiz_pre = $17.to_i
+          horiz_pre = $17.to_f
           end
           if ($19)
-            vert_pre = $19.to_i
+            vert_pre = $19.to_f
           end
-          
+
           latmin    = DEFAULT_MIN       unless latmin;
           latsec    = DEFAULT_SEC       unless latsec;
           lathem    = lathem.upcase;
@@ -163,8 +168,6 @@ module Dnsruby
           lonsec    = DEFAULT_SEC       unless lonsec;
           lonhem    = lonhem.upcase
           
-          size      = DEFAULT_SIZE      unless size;
-
           @version   = version;
           @size      = size * 100;
           @horiz_pre = horiz_pre * 100;
@@ -178,7 +181,7 @@ module Dnsruby
       def from_hash(hash) #:nodoc: all
         super(hash)
         if (@size == nil)
-          @size = DEFAULT_SIZE
+          @size = DEFAULT_SIZE * 100
         end
         if @horiz_pre == nil
           @horiz_pre = DEFAULT_HORIZ_PRE * 100
