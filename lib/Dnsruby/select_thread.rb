@@ -75,7 +75,7 @@ module Dnsruby
       srv = nil
       begin
         srv = TCPServer.new('localhost', 0)
-      rescue Errno::EADDRNOTAVAIL # OSX Snow Leopard issue - need to use explicit IP
+      rescue Errno::EADDRNOTAVAIL, SocketError # OSX Snow Leopard issue - need to use explicit IP
         begin
           srv = TCPServer.new('127.0.0.1', 0)
         rescue Error # Try IPv6
