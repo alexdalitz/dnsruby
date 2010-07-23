@@ -1,9 +1,13 @@
 NEW FOR DNSRUBY 1.48 :
 
+o Fixed deadlock/performance issue seen on some platforms
 o DNSSEC validation now disabled by default
 o Signed root DS record can be added to validator
 o ITAR support removed
 o multi-line DS/RRSIG reading bug fixed (thanks Marco Davids!)
+o DS algorithms of more than one digit can now be read from string
+o LOC records now parsed correctly
+o HINFO records now parsed correctly
 
 NEW FOR DNSRUBY 1.42 :
 
