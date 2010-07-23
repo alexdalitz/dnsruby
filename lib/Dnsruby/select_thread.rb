@@ -71,22 +71,25 @@ module Dnsruby
     end
     
     def get_socket_pair
+      # Emulate socketpair on platforms which don't support it
+      srv = nil
       begin
-        pair =  Socket::socketpair(Socket::AF_LOCAL, Socket::SOCK_DGRAM, 0)
-        return pair
-
-        # Emulate socketpair on platforms which don't support it
-      rescue Exception
         srv = TCPServer.new('localhost', 0)
-        rsock = TCPSocket.new(srv.addr[3], srv.addr[1])
-        lsock = srv.accept
-        srv.close
-        return [lsock, rsock]
+      rescue Errno::EADDRNOTAVAIL # OSX Snow Leopard issue - need to use explicit IP
+        begin
+          srv = TCPServer.new('127.0.0.1', 0)
+        rescue Error # Try IPv6
+          srv = TCPServer.new('::1', 0)
+        end
       end
+      rsock = TCPSocket.new(srv.addr[3], srv.addr[1])
+      lsock = srv.accept
+      srv.close
+      return [lsock, rsock]
     end
 
     class QuerySettings
-      attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue, 
+      attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue,
         :client_query_id, :socket, :dest_server, :dest_port, :endtime, :udp_packet_size,
         :single_resolver
       # new(query_bytes, query, ignore_truncation, client_queue, client_query_id,
@@ -100,7 +103,7 @@ module Dnsruby
         @socket = args[5]
         @dest_server = args[6]
         @dest_port=args[7]
-        @endtime = args[8]  
+        @endtime = args[8]
         @udp_packet_size = args[9]
         @single_resolver = args[10]
       end
@@ -156,8 +159,8 @@ module Dnsruby
         sockets=[]
         timeouts=[]
         has_observer = false
-        @@mutex.synchronize {                
-          sockets = @@sockets 
+        @@mutex.synchronize {
+          sockets = @@sockets
           timeouts = @@timeouts.values
           has_observer = !@@observers.empty?
         }
@@ -249,7 +252,7 @@ module Dnsruby
                 (answeripaddr != destserveripaddr) &&
                 (answerfrom != dest_server))
             Dnsruby.log.warn("Unsolicited response received from #{answerip} instead of #{query_settings.dest_server}")
-          else 
+          else
             send_response_to_client(msg, bytes, socket)
           end
         end
@@ -308,8 +311,8 @@ module Dnsruby
       @@mutex.synchronize{
         socket = @@query_hash[id].socket
         @@timeouts.delete(id)
-        @@query_hash.delete(id)  
-        @@socket_hash.delete(socket)        
+        @@query_hash.delete(id)
+        @@socket_hash.delete(socket)
         @@sockets.delete(socket) # @TODO@ Not if persistent!
       }
       Dnsruby.log.debug{"Closing socket #{socket}"}
@@ -421,13 +424,13 @@ module Dnsruby
           else
             # recvfrom failed - why?
             Dnsruby.log.error{"Error - recvfrom failed from #{socket}"}
-            handle_recvfrom_failure(socket, "")          
+            handle_recvfrom_failure(socket, "")
             return
-          end        
+          end
         end
       rescue Exception => e
         Dnsruby.log.error{"Error - recvfrom failed from #{socket}, exception : #{e}"}
-        handle_recvfrom_failure(socket, e)          
+        handle_recvfrom_failure(socket, e)
         return
       end
       Dnsruby.log.debug{";; answer from #{answerfrom} : #{answersize} bytes\n"}
@@ -469,7 +472,7 @@ module Dnsruby
             end
           }
           if !sent
-          send_exception_to_client(e, socket, client_id)
+            send_exception_to_client(e, socket, client_id)
           end
 
         else
@@ -546,7 +549,7 @@ module Dnsruby
       else
         @@select_thread = Thread.new {
           do_select
-        }      
+        }
       end
     end
     
@@ -667,7 +670,7 @@ module Dnsruby
     def add_observer(client_queue, observer)
       @@mutex.synchronize {
         @@observers[client_queue]=observer
-        check_select_thread_synchronized # Is this really necessary? The client should start the thread by sending a query, really...        
+        check_select_thread_synchronized # Is this really necessary? The client should start the thread by sending a query, really...
         if (!@@tick_observers.include?observer)
           @@tick_observers.push(observer)
         end
@@ -699,7 +702,7 @@ module Dnsruby
       }
       if (observer)
         observer.handle_queue_event(client_queue, client_query_id)
-      end      
+      end
     end
     
     def send_tick_to_observers
