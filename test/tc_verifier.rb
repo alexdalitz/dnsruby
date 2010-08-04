@@ -269,31 +269,53 @@ class VerifierTest < Test::Unit::TestCase
   end
 
   def test_naptr
-    key = Dnsruby::RR.create("all.rr.org.	2678400	IN	DNSKEY	256 3 7 AwEAAcW1ZJxnMxZAAfsQ0JJQPHOlVNeGzs/AWVSGXiIYsg9UUSsvRTiK/Wy2wD7XC6osZpgy4Blhm846wktPbCwHpkxxbjxpaMABjbhH14gRol1Gpzf+gOr8vpdii8c2y6VMN9kIXZyaZUWcshLii19ysSGlqY1a1g2XZjogFtvzDHjH ;{id = 43068 (zsk), size = 1024b}")
-    verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
-    key_rrset = Dnsruby::RRSet.new(key)
-    verifier.add_trusted_key(key_rrset);
-    sig = Dnsruby::RR.create("all.rr.org.	86400	IN	RRSIG	NAPTR 7 3 86400 20100727230632 20090919145743 43068 all.rr.org. RpyBsaLiaZ/OqX5twE0SoMhlVZVAHuAlS4FZqmnAg+udF3EwrY6N/POt3nPCtgwf7tczaxrMK6zWkOldfv37iyIgXIxDQvhoCb7IoffI5TsBL5CWl5n7pg8BNAMpLxd8HIu1DShWvlplpFbBWIaC6tZCR6ft/iP+uhU7dYcqTHg= ;{id = 43068}")
-    naptr = Dnsruby::RR.create('all.rr.org.	86400	IN	NAPTR	100 10 "" "" "!^urn:cid:.+@([^\\\\.]+\\\\.)(.*)$!\\\\2!i" .')
-    rrset = Dnsruby::RRSet.new(naptr)
-    rrset.add(sig)
-    verifier.verify_rrset(rrset, key_rrset)
+    begin
+      begin
+        require 'rubygems'
+      rescue LoadError
+      end
+      require 'timecop'
+    rescue LoadError
+      return
+    end
+    Timecop.travel(2010, 03, 24, 0, 0, 0) {
+      key = Dnsruby::RR.create("all.rr.org.	2678400	IN	DNSKEY	256 3 7 AwEAAcW1ZJxnMxZAAfsQ0JJQPHOlVNeGzs/AWVSGXiIYsg9UUSsvRTiK/Wy2wD7XC6osZpgy4Blhm846wktPbCwHpkxxbjxpaMABjbhH14gRol1Gpzf+gOr8vpdii8c2y6VMN9kIXZyaZUWcshLii19ysSGlqY1a1g2XZjogFtvzDHjH ;{id = 43068 (zsk), size = 1024b}")
+      verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+      key_rrset = Dnsruby::RRSet.new(key)
+      verifier.add_trusted_key(key_rrset);
+      sig = Dnsruby::RR.create("all.rr.org.	86400	IN	RRSIG	NAPTR 7 3 86400 20100727230632 20090919145743 43068 all.rr.org. RpyBsaLiaZ/OqX5twE0SoMhlVZVAHuAlS4FZqmnAg+udF3EwrY6N/POt3nPCtgwf7tczaxrMK6zWkOldfv37iyIgXIxDQvhoCb7IoffI5TsBL5CWl5n7pg8BNAMpLxd8HIu1DShWvlplpFbBWIaC6tZCR6ft/iP+uhU7dYcqTHg= ;{id = 43068}")
+      naptr = Dnsruby::RR.create('all.rr.org.	86400	IN	NAPTR	100 10 "" "" "!^urn:cid:.+@([^\\\\.]+\\\\.)(.*)$!\\\\2!i" .')
+      rrset = Dnsruby::RRSet.new(naptr)
+      rrset.add(sig)
+      verifier.verify_rrset(rrset, key_rrset)
+    }
   end
 
   def test_txt_rr
-    txt = 'txt2.all.rr.org.        86400   IN      TXT     "Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"'
-    rr = Dnsruby::RR.create(txt)
-    assert(rr.to_s.index('"Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"'), rr.to_s)
+    begin
+      begin
+        require 'rubygems'
+      rescue LoadError
+      end
+      require 'timecop'
+    rescue LoadError
+      return
+    end
+    Timecop.travel(2010, 03, 24, 0, 0, 0) {
+      txt = 'txt2.all.rr.org.        86400   IN      TXT     "Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"'
+      rr = Dnsruby::RR.create(txt)
+      assert(rr.to_s.index('"Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"'), rr.to_s)
 
-    key = Dnsruby::RR.create("all.rr.org.	2678400	IN	DNSKEY	256 3 7 AwEAAcW1ZJxnMxZAAfsQ0JJQPHOlVNeGzs/AWVSGXiIYsg9UUSsvRTiK/Wy2wD7XC6osZpgy4Blhm846wktPbCwHpkxxbjxpaMABjbhH14gRol1Gpzf+gOr8vpdii8c2y6VMN9kIXZyaZUWcshLii19ysSGlqY1a1g2XZjogFtvzDHjH ;{id = 43068 (zsk), size = 1024b}")
-    verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
-    key_rrset = Dnsruby::RRSet.new(key)
-    verifier.add_trusted_key(key_rrset);
-    sig = Dnsruby::RR.create("txt2.all.rr.org.        86400   IN      RRSIG   TXT 7 4 86400 20100813002344 20091006093439 43068 all.rr.org. LJv/ccd2JHyT6TK74Dtu/zH4jdeR4ScyrB8cGwaqeCjwxG4H5FY88Sk/U0JUQyxnUificnyZQwcyXAItn7QjBMHQO4ftVxl/gDCyt6MEXy9JKK/rfvXcAceo5prmlVrb8WxT5YnvPha3CxjK7f+YIs5cqppRVaZTQTxsAsJyJ20= ;{id = 43068}")
-    txt = Dnsruby::RR.create('txt2.all.rr.org.        86400   IN      TXT     "Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"')
-    rrset = Dnsruby::RRSet.new(txt)
-    rrset.add(sig)
-    verifier.verify_rrset(rrset, key_rrset)
+      key = Dnsruby::RR.create("all.rr.org.	2678400	IN	DNSKEY	256 3 7 AwEAAcW1ZJxnMxZAAfsQ0JJQPHOlVNeGzs/AWVSGXiIYsg9UUSsvRTiK/Wy2wD7XC6osZpgy4Blhm846wktPbCwHpkxxbjxpaMABjbhH14gRol1Gpzf+gOr8vpdii8c2y6VMN9kIXZyaZUWcshLii19ysSGlqY1a1g2XZjogFtvzDHjH ;{id = 43068 (zsk), size = 1024b}")
+      verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+      key_rrset = Dnsruby::RRSet.new(key)
+      verifier.add_trusted_key(key_rrset);
+      sig = Dnsruby::RR.create("txt2.all.rr.org.        86400   IN      RRSIG   TXT 7 4 86400 20100813002344 20091006093439 43068 all.rr.org. LJv/ccd2JHyT6TK74Dtu/zH4jdeR4ScyrB8cGwaqeCjwxG4H5FY88Sk/U0JUQyxnUificnyZQwcyXAItn7QjBMHQO4ftVxl/gDCyt6MEXy9JKK/rfvXcAceo5prmlVrb8WxT5YnvPha3CxjK7f+YIs5cqppRVaZTQTxsAsJyJ20= ;{id = 43068}")
+      txt = Dnsruby::RR.create('txt2.all.rr.org.        86400   IN      TXT     "Net-DNS\\\\; complicated $tuff" "sort of \\" text\\\\; and binary \\000 data"')
+      rrset = Dnsruby::RRSet.new(txt)
+      rrset.add(sig)
+      verifier.verify_rrset(rrset, key_rrset)
+    }
   end
 
   #  def test_txt_from_zone
@@ -330,3 +352,4 @@ class VerifierTest < Test::Unit::TestCase
   #    verifier.verify_rrset(rrset, key_rrset)
   #  end
 end
+
