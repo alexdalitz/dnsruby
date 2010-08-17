@@ -58,6 +58,8 @@ module Dnsruby
         @@queued_responses=[]
         @@queued_validation_responses=[]
         @@wakeup_sockets = get_socket_pair
+        @@sockets << @@wakeup_sockets[1]
+
         # Suppress reverse lookups
         BasicSocket.do_not_reverse_lookup = true
         #    end
@@ -164,7 +166,6 @@ module Dnsruby
           timeouts = @@timeouts.values
           has_observer = !@@observers.empty?
         }
-        sockets << @@wakeup_sockets[1]
         if (timeouts.length > 0)
           timeouts.sort!
           timeout = timeouts[0] - Time.now
