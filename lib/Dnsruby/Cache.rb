@@ -41,6 +41,9 @@ module Dnsruby
         @cache = Hash.new
       }
     end
+    def length
+      return @cache.length
+    end
     def add(message)
       q = message.question[0]
       key = CacheKey.new(q.qname, q.qtype, q.qclass).to_s
