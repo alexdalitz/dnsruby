@@ -176,7 +176,7 @@ module Dnsruby
             else
               if (c == ";")
                 if (!quoted)
-                  return line[0, pos]
+                  return line[0, pos+1]
                 end
               end
             end
