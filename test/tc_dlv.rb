@@ -53,8 +53,9 @@ class TestDlv < Test::Unit::TestCase
     ret = res.query("ns2.nic.se", Dnsruby::Types.A)
     assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
 
-    ret = res.query("b.ns.nic.cz", Dnsruby::Types.A)
-    assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
+    # .cz no longer in dlv?
+#    ret = res.query("b.ns.nic.cz", Dnsruby::Types.A)
+#    assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
 
     # Test .gov
 #    Dnsruby::TheLog.level = Logger::DEBUG

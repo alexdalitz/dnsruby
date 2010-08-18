@@ -141,5 +141,10 @@ class TestRrTest < Test::Unit::TestCase
   def test_nasty_txt
    t = RR.create('txt2.t.net-dns.org. 60 IN TXT "Net-DNS\; complicated $tuff" "sort of \" text\; and binary \000 data"')
    assert(t.rdata.to_s == '"Net-DNS\; complicated $tuff" "sort of \" text\; and binary \000 data"', t.to_s)
+
+   r1 = RR.create("auto._domainkey.cacert.org.  43200 IN	TXT	\"v=DKIM1\;g=*\;k=rsa\;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDDNFxiNr+NHJwih3OPhGr4iwLE+BBDu72YrMSzUnU1FF50CW7iOtuhg796UZ6xrZ5VuhAix6YmmzcvF2UxYzoD/XpfZ4MzBu0ND4/nkt9/YOTyIBzwQqn9uMNve0Y76Zsel89dIJtOI+y+lfnFExV0jKwe53gzmxMVpMSSCcZPGwIDAQAB\"	; ----- DKIM auto for cacert.org")
+   r2 = RR.create("auto._domainkey.cacert.org.	43200	IN	TXT	\"v=DKIM1;g=*;k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDDNFxiNr+NHJwih3OPhGr4iwLE+BBDu72YrMSzUnU1FF50CW7iOtuhg796UZ6xrZ5VuhAix6YmmzcvF2UxYzoD/XpfZ4MzBu0ND4/nkt9/YOTyIBzwQqn9uMNve0Y76Zsel89dIJtOI+y+lfnFExV0jKwe53gzmxMVpMSSCcZPGwIDAQAB\"")
+   assert(r1.to_s == r2.to_s)
   end
+
 end

@@ -318,6 +318,17 @@ class VerifierTest < Test::Unit::TestCase
     }
   end
 
+#  def test_txt_zonefile
+#     reader = Dnsruby::ZoneReader.new("cacert.org.")
+#     zone = reader.process_file("cacert.txt")
+#     reader2 = Dnsruby::ZoneReader.new("cacert.org.")
+#     zone2 = reader.process_file("cacert.signed.txt")
+#     assert(zone[1].to_s.index("DAQAB\""))
+#     assert(zone2[1].to_s.index("DAQAB\""))
+#
+#     assert(zone[1].to_s == zone2[1].to_s)
+#  end
+#
   #  def test_txt_from_zone
   #    reader = Dnsruby::ZoneReader.new("all.rr.org.")
   #    zone = reader.process_file("zone.txt")
