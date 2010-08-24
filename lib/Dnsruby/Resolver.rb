@@ -423,10 +423,10 @@ module Dnsruby
         # Add the Config nameservers
         @config.nameserver.each do |ns|
           res = PacketSender.new({:server=>ns, :dnssec=>@dnssec,
-                :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
-                :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
-                :src_address=>@src_address, :src_port=>@src_port,
-                :recurse=>@recurse, :udp_size=>@udp_size})
+              :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
+              :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
+              :src_address=>@src_address, :src_port=>@src_port,
+              :recurse=>@recurse, :udp_size=>@udp_size})
           @single_resolvers.push(res) if res
         end
       }
@@ -615,8 +615,8 @@ module Dnsruby
     def Resolver.port_in_range(p)
       if ((p == 0) || ((p >= 50000) && (p <= 65535)))
         # @TODO@ IANA port bitmap - use 50000 - 65535 for now
-#            ((Iana::IANA_PORTS.index(p)) == nil &&
-#              (p > 1024) && (p < 65535)))
+        #            ((Iana::IANA_PORTS.index(p)) == nil &&
+        #              (p > 1024) && (p < 65535)))
         return true
       end
       return false
@@ -1073,10 +1073,12 @@ module Dnsruby
         timeouts = @timeouts[client_query_id]
         if (!(error.to_s=~/Errno::EMFILE/))
           Dnsruby.log.debug{"Removing #{resolver.server} from resolver list for this query"}
-          timeouts[1].each do |key, value|
-            res = value[0]
-            if (res == resolver)
-              timeouts[1].delete(key)
+          if (timeouts)
+            timeouts[1].each do |key, value|
+              res = value[0]
+              if (res == resolver)
+                timeouts[1].delete(key)
+              end
             end
           end
           # Also stick it to the back of the list for future queries
@@ -1085,7 +1087,7 @@ module Dnsruby
           Dnsruby.log.debug{"NOT Removing #{resolver.server} due to Errno::EMFILE"}
         end
         #        - if it was the last server, then return an error to the client (and clean up)
-        if (outstanding.empty? && timeouts && timeouts[1].values.empty?)
+        if (outstanding.empty? && ((!timeouts) || (timeouts && timeouts[1].values.empty?)))
           #          if (outstanding.empty?)
           Dnsruby.log.debug{"Sending error to client"}
           send_result_and_stop_querying(client_queue, client_query_id, select_queue, response, error)
