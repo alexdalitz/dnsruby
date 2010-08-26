@@ -321,10 +321,10 @@ module Dnsruby
       if (udp_packet_size < query_packet.length)
         if (@no_tcp)
           # Can't send the message - abort!
-              err=IOError.new("Can't send message - too big for UDP and no_tcp=true")
-              Dnsruby.log.error{"#{err}"}
-              st.push_exception_to_select(client_query_id, client_queue, err, nil)
-              return
+          err=IOError.new("Can't send message - too big for UDP and no_tcp=true")
+          Dnsruby.log.error{"#{err}"}
+          st.push_exception_to_select(client_query_id, client_queue, err, nil)
+          return
         end
         Dnsruby.log.debug{"Query packet length exceeds max UDP packet size - using TCP"}
         use_tcp = true
@@ -372,7 +372,10 @@ module Dnsruby
           runnextportloop = false
         rescue Exception => e
           if (socket!=nil)
-            socket.close
+            begin
+              socket.close
+            rescue Exception
+            end
           end
           # Try again if the error was EADDRINUSE and a random source port is used
           # Maybe try a max number of times?
@@ -409,7 +412,10 @@ module Dnsruby
         err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
         Dnsruby.log.error{"#{err}"}
         st.push_exception_to_select(client_query_id, client_queue, err, nil)
-        socket.close
+        begin
+          socket.close
+        rescue Exception
+        end
         return
       end
       
