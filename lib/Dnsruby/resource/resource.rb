@@ -213,7 +213,23 @@ module Dnsruby
   #   rr_again = Dnsruby::RR.create(s)
   #
   class RR
+
+    include Comparable
     
+    def <=>(other)
+      #      return 1 if ((!other) || !(other.name) || !(other.type))
+      #      return -1 if (!@name)
+      if (@name.canonical == other.name.canonical)
+        if (@type.code == other.type.code)
+          return (@rdata <=> other.rdata)
+        else
+          return @type.code <=> other.type.code
+        end
+      else
+        return @name <=> other.name
+      end
+    end
+
     # A regular expression which catches any valid resource record.
     @@RR_REGEX = Regexp.new("^\\s*(\\S+)\\s*(\\d+)?\\s*(#{Classes.regexp +
       "|CLASS\\d+"})?\\s*(#{Types.regexp + '|TYPE\\d+'})?\\s*([\\s\\S]*)\$") #:nodoc: all
@@ -412,8 +428,8 @@ module Dnsruby
       if ((rrtype == "NAPTR") || (rrtype == "TXT"))
       else
         if (rdata)
-        rdata.gsub!("(", "")
-        rdata.gsub!(")", "")
+          rdata.gsub!("(", "")
+          rdata.gsub!(")", "")
         end
       end
       
