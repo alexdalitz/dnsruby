@@ -298,9 +298,10 @@ module Dnsruby
         # Old BINDs sent cross class A records for non IN classes.
         if (type == Types.A && rec.klass() != @klass)
         else
-          @axfr << rec
           if (type == Types.SOA)
             @state = :End
+          else
+            @axfr << rec
           end
         end
       when :End
@@ -340,10 +341,10 @@ module Dnsruby
       buf = tcp_read(socket, answersize)
       msg = Message.decode(buf)
       if (@tsig)
-          if !@tsig.verify_envelope(msg, buf)
-            Dnsruby.log.error("Bad signature on zone transfer - closing connection")
-            raise ResolvError.new("Bad signature on zone transfer")
-          end      
+        if !@tsig.verify_envelope(msg, buf)
+          Dnsruby.log.error("Bad signature on zone transfer - closing connection")
+          raise ResolvError.new("Bad signature on zone transfer")
+        end
       end
       return msg
     end  
