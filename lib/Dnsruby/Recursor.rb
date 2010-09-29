@@ -210,6 +210,8 @@ module Dnsruby
               hints[server] = AddressCache.new
             end
           end
+          # @TODO@ Some resolvers (e.g. 8.8.8.8) do not send an additional section -
+          # need to make explicit queries for these :(
           packet.additional.each do |rr|
             TheLog.debug(";; ADDITIONAL: "+rr.inspect+"\n")
             server = rr.name.to_s.downcase
