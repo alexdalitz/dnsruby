@@ -206,7 +206,7 @@ module Dnsruby
       TheLog.debug("Checking whether to validate, query.cd = #{query.header.cd}")
       if (((@@validation_policy > ValidationPolicy::ALWAYS_ROOT_ONLY) && (self.trust_anchors().length > 0)) ||
             # Check query here, and validate if CD is true
-          (query.header.cd == true))
+          ((query.header.cd == true))) # && (query.do_validation)))
         TheLog.debug("Starting validation")
 
         # Validate!

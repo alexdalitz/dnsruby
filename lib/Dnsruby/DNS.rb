@@ -282,6 +282,9 @@ module Dnsruby
         msg = Message.new
         msg.header.rd = 1
         msg.add_question(candidate, type, klass)
+        msg.do_validation = false
+        msg.header.cd = false
+        @resolver.do_validation = false
         @resolver.send_async(msg, q)
         id, ret, exception = q.pop
         if (exception == nil && ret && ret.rcode == RCode.NOERROR)
