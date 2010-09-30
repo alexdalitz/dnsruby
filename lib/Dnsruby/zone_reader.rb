@@ -359,9 +359,9 @@ module Dnsruby
         when Types::RP
           if (!parsed_rr.mailbox.absolute?)
             parsed_rr.mailbox = parsed_rr.mailbox.to_s + "." + @origin.to_s
-            if (!parsed_rr.txtdomain.absolute?)
-              parsed_rr.txtdomain = parsed_rr.txtdomain.to_s + "." + @origin.to_s
-            end
+          end
+          if (!parsed_rr.txtdomain.absolute?)
+            parsed_rr.txtdomain = parsed_rr.txtdomain.to_s + "." + @origin.to_s
           end
         end
         line = parsed_rr.to_s
