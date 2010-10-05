@@ -22,11 +22,19 @@ module Dnsruby
       TypeValue = Types::RP #:nodoc: all
       
       #Returns a domain name that specifies the mailbox for the responsible person.
-      attr_accessor :mailbox
+      attr_reader :mailbox
       #A domain name that specifies a TXT record containing further
       #information about the responsible person.
-      attr_accessor :txtdomain
+      attr_reader :txtdomain
+
+      def txtdomain=(s)
+        @txtdomain = Name.create(s)
+      end
       
+      def mailbox=(s)
+        @mailbox = Name.create(s)
+      end
+
       def from_hash(hash)
         @mailbox = Name.create(hash[:mailbox])
         @txtdomain = Name.create(hash[:txtdomain])

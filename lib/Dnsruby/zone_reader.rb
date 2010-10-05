@@ -217,7 +217,7 @@ module Dnsruby
       split = line.split(' ') # split on whitespace
       name = split[0].strip
       if (name.index"\\")
-
+        
         ls =[]
         Name.create(name).labels.each {|el| ls.push(Name.decode(el.to_s))}
         new_name = ls.join('.')
