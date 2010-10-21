@@ -283,6 +283,9 @@ module Dnsruby
                     server = addr
                   end
                 }
+                if (!found)
+                  raise ArgumentError.new("Recursor can't locate #{server}")
+                end
               end
             end
           rescue Exception => e

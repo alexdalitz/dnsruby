@@ -256,7 +256,7 @@ module Dnsruby
           end
         end
       else
-        warn "Server ["+(@@nameservers)[0].to_s+".] did not give answers"
+        raise ResolvError.new( "Server ["+(@@nameservers)[0].to_s+".] did not give answers")
       end
           
       # Disable recursion flag.
