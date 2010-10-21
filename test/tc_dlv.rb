@@ -49,9 +49,10 @@ class TestDlv < Test::Unit::TestCase
     Dnsruby::PacketSender.clear_caches
 
 
-    res = Dnsruby::Recursor.new()
-    ret = res.query("ns2.nic.se", Dnsruby::Types.A)
-    assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
+    # SE no longer in DLV
+#    res = Dnsruby::Recursor.new()
+#    ret = res.query("ns2.nic.se", Dnsruby::Types.A)
+#    assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
 
     # .cz no longer in dlv?
 #    ret = res.query("b.ns.nic.cz", Dnsruby::Types.A)
@@ -59,16 +60,18 @@ class TestDlv < Test::Unit::TestCase
 
     # Test .gov
 #    Dnsruby::TheLog.level = Logger::DEBUG
+res = Resolver.new
     ret = res.query("nih.gov", "NS")
     assert(ret.security_level = Dnsruby::Message::SecurityLevel::SECURE)
   end
 
-  def test_scrub_non_authoritative
-#    Dnssec.do_validation_with_recursor(true)
-    res = Dnsruby::Recursor.new()
-    ret = res.query("frobbit.se")
-      res.prune_rrsets_to_rfc5452(ret, "frobbit.se.")
-      Dnssec.validate(ret)
-    assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
-  end
+   # se no longer in dlv
+#  def test_scrub_non_authoritative
+##    Dnssec.do_validation_with_recursor(true)
+#    res = Dnsruby::Recursor.new()
+#    ret = res.query("frobbit.se")
+#      res.prune_rrsets_to_rfc5452(ret, "frobbit.se.")
+#      Dnssec.validate(ret)
+#    assert(ret.security_level == Dnsruby::Message::SecurityLevel::SECURE)
+#  end
 end
