@@ -48,7 +48,8 @@ module Dnsruby
       end      
       new_pos = @rrs.length - @num_sigs
       if ((@num_sigs == @rrs.length)  && @num_sigs > 0) # if we added RRSIG first
-        if (r.type != @rrs.last.type_covered)
+        if (((r.type != @rrs.last.type_covered) && (r.type != Types.RRSIG))||
+              ((r.type == Types.RRSIG) && (r.type_covered != @rrs.last.type_covered)))
           return false
         end
       end
@@ -291,6 +292,9 @@ module Dnsruby
     def sameRRset(rec)
       if (@klass != rec.klass || @name.downcase != rec.name.downcase)
         return false
+      end
+      if (rec.type == Types.RRSIG) && (@type == Types.RRSIG)
+        return rec.type_covered == self.type_covered
       end
       [rec, self].each { |rr|
         if (rr.type == Types::RRSIG)
