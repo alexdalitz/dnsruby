@@ -220,7 +220,22 @@ module Dnsruby
         type=args[1]
         ttl=args[2]
         rdata=args[3]
-        resource = RR.create("#{name} #{ttl} #{zoneclass} #{type} #{rdata}")
+        resource = nil
+        if (Types.new(type) == Types.TXT)
+          instring = "#{name} #{ttl} #{zoneclass} #{type} ";
+          if (String === rdata)
+            instring += " '#{rdata}'"
+          elsif (Array === rdata)
+            rdata.length.times {|rcounter|
+            instring += " '#{rdata[rcounter]}' "
+            }
+          else
+            instring += rdata
+          end
+          resource = RR.create(instring)
+        else
+          resource = RR.create("#{name} #{ttl} #{zoneclass} #{type} #{rdata}")
+        end
         add_update(resource)
         return resource
       end
@@ -231,14 +246,14 @@ module Dnsruby
     #
     #2.5.2 - Delete An RRset
     #   update.delete(name, type)
-    #   
+    #
     #
     #2.5.3 - Delete All RRsets From A Name
     #   update.delete(name)
-    #   
+    #
     #2.5.4 - Delete An RR From An RRset
     #  update.delete(name, type, rdata)
-    #  
+    #
     def delete(*args)
       ttl = 0
       klass = Classes.ANY
@@ -247,14 +262,14 @@ module Dnsruby
       case args.length
       when 1 # name
         resource = RR.create("#{args[0]} #{ttl} #{klass} #{Types.ANY} #{rdata}")
-        add_update(resource)      
+        add_update(resource)
       when 2 # name, type
         resource = RR.create("#{args[0]} #{ttl} #{klass} #{args[1]} #{rdata}")
-        add_update(resource)      
+        add_update(resource)
       when 3 # name, type, rdata
         resource = RR.create("#{args[0]} #{ttl} IN #{args[1]} #{args[2]}")
         resource.klass = Classes.NONE
-        add_update(resource)      
+        add_update(resource)
       end
       return resource
     end

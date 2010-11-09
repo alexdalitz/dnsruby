@@ -221,4 +221,18 @@ class TestUpdate < Test::Unit::TestCase
     assert_equal(Classes.ANY,               pre[1].klass, 'third class right');         #65
     assert_equal(Classes.NONE,              pre[2].klass, 'forth class right');         #66
   end
+
+  def test_txt
+    update = Update.new()
+    update.add("target_name", "TXT", 100, "test signed update")
+    print update.to_s
+    assert(update.to_s.index("test signed update"))
+  end
+
+  def test_array
+    update = Update.new
+    update.add("target_name", "TXT", 100, ['"test signed update"', 'item#2'])
+    print update.to_s
+    assert(update.to_s.index("item"))
+  end
 end
