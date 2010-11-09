@@ -285,6 +285,8 @@ module Dnsruby
           soa_serial = rec.serial
           if (soa_serial == @end_serial)
             @state = :End
+            raise ZoneSerialError.new("IXFR up to date: expected serial " +
+                @current_serial + " , got " + rec.serial);
             return
           elsif (soa_serial != @current_serial)
             raise ZoneSerialError.new("IXFR out of sync: expected serial " +
