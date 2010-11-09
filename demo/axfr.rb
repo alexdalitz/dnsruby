@@ -99,6 +99,12 @@ else
   
   nameserver = (ARGV[0] =~ /^@/) ? ARGV.shift : ""
   nameserver = nameserver.sub(/^@/, "")
+  res = nil
+  if nameserver
+    res = Dnsruby::Resolver.new(nameserver)
+  else
+    res = Dnsruby::Resolver.new
+  end
   
   zone = ARGV.shift 
   basedir = opt_d!=nil ? opt_d : (ENV["HOME"]!=nil ? ENV["HOME"] : "") + "/.dns-zones"
@@ -175,7 +181,7 @@ else
     
     zoneref = zt.transfer(zone)
     if zoneref==nil
-      raise RuntimeError,  "couldn't transfer zone: " + res.errorstring + "\n"
+      raise RuntimeError,  "couldn't transfer zone\n"
     end
     Marshal.dump(zoneref, File.open(zonefile, File::CREAT|File::RDWR))
   end

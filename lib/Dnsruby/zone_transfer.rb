@@ -91,7 +91,8 @@ module Dnsruby
           server=Config.resolve_server(server)
           xfr = do_transfer(zone, server)
           break
-        rescue Exception => exception
+        rescue Exception => e
+          exception = e
         end
       end
       if (xfr == nil && exception != nil)
@@ -133,8 +134,8 @@ module Dnsruby
               raise ResolvError.new(rcode.string);
             end
             
-            if (response.question[0].qtype != @transfer_type) 
-              raise ResolvError.new("invalid question section")
+            if (response.question[0].qtype != @transfer_type)
+                raise ResolvError.new("invalid question section")
             end
             
             if (response.header.ancount == 0 && @transfer_type == Types.IXFR) 
@@ -246,6 +247,7 @@ module Dnsruby
         else
           Dnsruby.log.debug("AXFR response - using AXFR")
           @rtype = Types.AXFR
+          @transfer_type = Types.AXFR
           @axfr = []
           @axfr << @initialsoa
           @state = :Axfr
