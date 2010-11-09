@@ -479,6 +479,10 @@ module Dnsruby
   class VerifyError < ResolvError
   end
 
+  #Indicates a zone transfer has failed due to SOA serial mismatch
+  class ZoneSerialError < ResolvError
+  end
+
   #The Resolv class can be used to resolve addresses using /etc/hosts and /etc/resolv.conf, 
   #
   #The DNS class may be used to perform more queries. If greater control over the sending 
