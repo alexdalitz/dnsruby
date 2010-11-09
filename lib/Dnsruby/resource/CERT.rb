@@ -74,7 +74,10 @@ module Dnsruby
           rescue ArgumentError
             @alg = Dnsruby::Algorithms.new(names[2].to_i)
           end
-          buf = names[3]
+          buf = ""
+          (names.length - 3).times {|index|
+            buf += names[index + 3]
+          }
 
 
           buf.gsub!(/\n/, "")
