@@ -477,7 +477,7 @@ module Dnsruby
         @buf = nil
         
         # RFC 2845 Section 2.3
-        @klass = Types.ANY
+        @klass = Classes.ANY
         
         @ttl = 0 # RFC 2845 Section 2.3
       end
