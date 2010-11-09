@@ -225,14 +225,12 @@ class TestUpdate < Test::Unit::TestCase
   def test_txt
     update = Update.new()
     update.add("target_name", "TXT", 100, "test signed update")
-    print update.to_s
     assert(update.to_s.index("test signed update"))
   end
 
   def test_array
     update = Update.new
     update.add("target_name", "TXT", 100, ['"test signed update"', 'item#2'])
-    print update.to_s
     assert(update.to_s.index("item"))
   end
 end
