@@ -231,6 +231,8 @@ module Dnsruby
         @end_serial = rec.serial
         if (@transfer_type == Types.IXFR && @end_serial <= @serial)
           Dnsruby.log.debug("zone up to date")
+            raise ZoneSerialError.new("IXFR up to date: expected serial " +
+                @current_serial + " , got " + rec.serial);
           @state = :End
         else
           @state = :FirstData
