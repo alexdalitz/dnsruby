@@ -135,7 +135,7 @@ module Dnsruby
             end
             
             if (response.question[0].qtype != @transfer_type)
-                raise ResolvError.new("invalid question section")
+              raise ResolvError.new("invalid question section")
             end
             
             if (response.header.ancount == 0 && @transfer_type == Types.IXFR) 
@@ -214,7 +214,28 @@ module Dnsruby
         ret +=", Deletes : " + @deletes.join(",")
       end
     end
-    
+
+    #Compare two serials according to RFC 1982. Return 0 if equal,
+    #-1 if s1 is bigger, 1 if s1 is smaller.
+    def compare_serial(s1, s2)
+      if s1 == s2
+        return 0
+      end
+      if s1 < s2 and (s2 - s1) < (2**31)
+        return 1
+      end
+      if s1 > s2 and (s1 - s2) > (2**31)
+        return 1
+      end
+      if s1 < s2 and (s2 - s1) > (2**31)
+        return -1
+      end
+      if s1 > s2 and (s1 - s2) < (2**31)
+        return -1
+      end
+      return 0
+    end
+
     def parseRR(rec) #:nodoc: all
       name = rec.name
       type = rec.type
@@ -229,10 +250,11 @@ module Dnsruby
         # Remember the serial number in the initial SOA; we need it
         # to recognize the end of an IXFR.
         @end_serial = rec.serial
-        if (@transfer_type == Types.IXFR && @end_serial <= @serial)
+        #        if ((@transfer_type == Types.IXFR) && (@end_serial <= @serial))
+        if ((@transfer_type == Types.IXFR) && (compare_serial(@end_serial, @serial) >= 0))
           Dnsruby.log.debug("zone up to date")
-            raise ZoneSerialError.new("IXFR up to date: expected serial " +
-                @current_serial + " , got " + rec.serial);
+          raise ZoneSerialError.new("IXFR up to date: expected serial " +
+              @serial.to_s + " , got " + rec.serial.to_s);
           @state = :End
         else
           @state = :FirstData
@@ -285,12 +307,10 @@ module Dnsruby
           soa_serial = rec.serial
           if (soa_serial == @end_serial)
             @state = :End
-            raise ZoneSerialError.new("IXFR up to date: expected serial " +
-                @current_serial + " , got " + rec.serial);
             return
           elsif (soa_serial != @current_serial)
             raise ZoneSerialError.new("IXFR out of sync: expected serial " +
-                @current_serial + " , got " + soa_serial);
+                @current_serial.to_s + " , got " + soa_serial.to_s);
           else
             @state = :Ixfr_DelSoa
             parseRR(rec); # Restart...
