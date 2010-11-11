@@ -111,6 +111,7 @@ module Dnsruby
       
       @header.opcode=('UPDATE')
       @header.rd=(0)
+      @do_validation = false
     end
     
     #Ways to create the prerequisite records (exists, notexists, inuse, etc. - RFC2136, section 2.4)
