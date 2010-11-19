@@ -869,7 +869,7 @@ module Dnsruby
       @parent.single_res_mutex.synchronize {
         @query_list.each do |client_query_id, values|
           msg, client_queue, q, outstanding = values
-          send_result_and_close(client_queue, client_query_id, q, nil, OtherResolvError.new("Resolver closing!"))
+          send_result_and_stop_querying(client_queue, client_query_id, q, nil, OtherResolvError.new("Resolver closing!"))
         end
       }
     end
