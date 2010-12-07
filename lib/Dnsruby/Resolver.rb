@@ -977,10 +977,10 @@ module Dnsruby
       # 2) we've validated the response - it's ready to be sent to the client
       #
       # so need two more methods :
-      #  handleValidationResponse : basically calls send_result_and_close and
+      #  handleValidationResponse : basically calls send_result_and_stop_querying and
       #  handleValidationError : does the same as handleValidationResponse, but for errors
       # can leave handleError alone
-      # but need to change handleResponse to stop sending, rather than send_result_and_close.
+      # but need to change handleResponse to stop sending, rather than send_result_and_stop_querying.
       #
       # @TODO@ Also, we could really do with a MaxValidationTimeout - if validation not OK within
       # this time, then raise Timeout (and stop validation)?
@@ -1143,7 +1143,6 @@ module Dnsruby
         Dnsruby.log.error{"Serious internal error : expected select queue #{s_queue}, got #{select_queue}"}
         raise RuntimeError.new("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
       end
-      #        send_result_and_close(client_queue, client_query_id, select_queue, response, nil)
       stop_querying(client_query_id)
       # @TODO@ Does the client want notified at this point?
       #        client_queue.push([client_query_id, Resolver::EventType::RECEIVED, msg, nil])
@@ -1163,7 +1162,6 @@ module Dnsruby
       else
         # @TODO@ Was there an error validating? Should we raise an exception for certain security levels?
         # This should be configurable by the client.
-        #        send_result_and_close(client_queue, client_query_id, select_queue, response, nil)
         send_result(client_queue, client_query_id, select_queue, response, nil)
         #      }
       end
