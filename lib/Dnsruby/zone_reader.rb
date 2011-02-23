@@ -324,7 +324,8 @@ module Dnsruby
         end
       end
 
-      line = line.split.join(' ').strip
+      line = line.strip
+
       # We need to fix up any non-absolute names in the RR
       # Some RRs have a single name, at the end of the string -
       #   to do these, we can just check the last character for "." and add the
