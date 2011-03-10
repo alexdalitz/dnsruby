@@ -333,6 +333,10 @@ module Dnsruby
 
       line = line.strip
 
+      if (stored_line && stored_line != "")
+        line += " " + stored_line.strip
+      end
+
       # We need to fix up any non-absolute names in the RR
       # Some RRs have a single name, at the end of the string -
       #   to do these, we can just check the last character for "." and add the
@@ -373,10 +377,6 @@ module Dnsruby
           end
         end
         line = parsed_rr.to_s
-      end
-
-      if (stored_line != "")
-        line += stored_line
       end
       if (do_prefix_hack)
         return line + "\n", type_string, @last_name
