@@ -517,7 +517,7 @@ module Dnsruby
     end
 
     def nameservers=(ns)
-      self.nameserver=(n)
+      self.nameserver=(ns)
     end
     def nameserver=(n)
       @configured = true
