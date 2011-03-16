@@ -184,17 +184,31 @@ module Dnsruby
     end
     def Recursor.set_hints(hints, resolver)
       TheLog.debug(";; hints(#{hints.inspect})\n")
+      @resolver = resolver
+      #      print (";; hints(#{hints.inspect})\n")
+      if (hints && hints.length > 0)
+        resolver.nameservers=hints
+        if (String === hints)
+          hints = [hints]
+        end
+        hints.each {|hint|
+          @@hints = Hash.new
+          @@hints[hint]=hint
+        }
+      end
       if (!hints && @@nameservers)
         @@hints=(@@nameservers)
       else
         @@nameservers=(hints)
+        @@hints = hints
       end
       TheLog.debug(";; verifying (root) zone...\n")
       # bind always asks one of the hint servers
       # for who it thinks is authoritative for
       # the (root) zone as a sanity check.
       # Nice idea.
-          
+
+      #      if (!@@hints || @@hints.length == 0)
       resolver.recurse=(1)
       packet=resolver.query_no_validation_or_recursion(".", "NS", "IN")
       hints = Hash.new
@@ -232,7 +246,7 @@ module Dnsruby
                 end
               end
                   
-            end 
+            end
           end
         end
         #                      foreach my $server (keys %hints) {
@@ -247,12 +261,10 @@ module Dnsruby
         @@hints = {}
       end
       if (@@hints.size > 0)
-        if (@debug)
-          TheLog.info(";; USING THE FOLLOWING HINT IPS:\n")
-          @@hints.values.each do |ips|
-            ips.each do |server|
-              TheLog.info(";;  #{server}\n")
-            end
+        TheLog.info(";; USING THE FOLLOWING HINT IPS:\n")
+        @@hints.values.each do |ips|
+          ips.each do |server|
+            TheLog.info(";;  #{server}\n")
           end
         end
       else
@@ -261,8 +273,27 @@ module Dnsruby
           
       # Disable recursion flag.
       resolver.recurse=(0)
+      #      end
           
       #  return $self->nameservers( map { @{ $_ } } values %{ $self->{'hints'} } );
+      if (Array === @@hints)
+        temp = []
+        @@hints.each {|hint|
+          temp.push(hint)
+        }
+        @@hints = Hash.new
+        count = 0
+        temp.each {|hint|
+          print "Adding hint : #{temp[count]}\n"
+          @@hints[count] = temp[count]
+          count += 1
+        }
+      end
+      if (String === @@hints)
+        temp = @@hints
+        @@hints = Hash.new
+        @@hints[0] = temp
+      end
       @@nameservers = @@hints.values
       return @@nameservers
     end
