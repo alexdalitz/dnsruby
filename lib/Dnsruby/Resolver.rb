@@ -394,8 +394,8 @@ module Dnsruby
               else
                 send(key.to_s+"=", args[0][key])
               end
-            rescue Exception
-              Dnsruby.log.error{"Argument #{key} not valid\n"}
+            rescue Exception => e
+              Dnsruby.log.error{"Argument #{key} not valid : #{e}\n"}
             end
           end
         elsif (args[0].class == String)
