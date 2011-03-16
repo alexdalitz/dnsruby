@@ -105,7 +105,7 @@ module Dnsruby
     # Add the
     def add_trust_anchor_with_expiration(k, expiration)
       if (k.type == Types.DNSKEY)
-        k.flags = k.flags | RR::IN::DNSKEY::SEP_KEY
+#        k.flags = k.flags | RR::IN::DNSKEY::SEP_KEY
         @trust_anchors.add_key_with_expiration(k, expiration)
         #        print "Adding trust anchor for #{k.name}\n"
         TheLog.info("Adding trust anchor for #{k.name}")
