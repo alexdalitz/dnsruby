@@ -892,6 +892,7 @@ module Dnsruby
       # Check if we have an anchor for name.
       # If not, strip off first label and try again
       # If we get to root, then return false
+      name = "." if name == ""
       n = Name.create(name)
       root = Name.create(".")
       while (true) # n != root)
@@ -899,7 +900,7 @@ module Dnsruby
         (@trust_anchors.keys + @trusted_keys.keys + @configured_ds_store + @discovered_ds_store).each {|key|
           return key if key.name.canonical == n.canonical
         }
-        break if (n == root)
+        break if (n.to_s == root.to_s)
         # strip the name
         n = n.strip_label
       end
@@ -924,7 +925,8 @@ module Dnsruby
       #      print "Follow chain from #{anchor.name} to #{name}\n"
       TheLog.debug("Follow chain from #{anchor.name} to #{name}")
 
-      res = nil
+#      res = nil
+      res = Dnssec.default_resolver
       #      while ((next_step != name) || (next_key.type != Types.DNSKEY))
       while (true)
         #        print "In loop for parent=#{parent}, next step = #{next_step}\n"
@@ -970,7 +972,11 @@ module Dnsruby
             parent_res = get_nameservers_for(parent)
             if (!parent_res)
               if (Dnssec.do_validation_with_recursor?)
+                 if (Dnssec.default_resolver)
+                parent_res = Recursor.new(Dnssec.default_resolver)
+                 else
                 parent_res = Recursor.new
+                 end
               else
                 if (Dnssec.default_resolver)
                   parent_res = Dnssec.default_resolver
