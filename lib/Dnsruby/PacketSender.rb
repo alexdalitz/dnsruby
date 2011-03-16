@@ -190,9 +190,12 @@ module Dnsruby
       elsif (arg.kind_of?Hash)
         arg.keys.each do |attr|
           begin
-            send(attr.to_s+"=", arg[attr])
-          rescue Exception
-            Dnsruby.log.error{"Argument #{attr} not valid\n"}
+            if ((attr.to_s == "src_address") && ((arg[attr] == nil) || (arg[attr] == "")))
+            else
+              send(attr.to_s+"=", arg[attr])
+            end
+          rescue Exception => e
+            Dnsruby.log.error{"PacketSender : Argument #{attr}, #{arg[attr]} not valid : #{e}\n"}
           end
           #        end
         end
