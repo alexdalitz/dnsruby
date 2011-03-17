@@ -163,8 +163,16 @@ module Dnsruby
     @@authority_cache = Hash.new
     @@zones_cache = nil
         
-    def initialize(res = Resolver.new)
-      @resolver = res
+    def initialize(res = nil)
+      if (res)
+        @resolver = res
+      else
+        if (defined?@@nameservers && @@nameservers.length > 0)
+          @resolver = Resolver.new({:nameserver => @@nameservers})
+        else
+          @resolver = Resolver.new
+        end
+      end
       @ipv6_ok = false
     end
     #Initialize the hint servers.  Recursive queries need a starting name
@@ -185,7 +193,9 @@ module Dnsruby
     def Recursor.set_hints(hints, resolver)
       TheLog.debug(";; hints(#{hints.inspect})\n")
       @resolver = resolver
-      #      print (";; hints(#{hints.inspect})\n")
+      if (resolver.single_resolvers.length == 0)
+        resolver = Resolver.new()
+      end
       if (hints && hints.length > 0)
         resolver.nameservers=hints
         if (String === hints)
@@ -569,6 +579,7 @@ module Dnsruby
         query = Message.new(name, type, klass)
         query.header.rd = false
         query.do_validation = true
+        query.do_caching = false
         query.do_validation = false if no_validation
         #            print "Sending msg from resolver, dnssec = #{resolver.dnssec}, do_validation = #{query.do_validation}\n"
         packet = resolver.send_message(query)
