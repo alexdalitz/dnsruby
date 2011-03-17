@@ -134,6 +134,11 @@ module Dnsruby
       @@default_resolver = Resolver.new
     end
 
+    def self.set_hints(hints)
+      @@root_verifier.set_hints(hints)
+      @@anchor_verifier.set_hints(hints)
+    end
+
     def self.no_keys?
       no_keys = true
       [@@anchor_verifier, @@root_verifier, @@dlv_verifier].each {|v|

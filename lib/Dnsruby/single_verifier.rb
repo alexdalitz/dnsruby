@@ -51,6 +51,22 @@ module Dnsruby
       # by the client as trust anchors. Use Dnssec#add_trust_anchor to add these
       @configured_ds_store = []
     end
+    
+    def set_hints(hints)
+      @@hints = hints
+    end
+
+    def get_recursor
+      if (!defined?@@recursor)
+        if (defined?@@hints)
+          Recursor.set_hints(@@hints, Resolver.new)
+        @@recursor = Recursor.new()
+        else
+        @@recursor = Recursor.new
+        end
+      end
+      return @@recursor
+    end
 
     def get_dlv_resolver # :nodoc:
 #      if (Dnssec.do_validation_with_recursor?)
@@ -813,7 +829,7 @@ module Dnsruby
       res = get_nameservers_for(name)
       if (!res)
         if (Dnssec.do_validation_with_recursor?)
-          res = Recursor.new
+          res = get_recursor
         else
           if(Dnssec.default_resolver)
             res = Dnssec.default_resolver
@@ -956,7 +972,7 @@ module Dnsruby
 
     def get_anchor_for(child, parent, current_anchor, parent_res = nil) # :nodoc:
       #      print "Trying to discover anchor for #{child} from #{parent}\n"
-      TheLog.debug("Trying to discover anchor for #{child} from #{parent}")
+      TheLog.debug("Trying to discover anchor for #{child} from #{parent} using #{current_anchor}, #{parent_res}")
       # We wish to return a DNSKEY which the caller can use to verify name
       # We are either given a key or a ds record from the parent zone
       # If given a DNSKEY, then find a DS record signed by that key for the child zone
@@ -965,18 +981,17 @@ module Dnsruby
 
       # Find NS RRSet for parent
       child_res = nil
+      if (Dnssec.do_validation_with_recursor?)
+        parent_res = get_recursor
+      end
       begin
         if (child!=parent)
           if (!parent_res)
-            #            print "No res passed - try to get nameservers for #{parent}\n"
+#                      print "No res passed - try to get nameservers for #{parent}\n"
             parent_res = get_nameservers_for(parent)
             if (!parent_res)
               if (Dnssec.do_validation_with_recursor?)
-                 if (Dnssec.default_resolver)
-                parent_res = Recursor.new(Dnssec.default_resolver)
-                 else
-                parent_res = Recursor.new
-                 end
+                parent_res = get_recursor
               else
                 if (Dnssec.default_resolver)
                   parent_res = Dnssec.default_resolver
@@ -1006,7 +1021,7 @@ module Dnsruby
             if (ds_rrset.rrs.length == 0)
               # @TODO@ Check NSEC(3) records - still need to verify there are REALLY no ds records!
               #              print "NO DS RECORDS RETURNED FOR #{parent}\n"
-              child_res = parent_res
+#              child_res = parent_res
             else
               begin
                 if (verify(ds_rrset, current_anchor))
@@ -1027,7 +1042,7 @@ module Dnsruby
         end
         if (!child_res)
           if (Dnssec.do_validation_with_recursor?)
-            child_res = Recursor.new
+            child_res = get_recursor
           else
             if (Dnssec.default_resolver)
               child_res = Dnssec.default_resolver
@@ -1114,7 +1129,7 @@ module Dnsruby
     def get_nameservers_for(name, res = nil) # :nodoc:
       # @TODO@ !!!
       if (Dnssec.do_validation_with_recursor?)
-        return Recursor.new
+        return get_recursor
       else
         if (Dnssec.default_resolver)
           return Dnssec.default_resolver
@@ -1250,6 +1265,7 @@ module Dnsruby
       msg.security_level = Message::SecurityLevel.INDETERMINATE
       qname = msg.question()[0].qname
       closest_anchor = find_closest_anchor_for(qname)
+      TheLog.debug("Closest anchor for #{qname} is #{closest_anchor} - trying to follow down")
       error = try_to_follow_from_anchor(closest_anchor, msg, qname)
 
       if ((msg.security_level.code < Message::SecurityLevel::SECURE) &&
