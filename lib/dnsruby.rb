@@ -104,7 +104,7 @@ require 'Dnsruby/TheLog'
 module Dnsruby
 
   # @TODO@ Remember to update version in dnsruby.gemspec!
-  VERSION = 1.51  
+  VERSION = 1.52
   def Dnsruby.version
     return VERSION
   end
