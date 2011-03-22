@@ -951,7 +951,7 @@ module Dnsruby
           dont_move_on = true
         end
         next_key, res = get_anchor_for(next_step, parent, next_key, res)
-        if (next_step == name)
+        if (next_step.canonical.to_s == name.canonical.to_s)
           #      print "Returning #{next_key.type} for #{next_step}, #{(next_key.type != Types.DNSKEY)}\n"
           return next_key
         end
@@ -1024,7 +1024,7 @@ module Dnsruby
 #              child_res = parent_res
             else
               begin
-                if (verify(ds_rrset, current_anchor))
+                if (verify(ds_rrset, current_anchor) || verify(ds_rrset))
                   # Try to make the resolver from the authority/additional NS RRSets in DS response
                   child_res = get_nameservers_from_message(child, ds_ret)
                 end
@@ -1099,13 +1099,6 @@ module Dnsruby
               verified = false
             end
           end
-          #          if (!verify(key_rrset, ds_rrset))
-          #            if (!verify(key_rrset))
-          #              #        if (!verify(key_ret))
-          #              verified = false
-          #            end
-          #          end
-
         end
         
         # Try to make the resolver from the authority/additional NS RRSets in DNSKEY response
@@ -1115,14 +1108,14 @@ module Dnsruby
         end
         if (!verified)
           TheLog.info("Failed to verify DNSKEY for #{child}")
-          return false, new_res
+          return false, nil # new_res
         end
         #        Cache.add(key_ret)
         return key_rrset, new_res
       rescue VerifyError => e
         #        print "Verification error : #{e}\n"
         TheLog.info("Verification error : #{e}\n")
-        return false, new_res
+        return false, nil # new_res
       end
     end
 
