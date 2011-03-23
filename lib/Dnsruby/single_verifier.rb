@@ -60,24 +60,24 @@ module Dnsruby
       if (!defined?@@recursor)
         if (defined?@@hints)
           Recursor.set_hints(@@hints, Resolver.new)
-        @@recursor = Recursor.new()
+          @@recursor = Recursor.new()
         else
-        @@recursor = Recursor.new
+          @@recursor = Recursor.new
         end
       end
       return @@recursor
     end
 
     def get_dlv_resolver # :nodoc:
-#      if (Dnssec.do_validation_with_recursor?)
-#        return Recursor.new
-#      else
-        if (Dnssec.default_resolver)
-          return Dnssec.default_resolver
-        else
-          return Resolver.new
-        end
-#      end
+      #      if (Dnssec.do_validation_with_recursor?)
+      #        return Recursor.new
+      #      else
+      if (Dnssec.default_resolver)
+        return Dnssec.default_resolver
+      else
+        return Resolver.new
+      end
+      #      end
     end
     def add_dlv_key(key)
       # Is this a ZSK or a KSK?
@@ -121,7 +121,7 @@ module Dnsruby
     # Add the
     def add_trust_anchor_with_expiration(k, expiration)
       if (k.type == Types.DNSKEY)
-#        k.flags = k.flags | RR::IN::DNSKEY::SEP_KEY
+        #        k.flags = k.flags | RR::IN::DNSKEY::SEP_KEY
         @trust_anchors.add_key_with_expiration(k, expiration)
         #        print "Adding trust anchor for #{k.name}\n"
         TheLog.info("Adding trust anchor for #{k.name}")
@@ -706,7 +706,7 @@ module Dnsruby
         check_rr_data(rrset, sigrec)
       end
       raise ArgumentError.new("Expecting DNSKEY, DLV, DS, RRSet, Array or nil for keys : got #{keys.class} instead") if
-          (keys && (![Array, RR::IN::DNSKEY, RR::IN::DLV, RR::IN::DS].include?keys.class) && (keys.class != RRSet))
+      (keys && (![Array, RR::IN::DNSKEY, RR::IN::DLV, RR::IN::DS].include?keys.class) && (keys.class != RRSet))
 
       keyrec = nil
       sigrec = nil
@@ -941,7 +941,7 @@ module Dnsruby
       #      print "Follow chain from #{anchor.name} to #{name}\n"
       TheLog.debug("Follow chain from #{anchor.name} to #{name}")
 
-#      res = nil
+      #      res = nil
       res = Dnssec.default_resolver
       #      while ((next_step != name) || (next_key.type != Types.DNSKEY))
       while (true)
@@ -983,11 +983,12 @@ module Dnsruby
       child_res = nil
       if (Dnssec.do_validation_with_recursor?)
         parent_res = get_recursor
+        child_res = get_recursor
       end
       begin
         if (child!=parent)
           if (!parent_res)
-#                      print "No res passed - try to get nameservers for #{parent}\n"
+            #                      print "No res passed - try to get nameservers for #{parent}\n"
             parent_res = get_nameservers_for(parent)
             if (!parent_res)
               if (Dnssec.do_validation_with_recursor?)
@@ -1021,12 +1022,14 @@ module Dnsruby
             if (ds_rrset.rrs.length == 0)
               # @TODO@ Check NSEC(3) records - still need to verify there are REALLY no ds records!
               #              print "NO DS RECORDS RETURNED FOR #{parent}\n"
-#              child_res = parent_res
+              #              child_res = parent_res
             else
               begin
                 if (verify(ds_rrset, current_anchor) || verify(ds_rrset))
                   # Try to make the resolver from the authority/additional NS RRSets in DS response
-                  child_res = get_nameservers_from_message(child, ds_ret)
+                  if (!Dnssec.do_validation_with_recursor?)
+                    child_res = get_nameservers_from_message(child, ds_ret)
+                  end
                 end
               rescue VerifyError => e
                 #                print "FAILED TO VERIFY DS RRSET FOR #{child}\n"
