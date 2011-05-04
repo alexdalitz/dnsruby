@@ -49,11 +49,11 @@ module Dnsruby
       def from_hash(hash)
         @mname = Name.create(hash[:mname])
         @rname = Name.create(hash[:rname])
-        @serial = hash[:serial]
-        @refresh = hash[:refresh]
-        @retry = hash[:retry]
-        @expire = hash[:expire]
-        @minimum = hash[:minimum]
+        @serial = hash[:serial].to_i
+        @refresh = hash[:refresh].to_i
+        @retry = hash[:retry].to_i
+        @expire = hash[:expire].to_i
+        @minimum = hash[:minimum].to_i
       end
       
       def from_string(input)
