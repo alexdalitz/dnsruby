@@ -390,7 +390,7 @@ module Dnsruby
       # strip out comments
       # Test for non escaped ";" by means of the look-behind assertion
       # (the backslash is escaped)
-      rrstring.gsub!(/(\?<!\\);.*/o, "");
+      rrstring = rrstring.gsub(/(\?<!\\);.*/o, "");
       
       if ((rrstring =~/#{@@RR_REGEX}/xo) == nil)
         raise Exception, "#{rrstring} did not match RR pat.\nPlease report this to the author!\n"
