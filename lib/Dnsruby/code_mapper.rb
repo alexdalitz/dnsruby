@@ -99,7 +99,7 @@ module Dnsruby
     def initialize(arg) #:nodoc: all
       array = @@arrays[self.class]
       if (arg.kind_of?String)
-        arg.gsub!("_", "-")
+        arg = arg.gsub("_", "-")
         code = array.stringsdown[arg.downcase]
         if (code != nil)
           @code = code
