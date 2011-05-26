@@ -74,7 +74,7 @@ class DnskeyTest < Test::Unit::TestCase
     end
     dnskey.flags=4
     assert_equal(4, dnskey.flags)
-    assert(dnskey.flags == 4, dnskey.flags)
+    assert(dnskey.flags == 4)
     dnskey.flags=256
     assert_equal(256, dnskey.flags)
 #    assert(!dnskey.bad_flags?)

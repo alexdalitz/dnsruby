@@ -78,6 +78,6 @@ class TestName < Test::Unit::TestCase
   def test_escapes
     n1 = Name.create("\\nall.all.")
     n2 = Name.create("nall.all.")
-    assert(n1 == n2, n1)
+    assert(n1 == n2, n1.to_s)
   end
 end

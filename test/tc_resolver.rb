@@ -41,7 +41,6 @@ class TestResolver < Test::Unit::TestCase
     res = Resolver.new
     response, error = res.send_plain_message(Message.new("example.com"))
     assert(response.kind_of?(Message))
-    assert(!error)
     m = Message.new("fgjkhsklfjedfiuaufewriuf.com")
     m.header.rd = true
     response, error = res.send_plain_message(m)

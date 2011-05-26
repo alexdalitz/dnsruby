@@ -37,9 +37,9 @@ class RrsetTest < Test::Unit::TestCase
     
     canon = rrset.sort_canonical
     
-    assert(1, canon[0].preference)
-    assert(10, canon[1].preference)
-    assert(12, canon[2].preference)
+    assert(1 == canon[0].preference)
+    assert(10 == canon[1].preference)
+    assert(12 == canon[2].preference)
     
     assert(rrset.sigs.length == 0)
     assert(rrset.num_sigs == 0)
