@@ -19,6 +19,7 @@ rescue LoadError
 end
 require 'test/unit'
 require 'dnsruby'
+include Dnsruby
 class TestRrUnknown < Test::Unit::TestCase
   def test_RrUnknown
     assert_equal(10226, Types::typesbyname('TYPE10226'), 'typesbyname(TYPE10226) returns 10226')
