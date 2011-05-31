@@ -234,28 +234,41 @@ module Dnsruby
               hints[server] = AddressCache.new
             end
           end
-          # @TODO@ Some resolvers (e.g. 8.8.8.8) do not send an additional section -
-          # need to make explicit queries for these :(
-          packet.additional.each do |rr|
-            TheLog.debug(";; ADDITIONAL: "+rr.inspect+"\n")
-            server = rr.name.to_s.downcase
-            server.sub!(/\.$/,"")
-            if (server)
-              if ( rr.type == Types::A)
-                #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
-                if (hints[server]!=nil)
-                  TheLog.debug(";; STORING IP: #{server} IN A "+rr.address.to_s+"\n")
-                  hints[server].push([rr.address.to_s, rr.ttl])
+          if ((packet.additional.length == 0) ||
+                 ((packet.additional.length == 1) && (packet.additional()[0].type == Types.OPT)))
+            # Some resolvers (e.g. 8.8.8.8) do not send an additional section -
+            # need to make explicit queries for these :(
+            # Probably best to limit the number of outstanding queries - extremely bursty behaviour otherwise
+            # What happens if we select only name
+            q = Queue.new
+            hints.keys.each {|server|
+              # Query for the server address and add it to hints.
+              ['A', 'AAAA'].each {|type|
+                msg = Message.new
+                msg.do_caching = @do_caching
+                msg.header.rd = false
+                msg.do_validation = false
+                msg.add_question(server, type, 'IN')
+                if (@dnssec)
+                  msg.header.cd = true # We do our own validation by default
                 end
+                resolver.send_async(msg, q)
+              }
+            }
+            (hints.length * 2).times {
+              id, result, error = q.pop
+              if (result)
+                result.answer.each {|rr|
+                  TheLog.debug(";; NS address: " + rr.inspect+"\n")
+                  add_to_hints(hints, rr)
+                }
               end
-              if ( rr.type == Types::AAAA)
-                #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
-                if (hints[server])
-                  TheLog.debug(";; STORING IP6: #{server} IN AAAA "+rr.address.to_s+"\n")
-                  hints[server].push([rr.address.to_s, rr.ttl])
-                end
-              end
-                  
+            }
+          else
+            packet.additional.each do |rr|
+              TheLog.debug(";; ADDITIONAL: "+rr.inspect+"\n")
+              add_to_hints(hints, rr)
+
             end
           end
         end
@@ -307,6 +320,28 @@ module Dnsruby
       @@nameservers = @@hints.values
       return @@nameservers
     end
+
+    def Recursor.add_to_hints(hints, rr)
+      server = rr.name.to_s.downcase
+      server.sub!(/\.$/,"")
+      if (server)
+        if ( rr.type == Types::A)
+          #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
+          if (hints[server]!=nil)
+            TheLog.debug(";; STORING IP: #{server} IN A "+rr.address.to_s+"\n")
+            hints[server].push([rr.address.to_s, rr.ttl])
+          end
+        end
+        if ( rr.type == Types::AAAA)
+          #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
+          if (hints[server])
+            TheLog.debug(";; STORING IP6: #{server} IN AAAA "+rr.address.to_s+"\n")
+            hints[server].push([rr.address.to_s, rr.ttl])
+          end
+        end
+
+      end
+    end
         
         
     #This method takes a code reference, which is then invoked each time a
@@ -315,9 +350,9 @@ module Dnsruby
     #
     # res.recursion_callback(Proc.new { |packet|
     #     print packet.additional.inspect
-    #		
-    #     print";; Received %d bytes from %s\n\n", 
-    #         packetanswersize, 
+    #
+    #     print";; Received %d bytes from %s\n\n",
+    #         packetanswersize,
     #         packet.answerfrom);
     # })
     #
@@ -325,7 +360,7 @@ module Dnsruby
       #          if (sub && UNIVERSAL::isa(sub, 'CODE'))
       @callback = sub
       #          end
-    end  
+    end
         
     def recursion_callback
       return @callback
@@ -405,7 +440,7 @@ module Dnsruby
             return name
           end
         }
-        return false if name=="." 
+        return false if name=="."
         # strip the name up to the first dot
         first_dot = name.index(".")
         if (first_dot == (name.length-1))
