@@ -1124,9 +1124,11 @@ module Dnsruby
     def initialize(*args)
       @qtype = Types::A
       @qclass = Classes::IN
+      type_given = false
       if (args.length > 0)
         if (args.length > 1)
           @qtype = Types.new(args[1])
+          type_given = true
           if (args.length > 2)
             @qclass = Classes.new(args[2])
           end
@@ -1135,22 +1137,40 @@ module Dnsruby
         raise ArgumentError.new("Must pass at least a name!")
       end
       # If the name looks like an IP address then do an appropriate
-      # PTR query.
+      # PTR query, unless the user specified the qtype
       @qname=args[0]
-      case @qname.to_s
-      when IPv4::Regex
-        @qname = IPv4.create(@qname).to_name
-        @qtype = Types.PTR
-      when IPv6::Regex
-        @qname = IPv6.create(@qname).to_name
-        @qtype = Types.PTR
-      when Name
-      when IPv6
-        @qtype = Types.PTR
-      when IPv4
-        @qtype = Types.PTR
+      if (!type_given)
+        case @qname.to_s
+        when IPv4::Regex
+          @qname = IPv4.create(@qname).to_name
+          @qtype = Types.PTR
+        when IPv6::Regex
+          @qname = IPv6.create(@qname).to_name
+          @qtype = Types.PTR
+        when Name
+        when IPv6
+          @qtype = Types.PTR
+        when IPv4
+          @qtype = Types.PTR
+        else
+          @qname = Name.create(@qname)
+        end
       else
-        @qname = Name.create(@qname)
+        case @qtype
+        when Types.PTR
+          case @qname.to_s
+          when IPv4::Regex
+            @qname = IPv4.create(@qname).to_name
+          when IPv6::Regex
+            @qname = IPv6.create(@qname).to_name
+          when IPv6
+          when IPv4
+          else
+            @qname = Name.create(@qname)
+          end
+        else
+          @qname = Name.create(@qname)
+        end
       end
     end
     
