@@ -162,6 +162,7 @@ module Dnsruby
     @@hints = nil
     @@authority_cache = Hash.new
     @@zones_cache = nil
+    @@nameservers = nil
         
     def initialize(res = nil)
       if (res)
