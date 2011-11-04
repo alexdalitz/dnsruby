@@ -16,7 +16,7 @@
 module Dnsruby
   class IPv4
     # Regular expression IPv4 addresses must match
-    Regex = /\A(\d+)\.(\d+)\.(\d+)\.(\d+)\z/
+    Regex = /\A(\d\d?\d?)\.(\d\d?\d?)\.(\d\d?\d?)\.(\d\d?\d?)\z/
     
     def self.create(arg)
       case arg
