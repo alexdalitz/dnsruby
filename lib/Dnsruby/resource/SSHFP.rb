@@ -66,8 +66,8 @@ module Dnsruby
             @fptype = FpTypes.new(names[1])
           end
           remaining = ""
-          for i in 2..names.length
-            remaining += names[i]
+          for i in 2..(names.length + 1)
+            remaining += names[i].to_s
           end
           @fp = [remaining].pack("H*")
         end
