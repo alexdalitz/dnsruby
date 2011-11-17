@@ -1,3 +1,13 @@
+NEW FOR DNSRUBY 1.53 SINCE 1.52 :
+
+o Validation routine fixes
+o Ruby 1.9 fixes
+o Recursor fixes
+o IPv4 Regex fixes
+o Fixes for A/PTR lookups with IP-like domain name
+o TXT and SSHFP processing fixes
+o Default retry parameters in Resolver more sensible
+
 NEW FOR DNSRUBY 1.48 :
 
 o Fixed deadlock/performance issue seen on some platforms
