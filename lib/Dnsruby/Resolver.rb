@@ -59,8 +59,8 @@ module Dnsruby
   #Support for EventMachine has been deprecated.
   class Resolver
     DefaultQueryTimeout = 0 
-    DefaultPacketTimeout = 10
-    DefaultRetryTimes = 4
+    DefaultPacketTimeout = 5
+    DefaultRetryTimes = 1
     DefaultRetryDelay = 5
     DefaultPort = 53
     DefaultDnssec = true
