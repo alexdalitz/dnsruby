@@ -34,7 +34,12 @@ module Dnsruby
       @num_sigs = 0
       rrs.each {|rr| add(rr)}
     end
-    # The RRSIGs stored with this RRSet
+    def self.new_from_string(string)
+      rr_strings = string.split("\n")
+      rrs = rr_strings.map { |s| Dnsruby::RR.new_from_string(s) }
+
+      Dnsruby::RRSet.new(rrs)
+    end    # The RRSIGs stored with this RRSet
     def sigs
       return @rrs[@rrs.length-@num_sigs, @num_sigs]
     end
@@ -106,10 +111,10 @@ module Dnsruby
     def <=>(other)
       #      return 1 if ((!other) || !(other.name) || !(other.type))
       #      return -1 if (!@name)
-      if (@name.canonical == other.name.canonical)
-        return @type.code <=> other.type.code
+      if (name.canonical == other.name.canonical)
+        return type.code <=> other.type.code
       else
-        return @name <=> other.name
+        return name <=> other.name
       end
     end
 
