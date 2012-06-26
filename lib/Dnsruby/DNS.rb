@@ -77,6 +77,8 @@ module Dnsruby
   #* ftp://ftp.isi.edu/in-notes/iana/assignments/dns-parameters
   #* etc.
   class DNS
+
+    attr_accessor :do_caching
     
     #Creates a new DNS resolver. See Resolv::DNS.new for argument details.
     #
@@ -114,6 +116,7 @@ module Dnsruby
     #                      :search => ['ruby-lang.org'],
     #                      :ndots => 1})
     def initialize(config_info=nil)
+      @do_caching = true
       @config = Config.new()
       @config.set_config_info(config_info)
       @resolver = Resolver.new(@config)
@@ -284,6 +287,7 @@ module Dnsruby
         msg.add_question(candidate, type, klass)
         msg.do_validation = false
         msg.header.cd = false
+        msg.do_caching = do_caching
         @resolver.do_validation = false
         @resolver.send_async(msg, q)
         id, ret, exception = q.pop
