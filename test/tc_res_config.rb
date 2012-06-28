@@ -14,48 +14,67 @@
 #limitations under the License.
 #++
 begin
-require 'rubygems'
+  require 'rubygems'
 rescue LoadError
 end
 require 'test/unit'
 require 'dnsruby'
 class TestResolverConfig < Test::Unit::TestCase
-  def setup
-    Dnsruby::Config.reset
-  end
   
   GoodInput = {
-	"port"		  => 54,
-	"src_address"        => '10.1.0.1',
-	"src_port"        => 56453,
-	"use_tcp"		   => true,
+    "port"		  => 54,
+    "src_address"        => '10.1.0.1',
+    "src_port"        => 56453,
+    "use_tcp"		   => true,
     #	"stayopen"       => 1,
-	"ignore_truncation"          => true,
-	"recurse"        => false,
-	"packet_timeout"    => 5,
+    "ignore_truncation"          => true,
+    "recurse"        => false,
+    "packet_timeout"    => 5,
     #	"dnssec"         => 1,
     #	"force_v4"       => 1,
   };
   
   ExtendedInput={
     "query_timeout"        => 30,
-	"retry_delay"	       => 6,
-	"retry_times"		   => 5,
+    "retry_delay"	       => 6,
+    "retry_times"		   => 5,
   }
   
   LookupInput={
-	"domain"	       => 'dnsruby.rubyforge.org',
-	"apply_search_list"         => false,
-	"ndots"       => 4	,
-	"apply_domain" => false	
+    "domain"	       => 'dnsruby.rubyforge.org',
+    "apply_search_list"         => false,
+    "ndots"       => 4	,
+    "apply_domain" => false
   }
   
+  def setup
+    Dnsruby::Config.reset
+    # If there are only IPv6 servers configured, then make sure we use an IPv6 source address
+    res = Dnsruby::Resolver.new();
+    ipv6only = true;
+    res.single_resolvers.each {|r|
+      if (Dnsruby::IPv4 ===  r.server)
+        ipv6only = false
+      end
+        begin
+            a = Dnsruby::IPv4.create(r.server)
+            ipv6only = false
+          rescue ArgumentError
+
+        end
+    }
+    if (ipv6only)
+      GoodInput.delete("src_address")
+      GoodInput.store("src_address", "fc00::1:2:3")
+    end
+  end
+
   def test_multiple_resolver
     res = Dnsruby::Resolver.new();
     assert(res, "new returned something");
     assert_instance_of(Dnsruby::Resolver, res, "new() returns an object of the correct class.");
     
-#    assert(res.config.nameserver,       'nameserver() works');
+    #    assert(res.config.nameserver,       'nameserver() works');
     
     searchlist = ["t.dnsruby.validation-test-servers.nominet.org.uk", "t2.dnsruby.validation-test-servers.nominet.org.uk"];
     assert_equal(res.config.search=searchlist, searchlist, 'setting searchlist returns correctly.');
@@ -65,7 +84,7 @@ class TestResolverConfig < Test::Unit::TestCase
     #~ #diag "\n\nIf you do not have Net::DNS::SEC installed you will see a warning.\n";
     #~ #diag "It is safe to ignore this\n";
     
-     (GoodInput.merge(ExtendedInput)).each do | param, value |
+    (GoodInput.merge(ExtendedInput)).each do | param, value |
       #      puts("Setting " + param);
       res.send(param+"=", value)
       assert_equal(res.send(param), value,       "setting #param sticks");
@@ -87,7 +106,7 @@ class TestResolverConfig < Test::Unit::TestCase
     LookupInput.each do | param, value |
       res.config.send(param+"=", value)
       assert_equal(res.config.send(param), value,       "setting #param sticks");
-    end;    
+    end;
   end
   
 end
