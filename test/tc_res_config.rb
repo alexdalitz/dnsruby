@@ -24,6 +24,7 @@ class TestResolverConfig < Test::Unit::TestCase
   GoodInput = {
     "port"		  => 54,
     "src_address"        => '10.1.0.1',
+    "src_address6"        => 'fc00::1:2:3',
     "src_port"        => 56453,
     "use_tcp"		   => true,
     #	"stayopen"       => 1,
@@ -52,28 +53,10 @@ class TestResolverConfig < Test::Unit::TestCase
   end
 
   def test_multiple_resolver
-    res = Dnsruby::Resolver.new();
+    res = Dnsruby::Resolver.new({:nameserver => ["127.0.0.1", "::1"]});
     assert(res, "new returned something");
     assert_instance_of(Dnsruby::Resolver, res, "new() returns an object of the correct class.");
 
-    # If there are only IPv6 servers configured, then make sure we use an IPv6 source address
-    ipv6only = true;
-    res.single_resolvers.each {|r|
-      if (Dnsruby::IPv4 ===  r.server)
-        ipv6only = false
-      end
-      begin
-        a = Dnsruby::IPv4.create(r.server)
-        ipv6only = false
-      rescue ArgumentError
-
-      end
-    }
-    if (ipv6only)
-      GoodInput.delete("src_address")
-      GoodInput.store("src_address", "fc00::1:2:3")
-    end
-    
     #    assert(res.config.nameserver,       'nameserver() works');
     
     searchlist = ["t.dnsruby.validation-test-servers.nominet.org.uk", "t2.dnsruby.validation-test-servers.nominet.org.uk"];
@@ -83,7 +66,7 @@ class TestResolverConfig < Test::Unit::TestCase
     
     #~ #diag "\n\nIf you do not have Net::DNS::SEC installed you will see a warning.\n";
     #~ #diag "It is safe to ignore this\n";
-    
+
     (GoodInput.merge(ExtendedInput)).each do | param, value |
       #      puts("Setting " + param);
       res.send(param+"=", value)
@@ -93,26 +76,14 @@ class TestResolverConfig < Test::Unit::TestCase
   end
   
   def test_single_resolver
-    res = Dnsruby::SingleResolver.new
-    ipv6only = true
-    if (Dnsruby::IPv4 ===  res.server)
-      ipv6only = false
-    end
-    begin
-      a = Dnsruby::IPv4.create(res.server)
-      ipv6only = false
-    rescue ArgumentError
-
-    end
-    if (ipv6only)
-      GoodInput.delete("src_address")
-      GoodInput.store("src_address", "fc00::1:2:3")
-    end
-    GoodInput.each do | param, value |
-      #      puts("Setting " + param);
-      res.send(param+"=", value)
-      assert_equal(res.send(param), value,       "setting #param sticks");
-    end;
+    [Dnsruby::SingleResolver.new({:nameserver => ["127.0.0.1"]}),
+      Dnsruby::SingleResolver.new({:nameserver => ["::1"]})].each {|res|
+      GoodInput.each do | param, value |
+        #      puts("Setting " + param);
+        res.send(param+"=", value)
+        assert_equal(res.send(param), value,       "setting #param sticks");
+      end;
+    }
   end
   
   def test_dns

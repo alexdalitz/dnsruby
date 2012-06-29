@@ -92,9 +92,12 @@ module Dnsruby
     # i.e. the TC bit is ignored and thus the resolver will not requery over TCP if TC is set
     attr_reader :ignore_truncation
     
-    # The source address to send queries from
+    # The source address to send queries from for IPv4
     attr_reader :src_address
     
+    # The source address to send queries from for IPv6
+    attr_reader :src_address6
+
     # Should the Recursion Desired bit be set?
     attr_reader :recurse
     
@@ -360,6 +363,7 @@ module Dnsruby
     # * :tsig
     # * :ignore_truncation
     # * :src_address
+    # * :src_address6
     # * :src_port
     # * :recurse
     # * :udp_size
@@ -374,6 +378,7 @@ module Dnsruby
       # @TODO@ Should we allow :namesver to be an RRSet of NS records? Would then need to randomly order them?
       @resolver_ruby = nil
       @src_address = nil
+      @src_address6 = nil
       @single_res_mutex = Mutex.new
       @configured = false
       @do_caching = true
@@ -425,7 +430,7 @@ module Dnsruby
           res = PacketSender.new({:server=>ns, :dnssec=>@dnssec,
               :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
               :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
-              :src_address=>@src_address, :src_port=>@src_port,
+              :src_address=>@src_address, :src_address6=>@src_address6, :src_port=>@src_port,
               :recurse=>@recurse, :udp_size=>@udp_size})
           @single_resolvers.push(res) if res
         end
@@ -472,6 +477,7 @@ module Dnsruby
       @ignore_truncation = false
       @config = Config.new()
       @src_address        = nil
+      @src_address6        = nil
       @src_port        = [0]
       @recurse = true
       @single_res_mutex.synchronize {
@@ -509,7 +515,7 @@ module Dnsruby
 
     def update_internal_res(res)
       [:port, :use_tcp, :no_tcp, :tsig, :ignore_truncation, :packet_timeout,
-        :src_address, :src_port, :recurse,
+        :src_address, :src_address6, :src_port, :recurse,
         :udp_size, :dnssec].each do |param|
 
         res.send(param.to_s+"=", instance_variable_get("@"+param.to_s))
@@ -695,6 +701,11 @@ module Dnsruby
       update
     end
     
+    def src_address6=(a)
+      @src_address6 = a
+      update
+    end
+
     def port=(a)
       @port = a
       update

@@ -46,6 +46,7 @@ module Dnsruby
     # * :no_tcp
     # * :ignore_truncation
     # * :src_address
+    # * :src_address6
     # * :src_port
     # * :udp_size
     # * :persistent_tcp
@@ -66,6 +67,7 @@ module Dnsruby
       @tsig = nil
       @ignore_truncation = false
       @src_address        = nil
+      @src_address6        = nil
       @src_port        = [0]
       @recurse = true
       @persistent_udp = false
@@ -115,8 +117,7 @@ module Dnsruby
       isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
           :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
-          :src_address=>@src_address, :src_port=>@src_port,
-          :do_caching=>@do_caching,
+          :src_address=>@src_address, :src_address6=>@src_address6, :src_port=>@src_port,
           :recurse=>@recurse, :udp_size=>@udp_size})
 
       @single_resolvers = [isr]
@@ -132,8 +133,7 @@ module Dnsruby
       isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
           :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
-          :src_address=>@src_address, :src_port=>@src_port,
-          :do_caching=>@do_caching,
+          :src_address=>@src_address, :src_address6=>@src_address6, :src_port=>@src_port,
           :recurse=>@recurse, :udp_size=>@udp_size})
 
       @single_res_mutex.synchronize {

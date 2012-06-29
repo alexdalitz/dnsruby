@@ -102,20 +102,16 @@ module Dnsruby
     attr_reader :dnssec
     
     # Set the source address. If the arg is nil, do nothing
+    def src_address6=(arg)
+      if (not arg.nil?)
+        @src_address6 = arg
+      end
+    end
+
+    # Set the source address. If the arg is nil, do nothing
     def src_address=(arg)
       if (not arg.nil?)
         @src_address = arg
-      end
-      # Do some verification to make sure that the source address
-      # is of the same type as the server address
-      if (@server.nil?)
-        return
-      else
-        si = IPAddr.new(@src_address)
-        i = IPAddr.new(@server)
-        if (i.ipv4? and si.ipv6?) or (i.ipv6? and si.ipv4?)
-          raise ArgumentError.new("Invalid address specified (address family does not match)")
-        end
       end
     end
 
@@ -150,6 +146,7 @@ module Dnsruby
     def server=(server)
       Dnsruby.log.debug{"InternalResolver setting server to #{server}"}
       @server=Config.resolve_server(server)
+      check_ipv6
     end
     
     # Can take a hash with the following optional keys : 
@@ -160,6 +157,7 @@ module Dnsruby
     # * :no_tcp
     # * :ignore_truncation
     # * :src_address
+    # * :src_address6
     # * :src_port
     # * :udp_size
     # * :tsig
@@ -167,6 +165,7 @@ module Dnsruby
     # * :recurse
     def initialize(*args)
       arg=args[0]
+      @ipv6 = false
       @packet_timeout = Resolver::DefaultPacketTimeout
       @port = Resolver::DefaultPort
       @udp_size = Resolver::DefaultUDPSize
@@ -176,6 +175,7 @@ module Dnsruby
       @tsig = nil
       @ignore_truncation = false
       @src_address        = '0.0.0.0'
+      @src_address6        = '::'
       @src_port        = [0]
       @recurse = true
       
@@ -190,7 +190,8 @@ module Dnsruby
       elsif (arg.kind_of?Hash)
         arg.keys.each do |attr|
           begin
-            if ((attr.to_s == "src_address") && ((arg[attr] == nil) || (arg[attr] == "")))
+            if (((attr.to_s == "src_address")||(attr.to_s == "src_address6")) &&
+                  ((arg[attr] == nil) || (arg[attr] == "")))
             else
               send(attr.to_s+"=", arg[attr])
             end
@@ -203,18 +204,24 @@ module Dnsruby
       #Check server is IP
       @server=Config.resolve_server(@server)
 
+      check_ipv6
+      #      ResolverRegister::register_single_resolver(self)
+    end
+
+    def check_ipv6
       begin
         i = IPv4.create(@server)
-        @src_address = '0.0.0.0'
+#        @src_address = '0.0.0.0'
+        @ipv6=false
       rescue Exception
         begin
           i = IPv6.create(@server)
-          @src_address = '::'
+#          @src_address6 = '::'
+          @ipv6=true
         rescue Exception
           Dnsruby.log.error{"Server is neither IPv4 or IPv6!\n"}
         end
       end
-      #      ResolverRegister::register_single_resolver(self)
     end
     
     def close
@@ -346,16 +353,20 @@ module Dnsruby
       socket = nil
       runnextportloop = true
       numtries = 0
+      src_address = @src_address
+      if (@ipv6)
+        src_address = @src_address6
+      end
       while (runnextportloop)do
         begin
           numtries += 1
           src_port = get_next_src_port
           if (use_tcp)
             begin
-              socket = TCPSocket.new(@server, @port, @src_address, src_port)
+              socket = TCPSocket.new(@server, @port, src_address, src_port)
             rescue Errno::EBADF, Errno::ENETUNREACH => e
               # Can't create a connection
-              err=IOError.new("TCP connection error to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
+              err=IOError.new("TCP connection error to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
               Dnsruby.log.error{"#{err}"}
               st.push_exception_to_select(client_query_id, client_queue, err, nil)
               return
@@ -366,10 +377,10 @@ module Dnsruby
             if (/java/ =~ RUBY_PLATFORM )
               socket = UDPSocket.new()
             else
-              ipv6 = @src_address =~ /:/
-              socket = UDPSocket.new(ipv6.nil? ? Socket::AF_INET : Socket::AF_INET6)
+              #              ipv6 = @src_address =~ /:/
+              socket = UDPSocket.new(@ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
             end
-            socket.bind(@src_address, src_port)
+            socket.bind(src_address, src_port)
             socket.connect(@server, @port)
           end
           runnextportloop = false
@@ -384,7 +395,7 @@ module Dnsruby
           # Maybe try a max number of times?
           if ((e.class != Errno::EADDRINUSE) || (numtries > 50) ||
                 ((e.class == Errno::EADDRINUSE) && (src_port == @src_port[0])))
-            err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
+            err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
             Dnsruby.log.error{"#{err}"}
             st.push_exception_to_select(client_query_id, client_queue, err, nil)
             return
@@ -392,12 +403,12 @@ module Dnsruby
         end
       end
       if (socket==nil)
-        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}")
+        err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}")
         Dnsruby.log.error{"#{err}"}
         st.push_exception_to_select(client_query_id, client_queue, err, nil) 
         return
       end
-      Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
+      Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
       #            print "#{Time.now} : Sending packet to #{@server} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
       # Listen for the response before we send the packet (to avoid any race conditions)
       query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
@@ -412,7 +423,7 @@ module Dnsruby
         end
         socket.send(query_bytes, 0)
       rescue Exception => e
-        err=IOError.new("Send failed to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
+        err=IOError.new("Send failed to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
         Dnsruby.log.error{"#{err}"}
         st.push_exception_to_select(client_query_id, client_queue, err, nil)
         begin
@@ -422,7 +433,7 @@ module Dnsruby
         return
       end
       
-      Dnsruby.log.debug{"Packet sent to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
+      Dnsruby.log.debug{"Packet sent to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
       #      print "Packet sent to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
     end
     

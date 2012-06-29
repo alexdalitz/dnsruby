@@ -72,6 +72,7 @@ class TestResOpt < Test::Unit::TestCase
       :server	   => '10.0.0.1',
       :port		   => 54, # SingleResolver and Multi-Resolver
       :src_address        => '10.1.0.1', # SingleResolver and Multi-Resolver
+      :src_address6        => 'fc00::1:2:3', # SingleResolver and Multi-Resolver
       :src_port        => 56353, # SingleResolver and Multi-Resolver
       :use_tcp		   => true, # SingleResolver and Multi-Resolver
       :ignore_truncation          => true, # SingleResolver and Multi-Resolver
@@ -94,6 +95,7 @@ class TestResOpt < Test::Unit::TestCase
       :nameserver	   => ['10.0.0.1', '10.0.0.2'], # for Multi-Resolver & DNS
       :port		   => 54, # SingleResolver and Multi-Resolver
       :src_address        => '10.1.0.1', # SingleResolver and Multi-Resolver
+      :src_address6        => 'fc00::1:2:3', # SingleResolver and Multi-Resolver
       :src_port        => 56753, # SingleResolver and Multi-Resolver
       :retry_delay	       => 6, # DNS and Multi-Resolver
       :retry_times		   => 5, # DNSand Multi-Resolver
