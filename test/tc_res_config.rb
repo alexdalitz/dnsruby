@@ -49,30 +49,30 @@ class TestResolverConfig < Test::Unit::TestCase
   
   def setup
     Dnsruby::Config.reset
-    # If there are only IPv6 servers configured, then make sure we use an IPv6 source address
-    res = Dnsruby::Resolver.new();
-    ipv6only = true;
-    res.single_resolvers.each {|r|
-      if (Dnsruby::IPv4 ===  r.server)
-        ipv6only = false
-      end
-        begin
-            a = Dnsruby::IPv4.create(r.server)
-            ipv6only = false
-          rescue ArgumentError
-
-        end
-    }
-    if (ipv6only)
-      GoodInput.delete("src_address")
-      GoodInput.store("src_address", "fc00::1:2:3")
-    end
   end
 
   def test_multiple_resolver
     res = Dnsruby::Resolver.new();
     assert(res, "new returned something");
     assert_instance_of(Dnsruby::Resolver, res, "new() returns an object of the correct class.");
+
+    # If there are only IPv6 servers configured, then make sure we use an IPv6 source address
+    ipv6only = true;
+    res.single_resolvers.each {|r|
+      if (Dnsruby::IPv4 ===  r.server)
+        ipv6only = false
+      end
+      begin
+        a = Dnsruby::IPv4.create(r.server)
+        ipv6only = false
+      rescue ArgumentError
+
+      end
+    }
+    if (ipv6only)
+      GoodInput.delete("src_address")
+      GoodInput.store("src_address", "fc00::1:2:3")
+    end
     
     #    assert(res.config.nameserver,       'nameserver() works');
     
@@ -94,6 +94,20 @@ class TestResolverConfig < Test::Unit::TestCase
   
   def test_single_resolver
     res = Dnsruby::SingleResolver.new
+    ipv6only = true
+    if (Dnsruby::IPv4 ===  res.server)
+      ipv6only = false
+    end
+    begin
+      a = Dnsruby::IPv4.create(res.server)
+      ipv6only = false
+    rescue ArgumentError
+
+    end
+    if (ipv6only)
+      GoodInput.delete("src_address")
+      GoodInput.store("src_address", "fc00::1:2:3")
+    end
     GoodInput.each do | param, value |
       #      puts("Setting " + param);
       res.send(param+"=", value)
