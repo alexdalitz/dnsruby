@@ -14,7 +14,7 @@
 #limitations under the License.
 #++
 begin
-require 'rubygems'
+  require 'rubygems'
 rescue LoadError
 end
 require 'test/unit'
@@ -42,7 +42,7 @@ class TestRrOpt < Test::Unit::TestCase
   end
   
   def test_resolver_opt_application
-        return if (/java/ =~ RUBY_PLATFORM) # @TODO@ Check if this is fixed with JRuby yet
+    return if (/java/ =~ RUBY_PLATFORM) # @TODO@ Check if this is fixed with JRuby yet
     # Set up a server running on localhost. Get the resolver to send a
     # query to it with the UDP size set to 4096. Make sure that it is received
     # correctly.
@@ -101,5 +101,60 @@ class TestRrOpt < Test::Unit::TestCase
     
     # Make sure there is an OPT RR there
     assert(m2.rcode == RCode.NOERROR  )
+  end
+
+  def test_formerr_response
+    # If we get a FORMERR back from the remote resolver, we should retry with no OPT record
+    # So, we need a server which sends back FORMERR for OPT records, and is OK without them.
+    # Then, we need to get a client to send a request to it (by default adorned with EDNS0),
+    # and make sure that the response is returned to the client OK.
+    # We should then check that the server only received one message with EDNS0, and one message
+    # without.
+    return if (/java/ =~ RUBY_PLATFORM) # @TODO@ Check if this is fixed with JRuby yet
+    # Set up a server running on localhost. Get the resolver to send a
+    # query to it with the UDP size set to 4096. Make sure that it is received
+    # correctly.
+    Dnsruby::PacketSender.clear_caches
+    socket = UDPSocket.new
+    socket.bind("127.0.0.1", 0)
+    port = socket.addr[1]
+    q = Queue.new
+    Thread.new {
+      2.times {
+        s = socket.recvfrom(65536)
+        received_query = s[0]
+        m = Message.decode(received_query)
+        q.push(m)
+        if (m.header.arcount > 0)
+          # send back FORMERR
+          m.header.rcode = RCode.FORMERR
+          socket.send(m.encode,0,s[1][2], s[1][1])
+        else
+          socket.send(received_query,0,s[1][2], s[1][1]) # @TODO@ FORMERR if edns
+        end
+      }
+
+    }
+    # Now send query
+    res = Resolver.new("127.0.0.1")
+    res.port = port
+    res.udp_size = 4096
+    assert(res.udp_size == 4096)
+    ret = res.query("example.com")
+    assert(ret.header.get_header_rcode == RCode.NOERROR)
+    assert(ret.header.arcount == 0)
+
+    # Now get received query from the server
+    p = q.pop
+    # Now check the query was what we expected
+    assert(p.header.arcount == 1)
+    assert(p.additional()[0].type = Types.OPT)
+    assert(p.additional()[0].klass.code == 4096)
+
+    # Now check the second message
+    assert (!(q.empty?))
+    p2 = q.pop
+    assert (p2)
+    assert(p2.header.arcount == 0)
   end
 end

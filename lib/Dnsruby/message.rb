@@ -314,6 +314,11 @@ module Dnsruby
       return ret
     end
 
+    def remove_additional
+      @additional = Section.new(self)
+      @header.arcount = 0
+    end
+
     # Return the first rrset of the specified attributes in the message
     def rrset(name, type, klass = Classes::IN)
       [@answer, @authority, @additional].each do |section|

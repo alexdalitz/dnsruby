@@ -532,6 +532,16 @@ module Dnsruby
           end
         end
       end
+      # IF WE GET FORMERR BACK HERE (and we have EDNS0 on) THEN
+      # TRY AGAIN WITH NO OPT RECORDS! (rfc2671 section 5.3)
+      if ((response.header.get_header_rcode == RCode.FORMERR) &&
+            (query.header.arcount > 0))
+        # try resending the message with no OPT record
+        query.remove_additional
+        query.send_raw = true
+        send_async(query, client_queue, client_query_id, false)
+        return false
+      end
       if (response.header.tc && !tcp && !@ignore_truncation)
         if (@no_tcp)
           Dnsruby.log.debug{"Truncated response - not resending over TCP as no_tcp==true"}
