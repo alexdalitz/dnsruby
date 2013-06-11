@@ -680,8 +680,9 @@ module Dnsruby
         end
 
         sigrecs.each {|sig|
+#          print "Looking at #{sig.key_tag} on sig, #{key.key_tag} on key\n"
           if ((key.key_tag == sig.key_tag) && (key.algorithm == sig.algorithm))
-            #                        print "Found key #{key.key_tag}\n"
+#                                    print "Found key #{key.key_tag}\n"
             return key, sig
           end
         }
@@ -695,6 +696,12 @@ module Dnsruby
     # Returns true if the RRSet verified, false otherwise.
     def verify_rrset(rrset, keys = nil)
       #      print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
+#      print "ABOUT TO VERIFY WITH #{keys == nil ? '0' : keys.length} keys\n"
+#      if (keys != nil)
+#        if (keys.length > 0)
+#          print "KEY TAG : #{keys[0].key_tag}\n"
+#        end
+#      end
       sigrecs = rrset.sigs
       if (rrset.rrs.length == 0)
         raise VerifyError.new("No RRSet to verify")
@@ -743,6 +750,9 @@ module Dnsruby
         #        return false
         raise VerifyError.new("DNSKEY with SEP flag set and Zone Key flag not set")
       end
+
+
+#      print "VERIFY KEY FOUND - doing verification\n"
 
       #Any DNS names in the RDATA field of each RR MUST be in
       #canonical form; and
