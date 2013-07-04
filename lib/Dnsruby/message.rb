@@ -633,7 +633,11 @@ module Dnsruby
       end
       return o
     end
-    
+
+    def clone
+      Message.decode(self.encode)
+    end
+
     #In dynamic update packets, the question section is known as zone and
     #specifies the zone to be updated.
     alias :zone :question

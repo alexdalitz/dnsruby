@@ -289,4 +289,11 @@ f4 00 31 04 64 6e 73 31 05 69 63 61 6e 6e 03 6f
     assert(section_rrsets["authority"].length == 1)
     assert(section_rrsets["additional"].length == 0)
   end
+
+  def test_clone
+    m = Message.new("blah.example.com", "DNSKEY", "IN")
+    m.header.rcode=4
+    m2 = m.clone
+    assert_equal(m.to_s, m2.to_s, "Clone failed")
+  end
 end
