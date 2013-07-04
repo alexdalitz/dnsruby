@@ -123,7 +123,10 @@ module Dnsruby
             digestbin = OpenSSL::Digest::SHA1.digest(data)
             return digestbin
         elsif (digest_type.code == 2) 
-            digestbin = Digest::SHA256.digest(data)
+            digestbin = OpenSSL::Digest::SHA256.digest(data)
+            return digestbin
+        elsif (digest_type.code == 4)
+            digestbin = OpenSSL::Digest::SHA384.digest(data)
             return digestbin
         end
 
