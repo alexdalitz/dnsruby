@@ -141,7 +141,7 @@ module Dnsruby
     NOTAUTH = 9       # RFC 2136
     NOTZONE = 10       # RFC 2136
     
-#    BADVERS = 16 # an EDNS ExtendedRCode
+    #    BADVERS = 16 # an EDNS ExtendedRCode
     BADSIG = 16
     BADKEY = 17
     BADTIME = 18
@@ -266,7 +266,7 @@ module Dnsruby
     CERT      = 37      # RFC 2538
     DNAME     = 39      # RFC 2672
     OPT       = 41      # RFC 2671
-#    APL       = 42      # RFC 3123
+    #    APL       = 42      # RFC 3123
     DS        = 43      # RFC 4034
     SSHFP     = 44      # RFC 4255
     IPSECKEY  = 45      # RFC 4025
@@ -384,10 +384,11 @@ module Dnsruby
     RSAMD5     = 1
     DH         = 2
     DSA        = 3
-    ECC        = 4
     RSASHA1    = 5
     RSASHA256  = 8
     RSASHA512  = 10
+    ECDSAP256SHA256 = 13
+    ECDSAP384SHA384 = 14
     INDIRECT   = 252
     PRIVATEDNS = 253
     PRIVATEOID = 254
@@ -396,6 +397,8 @@ module Dnsruby
     add_pair("DSA-NSEC3-SHA1", 6)
     # Referred to as Algorithms.RSASHA1_NSEC3_SHA1
     add_pair("RSASHA1-NSEC3-SHA1", 7)
+    # Referred to as Algorithms.ECC_GOST
+    add_pair("ECC-GOST",12)
   end  
 
   # http://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml
