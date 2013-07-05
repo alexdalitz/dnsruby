@@ -638,6 +638,10 @@ module Dnsruby
       Message.decode(self.encode)
     end
 
+    def ==(msg2)
+      return self.to_s == msg2.to_s
+    end
+
     #In dynamic update packets, the question section is known as zone and
     #specifies the zone to be updated.
     alias :zone :question
