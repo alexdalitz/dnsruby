@@ -798,7 +798,6 @@ module Dnsruby
     end
     def send_async(*args) # msg, client_queue, client_query_id=nil)
       msg=args[0]
-      client_queue=nil
       client_query_id=nil
       client_queue=args[1]
       if (args.length > 2)
