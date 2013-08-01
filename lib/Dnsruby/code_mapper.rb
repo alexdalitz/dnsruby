@@ -133,6 +133,10 @@ module Dnsruby
       @string = @@arrays[self.class].values[@code]
     end
         
+    def hash
+      @code
+    end
+
     def inspect
       return @string
     end    
