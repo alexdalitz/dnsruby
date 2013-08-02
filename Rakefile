@@ -1,5 +1,5 @@
 require 'rake/testtask'
-require 'rake/rdoctask'
+require 'rdoc/task'
 
 Rake::RDocTask.new do |rd|
   rd.rdoc_files.include("lib/**/*.rb")
