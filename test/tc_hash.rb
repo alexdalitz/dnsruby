@@ -21,15 +21,12 @@ end
 require 'test/unit'
 require 'set'
 require 'dnsruby'
-require 'dnsruby/code_mapper'
 
 module Dnsruby
 
 class TestHash < Test::Unit::TestCase
 
   def test_types_hash
-    CodeMapper.update
-    Types.update
     object1 = Types.new(Types::NSEC3)
     object2 = Types.new(Types::NSEC3)
     assert(object1 == object2)
@@ -37,8 +34,6 @@ class TestHash < Test::Unit::TestCase
   end
 
   def test_types_set
-    CodeMapper.update
-    Types.update
     object1 = Types.new(Types::NSEC3)
     object2 = Types.new(Types::NSEC3)
     assert(object1 == object2)
