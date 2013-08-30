@@ -36,7 +36,8 @@ module Dnsruby
       class DigestTypes < CodeMapper
         update()
         add_pair("SHA-1", 1)
-        add_pair("SHA-2", 2 )
+        add_pair("SHA-256", 2 )
+        add_pair("SHA-384", 4)
       end
   
       ClassValue = nil #:nodoc: all
