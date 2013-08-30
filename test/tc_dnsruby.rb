@@ -23,11 +23,11 @@ include Dnsruby
 class TestDnsruby < Test::Unit::TestCase
   def test_dnsruby
     a = Resolv.getaddress("www.ruby-lang.org")
-    assert_equal(a.to_s, "221.186.184.68")
+    assert_equal(a.to_s, "221.186.184.75")
     a = Resolv.getaddresses("www.ruby-lang.org")
     assert(a.length==1)
-    assert_equal(a[0].to_s, "221.186.184.68")
-    Resolv.each_address("www.ruby-lang.org") {|address| assert_equal(address, "221.186.184.68")}
+    assert_equal(a[0].to_s, "221.186.184.75")
+    Resolv.each_address("www.ruby-lang.org") {|address| assert_equal(address, "221.186.184.75")}
     
     n = Resolv.getname("210.251.121.214")
     assert_equal(n, "ci.ruby-lang.org")
