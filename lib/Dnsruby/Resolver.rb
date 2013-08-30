@@ -329,7 +329,7 @@ module Dnsruby
     #     end
     #   end
     #
-    def send_async(*args) # msg, client_queue, client_query_id)
+    def send_async(msg, client_queue, client_query_id = nil)
       if (!@configured)
         add_config_nameservers
       end
@@ -338,11 +338,11 @@ module Dnsruby
         @resolver_ruby = ResolverRuby.new(self)
       end
       #      }
-      client_query_id = @resolver_ruby.send_async(*args)
+      client_query_id = @resolver_ruby.send_async(msg, client_queue, client_query_id)
       if (@single_resolvers.length == 0)
         Thread.start {
           sleep(@query_timeout == 0 ? 1 : @query_timeout)
-          args[1].push([client_query_id, nil, ResolvTimeout.new("Query timed out - no nameservers configured")])
+          client_queue.push([client_query_id, nil, ResolvTimeout.new("Query timed out - no nameservers configured")])
         }
       end
       return client_query_id
@@ -796,15 +796,7 @@ module Dnsruby
       @query_list = {}
       @timeouts = {}
     end
-    def send_async(*args) # msg, client_queue, client_query_id=nil)
-      msg=args[0]
-      client_query_id=nil
-      client_queue=args[1]
-      if (args.length > 2)
-        client_query_id = args[2]
-      end
-
-      
+    def send_async(msg, client_queue, client_query_id=nil)
       # This is the whole point of the Resolver class.
       # We want to use multiple SingleResolvers to run a query.
       # So we kick off a system with select_thread where we send
