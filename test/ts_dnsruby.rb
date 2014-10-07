@@ -13,5 +13,5 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-require "test/ts_online.rb"
-require "test/ts_offline.rb"
+require_relative "ts_online.rb"
+require_relative "ts_offline.rb"

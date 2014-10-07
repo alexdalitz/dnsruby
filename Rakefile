@@ -9,8 +9,15 @@ Rake::RDocTask.new do |rd|
 end
   
 task :test => :install do 
-  require 'rake/runtest'
-  Rake.run_tests 'test/ts_dnsruby.rb'
+#  require 'rake/runtest'
+#  Rake.run_tests 'test/ts_dnsruby.rb'
+  require 'rake/testtask'
+
+  Rake::TestTask.new do |t|
+    t.libs << "test"
+    t.test_files = FileList['test/ts_dnsruby.rb']
+    t.verbose = true
+  end
 end
 
 task :default => :install do

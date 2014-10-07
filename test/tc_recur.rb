@@ -22,7 +22,7 @@ class TestRecur < Test::Unit::TestCase
     Dnsruby::PacketSender.clear_caches
     r = Dnsruby::Recursor.new
 #    Dnsruby::TheLog.level = Logger::DEBUG
-    ret = r.query("uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
+    ret = r.query("uk", Dnsruby::Types.DNSKEY)
 #    print ret
     assert(ret && ret.answer.length > 0)
 #    ret = r.query_dorecursion("aaa.bigzone.uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)

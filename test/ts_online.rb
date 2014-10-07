@@ -41,14 +41,14 @@ if (online)
   print "Running online tests. These tests send UDP packets - some may be lost.\n"
   print "If you get the odd timeout error with these tests, try running them again.\n"
   print "It may just be that some UDP packets got lost the first time...\n"
-  require "test/tc_resolver.rb"
-  require "test/tc_dnsruby.rb"
-  #  require "test/tc_inet6.rb"
-  #  require "test/tc_recurse.rb"
-  require "test/tc_tcp.rb"
-#  require "test/tc_queue.rb"
-  require "test/tc_recur.rb"
-  #  require "test/tc_soak.rb"
+  require_relative "tc_resolver.rb"
+  require_relative "tc_dnsruby.rb"
+  #  require_relative "tc_inet6.rb"
+  #  require_relative "tc_recurse.rb"
+  require_relative "tc_tcp.rb"
+#  require_relative "tc_queue.rb"
+  require_relative "tc_recur.rb"
+  #  require_relative "tc_soak.rb"
 
   # Check if we can contact the server - if we can't, then abort the test 
   # (but tell user that test has not been run due to connectivity problems)
@@ -61,18 +61,18 @@ if (online)
     server_up = true
   rescue Exception
     puts "----------------------------------------"
-    puts "Cannot connect to test server\n\t"+$!+"\n"
+    puts "Cannot connect to test server\n\t"+$!.to_s+"\n"
     puts "\n\nNo tests targetting this server will be run!!\n\n"
     puts "----------------------------------------"
   end
   if (server_up)
 
-    require "test/tc_single_resolver.rb"
-    require "test/tc_axfr.rb"
-    require "test/tc_cache.rb"
-    require "test/tc_dns.rb"
-    require "test/tc_rr-opt.rb"
-    require "test/tc_res_config.rb"
+    require_relative "tc_single_resolver.rb"
+    require_relative "tc_axfr.rb"
+    require_relative "tc_cache.rb"
+    require_relative "tc_dns.rb"
+    require_relative "tc_rr-opt.rb"
+    require_relative "tc_res_config.rb"
 
     have_openssl = false
     begin
@@ -88,13 +88,13 @@ if (online)
       puts "-------------------------------------------------------------------------"
     end
     if (have_openssl)
-      require "test/tc_tsig.rb"
+      require_relative "tc_tsig.rb"
       puts "------------------------------------------------------"
       puts "Running DNSSEC test - may fail if OpenSSL not complete"
       puts "------------------------------------------------------"      
-      require "test/tc_verifier.rb"
-      require "test/tc_dlv.rb"
-      require "test/tc_validator.rb"
+      require_relative "tc_verifier.rb"
+      require_relative "tc_dlv.rb"
+      require_relative "tc_validator.rb"
     end
 
 #    have_em = false
