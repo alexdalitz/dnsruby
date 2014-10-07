@@ -64,7 +64,8 @@ class TestName < Test::Unit::TestCase
     names.push(Name.create("z.example"))
     names.push(Name.create("\001.z.example"))
     names.push(Name.create("*.z.example"))
-    names.push(Name.create("\200.z.example"))
+#    names.push(Name.create("\200.z.example"))
+    names.push(Name.create(["c8"].pack("H*")+".z.example"))
     names.each_index {|i|
       if (i < (names.length() - 1))
         assert(names[i].canonically_before(names[i+1]))
