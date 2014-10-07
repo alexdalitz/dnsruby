@@ -22,24 +22,24 @@ require 'dnsruby'
 include Dnsruby
 class TestDnsruby < Test::Unit::TestCase
   def test_dnsruby
-    a = Resolv.getaddress("www.ruby-lang.org")
-    assert_equal(a.to_s, "221.186.184.75")
-    a = Resolv.getaddresses("www.ruby-lang.org")
+    a = Resolv.getaddress("google-public-dns-a.google.com.")
+    assert_equal(a.to_s, "8.8.8.8")
+    a = Resolv.getaddresses("google-public-dns-a.google.com.")
     assert(a.length==1)
-    assert_equal(a[0].to_s, "221.186.184.75")
-    Resolv.each_address("www.ruby-lang.org") {|address| assert_equal(address, "221.186.184.75")}
+    assert_equal(a[0].to_s, "8.8.8.8")
+    Resolv.each_address("google-public-dns-a.google.com.") {|address| assert_equal(address, "8.8.8.8")}
     
-    n = Resolv.getname("210.251.121.214")
-    assert_equal(n, "ci.ruby-lang.org")
+    n = Resolv.getname("8.8.8.8")
+    assert_equal(n, "google-public-dns-a.google.com")
     begin
-      ret = Resolv.getname("www.ruby-lang.org")
+      ret = Resolv.getname("google-public-dns-a.google.com.")
       assert(false, ret)
     rescue Exception => e
       assert(e.kind_of?(ResolvError))
     end
-    n = Resolv.getnames("210.251.121.214")
+    n = Resolv.getnames("8.8.8.8")
     assert(n.length==1)
-    assert_equal(n[0], "ci.ruby-lang.org")
-    Resolv.each_name("210.251.121.214") {|name| assert_equal(name, "ci.ruby-lang.org")}
+    assert_equal(n[0], "google-public-dns-a.google.com")
+    Resolv.each_name("8.8.8.8") {|name| assert_equal(name, "google-public-dns-a.google.com")}
   end
 end
