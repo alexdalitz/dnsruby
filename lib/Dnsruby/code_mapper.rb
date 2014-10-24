@@ -50,10 +50,6 @@ module Dnsruby
       return strings
     end
     
-    def CodeMapper.maxcode
-      return @maxcode
-    end
-    
     # Creates the CodeMapper from the defined constants
     def CodeMapper.update
 
