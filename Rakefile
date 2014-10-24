@@ -8,7 +8,7 @@ Rake::RDocTask.new do |rd|
 #  rd.options << "--ri"
 end
   
-task :test => :install do 
+task :test do
 #  require 'rake/runtest'
 #  Rake.run_tests 'test/ts_dnsruby.rb'
   require 'rake/testtask'
@@ -19,11 +19,3 @@ task :test => :install do
     t.verbose = true
   end
 end
-
-task :default => :install do
-end
-
-task :install do
-  sh "ruby setup.rb"
-end
-
