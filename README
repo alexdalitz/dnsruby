@@ -38,17 +38,30 @@ the test code will not run the tests which require it. Code which
 attempts to use the library (if it is not present) will raise an
 exception.
 
-Demo code
+Demo Code
 =========
 
 The demo folder contains some example programs using Dnsruby.
 These examples include a basic dig tool (rubydig) and a tool to
 concurrently resolve many names, amongst others.
 
-Online tests
-============
+Unit Tests
+==========
 
-Nominet operate a test server which the Dnsruby test code queries.
+Tests require a current version of minitest (see the .gemspec file
+for which version is required).  In order for the tests to run
+successfully you may need to have the bundler gem installed and
+run 'bundle' or 'bundle install' from the project root to install
+a suitable version of minitest.
+
+There are "online" and "offline" tests.  You can use rake to
+conveniently run the tests.  From the project root you can run:
+
+rake test          # run all tests
+rake test_offline  # run only offline tests
+rake test_online   # run only online tests
+
+Nominet operates a test server which the Dnsruby test code queries.
 If this server is not available then some of the online tests will 
 not be run.
 

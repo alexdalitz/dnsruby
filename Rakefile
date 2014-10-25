@@ -7,15 +7,17 @@ Rake::RDocTask.new do |rd|
   rd.main = "Dnsruby"
 #  rd.options << "--ri"
 end
-  
-task :test do
-#  require 'rake/runtest'
-#  Rake.run_tests 'test/ts_dnsruby.rb'
-  require 'rake/testtask'
 
+
+def create_task(task_name, test_suite_filespec)
   Rake::TestTask.new do |t|
-    t.libs << "test"
-    t.test_files = FileList['test/ts_dnsruby.rb']
-    t.verbose = true
+  t.name = task_name
+  t.test_files = FileList[test_suite_filespec]
+  t.verbose = true
   end
 end
+
+
+create_task(:test,         'test/ts_dnsruby.rb')
+create_task(:test_offline, 'test/ts_offline.rb')
+create_task(:test_online,  'test/ts_online.rb')
