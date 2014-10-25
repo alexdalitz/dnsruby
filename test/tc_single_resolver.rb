@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestSingleResolver < Test::Unit::TestCase
+class TestSingleResolver < Minitest::Test
   Thread::abort_on_exception = true
   #  Dnsruby.log.level=Logger::DEBUG
   

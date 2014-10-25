@@ -17,10 +17,11 @@ begin
   require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 require 'socket'
-class TestTcp < Test::Unit::TestCase
+class TestTcp < Minitest::Test
   def test_TCP
     res = Dnsruby::Resolver.new()
     res.use_tcp = true

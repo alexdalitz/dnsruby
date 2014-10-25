@@ -14,11 +14,12 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
 
-class NsecTest < Test::Unit::TestCase
+class NsecTest < Minitest::Test
   INPUT = "alfa.example.com. 86400 IN NSEC host.example.com. ( " +
     "A MX RRSIG NSEC TYPE1234 )"
   include Dnsruby

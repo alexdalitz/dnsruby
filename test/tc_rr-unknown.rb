@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestRrUnknown < Test::Unit::TestCase
+class TestRrUnknown < Minitest::Test
   def test_RrUnknown
     assert_equal(10226, Types::typesbyname('TYPE10226'), 'typesbyname(TYPE10226) returns 10226')
     assert_equal('TYPE10226', Types::typesbyval(10226),        'typesbyval(10226) returns TYPE10226')

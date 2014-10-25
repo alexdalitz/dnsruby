@@ -14,11 +14,12 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
 
-class TestDlv < Test::Unit::TestCase
+class TestDlv < Minitest::Test
   def test_dlv
     # Enable DLV (only) for validation.
     # Try to validate some records which can only be done through dlv

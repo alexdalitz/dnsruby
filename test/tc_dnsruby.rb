@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestDnsruby < Test::Unit::TestCase
+class TestDnsruby < Minitest::Test
   def test_dnsruby
     a = Resolv.getaddress("google-public-dns-a.google.com.")
     assert_equal(a.to_s, "8.8.8.8")

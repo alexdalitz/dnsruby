@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestUpdate < Test::Unit::TestCase
+class TestUpdate < Minitest::Test
   def is_empty(string)
     return true if string == nil || string.length == 0
     

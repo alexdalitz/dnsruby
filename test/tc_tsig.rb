@@ -17,11 +17,12 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 require "digest/md5"
 include Dnsruby
-class TestTSig < Test::Unit::TestCase
+class TestTSig < Minitest::Test
   KEY_NAME="rubytsig"
   KEY = "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw=="
   def is_empty(string)

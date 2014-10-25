@@ -18,10 +18,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestSSHFP < Test::Unit::TestCase
+class TestSSHFP < Minitest::Test
   def test_sshfp
     txt = "apt-blade6.nominet.org.uk. 85826 IN	SSHFP	1 1 6D4CF7C68E3A959990855099E15D6E0D4DEA4FFF"
     sshfp = RR.create(txt)

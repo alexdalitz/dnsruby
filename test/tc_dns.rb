@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestDNS < Test::Unit::TestCase
+class TestDNS < Minitest::Test
   def setup
     Dnsruby::Config.reset
   end

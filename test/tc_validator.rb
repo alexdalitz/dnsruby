@@ -14,11 +14,12 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
 
-class TestValidator < Test::Unit::TestCase
+class TestValidator < Minitest::Test
   def test_validation
 #    Dnsruby::TheLog.level = Logger::DEBUG
     Dnsruby::Dnssec.clear_trusted_keys

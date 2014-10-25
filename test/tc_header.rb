@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestHeader < Test::Unit::TestCase
+class TestHeader < Minitest::Test
   def test_header
     header = Header.new();
     assert(header, "new() returned something")

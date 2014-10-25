@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 require "digest/md5"
-class TestTKey < Test::Unit::TestCase
+class TestTKey < Minitest::Test
   def is_empty(string)
     return (string == "; no data" || string == "; rdlength = 0")
   end

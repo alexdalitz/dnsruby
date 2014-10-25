@@ -17,11 +17,12 @@ begin
   require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 require 'socket'
 include Dnsruby
-class TestRrOpt < Test::Unit::TestCase
+class TestRrOpt < Minitest::Test
   def test_rropt
     size=2048;
     ednsflags=0x9e22;

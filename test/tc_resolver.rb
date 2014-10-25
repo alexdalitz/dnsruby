@@ -15,14 +15,15 @@
 #++
 require 'dnsruby'
 require 'socket'
-require 'test/unit'
+require 'minitest/autorun'
+
 include Dnsruby
 #@TODO@ We also need a test server so we can control behaviour of server to test
 #different aspects of retry strategy.
 #Of course, with Ruby's limit of 256 open sockets per process, we'd need to run 
 #the server in a different Ruby process.
 
-class TestResolver < Test::Unit::TestCase
+class TestResolver < Minitest::Test
   include Dnsruby
   Thread::abort_on_exception = true
   PORT = 42138

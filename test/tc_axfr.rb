@@ -17,9 +17,10 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
-class TestAxfr < Test::Unit::TestCase
+class TestAxfr < Minitest::Test
   def test_axfr
     zt = Dnsruby::ZoneTransfer.new
     zt.transfer_type = Dnsruby::Types.AXFR

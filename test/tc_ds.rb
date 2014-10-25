@@ -14,12 +14,13 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'openssl'
 require 'digest/sha2'
 require 'dnsruby'
 
-class DsTest < Test::Unit::TestCase
+class DsTest < Minitest::Test
   DLVINPUT = "dskey.example.com. 86400 IN DLV 60485 5 1 ( 2BB183AF5F22588179A53B0A" + 
     "98631FAD1A292118 )"
   INPUT = "dskey.example.com. 86400 IN DS 60485 5 1 ( 2BB183AF5F22588179A53B0A" + 

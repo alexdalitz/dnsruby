@@ -17,9 +17,10 @@ begin
   require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
-class TestResolverConfig < Test::Unit::TestCase
+class TestResolverConfig < Minitest::Test
   
   GoodInput = {
     "port"		  => 54,

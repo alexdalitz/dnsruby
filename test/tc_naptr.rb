@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestNAPTR < Test::Unit::TestCase
+class TestNAPTR < Minitest::Test
   def test_naptr
     txt = "example.com. IN NAPTR 100  50  \"s\"  \"z3950+I2L+I2C\"     \"\"  _z3950._tcp.gatech.edu."
     naptr = RR.create(txt)
