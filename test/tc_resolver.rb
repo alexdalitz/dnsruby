@@ -69,7 +69,7 @@ class TestResolver < Minitest::Test
   end
 
   def test_query_one_duff_server_one_good
-    res = Resolver.new({:nameserver => ["localhost", "128.8.10.90"]})
+    res = Resolver.new({:nameserver => ["8.8.8.8", "8.8.8.7"]})
     res.retry_delay=1
     q = Queue.new
     res.send_async(Message.new("example.com", Types.A),q,q)
@@ -85,7 +85,7 @@ class TestResolver < Minitest::Test
   #  end
   
   def test_reverse_lookup
-    m = Message.new("210.251.121.214", Types.PTR)
+    m = Message.new("8.8.8.8", Types.PTR)
     r = Resolver.new
     q=Queue.new
     r.send_async(m,q,q)
@@ -95,7 +95,7 @@ class TestResolver < Minitest::Test
     ret.each_answer do |answer|
       if (answer.type==Types.PTR)
         no_pointer=false
-        assert(answer.domainname.to_s=~/ruby-lang/)      
+        assert(answer.domainname.to_s=~/google-public-dns/)      
       end
     end
     assert(!no_pointer)
