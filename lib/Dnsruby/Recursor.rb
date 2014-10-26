@@ -663,9 +663,11 @@ module Dnsruby
                 elsif (of =~ /#{known_zone}/)
                   TheLog.debug(";; _dorecursion() FOUND closer authority for [#{of}] at [#{server}].")
                   auth[server] ||= AddressCache.new #[] @TODO@ If there is no additional record for this, then we want to use the authority!
-                  if ((packet.additional.rrset(rr.nsdname, Types::A).length == 0) &&
-                        (packet.additional.rrset(rr.nsdname, Types::AAAA).length == 0))
-                    auth[server].push([rr.nsdname, rr.ttl])
+                  if (rr.type == Types.NS) 
+                      if ((packet.additional.rrset(rr.nsdname, Types::A).length == 0) &&
+                            (packet.additional.rrset(rr.nsdname, Types::AAAA).length == 0))
+                        auth[server].push([rr.nsdname, rr.ttl])
+                      end
                   end
                 else
                   TheLog.debug(";; _dorecursion() Confused name server [" + @answerfrom + "] thinks [#{of}] is closer than [#{known_zone}]?")
