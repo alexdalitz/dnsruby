@@ -61,6 +61,15 @@ rake test          # run all tests
 rake test_offline  # run only offline tests
 rake test_online   # run only online tests
 
+If you get the following error when running rake test tasks,
+then you may need to preface the command with bundle exec to
+ensure that the gem versions specified in Gemfile.lock are used
+at runtime:
+
+```
+bundle exec rake test
+```
+
 Nominet operates a test server which the Dnsruby test code queries.
 If this server is not available then some of the online tests will 
 not be run.
