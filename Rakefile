@@ -11,9 +11,9 @@ end
 
 def create_task(task_name, test_suite_filespec)
   Rake::TestTask.new do |t|
-  t.name = task_name
-  t.test_files = FileList[test_suite_filespec]
-  t.verbose = true
+    t.name = task_name
+    t.test_files = FileList[test_suite_filespec]
+    t.verbose = true
   end
 end
 
