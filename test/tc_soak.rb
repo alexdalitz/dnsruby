@@ -17,7 +17,8 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 begin
 require 'test/tc_single_resolver'
@@ -35,7 +36,7 @@ include Dnsruby
 # @TODO@ Future versions of dnsruby will allow random streaming over a fixed number of (cycling) random sockets,
 # so this test can be beefed up considerably at that point.
 # @todo@ A test DNS server running on localhost is really needed here
-class TestSingleResolverSoak < Test::Unit::TestCase
+class TestSingleResolverSoak < Minitest::Test
   
   def test_many_asynchronous_queries_one_single_resolver
     run_many_asynch_queries_test_single_res(1)

@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestEscapedChars < Test::Unit::TestCase
+class TestEscapedChars < Minitest::Test
   def test_one
     Name::Label.set_max_length(150)
     #

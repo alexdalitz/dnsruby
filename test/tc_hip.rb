@@ -18,10 +18,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestHIP < Test::Unit::TestCase
+class TestHIP < Minitest::Test
   def test_hip
     [{"www.example.com.      IN  HIP ( 2 200100107B1A74DF365639CC39F1D578
                                 AwEAAbdxyhNuSutc5EMzxTs9LBPCIkOFH8cIvM4p9+LrV4e19WzK00+CI6zBCQTdtWsuxKbWIy87UOoJTwkUs7lBu+Upr1gsNrut79ryra+bSRGQb1slImA8YVJyuIDsj7kwzG7jnERNqnWxZ48AWkskmdHaVDP4BcelrTI3rMXdXF5D )" =>

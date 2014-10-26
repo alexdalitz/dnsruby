@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestResOpt < Test::Unit::TestCase
+class TestResOpt < Minitest::Test
   def test_dns_file
     
     # .txt because this test will run under windows, unlike the other file

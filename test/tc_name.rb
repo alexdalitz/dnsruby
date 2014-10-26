@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestName < Test::Unit::TestCase
+class TestName < Minitest::Test
   def test_label_length
     Name::Label.set_max_length(Name::Label::MaxLabelLength) # Other tests may have changed this  
     # Test max label length = 63

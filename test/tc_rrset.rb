@@ -14,10 +14,11 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 
-class RrsetTest < Test::Unit::TestCase
+class RrsetTest < Minitest::Test
   def test_rrset
     rrset = Dnsruby::RRSet.new
 

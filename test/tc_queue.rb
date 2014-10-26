@@ -14,10 +14,11 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 
-class TestQueue < Test::Unit::TestCase
+class TestQueue < Minitest::Test
   def test_queue
     q = Queue.new
     r = Dnsruby::Resolver.new

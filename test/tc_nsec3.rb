@@ -14,10 +14,11 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 
-class Nsec3Test < Test::Unit::TestCase
+class Nsec3Test < Minitest::Test
   INPUT = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd ( " + 
     "2vptu5timamqttgl4luu9kg21e0aor3s A RRSIG )"
   INPUT2 = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd " +

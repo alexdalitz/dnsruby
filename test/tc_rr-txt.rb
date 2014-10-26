@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestRrTest < Test::Unit::TestCase
+class TestRrTest < Minitest::Test
   #Stimulus, expected response, and test name:
   
   TESTLIST =	[

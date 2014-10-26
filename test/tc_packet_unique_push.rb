@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestPacketUniquePush < Test::Unit::TestCase
+class TestPacketUniquePush < Minitest::Test
   #  def test_packUniquePush
   #    
   #    

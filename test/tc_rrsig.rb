@@ -14,10 +14,11 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 
-class RrsigTest < Test::Unit::TestCase
+class RrsigTest < Minitest::Test
   INPUT = "host.example.com. 86400 IN RRSIG A 5 3 86400 20030322173103 ( " + 
     "20030220173103 2642 example.com. " +
     "oJB1W6WNGv+ldvQ3WDG0MQkg5IEhjRip8WTr" +

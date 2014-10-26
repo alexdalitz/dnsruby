@@ -14,11 +14,12 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
 
-class TestCache < Test::Unit::TestCase
+class TestCache < Minitest::Test
   def test_cache
     cache = Cache.new
     m1 = Message.new("example.com.", Types.A, Classes.IN)

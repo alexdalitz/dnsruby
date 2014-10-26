@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestRR < Test::Unit::TestCase
+class TestRR < Minitest::Test
   def test_rr
     #------------------------------------------------------------------------------
     # Canned data.

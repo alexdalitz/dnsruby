@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestResolverEnv < Test::Unit::TestCase
+class TestResolverEnv < Minitest::Test
 # @todo@ Dnsruby does not provide this functionality
   def test_res_env
     ENV['RES_NAMESERVERS'] = '10.0.1.128 10.0.2.128';

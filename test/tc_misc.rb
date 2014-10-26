@@ -17,9 +17,10 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
-class TestMisc < Test::Unit::TestCase
+class TestMisc < Minitest::Test
   def test_wildcard
     # test to make sure that wildcarding works.
     #

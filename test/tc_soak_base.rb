@@ -18,10 +18,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 
-class TestSoakBase # < Test::Unit::TestCase
+class TestSoakBase # < Minitest::Test
   include Dnsruby
   Rrs = [
   {

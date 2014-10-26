@@ -15,9 +15,10 @@
 #++
 
 require 'dnsruby'
-require 'test/unit'
+require 'minitest/autorun'
 
-class TestRecur < Test::Unit::TestCase
+
+class TestRecur < Minitest::Test
   def test_recur
     Dnsruby::PacketSender.clear_caches
     r = Dnsruby::Recursor.new

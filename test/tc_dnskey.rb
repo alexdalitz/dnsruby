@@ -14,10 +14,11 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 
-class DnskeyTest < Test::Unit::TestCase
+class DnskeyTest < Minitest::Test
   INPUT = "example.com. 86400 IN DNSKEY 256 3 5 ( AQPSKmynfzW4kyBv015MUG2DeIQ3" + 
     "Cbl+BBZH4b/0PY1kxkmvHjcZc8no" + 
     "kfzj31GajIQKY+5CptLr3buXA10h" +

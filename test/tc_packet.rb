@@ -17,10 +17,11 @@ begin
 require 'rubygems'
 rescue LoadError
 end
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 include Dnsruby
-class TestPacket < Test::Unit::TestCase
+class TestPacket < Minitest::Test
   def test_packet
     domain = "example.com."
     type = "MX"

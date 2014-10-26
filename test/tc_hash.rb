@@ -18,13 +18,14 @@ begin
 rescue LoadError
 end
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'set'
 require 'dnsruby'
 
 module Dnsruby
 
-class TestHash < Test::Unit::TestCase
+class TestHash < Minitest::Test
 
   def test_types_hash
     object1 = Types.new(Types::NSEC3)

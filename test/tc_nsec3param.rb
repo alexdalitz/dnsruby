@@ -14,10 +14,11 @@
 #limitations under the License.
 #++
 
-require 'test/unit'
+require 'minitest/autorun'
+
 require 'dnsruby'
 
-class Nsec3ParamTest < Test::Unit::TestCase
+class Nsec3ParamTest < Minitest::Test
   INPUT = "example. 3600 IN NSEC3PARAM 1 0 12 aabbccdd"
 
   include Dnsruby
