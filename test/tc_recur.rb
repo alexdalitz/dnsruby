@@ -14,9 +14,7 @@
 #limitations under the License.
 #++
 
-require 'dnsruby'
-require 'minitest/autorun'
-
+require_relative 'spec_helper'
 
 class TestRecur < Minitest::Test
   def test_recur

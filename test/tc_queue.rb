@@ -14,9 +14,7 @@
 #limitations under the License.
 #++
 
-require 'minitest/autorun'
-
-require 'dnsruby'
+require_relative 'spec_helper'
 
 class TestQueue < Minitest::Test
   def test_queue

@@ -14,9 +14,7 @@
 #limitations under the License.
 #++
 
-require 'minitest/autorun'
-
-require 'dnsruby'
+require_relative 'spec_helper'
 
 class DnskeyTest < Minitest::Test
   INPUT = "example.com. 86400 IN DNSKEY 256 3 5 ( AQPSKmynfzW4kyBv015MUG2DeIQ3" + 

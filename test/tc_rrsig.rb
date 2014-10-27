@@ -14,9 +14,7 @@
 #limitations under the License.
 #++
 
-require 'minitest/autorun'
-
-require 'dnsruby'
+require_relative 'spec_helper'
 
 class RrsigTest < Minitest::Test
   INPUT = "host.example.com. 86400 IN RRSIG A 5 3 86400 20030322173103 ( " + 

@@ -14,9 +14,7 @@
 #limitations under the License.
 #++
 
-require 'minitest/autorun'
-
-require 'dnsruby'
+require_relative 'spec_helper'
 
 class Nsec3ParamTest < Minitest::Test
   INPUT = "example. 3600 IN NSEC3PARAM 1 0 12 aabbccdd"
