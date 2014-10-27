@@ -1,12 +1,13 @@
 PATH
   remote: .
   specs:
-    dnsruby (1.55)
+    dnsruby (1.56.0)
 
 GEM
   remote: https://rubygems.org/
   specs:
     minitest (5.4.2)
+    rake (10.3.2)
 
 PLATFORMS
   ruby
@@ -14,3 +15,4 @@ PLATFORMS
 DEPENDENCIES
   dnsruby!
   minitest (~> 5.4)
+  rake (~> 10.1)

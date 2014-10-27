@@ -26,5 +26,6 @@ SPEC = Gem::Specification.new do |s|
   s.extra_rdoc_files = ["DNSSEC", "EXAMPLES", "README", "EVENTMACHINE"]
 
   s.add_development_dependency 'minitest', '~> 5.4'
+  s.add_development_dependency 'rake',     '~> 10.1'
 end
 
