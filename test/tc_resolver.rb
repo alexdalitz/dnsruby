@@ -13,9 +13,9 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-require 'dnsruby'
+require_relative 'spec_helper'
+
 require 'socket'
-require 'minitest/autorun'
 
 include Dnsruby
 #@TODO@ We also need a test server so we can control behaviour of server to test

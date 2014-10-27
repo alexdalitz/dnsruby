@@ -13,13 +13,9 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-begin
-require 'rubygems'
-rescue LoadError
-end
-require 'minitest/autorun'
 
-require 'dnsruby'
+require_relative 'spec_helper'
+
 include Dnsruby
 class TestRR < Minitest::Test
   def test_rr

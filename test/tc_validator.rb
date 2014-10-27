@@ -14,9 +14,8 @@
 #limitations under the License.
 #++
 
-require 'minitest/autorun'
+require_relative 'spec_helper'
 
-require 'dnsruby'
 include Dnsruby
 
 class TestValidator < Minitest::Test

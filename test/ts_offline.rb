@@ -13,11 +13,9 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-begin
-require 'rubygems'
-rescue LoadError
-end
-require 'dnsruby'
+
+require_relative 'spec_helper'
+
 Dnsruby.log.level = Logger::FATAL
 
 require_relative 'tc_header.rb'

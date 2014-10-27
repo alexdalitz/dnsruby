@@ -14,13 +14,7 @@
 #limitations under the License.
 #++
 
-begin
-require 'rubygems'
-rescue LoadError
-end
-require 'minitest/autorun'
-
-require 'dnsruby'
+require_relative 'spec_helper'
 
 class TestSoakBase # < Minitest::Test
   include Dnsruby

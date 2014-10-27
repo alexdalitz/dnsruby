@@ -14,9 +14,7 @@
 #limitations under the License.
 #++
 
-require 'minitest/autorun'
-
-require 'dnsruby'
+require_relative 'spec_helper'
 
 class Nsec3Test < Minitest::Test
   INPUT = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd ( " + 
