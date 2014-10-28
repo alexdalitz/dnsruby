@@ -21,7 +21,7 @@ rescue LoadError
   require 'thread'
 end
 require 'singleton'
-require 'Dnsruby/validator_thread.rb'
+require 'dnsruby/validator_thread.rb'
 module Dnsruby
   Thread::abort_on_exception = true
   class SelectThread #:nodoc: all

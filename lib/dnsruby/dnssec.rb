@@ -15,8 +15,8 @@
 #++
 require 'digest/sha2'
 require 'net/ftp'
-require 'Dnsruby/key_cache'
-require 'Dnsruby/single_verifier'
+require 'dnsruby/key_cache'
+require 'dnsruby/single_verifier'
 module Dnsruby
 
   # RFC4033, section 7

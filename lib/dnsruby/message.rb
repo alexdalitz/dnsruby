@@ -13,8 +13,8 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-require 'Dnsruby/name'
-require 'Dnsruby/resource/resource'
+require 'dnsruby/name'
+require 'dnsruby/resource/resource'
 module Dnsruby
   #===Defines a DNS packet.
   # 

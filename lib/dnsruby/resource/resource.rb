@@ -673,6 +673,6 @@ module Dnsruby
     end
   end
 end
-require 'Dnsruby/resource/domain_name'
-require 'Dnsruby/resource/generic'
-require 'Dnsruby/resource/IN'
+require 'dnsruby/resource/domain_name'
+require 'dnsruby/resource/generic'
+require 'dnsruby/resource/IN'

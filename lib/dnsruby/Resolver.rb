@@ -14,8 +14,8 @@
 #limitations under the License.
 #++
 #require "Dnsruby/resolver_register.rb"
-require "Dnsruby/PacketSender"
-require "Dnsruby/Recursor"
+require "dnsruby/PacketSender"
+require "dnsruby/Recursor"
 module Dnsruby
   #== Description
   #Dnsruby::Resolver is a DNS stub resolver.
@@ -164,7 +164,7 @@ module Dnsruby
     # Query for a name. If a valid Message is received, then it is returned
     # to the caller. Otherwise an exception (a Dnsruby::ResolvError or Dnsruby::ResolvTimeout) is raised.
     #
-    #   require 'Dnsruby'
+    #   require 'dnsruby'
     #   res = Dnsruby::Resolver.new
     #   response = res.query("example.com") # defaults to Types.A, Classes.IN
     #   response = res.query("example.com", Types.MX)
@@ -312,7 +312,7 @@ module Dnsruby
     #    
     #=== Example code :
     #
-    #   require 'Dnsruby'
+    #   require 'dnsruby'
     #   res = Dnsruby::Resolver.newsend
     #   query_id = 10 # can be any object you like
     #   query_queue = Queue.new
@@ -1186,4 +1186,4 @@ module Dnsruby
     end
   end
 end
-require "Dnsruby/SingleResolver"
+require "dnsruby/SingleResolver"

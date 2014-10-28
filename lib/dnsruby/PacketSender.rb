@@ -13,9 +13,9 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-require 'Dnsruby/select_thread'
+require 'dnsruby/select_thread'
 require 'ipaddr'
-#require 'Dnsruby/iana_ports'
+#require 'dnsruby/iana_ports'
 module Dnsruby
   class PacketSender # :nodoc: all
     @@authoritative_cache = Cache.new
