@@ -884,7 +884,7 @@ module Dnsruby
         s
       else
 
-        flags_str = -> do
+        flags_str = begin
           flags = []
           flags << 'qr' if @qr
           flags << 'aa' if @aa
@@ -897,15 +897,13 @@ module Dnsruby
           ";; flags: #{flags.join(' ')}; "
         end
 
-        head_line_str = -> do
-          ";; ->>HEADER<<- opcode: #{opcode.string.upcase}, status: #{@rcode.string}, id: #{@id}\n"
-        end
+        head_line_str =
+            ";; ->>HEADER<<- opcode: #{opcode.string.upcase}, status: #{@rcode.string}, id: #{@id}\n"
 
-        section_counts_str = -> do
-          "QUERY: #{@qdcount}, ANSWER: #{@ancount}, AUTHORITY: #{@nscount}, ADDITIONAL: #{@arcount}\n"
-        end
+        section_counts_str =
+            "QUERY: #{@qdcount}, ANSWER: #{@ancount}, AUTHORITY: #{@nscount}, ADDITIONAL: #{@arcount}\n"
 
-        head_line_str.() + flags_str.() + section_counts_str.()
+        head_line_str + flags_str + section_counts_str
       end
     end
 
