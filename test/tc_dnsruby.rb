@@ -32,7 +32,8 @@ class TestDnsruby < Minitest::Test
       ret = Resolv.getname("google-public-dns-a.google.com.")
       assert(false, ret)
     rescue Exception => e
-      assert(e.kind_of?(ResolvError))
+#      assert(e.kind_of?(ResolvError))
+      assert(e.kind_of?(Resolv::ResolvError), "Error was a #{e.class}: #{e}")
     end
     n = Resolv.getnames("8.8.8.8")
     assert(n.length==1)
