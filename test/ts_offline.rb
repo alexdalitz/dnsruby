@@ -20,6 +20,7 @@ Dnsruby.log.level = Logger::FATAL
 
 require_relative 'tc_header.rb'
 require_relative "tc_name.rb"
+require_relative 'tc_message.rb'
 require_relative "tc_misc.rb"
 require_relative "tc_hash.rb"
 require_relative "tc_packet.rb"
