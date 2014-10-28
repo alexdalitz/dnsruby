@@ -77,12 +77,6 @@ class TestHeader < Minitest::Test
     
     assert(header==(header2), 'Headers are the same');
     
-    #
-    #  Is header.inspect remotely sane?
-    #
-    assert(header.to_s =~ /opcode = Query/, 'inspect() has opcode correct');
-    assert(header.to_s =~ /ancount = 2/,    'inspect() has ancount correct');
-    
     header = Header.new;
     
     #
