@@ -1,0 +1,9 @@
+language: ruby
+cache: bundler
+
+script: "bundle exec rake test_offline"
+
+rvm:
+  - 1.9.3
+  - 2.0.0
+  - 2.1.4
