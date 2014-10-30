@@ -13,9 +13,9 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-require 'Dnsruby/Hosts'
-require 'Dnsruby/Config'
-require "Dnsruby/Resolver"
+require 'dnsruby/Hosts'
+require 'dnsruby/Config'
+require "dnsruby/Resolver"
 module Dnsruby
 
   #== Dnsruby::DNS class

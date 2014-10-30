@@ -13,11 +13,11 @@
 #See the License for the specific language governing permissions and 
 #limitations under the License.
 #++
-require 'Dnsruby/code_mapper'
-require 'Dnsruby/ipv4'
-require 'Dnsruby/ipv6'
+require 'dnsruby/code_mapper'
+require 'dnsruby/ipv4'
+require 'dnsruby/ipv6'
 require 'timeout'
-require 'Dnsruby/TheLog'
+require 'dnsruby/TheLog'
 #= Dnsruby library
 #Dnsruby is a thread-aware DNS stub resolver library written in Ruby.
 #
@@ -580,14 +580,14 @@ module Dnsruby
     end
     
     
-    require 'Dnsruby/Cache'
-    require 'Dnsruby/DNS'
-    require 'Dnsruby/Hosts'
-    require 'Dnsruby/message'
-    require 'Dnsruby/update'
-    require 'Dnsruby/zone_transfer'
-    require 'Dnsruby/dnssec'
-    require 'Dnsruby/zone_reader'
+    require 'dnsruby/Cache'
+    require 'dnsruby/DNS'
+    require 'dnsruby/Hosts'
+    require 'dnsruby/message'
+    require 'dnsruby/update'
+    require 'dnsruby/zone_transfer'
+    require 'dnsruby/dnssec'
+    require 'dnsruby/zone_reader'
     
     #Default Resolver to use for Dnsruby class methods
     DefaultResolver = self.new

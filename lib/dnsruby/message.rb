@@ -16,7 +16,6 @@
 
 require 'dnsruby/name'
 require 'dnsruby/resource/resource'
-
 module Dnsruby
   #===Defines a DNS packet.
   # 

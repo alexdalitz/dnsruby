@@ -96,8 +96,8 @@ module Dnsruby
     end
   end
 end
-require 'Dnsruby/resource/A'
-require 'Dnsruby/resource/AAAA'
-require 'Dnsruby/resource/AFSDB'
-require 'Dnsruby/resource/PX'
-require 'Dnsruby/resource/SRV'
+require 'dnsruby/resource/A'
+require 'dnsruby/resource/AAAA'
+require 'dnsruby/resource/AFSDB'
+require 'dnsruby/resource/PX'
+require 'dnsruby/resource/SRV'
