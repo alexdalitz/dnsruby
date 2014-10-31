@@ -24,10 +24,17 @@ include Dnsruby
 #the server in a different Ruby process.
 
 class TestResolver < Minitest::Test
+
   include Dnsruby
+
   Thread::abort_on_exception = true
+
+  GOOD_DOMAIN_NAME = 'example.com'
+  BAD_DOMAIN_NAME  = 'dnsruby-test-of-bad-domain-name.blah'
+
   PORT = 42138
   @@port = PORT
+
   def setup
     Dnsruby::Config.reset
   end
@@ -38,11 +45,25 @@ class TestResolver < Minitest::Test
     assert(ret.kind_of?(Message))
   end
 
+  def test_send_message_bang_noerror
+    res = Resolver.new
+    response, error = res.send_message!(Message.new(GOOD_DOMAIN_NAME, Types.A))
+    assert(response.kind_of?(Message), "Response was not a message, was: #{response}")
+    assert(error.nil?, "Error was not nil, was: #{error}")
+  end
+
+  def test_send_message_bang_error
+    res = Resolver.new
+    response, error = res.send_message!(Message.new(BAD_DOMAIN_NAME, Types.A))
+    assert(response.nil?, "Response was not nil, was: #{response}")
+    assert(error.is_a?(Exception), "error was not an exception, was: #{error}")
+  end
+
   def test_send_plain_message
     res = Resolver.new
     response, error = res.send_plain_message(Message.new("example.com"))
     assert(response.kind_of?(Message))
-    m = Message.new("fgjkhsklfjedfiuaufewriuf.com")
+    m = Message.new(BAD_DOMAIN_NAME)
     m.header.rd = true
     response, error = res.send_plain_message(m)
 #    print "Response : #{response}\n"
@@ -56,6 +77,20 @@ class TestResolver < Minitest::Test
     res = Resolver.new
     ret = res.query("example.com")
     assert(ret.kind_of?(Message))
+  end
+
+  def test_query_bang_noerror
+    res = Resolver.new
+    response, error = res.query!(GOOD_DOMAIN_NAME)
+    assert(error.nil?, "Error was not nil, was a: #{error.class}")
+    assert(response.kind_of?(Message), "Response was not a message, was a #{response.inspect}")
+  end
+
+  def test_query_bang_error
+    res = Resolver.new
+    response, error = res.query!(BAD_DOMAIN_NAME)
+    assert(response.nil?, "Response was not nil, was a #{response.class}")
+    assert(error.is_a?(Exception), "error was not an exception, was a #{error.inspect}")
   end
 
   def test_query_async
@@ -117,7 +152,7 @@ class TestResolver < Minitest::Test
   def test_nxdomain
     res=Resolver.new
     q = Queue.new
-    res.send_async(Message.new("dklfjhdFHFHDVVUIEWRFDSAJKVCNASDLFJHN.com", Types.A), q, 1)
+    res.send_async(Message.new(BAD_DOMAIN_NAME, Types.A), q, 1)
     id, m, err = q.pop
     assert(id==1)
     assert(m.rcode == RCode.NXDOMAIN)
