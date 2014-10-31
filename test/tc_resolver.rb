@@ -63,7 +63,7 @@ class TestResolver < Minitest::Test
     res = Resolver.new
     response, error = res.send_plain_message(Message.new("example.com"))
     assert(response.kind_of?(Message))
-    m = Message.new("fgjkhsklfjedfiuaufewriuf.com")
+    m = Message.new(BAD_DOMAIN_NAME)
     m.header.rd = true
     response, error = res.send_plain_message(m)
 #    print "Response : #{response}\n"
@@ -152,7 +152,7 @@ class TestResolver < Minitest::Test
   def test_nxdomain
     res=Resolver.new
     q = Queue.new
-    res.send_async(Message.new("dklfjhdFHFHDVVUIEWRFDSAJKVCNASDLFJHN.com", Types.A), q, 1)
+    res.send_async(Message.new(BAD_DOMAIN_NAME, Types.A), q, 1)
     id, m, err = q.pop
     assert(id==1)
     assert(m.rcode == RCode.NXDOMAIN)
