@@ -50,18 +50,21 @@ if (online)
   # Check if we can contact the server - if we can't, then abort the test 
   # (but tell user that test has not been run due to connectivity problems)
   server_up = false
-  begin
-    sock = UDPSocket.new
-    sock.connect('ns0.validation-test-servers.nominet.org.uk',
-      25)
-    sock.close
-    server_up = true
-  rescue Exception
-    puts "----------------------------------------"
-    puts "Cannot connect to test server\n\t"+$!.to_s+"\n"
-    puts "\n\nNo tests targetting this server will be run!!\n\n"
-    puts "----------------------------------------"
-  end
+
+  # Disabling the attempt to connect to Nominet servers...
+  # begin
+  #   sock = UDPSocket.new
+  #   sock.connect('ns0.validation-test-servers.nominet.org.uk',
+  #     25)
+  #   sock.close
+  #   server_up = true
+  # rescue Exception
+  #   puts "----------------------------------------"
+  #   puts "Cannot connect to test server\n\t"+$!.to_s+"\n"
+  #   puts "\n\nNo tests targetting this server will be run!!\n\n"
+  #   puts "----------------------------------------"
+  # end
+
   if (server_up)
 
     require_relative "tc_single_resolver.rb"
