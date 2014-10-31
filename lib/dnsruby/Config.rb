@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
@@ -19,17 +19,17 @@ module Dnsruby
   # In particular, it determines the nameserver to target queries to.
   #
   #
-  # It also specifies whether and how the search list and default 
+  # It also specifies whether and how the search list and default
   # domain should be applied to queries, according to the following
   # algorithm :
-  # 
+  #
   #*     If the name is absolute, then it is used as is.
-  # 
+  #
   #*     If the name is not absolute, then :
-  #     
-  #         If apply_domain is true, and ndots is greater than the number 
+  #
+  #         If apply_domain is true, and ndots is greater than the number
   #         of labels in the name, then the default domain is added to the name.
-  #         
+  #
   #         If apply_search_list is true, then each member of the search list
   #         is appended to the name.
   #
@@ -44,7 +44,7 @@ module Dnsruby
     #  -- single socket for all packets
     #  -- single new socket for individual client queries (including retries and multiple nameservers)
     #++
-    
+
     # The list of nameservers to query
     def nameserver
       if (!@configured)
@@ -63,13 +63,13 @@ module Dnsruby
       end
       return @ndots
     end
-    
+
     # Set the config. Parameter can be :
-    # 
-    # * A String containing the name of the config file to load 
+    #
+    # * A String containing the name of the config file to load
     #        e.g. /etc/resolv.conf
-    # 
-    # * A hash with the following elements : 
+    #
+    # * A hash with the following elements :
     #        nameserver (String)
     #        domain (String)
     #        search (String)
@@ -79,20 +79,20 @@ module Dnsruby
     def set_config_info(config_info)
       parse_config(config_info)
     end
-    
-    # Create a new Config with system default values  
+
+    # Create a new Config with system default values
     def initialize()
       @mutex = Mutex.new
       @configured = false
       #      parse_config
     end
-    # Reset the config to default values    
+    # Reset the config to default values
     def Config.reset
       c = Config.new
       @configured = false
       #      c.parse_config
     end
-    
+
     def parse_config(config_info=nil) #:nodoc: all
       @mutex.synchronize {
         ns = []
@@ -130,13 +130,13 @@ module Dnsruby
           send("nameserver=",ns)
         end
         @configured = true
-        send("search=",s)        
+        send("search=",s)
         send("ndots=",nd)
-        send("domain=",dom)        
+        send("domain=",dom)
       }
       Dnsruby.log.info{to_s}
     end
-    
+
     # Set the default domain
     def domain=(dom)
       #      @configured = true
@@ -149,7 +149,7 @@ module Dnsruby
         @domain=nil
       end
     end
-    
+
     # Set ndots
     def ndots=(nd)
       @configured = true
@@ -158,7 +158,7 @@ module Dnsruby
         raise ArgumentError.new("invalid ndots config: #{@ndots.inspect}")
       end
     end
-    
+
     # Set the default search path
     def search=(s)
       @configured = true
@@ -177,14 +177,14 @@ module Dnsruby
           @search = [[]]
         end
       end
-      
+
       if !@search.kind_of?(Array) ||
           #              !@search.all? {|ls| ls.all? {|l| Label::Str === l } }
         !@search.all? {|ls| ls.all? {|l| Name::Label === l } }
         raise ArgumentError.new("invalid search config: #{@search.inspect}")
       end
     end
-    
+
     def check_ns(ns) #:nodoc: all
       if !ns.kind_of?(Array) ||
           !ns.all? {|n| (Name === n || String === n || IPv4 === n || IPv6 === n)}
@@ -209,14 +209,14 @@ module Dnsruby
         end
       }
     end
-    
+
     # Add a nameserver to the list of nameservers.
-    # 
+    #
     # Can take either a single String or an array of Strings.
     # The new nameservers are added at a higher priority.
     def add_nameserver(ns)
       @configured = true
-      if (ns.kind_of?String) 
+      if (ns.kind_of?String)
         ns=[ns]
       end
       check_ns(ns)
@@ -226,7 +226,7 @@ module Dnsruby
         end
       end
     end
-    
+
     # Set the config to point to a single nameserver
     def nameserver=(ns)
       @configured = true
@@ -236,7 +236,7 @@ module Dnsruby
       @nameserver=ns
       Dnsruby.log.debug{"Nameservers = #{@nameserver.join(", ")}"}
     end
-    
+
     def Config.resolve_server(ns) #:nodoc: all
       # Sanity check server
       # If it's an IP address, then use that for server
@@ -248,7 +248,7 @@ module Dnsruby
       begin
         addr = IPv4.create(ns)
         server = ns
-      rescue Exception 
+      rescue Exception
         begin
           addr=IPv6.create(ns)
           server = ns
@@ -297,7 +297,7 @@ module Dnsruby
       end
       return server
     end
-    
+
     def Config.parse_resolv_conf(filename) #:nodoc: all
       nameserver = []
       search = nil
@@ -339,11 +339,11 @@ module Dnsruby
       }
       return { :nameserver => nameserver, :domain => domain, :search => search, :ndots => ndots }
     end
-    
+
     def inspect #:nodoc: all
       to_s
     end
-    
+
     def to_s
       if (!@configured)
         parse_config
@@ -359,7 +359,7 @@ module Dnsruby
       ret += " ndots : #{@ndots}"
       return ret
     end
-    
+
     def Config.default_config_hash(filename="/etc/resolv.conf") #:nodoc: all
       config_hash={}
       if File.exist? filename
@@ -385,7 +385,7 @@ module Dnsruby
       end
       config_hash
     end
-    
+
     # Return the search path
     def search
       if (!@configured)
@@ -397,7 +397,7 @@ module Dnsruby
       end
       return search
     end
-    
+
     # Return the default domain
     def domain
       if (!@configured)
@@ -408,7 +408,7 @@ module Dnsruby
       end
       return Name.create(@domain).to_s
     end
-    
+
     def single? #:nodoc: all
       if @nameserver.length == 1
         return @nameserver[0]
@@ -422,7 +422,7 @@ module Dnsruby
         parse_config
       end
     end
-    
+
     def generate_candidates(name) #:nodoc: all
       if !@configured
         parse_config

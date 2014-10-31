@@ -2,19 +2,19 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
-  class RR   
+  class RR
     #Class for EDNS pseudo resource record OPT.
     #This class is effectively internal to Dnsruby
     #See RFC 2671, RFC 2435 Section 3
@@ -34,13 +34,13 @@ module Dnsruby
       def initialize(*args)
         @type = Types.new('OPT')
         @ttl = nil
-        
+
         @options=nil
         if (args.length > 0)
           self.payloadsize=(args[0])
           if (args.length > 1)
             self.flags=(args[1])
-            if (args.length > 2) 
+            if (args.length > 2)
               self.options=(args[2])
             else
               self.options=nil
@@ -52,7 +52,7 @@ module Dnsruby
           self.payloadsize=0
         end
       end
-      
+
       # From RFC 2671 :
       # 4.3. The fixed part of an OPT RR is structured as follows:
       #
@@ -64,7 +64,7 @@ module Dnsruby
       #     TTL          u_int32_t      extended RCODE and flags
       #     RDLEN        u_int16_t      describes RDATA
       #     RDATA        octet stream   {attribute,value} pairs
-      
+
       #4.6. The extended RCODE and flags (which OPT stores in the RR TTL field)
       #are structured as follows:
       #
@@ -81,8 +81,8 @@ module Dnsruby
       #
       #   VERSION         Indicates the implementation level of whoever sets
       #                   it.  Full conformance with this specification is
-      #                   indicated by version "0." 
-      
+      #                   indicated by version "0."
+
       def flags_from_ttl
         if (@ttl)
           return [@ttl].pack("N")
@@ -90,40 +90,40 @@ module Dnsruby
           return [0].pack("N")
         end
       end
-      
+
       def xrcode
         return ExtendedRCode.new(flags_from_ttl[0, 1].unpack("C")[0])
       end
-      
+
       def xrcode=(c)
         code = ExtendedRCode.new(c)
         @ttl = (code.code << 24) + (version() << 16) + flags()
       end
-      
+
       def version
         return flags_from_ttl[1, 1].unpack("C")[0]
       end
-      
+
       def version=(code)
         @ttl = (xrcode().code << 24) + (code << 16) + flags()
       end
-      
+
       def flags
         return flags_from_ttl[2, 2].unpack("n")[0]
       end
-      
+
       def flags=(code)
         set_flags(code)
       end
-      
+
       def set_flags(code) # Should always be zero
         @ttl = (xrcode().code << 24) + (version() << 16) + code
       end
-      
+
       def dnssec_ok
         return ((flags() & DO_BIT) == DO_BIT)
       end
-      
+
       def dnssec_ok=(on)
         if (on)
           set_flags(flags() | DO_BIT)
@@ -131,15 +131,15 @@ module Dnsruby
           set_flags(flags() & (~DO_BIT))
         end
       end
-      
+
       def payloadsize
         return @klass.code
       end
-      
+
       def payloadsize=(size)
         self.klass=size
       end
-      
+
       def options(args)
         if (args==nil)
           return @options
@@ -154,19 +154,19 @@ module Dnsruby
           return ret
         end
       end
-      
+
       def options=(options)
         @options = options
       end
-      
+
       def from_data(data)
         @options = data
       end
-      
+
       def from_string(input)
         raise NotImplementedError
       end
-      
+
       def to_s
         ret = "OPT pseudo-record : payloadsize #{payloadsize}, xrcode #{xrcode.code}, version #{version}, flags #{flags}"
         if @options
@@ -177,7 +177,7 @@ module Dnsruby
         ret = ret + "\n"
         return ret
       end
-      
+
       def encode_rdata(msg, canonical=false)
         if (@options)
           @options.each do |opt|
@@ -187,7 +187,7 @@ module Dnsruby
           end
         end
       end
-      
+
       def self.decode_rdata(msg)#:nodoc: all
         if (msg.has_remaining)
           options = []
@@ -200,7 +200,7 @@ module Dnsruby
         end
         return self.new([options])
       end
-      
+
       class Option
         attr_accessor :code, :data
         def initialize(code, data)

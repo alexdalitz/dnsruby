@@ -17,7 +17,7 @@
 require_relative 'spec_helper'
 
 class Nsec3Test < Minitest::Test
-  INPUT = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd ( " + 
+  INPUT = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd ( " +
     "2vptu5timamqttgl4luu9kg21e0aor3s A RRSIG )"
   INPUT2 = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd " +
     "2vptu5timamqttgl4luu9kg21e0aor3s"
@@ -30,7 +30,7 @@ class Nsec3Test < Minitest::Test
     assert_equal(12, nsec.iterations)
     assert_equal("aabbccdd", nsec.salt)
     assert_equal(Dnsruby::Nsec3HashAlgorithms.SHA_1, nsec.hash_alg)
-    
+
     nsec2 = Dnsruby::RR.create(nsec.to_s)
     assert(nsec2.to_s == nsec.to_s)
 
@@ -116,7 +116,7 @@ class Nsec3Test < Minitest::Test
     rescue DecodeError
     end
   end
-  
+
   def test_nsec_types
     # Test types in last section to 65536.
     #Test no zeros

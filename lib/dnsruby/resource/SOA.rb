@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
@@ -18,7 +18,7 @@ module Dnsruby
     class SOA < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::SOA #:nodoc: all
-      
+
       #The domain name of the original or primary nameserver for
       #this zone.
       attr_accessor :mname
@@ -32,7 +32,7 @@ module Dnsruby
       #updates from the primary nameserver.
       attr_accessor :refresh
       #The zone's retry interval.
-      #How often, in seconds, a secondary nameserver is to retry, after a 
+      #How often, in seconds, a secondary nameserver is to retry, after a
       #failure to check for a refresh
       attr_accessor :retry
       #The zone's expire interval.
@@ -41,11 +41,11 @@ module Dnsruby
       attr_accessor :expire
       #The minimum (default) TTL for records in this zone.
       attr_accessor :minimum
-      
+
       def from_data(data) #:nodoc: all
         @mname, @rname, @serial, @refresh, @retry, @expire, @minimum = data
       end
-      
+
       def from_hash(hash)
         @mname = Name.create(hash[:mname])
         @rname = Name.create(hash[:rname])
@@ -55,7 +55,7 @@ module Dnsruby
         @expire = hash[:expire].to_i
         @minimum = hash[:minimum].to_i
       end
-      
+
       def from_string(input)
         if (input.length > 0)
           names = input.split(" ")
@@ -68,7 +68,7 @@ module Dnsruby
           @minimum = names[6].to_i
         end
       end
-      
+
       def rdata_to_string #:nodoc: all
         if (@mname!=nil)
           return "#{@mname.to_s(true)} #{@rname.to_s(true)} #{@serial} #{@refresh} #{@retry} #{@expire} #{@minimum}"
@@ -76,13 +76,13 @@ module Dnsruby
           return ""
         end
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
         msg.put_name(@mname, canonical)
         msg.put_name(@rname, canonical)
         msg.put_pack('NNNNN', @serial, @refresh, @retry, @expire, @minimum)
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         mname = msg.get_name
         rname = msg.get_name
@@ -90,6 +90,6 @@ module Dnsruby
         return self.new(
                         [mname, rname, serial, refresh, retry_, expire, minimum])
       end
-    end 
+    end
   end
 end

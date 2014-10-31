@@ -33,7 +33,7 @@ module Dnsruby
       # 1 - DSA key present
       # 2 - RSA key present
       attr_accessor :algorithm
-      #The gateway. May either be a 32-bit network order IPv4 address, or a 
+      #The gateway. May either be a 32-bit network order IPv4 address, or a
       #128-bit IPv6 address, or a domain name, or may not be present.
       attr_accessor :gateway
 
@@ -57,7 +57,7 @@ module Dnsruby
         @gateway = load_gateway_from_string(@gateway_type, hash[:gateway])
         @public_key = hash[:public_key]
       end
-      
+
       def load_gateway_from_string(gateway_type, s)
         gateway = nil
         if (gateway_type == 0)
@@ -72,7 +72,7 @@ module Dnsruby
           # Load gateway domain name
           gateway = Name.create(s)
         end
-        return gateway        
+        return gateway
       end
 
       def public_key_string

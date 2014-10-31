@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 
@@ -21,11 +21,11 @@ class TestDNS < Minitest::Test
   def setup
     Dnsruby::Config.reset
   end
-  
+
   def test_ipv4_address
     Dnsruby::DNS.open { |dns| dns.getnames(Dnsruby::IPv4.create("221.186.184.68")) }
   end
-  
+
   def test_resolv_rb_api
     DNS.open {|dns|
       dns.getresources("www.ruby-lang.org", Types.A).each  {|r| assert_equal(r.address.to_s, "221.186.184.68")}
@@ -56,7 +56,7 @@ class TestDNS < Minitest::Test
     assert_equal(r[0].exchange.to_s, "carbon.ruby-lang.org")
     assert_equal(r[0].klass, Classes.IN)
     assert_equal(r[0].type, Types.MX)
-    r = d.each_resource("www.ruby-lang.org", Types.ANY) {|r|     
+    r = d.each_resource("www.ruby-lang.org", Types.ANY) {|r|
       assert_equal(r.name.to_s, "www.ruby-lang.org")
       assert_equal(r.domainname.to_s, "carbon.ruby-lang.org")
       assert_equal(r.klass, Classes.IN)
@@ -64,16 +64,16 @@ class TestDNS < Minitest::Test
     }
     d.close
   end
-  
+
   def test_async_api
     #@TODO@ Do we really want an async API for Resolv/DNS?
     #Or would users be better off with Resolver async API?
   end
-  
+
   def test_concurrent
     #@TODO@ What kind of concurrent testing are we going to do on the top-level API?
   end
-  
+
   def test_bad_input
     #
     # Check that new() is vetting things properly.
@@ -93,7 +93,7 @@ class TestDNS < Minitest::Test
       end
     end
   end
-  
+
   def test_online
     res = DNS.new
     rrs = [
@@ -117,44 +117,44 @@ class TestDNS < Minitest::Test
       :type		=> Types.TXT,
       :name		=> 'txt.t.dnsruby.validation-test-servers.nominet.org.uk',
       :strings		=> ['Net-DNS']
-    }		
-    ]		
-    
+    }
+    ]
+
     rrs.each do |data|
       answer = res.getresource(data[:name], data[:type])
       assert(answer)
       assert_equal(answer.klass,    'IN',             'Class correct'           )
-      
+
       packet, queried_name = res.send_query(data[:name], data[:type])
-      
+
       assert(packet, "Got an answer for #{data[:name]} IN #{data[:type]}")
       assert_equal(1, packet.header.qdcount, 'Only one question')
       assert_equal(1, packet.header.ancount, 'Got single answer')
-      
+
       question = (packet.question)[0]
       answer   = (packet.answer)[0]
-      
+
       assert(question,                           'Got question'            )
       assert_equal(data[:name],  question.qname.to_s,  'Question has right name' )
       assert_equal(data[:name],  queried_name.to_s,  'queried_name has right name' )
       assert_equal(Types.new(data[:type]),  question.qtype,  'Question has right type' )
       assert_equal('IN',             question.qclass.string, 'Question has right class')
-      
+
       assert(answer)
       assert_equal(answer.klass,    'IN',             'Class correct'           )
-      
-      
-      data.keys.each do |meth| 
+
+
+      data.keys.each do |meth|
         if (meth == :type)
-          assert_equal(Types.new(data[meth]).to_s, answer.send(meth).to_s, "#{meth} correct (#{data[:name]})") 
-        else       
-          assert_equal(data[meth].to_s, answer.send(meth).to_s, "#{meth} correct (#{data[:name]})") 
+          assert_equal(Types.new(data[meth]).to_s, answer.send(meth).to_s, "#{meth} correct (#{data[:name]})")
+        else
+          assert_equal(data[meth].to_s, answer.send(meth).to_s, "#{meth} correct (#{data[:name]})")
         end
       end
     end # do
   end # test_online
-  
-  def test_search_query_reverse    
+
+  def test_search_query_reverse
     #
     # test that getname() DTRT with reverse lookups
     #
@@ -168,31 +168,31 @@ class TestDNS < Minitest::Test
       :host => 'h.root-servers.net',
     },
     ]
-    
+
     res = DNS.new
-    tests.each do |test| 
+    tests.each do |test|
       name = res.getname(test[:ip])
-      
+
       assert_instance_of(Name,name)
-      
+
       next unless name
-      
+
       assert_equal(name.to_s, test[:host], "getname(#{test[:ip]}) works")
     end # do
   end # test
-  
+
   def test_searchlist
     res = DNS.new(
                   :domain     => 't.dnsruby.validation-test-servers.nominet.org.uk',
     :search => ["t.dnsruby.validation-test-servers.nominet.org.uk", "dnsruby.validation-test-servers.nominet.org.uk"]
     )
-    
+
     #
-    # test the send_query() appends the default domain and 
+    # test the send_query() appends the default domain and
     # searchlist correctly.
     #
     #@TODO@ Should really be done in Config test!
-    
+
     tests = [
     {
       :method => 'search',
@@ -207,30 +207,30 @@ class TestDNS < Minitest::Test
       :name   => 'a'
     }
     ]
-    
+
     res.send_query("a.t.dnsruby.validation-test-servers.nominet.org.uk",  "A")
     res.config.ndots=2
-    
+
     tests.each do |test|
       method = test[:method]
-      
+
       if (method=="query")
         res.config.apply_search_list=false
       else
         res.config.apply_search_list=true
       end
-      
+
       ans, query = res.send_query(test[:name])
-      
+
       assert_instance_of(Message, ans)
-      
+
       assert_equal(1, ans.header.ancount, "Correct answer count (with persistent socket and #{method})")
-      
+
       a = ans.answer
-      
+
       assert_instance_of(RR::IN::A, a[0])
       assert_equal(a[0].name.to_s, 'a.t.dnsruby.validation-test-servers.nominet.org.uk',"Correct name (with persistent socket and #{method})")
     end
-    
+
   end
 end

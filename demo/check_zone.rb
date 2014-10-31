@@ -48,13 +48,13 @@ require 'getoptLong'
 def check_domain(args)
   domain = args[0]
   klass = "IN"
-  if (args.length > 1) 
+  if (args.length > 1)
     klass = args[1]
   end
   print "----------------------------------------------------------------------\n"
   print "#{domain} (class #{klass}\n"
   print "\n"
-  
+
   res = Dnsruby::Resolver.new
   res.retry_times=(2)
   nspack = nil
@@ -64,16 +64,16 @@ def check_domain(args)
     print "Couldn't find nameservers for #{domain}: #{e}\n"
     return
   end
-  
+
   print "nameservers (will request zone from first available):\n"
   ns=""
   (nspack.answer.select {|r| r.type == "NS"}).each do |ns|
     print "\t", ns.domainname, "\n"
   end
   print "\n"
-  
+
   res.nameserver= (nspack.answer.select {|i| i.type == "NS"}).collect {|i| i.domainname.to_s}
-  
+
   zt = Dnsruby::ZoneTransfer.new
   zt.server=(nspack.answer.select {|i| i.type == "NS"}).collect {|i| i.domainname.to_s}
   zone = zt.transfer(domain) # , klass)
@@ -81,23 +81,23 @@ def check_domain(args)
     print "Zone transfer failed: ", res.errorstring, "\n"
     return
   end
-  
+
   print "checking PTR records\n"
   check_ptr(domain, klass, zone)
   print "\n"
-  
+
   print "checking NS records\n"
   check_ns(domain, klass, zone)
   print "\n"
-  
+
   print "checking MX records\n"
   check_mx(domain, klass, zone)
   print "\n"
-  
+
   print "checking CNAME records\n"
   check_cname(domain, klass, zone)
   print "\n"
-  
+
   if (@recurse)
     print "checking subdomains\n\n"
     subdomains = Hash.new
@@ -165,9 +165,9 @@ opts.each do |opt, arg|
 end
 
 if (ARGV.length >=1 && ARGV.length <=2)
-  
+
   check_domain(ARGV)
   exit
-else 
+else
   print "Usage: #{$0} [ -r ] domain [ class ]\n"
 end

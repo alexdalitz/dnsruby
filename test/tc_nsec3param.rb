@@ -27,7 +27,7 @@ class Nsec3ParamTest < Minitest::Test
     assert_equal(0, nsec.flags)
     assert_equal(12, nsec.iterations)
     assert_equal("aabbccdd", nsec.salt)
-    
+
     nsec2 = Dnsruby::RR.create(nsec.to_s)
     assert(nsec2.to_s == nsec.to_s)
   end
@@ -49,5 +49,5 @@ class Nsec3ParamTest < Minitest::Test
     assert_equal("beef", r.salt)
     assert_equal(Dnsruby::Nsec3HashAlgorithms.SHA_1, r.hash_alg)
   end
-  
+
 end

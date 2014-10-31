@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License f181or the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License f181or the specific language governing permissions and
 #limitations under the License.
 #++
 require 'digest/sha2'
@@ -53,7 +53,7 @@ module Dnsruby
       # want them to be used. Could then dispense with all this logic
       # Note that any DLV registries which have been configured will only be tried
       # after both the root and any local trust anchors (RFC 5074 section 5)
-      
+
       #* Always use the root and ignore local trust anchors.
       ALWAYS_ROOT_ONLY = 1
       #* Use the root if successful, otherwise try local anchors.
@@ -64,7 +64,7 @@ module Dnsruby
       ALWAYS_LOCAL_ANCHORS_ONLY = 4
     end
     @@validation_policy = ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT
-    
+
     def Dnssec.validation_policy=(p)
       if ((p >= ALWAYS_ROOT_ONY) && (p <= ALWAYS_LOCAL_ANCHORS))
         @@validation_policy = p
@@ -110,7 +110,7 @@ module Dnsruby
     def self.clear_trust_anchors
       @@anchor_verifier.clear_trust_anchors
     end
-    
+
     def self.trust_anchors
       return @@anchor_verifier.trust_anchors
     end
@@ -183,7 +183,7 @@ module Dnsruby
       query.header.cd=true
       return self.validate_with_query(query, msg)
     end
-    
+
     def self.validate_with_query(query, msg)
       if (!msg)
         return false
@@ -226,7 +226,7 @@ module Dnsruby
           last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
             Proc.new{|m, q| validate_with_root(m, q)}, msg, query)
         elsif (@@validation_policy == ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT)
-          last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level, 
+          last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
             Proc.new{|m, q| validate_with_anchors(m, q)}, msg, query)
           if (last_level != Message::SecurityLevel.SECURE)
             last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
@@ -241,7 +241,7 @@ module Dnsruby
           end
         end
         if (last_level != Message::SecurityLevel.SECURE)
-          last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level, 
+          last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
             Proc.new{|m, q| validate_with_dlv(m, q)}, msg, query)
         end
         # Set the message security level!
@@ -266,7 +266,7 @@ module Dnsruby
       end
       return last_level, last_error, last_error_level
     end
-        
+
     def self.validate_with_anchors(msg, query)
       return @@anchor_verifier.validate(msg, query)
     end

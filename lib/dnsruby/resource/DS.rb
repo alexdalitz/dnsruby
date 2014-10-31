@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 require 'base64'
@@ -39,10 +39,10 @@ module Dnsruby
         add_pair("SHA-256", 2 )
         add_pair("SHA-384", 4)
       end
-  
+
       ClassValue = nil #:nodoc: all
       TypeValue = Types::DS #:nodoc: all
-      
+
       #The RDATA for a DS RR consists of a 2 octet Key Tag field, a 1 octet
       #Algorithm field, a 1 octet Digest Type field, and a Digest field.
       #
@@ -55,7 +55,7 @@ module Dnsruby
       #/                            Digest                             /
       #/                                                               /
       #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-   
+
 
       #The Key Tag field lists the key tag of the DNSKEY RR referred to by
       #the DS record, in network byte order.
@@ -71,12 +71,12 @@ module Dnsruby
       #DNSKEY RR.
       attr_accessor :digest
       attr_accessor :digestbin
-      
+
       def digest_type=(d)
         dig = DS.get_digest_type(d)
         @digest_type = dig
       end
-      
+
       def DS.get_digest_type(d)
         if (d.instance_of?String)
           if (d.length == 1)
@@ -88,9 +88,9 @@ module Dnsruby
           return digest
         rescue ArgumentError => e
           raise DecodeError.new(e)
-        end        
+        end
       end
-    
+
       def algorithm=(a)
         if (a.instance_of?String)
           if (a.length < 3)
@@ -102,9 +102,9 @@ module Dnsruby
           @algorithm = alg
         rescue ArgumentError => e
           raise DecodeError.new(e)
-        end        
+        end
       end
-      
+
       # Return the digest of the specified DNSKEY RR
       def digest_key(*args) # key, digest_type)
         digest_type = @digest_type
@@ -112,18 +112,18 @@ module Dnsruby
         if (args.length == 2)
             digest_type = args[1]
         end
-        
-        
+
+
         data = MessageEncoder.new {|msg|
            msg.put_name(key.name, true)
            key.encode_rdata(msg, true)
         }.to_s
 
-        
+
         if (digest_type.code == 1)
             digestbin = OpenSSL::Digest::SHA1.digest(data)
             return digestbin
-        elsif (digest_type.code == 2) 
+        elsif (digest_type.code == 2)
             digestbin = OpenSSL::Digest::SHA256.digest(data)
             return digestbin
         elsif (digest_type.code == 4)
@@ -132,11 +132,11 @@ module Dnsruby
         end
 
       end
-      
-      # Check if the key's digest is the same as that stored in the DS record      
+
+      # Check if the key's digest is the same as that stored in the DS record
       def check_key(key)
         if ((key.key_tag == @key_tag) && (key.algorithm == @algorithm))
-          
+
           digestbin = digest_key(key)
           if (@digestbin == digestbin)
             if (!key.zone_key?)
@@ -148,7 +148,7 @@ module Dnsruby
         end
         return false
       end
-      
+
 
       def DS.from_key(key, digest_type)
 ## The key must not be a NULL key.
@@ -156,39 +156,39 @@ module Dnsruby
 #	puts "\nCreating a DS record for a NULL key is illegal"
 #        return
 #    end
-#    
+#
 #    # Bit 0 must not be set.
 #    if (key.flags & 0x8000)
 #	puts "\nCreating a DS record for a key with flag bit 0 set " +
 #	    "to 0 is illegal"
 #          return
 #    end
-#    
+#
     # Bit 6 must be set to 0 bit 7 must be set to 1
     if (( key.flags & 0x300) != 0x100)
 	puts "\nCreating a DS record for a key with flags 6 and 7 not set "+
 	    "0  and 1 respectively is illegal"
          return
     end
-#    
+#
 #
 #    if (key.protocol  != 3 )
 #	puts "\nCreating a DS record for a non DNSSEC (protocol=3) " +
 #	    "key is illegal"
 #          return
 #    end
-#    
+#
         digest_type = get_digest_type(digest_type)
         # Create a new DS record from the specified key
-        ds = RR.create(:name => key.name, :type => "DS", :ttl => key.ttl, 
+        ds = RR.create(:name => key.name, :type => "DS", :ttl => key.ttl,
                       :key_tag => key.key_tag,
                      :digest_type => digest_type, :algorithm => key.algorithm)
-                   
+
         ds.digestbin = ds.digest_key(key, digest_type)
         ds.digest = ds.digestbin.unpack("H*")[0]
         return ds
       end
-  
+
       def from_data(data) #:nodoc: all
         key_tag, algorithm, digest_type, digest = data
         self.key_tag=(key_tag)
@@ -197,7 +197,7 @@ module Dnsruby
         self.digestbin=(digest)
         self.digest=@digestbin.unpack("H*")[0]
       end
-      
+
       def from_string(input)
         if (input.length > 0)
           data = input.split(" ")
@@ -220,7 +220,7 @@ module Dnsruby
             else
               buf += data[i]
             end
-          } 
+          }
 #          self.digest=Base64.decode64(buf)
           buf.gsub!(/\n/, "")
           buf.gsub!(/ /, "")
@@ -229,7 +229,7 @@ module Dnsruby
           self.digestbin = [buf].pack("H*")
         end
       end
-      
+
       def rdata_to_string #:nodoc: all
         if (@key_tag != nil)
 #          return "#{@key_tag.to_i} #{@algorithm.string} #{@digest_type} ( #{Base64.encode64(@digest)} )"
@@ -237,20 +237,20 @@ module Dnsruby
           return "#{@key_tag.to_i} #{@algorithm.string} #{@digest_type.code} ( #{@digest.upcase} )"
         else
           return ""
-        end 
+        end
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
         msg.put_pack("ncc", @key_tag, @algorithm.code, @digest_type.code)
         msg.put_bytes(@digestbin)
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         key_tag, algorithm, digest_type = msg.get_unpack("ncc")
         digest = msg.get_bytes
         return self.new(
           [key_tag, algorithm, digest_type, digest])
       end
-    end 
+    end
   end
 end

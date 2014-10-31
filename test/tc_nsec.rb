@@ -26,7 +26,7 @@ class NsecTest < Minitest::Test
     nsec = Dnsruby::RR.create(INPUT)
     assert_equal("host.example.com", nsec.next_domain.to_s)
     assert_equal([Types.A, Types.MX, Types.RRSIG, Types.NSEC, Types.TYPE1234], nsec.types)
-    
+
     nsec2 = Dnsruby::RR.create(nsec.to_s)
     assert(nsec2.to_s == nsec.to_s)
 
@@ -45,7 +45,7 @@ class NsecTest < Minitest::Test
     nsec3 = m2.additional()[0]
     assert_equal(nsec.to_s, nsec3.to_s)
   end
-  
+
   def test_nsec_types
     # Test types in last section to 65536.
     #Test no zeros
@@ -93,7 +93,7 @@ class NsecTest < Minitest::Test
     rescue VerifyError
     end
   end
-  
+
   def test_examples_from_rfc_4035_no_data
     # Grab the example responses from RFC4035 and make sure that they pass.
     # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
@@ -131,7 +131,7 @@ class NsecTest < Minitest::Test
     # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
     # and make sure that they fail verification for that reason
     m = Message.new
-    m.header.rcode = 
+    m.header.rcode =
       m.add_question(Question.new("a.z.w.example.", Types.MX))
     m.add_answer(RR.create("a.z.w.example. 3600 IN MX  1 ai.example."))
     m.add_answer(RR.create("a.z.w.example. 3600 RRSIG  MX 5 4 3600 20040509183619 (

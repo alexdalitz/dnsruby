@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License f181or the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License f181or the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
@@ -27,10 +27,10 @@ module Dnsruby
     class DNSKEY < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::DNSKEY #:nodoc: all
-      
+
       #Key is revoked
       REVOKED_KEY = 0x80
-      
+
       #Key is a zone key
       ZONE_KEY = 0x100
 
@@ -49,7 +49,7 @@ module Dnsruby
       attr_reader :key
       #The length (in bits) of the key - NOT key.length
       attr_reader :key_length
-      
+
       def init_defaults
         @make_new_key_tag = false
         self.protocol=3
@@ -59,7 +59,7 @@ module Dnsruby
         @key_tag = nil
         @make_new_key_tag = true
       end
-      
+
       def protocol=(p)
         if (p!=3)
           raise DecodeError.new("DNSKEY protocol field set to #{p}, contrary to RFC4034 section 2.1.2")
@@ -67,7 +67,7 @@ module Dnsruby
         end
         get_new_key_tag
       end
-      
+
       def algorithm=(a)
         if (a.instance_of?String)
           if (a.to_i > 0)
@@ -79,10 +79,10 @@ module Dnsruby
           @algorithm = alg
         rescue ArgumentError => e
           raise DecodeError.new(e)
-        end        
+        end
         get_new_key_tag
       end
-      
+
       def revoked=(on)
         if (on)
           @flags |= REVOKED_KEY
@@ -91,7 +91,7 @@ module Dnsruby
         end
         get_new_key_tag
       end
-      
+
       def revoked?
         return ((@flags & REVOKED_KEY) > 0)
       end
@@ -104,11 +104,11 @@ module Dnsruby
         end
         get_new_key_tag
       end
-      
+
       def zone_key?
         return ((@flags & ZONE_KEY) > 0)
       end
-      
+
       def sep_key=(on)
         if (on)
           @flags |= SEP_KEY
@@ -117,13 +117,13 @@ module Dnsruby
         end
         get_new_key_tag
       end
-      
+
       def sep_key?
         return ((@flags & SEP_KEY) > 0)
       end
-      
+
       def flags=(f)
-        # Only three values allowed - 
+        # Only three values allowed -
         # Zone Key flag (bit 7)
         # Secure Entry Point flag (bit 15)
         # Revoked bit (bit 8) - RFC 5011
@@ -135,7 +135,7 @@ module Dnsruby
         @flags = f
         get_new_key_tag
       end
-      
+
       #      def bad_flags?
       #        if ((@flags & ~ZONE_KEY & ~SEP_KEY) > 0)
       #          return true
@@ -152,7 +152,7 @@ module Dnsruby
         @make_new_key_tag = true
         get_new_key_tag
       end
-      
+
       def from_hash(hash) #:nodoc: all
         @make_new_key_tag = false
         hash.keys.each do |param|
@@ -195,7 +195,7 @@ module Dnsruby
           get_new_key_tag
         end
       end
-      
+
       def rdata_to_string #:nodoc: all
         if (@flags!=nil)
           #          return "#{@flags} #{@protocol} #{@algorithm.string} ( #{Base64.encode64(@key.to_s)} )"
@@ -204,13 +204,13 @@ module Dnsruby
           return ""
         end
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
         # 2 octets, then 2 sets of 1 octet
         msg.put_pack('ncc', @flags, @protocol, @algorithm.code)
         msg.put_bytes(@key)
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         # 2 octets, then 2 sets of 1 octet
         flags, protocol, algorithm = msg.get_unpack('ncc')
@@ -289,7 +289,7 @@ module Dnsruby
         tag=tag&0xFFFF
         return tag
       end
-      
+
       def key=(key_text)
         begin
           key_text.gsub!(/\n/, "")
@@ -302,7 +302,7 @@ module Dnsruby
           raise ArgumentError.new("Key #{key_text} invalid")
         end
       end
-      
+
       def public_key
         if (!@public_key)
           if [Algorithms.RSASHA1,
@@ -342,9 +342,9 @@ module Dnsruby
         pkey = OpenSSL::PKey::RSA.new
         pkey.e = exponent
         pkey.n = modulus
-        return pkey 
+        return pkey
       end
-      
+
       def dsa_key
         t = @key[0]
         t = t.getbyte(0) if t.class == String
@@ -359,15 +359,15 @@ module Dnsruby
         y = RR::get_num(@key[pos, pgy_len])
         pos += pgy_len
         @key_length = (pgy_len * 8)
-        
+
         pkey = OpenSSL::PKey::DSA.new
         pkey.p = p
         pkey.q = q
         pkey.g = g
         pkey.pub_key = y
-        
+
         pkey
       end
-    end 
+    end
   end
 end

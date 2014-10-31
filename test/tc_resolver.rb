@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either tmexpress or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either tmexpress or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 require_relative 'spec_helper'
@@ -20,7 +20,7 @@ require 'socket'
 include Dnsruby
 #@TODO@ We also need a test server so we can control behaviour of server to test
 #different aspects of retry strategy.
-#Of course, with Ruby's limit of 256 open sockets per process, we'd need to run 
+#Of course, with Ruby's limit of 256 open sockets per process, we'd need to run
 #the server in a different Ruby process.
 
 class TestResolver < Minitest::Test
@@ -38,7 +38,7 @@ class TestResolver < Minitest::Test
   def setup
     Dnsruby::Config.reset
   end
-  
+
   def test_send_message
     res = Resolver.new
     ret = res.send_message(Message.new("example.com", Types.A))
@@ -118,7 +118,7 @@ class TestResolver < Minitest::Test
   #  def test_many_threaded_clients
   #    assert(false, "IMPLEMENT!")
   #  end
-  
+
   def test_reverse_lookup
     m = Message.new("8.8.8.8", Types.PTR)
     r = Resolver.new
@@ -130,12 +130,12 @@ class TestResolver < Minitest::Test
     ret.each_answer do |answer|
       if (answer.type==Types.PTR)
         no_pointer=false
-        assert(answer.domainname.to_s=~/google-public-dns/)      
+        assert(answer.domainname.to_s=~/google-public-dns/)
       end
     end
     assert(!no_pointer)
   end
-  
+
 #  def test_bad_host
 #    res = Resolver.new({:nameserver => "localhost"})
 #    res.retry_times=1
@@ -148,7 +148,7 @@ class TestResolver < Minitest::Test
 #    assert(m == nil)
 #    assert(err.kind_of?(OtherResolvError) || err.kind_of?(IOError), "OtherResolvError or IOError expected : got #{err.class}")
 #  end
-#  
+#
   def test_nxdomain
     res=Resolver.new
     q = Queue.new
@@ -158,10 +158,10 @@ class TestResolver < Minitest::Test
     assert(m.rcode == RCode.NXDOMAIN)
     assert(NXDomain === err)
   end
-  
+
   def test_timeouts
     #test timeout behaviour for different retry, retrans, total timeout etc.
-    #Problem here is that many sockets will be created for queries which time out. 
+    #Problem here is that many sockets will be created for queries which time out.
     # Run a query which will not respond, and check that the timeout works
     if (!RUBY_PLATFORM=~/darwin/)
       start=stop=0
@@ -186,7 +186,7 @@ class TestResolver < Minitest::Test
       end
   end
   end
-  
+
   def test_packet_timeout
         res = Resolver.new({:nameserver => []})
 #      res = Resolver.new({:nameserver => "10.0.1.128"})
@@ -209,14 +209,14 @@ class TestResolver < Minitest::Test
         assert(time <= expected *1.3 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")
       end    #
   end
-  
+
   def test_queue_packet_timeout
 #    if (!RUBY_PLATFORM=~/darwin/)
       res = Resolver.new({:nameserver => "10.0.1.128"})
 #      bad = SingleResolver.new("localhost")
       res.add_server("localhost")
       expected = 2
-      res.query_timeout=expected    
+      res.query_timeout=expected
       q = Queue.new
       start = Time.now
       m = res.send_async(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A), q, q)
@@ -229,7 +229,7 @@ class TestResolver < Minitest::Test
       assert(time <= expected *1.3 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")
 #    end
   end
-  
+
   def test_illegal_src_port
     # Also test all singleresolver ports ok
     # Try to set src_port to an illegal value - make sure error raised, and port OK
@@ -245,7 +245,7 @@ class TestResolver < Minitest::Test
     end
     assert(res.single_resolvers[0].src_port = 56789)
   end
-  
+
   def test_add_src_port
     # Try setting and adding port ranges, and invalid ports, and 0.
     # Also test all singleresolver ports ok
@@ -270,7 +270,7 @@ class TestResolver < Minitest::Test
       end
     end
     assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])
-    assert(res.single_resolvers[0].src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])    
+    assert(res.single_resolvers[0].src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])
   end
 
   def test_eventtype_api

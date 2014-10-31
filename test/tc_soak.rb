@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 
@@ -28,20 +28,20 @@ rescue LoadError
 end
 include Dnsruby
 # This class tries to soak test the Dnsruby library.
-# It can't do this very well, owing to the small number of sockets allowed to be open simultaneously. 
+# It can't do this very well, owing to the small number of sockets allowed to be open simultaneously.
 # @TODO@ Future versions of dnsruby will allow random streaming over a fixed number of (cycling) random sockets,
 # so this test can be beefed up considerably at that point.
 # @todo@ A test DNS server running on localhost is really needed here
 class TestSingleResolverSoak < Minitest::Test
-  
+
   def test_many_asynchronous_queries_one_single_resolver
     run_many_asynch_queries_test_single_res(1)
   end
-  
+
   def test_many_asynchronous_queries_many_single_resolvers
     run_many_asynch_queries_test_single_res(50)
   end
-  
+
   def run_many_asynch_queries_test_single_res(num_resolvers)
     q = Queue.new
     resolvers = []
@@ -77,15 +77,15 @@ class TestSingleResolverSoak < Minitest::Test
       elsif (ret.class != Message)
         p "ERROR RETURNED : #{error}"
       end
-      
+
     end
     stop=Time.now
     time_taken=stop-start
     p "Query count : #{query_count}, #{timed_out} timed out. #{time_taken} time taken"
     assert(timed_out < query_count * 0.1, "#{timed_out} of #{query_count} timed out!")
   end
-  
-  
+
+
   def test_many_threads_on_one_single_resolver_synchronous
     # Test multi-threaded behaviour
     # Check the header IDs to make sure they're all different
@@ -102,7 +102,7 @@ class TestSingleResolverSoak < Minitest::Test
     if (/java/ =~ RUBY_PLATFORM)
       # JRuby threads are native threads, so let's not go too mad!
       num_times=50
-    end        
+    end
     num_times.times do |i|
       threads[i] = Thread.new{
         40.times do |j|
@@ -135,7 +135,7 @@ class TestSingleResolverSoak < Minitest::Test
     #    check_ids(ids) # only do this if we expect all different IDs - e.g. if we stream over a single socket
     assert(timed_out < query_count * 0.1, "#{timed_out} of #{query_count} timed out!")
   end
-  
+
   def check_ids(ids)
     ids.sort!
     count = 0
@@ -146,7 +146,7 @@ class TestSingleResolverSoak < Minitest::Test
       end
     end
   end
-  
+
   def test_many_threads_on_many_single_resolvers
     # Test multi-threaded behaviour
     # @todo@ Check the header IDs to make sure they're all different
@@ -159,7 +159,7 @@ class TestSingleResolverSoak < Minitest::Test
     if (/java/ =~ RUBY_PLATFORM)
       # JRuby threads are native threads, so let's not go too mad!
       num_times=50
-    end        
+    end
     num_times.times do |i|
       threads[i] = Thread.new{
         res = SingleResolver.new
@@ -180,7 +180,7 @@ class TestSingleResolverSoak < Minitest::Test
             elsif (packet.class!=Message)
               p "ERROR! #{error}"
             end
-            
+
             assert(packet)
             assert_equal(packet.question[0].qclass,    'IN',             'Class correct'           )
           end
@@ -195,6 +195,6 @@ class TestSingleResolverSoak < Minitest::Test
     p "Query count : #{query_count}, #{timed_out} timed out. #{time_taken} time taken"
     assert(timed_out < query_count * 0.1, "#{timed_out} of #{query_count} timed out!")
   end
-  
-  
+
+
 end
