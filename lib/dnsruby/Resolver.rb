@@ -49,6 +49,17 @@ module Dnsruby
   #*  Dnsruby::Resolver#send_message(msg)
   #*  Dnsruby::Resolver#query(name [, type [, klass]])
   #
+  #   There are "!" versions of these two methods that return an array [response, error]
+  #   instead of raising an error on failure.  They can be called as follows:
+  #
+  #   response, error = resolver.send_message!(...)
+  #   response, error = resolver.query!(...)
+  #
+  #   If the request succeeds, response will contain the Dnsruby::Message response
+  #   and error will be nil.
+  #
+  #   If the request fails, response will be nil and error will contain the error raised.
+  #
   #=== Asynchronous
   #These methods use a response queue to return the response and the error
   #
@@ -182,6 +193,19 @@ module Dnsruby
       return send_message(msg)
     end
 
+    # Like query, but does not raise an error when an error occurs.
+    # Instead, it returns it.
+    # @return a 2 element array: [response, error]
+    def query!(name, type=Types.A, klass=Classes.IN, set_cd=@dnssec)
+      response = nil; error = nil
+      begin
+        response = query(name, type, klass, set_cd)
+      rescue => e
+        error = e
+      end
+      [response, error]
+    end
+
     def query_no_validation_or_recursion(name, type=Types.A, klass=Classes.IN) # :nodoc: all
       msg = Message.new
       msg.do_caching = @do_caching
@@ -236,6 +260,19 @@ module Dnsruby
       else
         return result
       end
+    end
+
+    # Like send_message, but does not raise an error when an error occurs.
+    # Instead, it returns it.
+    # @return a 2 element array: [response, error]
+    def send_message!(message)
+      response = nil; error = nil
+      begin
+        response = send_message(message)
+      rescue => e
+        error = e
+      end
+      [response, error]
     end
 
     # This method takes a Message (supplied by the client), and sends it to
