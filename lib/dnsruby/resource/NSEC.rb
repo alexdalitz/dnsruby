@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
@@ -23,11 +23,11 @@ module Dnsruby
     #set of NSEC RRs in a zone indicates which authoritative RRsets exist
     #in a zone and also form a chain of authoritative owner names in the
     #zone.  This information is used to provide authenticated denial of
-    #existence for DNS data, as described in [RFC4035].    
+    #existence for DNS data, as described in [RFC4035].
     class NSEC < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::NSEC #:nodoc: all
-      
+
       #The next name which exists after this NSEC
       #The Next Domain field contains the next owner name (in the canonical
       #ordering of the zone) that has authoritative data or contains a
@@ -36,7 +36,7 @@ module Dnsruby
       #The Type Bit Maps field identifies the RRset types that exist at the
       #NSEC RR's owner name
       attr_reader :types
-      
+
       def next_domain=(n)
         nxt = Name.create(n)
         @next_domain = nxt
@@ -52,7 +52,7 @@ module Dnsruby
         end
         return false
       end
-      
+
       def check_name_in_wildcard_range(n)
         #  Check if the name is covered by this record
         return false if !@name.wild?
@@ -72,7 +72,7 @@ module Dnsruby
           @types = []
         end
       end
-      
+
       def self.get_types(t)
         types = nil
         if (t.instance_of?Array)
@@ -97,11 +97,11 @@ module Dnsruby
         end
         return types
       end
-      
+
       def add_type(t)
         self.types=(@types + [t])
       end
-      
+
       def self.decode_types(bytes)
         types = []
         #RFC4034 section 4.1.2
@@ -118,7 +118,7 @@ module Dnsruby
         #  Type Bit Maps Field = ( Window Block # | Bitmap Length | Bitmap )+
 
         #  where "|" denotes concatenation.
-       
+
         pos = 0
         while (pos < bytes.length)
           #So, read the first two octets
@@ -154,7 +154,7 @@ module Dnsruby
                   if (!([Types::OPT, Types::TSIG].include?(type)))
                     types.push(type)
                   end
-                end               
+                end
               end
             end
             index += 1
@@ -162,11 +162,11 @@ module Dnsruby
         end
         return types
       end
-      
+
       def encode_types
         NSEC.encode_types(self)
       end
-      
+
       def self.encode_types(nsec)
         output=""
         #types represents all 65536 possible RR types.
@@ -186,7 +186,7 @@ module Dnsruby
             type_codes=type_codes.last(type_codes.length-1)
             break if (type_codes.empty?)
           end
-          
+
           if (!types_to_go.empty?)
             # Then create the bitmap for them
             bitmap=""
@@ -194,7 +194,7 @@ module Dnsruby
             pos = 0
             bitmap_pos = 0
             while (!types_to_go.empty?)
-              
+
               # Check the next eight
               byte = 0
               pos += 8
@@ -209,17 +209,17 @@ module Dnsruby
               if (bitmap[bitmap_pos].class == String)
                 bitmap.setbyte(bitmap_pos, byte) # Ruby 1.9
               else
-                bitmap[bitmap_pos]=byte              
+                bitmap[bitmap_pos]=byte
               end
               bitmap_pos+=1
             end
-            
+
             # Now add data to output bytes
             start = output.length
-            (2+bitmap.length).times do 
+            (2+bitmap.length).times do
               output += " "
             end
-          
+
             if (output[start].class == String)
               output.setbyte(start, window)
               output.setbyte(start+1, bitmap.length)
@@ -235,7 +235,7 @@ module Dnsruby
             end
           end
           window += 1
-          
+
           # Are there any more types after this?
           if (type_codes.empty?)
             # If not, then break (so we don't add more zeros)
@@ -253,7 +253,7 @@ module Dnsruby
         self.next_domain=(next_domain)
         self.types=(types)
       end
-      
+
       def from_string(input)
         if (input.length > 0)
           data = input.split(" ")
@@ -266,7 +266,7 @@ module Dnsruby
           @types = NSEC.get_types(input[len, input.length-len])
         end
       end
-      
+
       def rdata_to_string #:nodoc: all
         if (@next_domain!=nil)
           type_strings = []
@@ -279,20 +279,20 @@ module Dnsruby
           return ""
         end
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
         # Canonical
         msg.put_name(@next_domain, canonical, false) # dnssec-bis-updates says NSEC should not be downcased
         types = encode_types
         msg.put_bytes(types)
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         next_domain = msg.get_name
         types = decode_types(msg.get_bytes)
         return self.new(
           [next_domain, types])
       end
-    end 
+    end
   end
 end

@@ -2,42 +2,42 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
   #Dnsruby::Update is a subclass of Dnsruby::Packet,
   #to be used for making DNS dynamic updates.  Programmers
   #should refer to RFC 2136 for the semantics of dynamic updates.
-  
+
   #The first example below shows a complete program; subsequent examples
   #show only the creation of the update packet.
   #
   #== Add a new host
   #
   # require 'Dnsruby'
-  # 
+  #
   # # Create the update packet.
   # update = Dnsruby::Update.new('example.com')
-  # 
+  #
   # # Prerequisite is that no A records exist for the name.
   # update.absent('foo.example.com.', 'A')
-  # 
+  #
   # # Add two A records for the name.
   # update.add('foo.example.com.', 'A', 86400, '192.168.1.2')
   # update.add('foo.example.com.', 'A', 86400, '172.16.3.4')
-  # 
+  #
   # # Send the update to the zone's primary master.
   # res = Dnsruby::Resolver.new({:nameserver => 'primary-master.example.com'})
-  # 
+  #
   # begin
   #     reply = res.send_message(update)
   #     print "Update succeeded\n"
@@ -96,44 +96,44 @@ module Dnsruby
     #    packet = Dnsruby::Update.new('example.com', 'HS')
     #
     def initialize(zone=nil, klass=nil)
-      
+
       # sort out the zone section (RFC2136, section 2.3)
       if (zone==nil)
         config = Config.new
         zone = (config.search)[0]
         return unless zone
       end
-      
+
       type  = 'SOA'
       klass  ||= 'IN'
-      
+
       super(zone, type, klass) || return
-      
+
       @header.opcode=('UPDATE')
       @header.rd=(0)
       @do_validation = false
     end
-    
+
     #Ways to create the prerequisite records (exists, notexists, inuse, etc. - RFC2136, section 2.4)
     #
     #      (1)  RRset exists (value independent).  At least one RR with a
     #           specified NAME and TYPE (in the zone and class specified by
     #           the Zone Section) must exist.
-    #           
+    #
     #           update.present(name, type)
     #
     #      (2)  RRset exists (value dependent).  A set of RRs with a
     #           specified NAME and TYPE exists and has the same members
     #           with the same RDATAs as the RRset specified here in this
     #           Section.
-    #           
+    #
     #           update.present(name, type, rdata)
     #
     #      (4)  Name is in use.  At least one RR with a specified NAME (in
     #           the zone and class specified by the Zone Section) must exist.
     #           Note that this prerequisite is NOT satisfied by empty
     #           nonterminals.
-    #           
+    #
     #           update.present(name)
     def present(*args)
       ttl = 0
@@ -156,9 +156,9 @@ module Dnsruby
         raise ArgumentError.new("Wrong number of arguments (#{args.length} for 1 or 2) for Update#absent")
       end
     end
-    
+
     #Ways to create the prerequisite records (exists, notexists, inuse, etc. - RFC2136, section 2.4)
-    #Can be called with one arg : 
+    #Can be called with one arg :
     #
     #   update.absent(name)
     #      (5)  Name is not in use.  No RR of any type is owned by a
@@ -188,7 +188,7 @@ module Dnsruby
         raise ArgumentError.new("Wrong number of arguments (#{args.length} for 1 or 2) for Update#absent")
       end
     end
-    
+
     #Ways to create the update records (add, delete, RFC2136, section 2.5)
     #  " 2.5.1 - Add To An RRset
     #
@@ -196,7 +196,7 @@ module Dnsruby
     #   and RDATA are those being added, and CLASS is the same as the zone
     #   class.  Any duplicate RRs will be silently ignored by the primary
     #   master."
-    #   
+    #
     #   update.add(rr)
     #   update.add([rr1, rr2])
     #   update.add(name, type, ttl, rdata)
@@ -242,7 +242,7 @@ module Dnsruby
       end
       # @TODO@ Should be able to take RRSet!
     end
-    
+
     #Ways to create the update records (add, delete, RFC2136, section 2.5)
     #
     #2.5.2 - Delete An RRset

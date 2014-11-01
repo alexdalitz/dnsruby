@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 begin
@@ -24,18 +24,18 @@ module Dnsruby
     class TXT < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::TXT #:nodoc: all
-      
+
       #List of the individual elements
       attr_accessor :strings
-      
+
       def data
         @strings[0]
       end
-      
+
       def from_data(data)
         @strings = data
       end
-      
+
       def from_hash(hash)
         if (hash.has_key?:strings)
           from_string(hash[:strings])
@@ -44,7 +44,7 @@ module Dnsruby
 
       ESCAPE_CHARS = {"b" => 8, "t" => 9, "n" => 10, "v" => 11, "f" => 12, "r" => 13}
       ESCAPE_CODES = ESCAPE_CHARS.invert
-      
+
       def from_string(input)
         @strings = TXT.parse(input)
       end
@@ -166,7 +166,7 @@ module Dnsruby
         }
         return output
       end
-      
+
       def rdata_to_string
         if (defined?@strings)
           temp = []
@@ -178,11 +178,11 @@ module Dnsruby
         end
         return ''
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
         msg.put_string_list(@strings)
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         strings = msg.get_string_list
         return self.new(strings)

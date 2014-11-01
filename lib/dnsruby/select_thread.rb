@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 require 'socket'
@@ -27,20 +27,20 @@ module Dnsruby
   class SelectThread #:nodoc: all
     class SelectWakeup < RuntimeError; end
     include Singleton
-    # This singleton class runs a continuous select loop which 
+    # This singleton class runs a continuous select loop which
     # listens for responses on all of the in-use sockets.
     # When a new query is sent, the thread is woken up, and
     # the socket is added to the select loop (and the new timeout
     # calculated).
     # Note that a combination of the socket and the packet ID is
     # sufficient to uniquely identify the query to the select thread.
-    # 
+    #
     # But how do we find the response queue for a particular query?
     # Hash of client_id->[query, client_queue, socket]
     # and socket->[client_id]
-    # 
+    #
     # @todo@ should we implement some of cancel function?
-    
+
     def initialize
       @@mutex = Mutex.new
       @@mutex.synchronize {
@@ -71,7 +71,7 @@ module Dnsruby
         #        @@validator = ValidatorThread.instance
       }
     end
-    
+
     def get_socket_pair
       # Emulate socketpair on platforms which don't support it
       srv = nil
@@ -110,7 +110,7 @@ module Dnsruby
         @single_resolver = args[10]
       end
     end
-    
+
     def add_to_select(query_settings)
       # Add the query to sockets, and then wake the select thread up
       @@mutex.synchronize {
@@ -128,7 +128,7 @@ module Dnsruby
         #         do nothing
       end
     end
-    
+
     def check_select_thread_synchronized
       if (!@@select_thread.alive?)
         Dnsruby.log.debug{"Restarting select thread"}
@@ -137,7 +137,7 @@ module Dnsruby
         }
       end
     end
-    
+
     def select_thread_alive?
       ret=true
       @@mutex.synchronize{
@@ -145,7 +145,7 @@ module Dnsruby
       }
       return ret
     end
-    
+
     def do_select
       unused_loop_count = 0
       last_tick_time = Time.now - 10
@@ -218,12 +218,12 @@ module Dnsruby
         #              }
       end
     end
-    
+
     def process_error(errors)
       Dnsruby.log.debug{"Error! #{errors.inspect}"}
       # @todo@ Process errors [can we do this in single socket environment?]
     end
-    
+
     #        @@query_hash[query_settings.client_query_id]=query_settings
     #        @@socket_hash[query_settings.socket]=[query_settings.client_query_id] # @todo@ If we use persistent sockets then we need to update this array
     def process_ready(ready)
@@ -260,7 +260,7 @@ module Dnsruby
         ready.delete(socket)
       end
     end
-    
+
     def send_response_to_client(msg, bytes, socket)
       # Figure out which client_ids we were expecting on this socket, then see if any header ids match up
       # @TODO@ Can get rid of this, as we only have one query per socket.
@@ -306,7 +306,7 @@ module Dnsruby
       Dnsruby.log.error{"Stray packet - " + msg.inspect + "\n from " + socket.inspect}
       print("Stray packet - " + msg.question()[0].qname.to_s + " from " + msg.answerip.to_s + ", #{client_ids.length} client_ids\n")
     end
-    
+
     def remove_id(id)
       socket=nil
       @@mutex.synchronize{
@@ -322,7 +322,7 @@ module Dnsruby
       rescue IOError # Don't worry if the socket was closed already
       end
     end
-    
+
     def process_timeouts
       time_now = Time.now
       timeouts={}
@@ -335,7 +335,7 @@ module Dnsruby
         end
       end
     end
-    
+
     def tcp_read(socket)
       # Keep buffer for all TCP sockets, and return
       # to select after reading available data. Once all data has been received,
@@ -387,7 +387,7 @@ module Dnsruby
         return false
       end
     end
-    
+
     def get_incoming_data(socket, packet_size)
       answerfrom,answerip,answerport,answersize=nil
       ans,buf = nil
@@ -435,7 +435,7 @@ module Dnsruby
         return
       end
       Dnsruby.log.debug{";; answer from #{answerfrom} : #{answersize} bytes\n"}
-      
+
       begin
         ans = Message.decode(buf)
       rescue Exception => e
@@ -481,7 +481,7 @@ module Dnsruby
         end
         return
       end
-      
+
       if (ans!= nil)
         Dnsruby.log.debug{"#{ans}"}
         ans.answerfrom=(answerfrom)
@@ -490,7 +490,7 @@ module Dnsruby
       end
       return ans, buf
     end
-    
+
     def handle_recvfrom_failure(socket, exception)
       #  No way to notify the client about this error, unless there was only one connection on the socket
       # Not a problem, as there only will ever be one connection on the socket (Kaminsky attack mitigation)
@@ -509,7 +509,7 @@ module Dnsruby
         Dnsruby.log.fatal{"Recvfrom failed from #{socket}, no way to tell query id"}
       end
     end
-    
+
     def get_client_id_from_answerfrom(socket, answerip, answerport)
       # @TODO@ Can get rid of this, as there is only one query per socket
       client_id=nil
@@ -528,7 +528,7 @@ module Dnsruby
       }
       return client_id
     end
-    
+
     def send_exception_to_client(err, socket, client_id, msg=nil)
       # find the client response queue
       client_queue = nil
@@ -540,7 +540,7 @@ module Dnsruby
       client_queue.push([client_id, Resolver::EventType::ERROR, msg, err])
       notify_queue_observers(client_queue, client_id)
     end
-    
+
     def push_exception_to_select(client_id, client_queue, err, msg)
       @@mutex.synchronize{
         @@queued_exceptions.push([client_id, client_queue, err, msg])
@@ -553,7 +553,7 @@ module Dnsruby
         }
       end
     end
-    
+
     def push_response_to_select(client_id, client_queue, msg, query, res)
       # This needs to queue the response TO THE SELECT THREAD, which then needs
       # to send it out from its normal loop.
@@ -573,7 +573,7 @@ module Dnsruby
         }
       end
     end
-    
+
     def push_validation_response_to_select(client_id, client_queue, msg, err, query, res)
       # This needs to queue the response TO THE SELECT THREAD, which then needs
       # to send it out from its normal loop.
@@ -596,7 +596,7 @@ module Dnsruby
         exceptions = @@queued_exceptions
         @@queued_exceptions = []
       }
-      
+
       exceptions.each do |item|
         client_id, client_queue, err, msg = item
         #        push_to_client(client_id, client_queue, msg, err)
@@ -604,7 +604,7 @@ module Dnsruby
         notify_queue_observers(client_queue, client_id)
       end
     end
-    
+
     def send_queued_responses
       responses = []
       @@mutex.synchronize{
@@ -677,7 +677,7 @@ module Dnsruby
         end
       }
     end
-    
+
     def remove_observer(client_queue, observer)
       @@mutex.synchronize {
         if (@@observers[client_queue]==observer)
@@ -705,7 +705,7 @@ module Dnsruby
         observer.handle_queue_event(client_queue, client_query_id)
       end
     end
-    
+
     def send_tick_to_observers
       # If any observers are known then send them a tick
       tick_observers=nil

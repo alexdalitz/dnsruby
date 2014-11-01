@@ -77,7 +77,7 @@ while (!eof)
     in_progress -= 1
     if (error)
       print("#{id}:\t#{error}\n")
-    else 
+    else
       print("#{result.answer.join("\n")}\n")
     end
   end

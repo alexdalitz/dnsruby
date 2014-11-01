@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 #require 'base64'
@@ -35,18 +35,18 @@ module Dnsruby
     #
     #Example code :
     #    res = Dnsruby::Resolver.new("ns0.validation-test-servers.nominet.org.uk")
-    #    
+    #
     #    # Now configure the resolver with the TSIG key for signing/verifying
     #    KEY_NAME="rubytsig"
     #    KEY = "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw=="
     #    res.tsig=KEY_NAME, KEY
-    #    
+    #
     #    update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
     #    # Generate update record name, and test it has been made. Then delete it and check it has been deleted
     #    update_name = generate_update_name
     #    update.absent(update_name)
     #    update.add(update_name, 'TXT', 100, "test signed update")
-    #    
+    #
     #    # Resolver will automatically sign message and verify response
     #    response = res.send_message(update)
     #    assert(response.verified?) # Check that the response has been verified
@@ -54,11 +54,11 @@ module Dnsruby
       HMAC_MD5 = Name.create("HMAC-MD5.SIG-ALG.REG.INT.")
       HMAC_SHA1 = Name.create("hmac-sha1.")
       HMAC_SHA256 = Name.create("hmac-sha256.")
-      
+
       DEFAULT_FUDGE     = 300
-      
+
       DEFAULT_ALGORITHM = HMAC_MD5
-      
+
       #Generates a TSIG record and adds it to the message.
       #Takes an optional original_request argument for the case where this is
       #a response to a query (RFC2845 3.4.1)
@@ -73,12 +73,12 @@ module Dnsruby
           tsig_rr.query = message
         end
       end
-      
+
       def query=q#:nodoc: all
         @query = q
       end
-      
-      
+
+
       #Generates a TSIG record
       def generate(msg, original_request = nil, data="", msg_bytes=nil, tsig_rr=self)#:nodoc: all
         time_signed=@time_signed
@@ -88,7 +88,7 @@ module Dnsruby
         if (tsig_rr.time_signed)
           time_signed = tsig_rr.time_signed
         end
-        
+
         if (original_request)
           #	# Add the request MAC if present (used to validate responses).
           #	  hmac.update(pack("H*", request_mac))
@@ -104,7 +104,7 @@ module Dnsruby
             msg.header.id = original_request.header.id
           end
         end
-        
+
         if (!msg_bytes)
           msg_bytes = msg.encode
           data += msg_bytes
@@ -115,11 +115,11 @@ module Dnsruby
           msg_bytes = Header.decrement_arcount_encoded(msg_bytes)
           data += msg_bytes[0, msg.tsigstart]
         end
-        
+
         data += sig_data(tsig_rr, time_signed)
-        
+
         mac = calculate_mac(tsig_rr.algorithm, data)
-        
+
         mac_size = mac.length
 
         new_tsig_rr = Dnsruby::RR.create({
@@ -137,9 +137,9 @@ module Dnsruby
             :original_id => msg.header.id
           })
         return new_tsig_rr
-        
+
       end
-      
+
       def calculate_mac(algorithm, data)
         mac=nil
 #+ if (key_size > max_digest_len) {
@@ -163,14 +163,14 @@ module Dnsruby
         end
         return mac
       end
-      
+
       # Private method to return the TSIG RR data to be signed
       def sig_data(tsig_rr, time_signed=@time_signed) #:nodoc: all
         return MessageEncoder.new { |msg|
           msg.put_name(tsig_rr.name.downcase, true)
           msg.put_pack('nN', tsig_rr.klass.code, tsig_rr.ttl)
           msg.put_name(tsig_rr.algorithm.downcase, true)
-          
+
           time_high = (time_signed >> 32)
           time_low = (time_signed & 0xFFFFFFFF)
           msg.put_pack('nN', time_high, time_low)
@@ -180,7 +180,7 @@ module Dnsruby
           msg.put_bytes(tsig_rr.other_data)
         }.to_s
       end
-      
+
       #Verify a response. This method will be called by Dnsruby::SingleResolver
       #before passing a response to the client code.
       #The TSIG record will be removed from packet before passing to client, and
@@ -216,7 +216,7 @@ module Dnsruby
         end
 
         new_msg_tsig_rr = generate(response, query, buf, response_bytes, msg_tsig_rr)
-        
+
         if (msg_tsig_rr.mac == new_msg_tsig_rr.mac)
           response.tsigstate = :Verified
           response.tsigerror = RCode.NOERROR
@@ -227,7 +227,7 @@ module Dnsruby
           return false
         end
       end
-      
+
       def verify_common(response)#:nodoc: all
         tsig_rr = response.tsig
 
@@ -244,35 +244,35 @@ module Dnsruby
         if (tsig_rr.error != RCode.NOERROR)
           response.tsigstate = :Failed
           response.tsigerror = tsig_rr.error
-          return false                    
+          return false
         end
-        
+
 	if ((tsig_rr.name != @name) || (tsig_rr.algorithm.downcase != @algorithm.downcase))
           Dnsruby.log.error("BADKEY failure")
           response.tsigstate = :Failed
           response.tsigerror = RCode.BADKEY
-          return false          
+          return false
         end
-        
+
         # Check time_signed (RFC2845, 4.5.2) - only really necessary for server
         if (Time.now.to_i > tsig_rr.time_signed + tsig_rr.fudge  ||
               Time.now.to_i < tsig_rr.time_signed - tsig_rr.fudge)
           Dnsruby.log.error("TSIG failed with BADTIME")
           response.tsigstate = :Failed
           response.tsigerror = RCode.BADTIME
-          return false          
+          return false
         end
-        
+
         return true
       end
-      
+
       #Checks TSIG signatures across sessions of multiple DNS envelopes.
       #This method is called each time a new envelope comes in. The envelope
-      #is checked - if a TSIG is present, them the stream so far is verified, 
+      #is checked - if a TSIG is present, them the stream so far is verified,
       #and the response#tsigstate set to :Verified. If a TSIG is not present,
       #and does not need to be present, then the message is added to the digest
       #stream and the response#tsigstate is set to :Intermediate.
-      #If there is an error with the TSIG verification, then the response#tsigstate 
+      #If there is an error with the TSIG verification, then the response#tsigstate
       #is set to :Failed.
       #Like verify, this method will only be called by the Dnsruby::SingleResolver
       #class. Client code need not call this method directly.
@@ -306,9 +306,9 @@ module Dnsruby
         # Each time a new envelope comes in, this method is called on the QUERY TSIG RR.
         # It will set the response tsigstate to :Verified :Intermediate or :Failed
         # as appropriate.
-        
+
         # Keep digest going of messages as they come in (and mark them intermediate)
-        # When TSIG comes in, work out what key should be and check. If OK, mark 
+        # When TSIG comes in, work out what key should be and check. If OK, mark
         # verified. Can reset digest then.
         if (!@buf)
           @num_envelopes = 0
@@ -329,7 +329,7 @@ module Dnsruby
           end
         end
         @last_signed = @num_envelopes
-        
+
         # We have a TSIG - process it!
         tsig = response.tsig
         if (@num_envelopes == 1)
@@ -350,11 +350,11 @@ module Dnsruby
         if (!verify_common(response))
           return false
         end
-        
+
         # Now add the current message data - remember to frig the arcount
         response_bytes = Header.decrement_arcount_encoded(response_bytes)
         @buf += response_bytes[0, response.tsigstart]
-        
+
         # Let's add the timers
         timers_data = MessageEncoder.new { |msg|
           time_high = (tsig.time_signed >> 32)
@@ -363,7 +363,7 @@ module Dnsruby
           msg.put_pack('n', tsig.fudge)
         }.to_s
         @buf += timers_data
-        
+
         mac = calculate_mac(tsig.algorithm, @buf)
 
         if (mac != tsig.mac)
@@ -382,11 +382,11 @@ module Dnsruby
         return true
       end
 
-            
+
       TypeValue = Types::TSIG #:nodoc: all
       ClassValue = nil #:nodoc: all
       ClassHash[[TypeValue, Classes::ANY]] = self #:nodoc: all
-      
+
       #Gets or sets the domain name that specifies the name of the algorithm.
       #The only algorithms currently supported are hmac-md5 and hmac-sha1.
       #
@@ -394,7 +394,7 @@ module Dnsruby
       #    print "algorithm = ", rr.algorithm, "\n"
       #
       attr_reader :algorithm
-      
+
       #Gets or sets the signing time as the number of seconds since 1 Jan 1970
       #00:00:00 UTC.
       #
@@ -404,7 +404,7 @@ module Dnsruby
       #    print "time signed = ", rr.time_signed, "\n"
       #
       attr_accessor :time_signed
-      
+
       #Gets or sets the "fudge", i.e., the seconds of error permitted in the
       #signing time.
       #
@@ -414,7 +414,7 @@ module Dnsruby
       #    print "fudge = ", rr.fudge, "\n"
       #
       attr_reader :fudge
-      
+
       #Returns the number of octets in the message authentication code (MAC).
       #The programmer must call a Net::DNS::Packet object's data method
       #before this will return anything meaningful.
@@ -422,7 +422,7 @@ module Dnsruby
       #    print "MAC size = ", rr.mac_size, "\n"
       #
       attr_accessor :mac_size
-      
+
       #Returns the message authentication code (MAC) as a string of hex
       #characters.  The programmer must call a Net::DNS::Packet object's
       #data method before this will return anything meaningful.
@@ -430,28 +430,28 @@ module Dnsruby
       #    print "MAC = ", rr.mac, "\n"
       #
       attr_accessor :mac
-      
+
       #Gets or sets the original message ID.
       #
       #    rr.original_id(12345)
       #    print "original ID = ", rr.original_id, "\n"
       #
       attr_accessor :original_id
-      
+
       #Returns the RCODE covering TSIG processing.  Common values are
       #NOERROR, BADSIG, BADKEY, and BADTIME.  See RFC 2845 for details.
       #
       #    print "error = ", rr.error, "\n"
       #
       attr_accessor :error
-      
+
       #Returns the length of the Other Data.  Should be zero unless the
       #error is BADTIME.
       #
       #    print "other len = ", rr.other_size, "\n"
       #
       attr_accessor :other_size
-      
+
       #Returns the Other Data.  This field should be empty unless the
       #error is BADTIME, in which case it will contain the server's
       #time as the number of seconds since 1 Jan 1970 00:00:00 UTC.
@@ -459,10 +459,10 @@ module Dnsruby
       #    print "other data = ", rr.other_data, "\n"
       #
       attr_accessor :other_data
-      
+
       #Stores the secret key used for signing/verifying messages.
       attr_accessor :key
-      
+
       def init_defaults
         # @TODO@ Have new() method which takes key_name and key?
         @algorithm   = DEFAULT_ALGORITHM
@@ -475,28 +475,28 @@ module Dnsruby
         @other_data  = ""
         @time_signed = nil
         @buf = nil
-        
+
         # RFC 2845 Section 2.3
         @klass = Classes.ANY
-        
+
         @ttl = 0 # RFC 2845 Section 2.3
       end
-      
+
       def from_data(data) #:nodoc: all
         @algorithm, @time_signed, @fudge, @mac_size, @mac, @original_id, @error, @other_size, @other_data = data
       end
-      
+
       def name=(n)
         if (n.instance_of?String)
           n = Name.create(n)
         end
         if (!n.absolute?)
           @name = Name.create(n.to_s + ".")
-        else 
+        else
           @name = n
         end
       end
-      
+
       # Create the RR from a standard string
       def from_string(str) #:nodoc: all
         parts = str.split("[:/]")
@@ -509,7 +509,7 @@ module Dnsruby
           return TSIG.new(HMAC_MD5, parts[0], parts[1]);
         end
       end
-      
+
       #Set the algorithm to use to generate the HMAC
       #Supported values are :
       #* hmac-md5
@@ -536,7 +536,7 @@ module Dnsruby
         end
         Dnsruby.log.debug{"Using #{@algorithm.to_s} algorithm"}
       end
-      
+
       def fudge=(f)
         if (f < 0 || f > 0x7FFF)
           @fudge = DEFAULT_FUDGE
@@ -544,8 +544,8 @@ module Dnsruby
           @fudge = f
         end
       end
-      
-      def rdata_to_string        
+
+      def rdata_to_string
         rdatastr=""
         if (@algorithm!=nil)
           error = @error
@@ -556,10 +556,10 @@ module Dnsruby
           end
           rdatastr += " " + mac.unpack("H*").to_s
         end
-        
+
         return rdatastr
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
         # Name needs to be added with no compression - done in Dnsruby::Message#encode
         msg.put_name(@algorithm.downcase, true)
@@ -574,7 +574,7 @@ module Dnsruby
         msg.put_pack('n', @other_size)
         msg.put_bytes(@other_data)
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         alg=msg.get_name
         time_high, time_low = msg.get_unpack("nN")
@@ -589,5 +589,5 @@ module Dnsruby
         return self.new([alg, time_signed, fudge, mac_size, mac, original_id, error, other_size, other_data])
       end
     end
-  end   
+  end
 end

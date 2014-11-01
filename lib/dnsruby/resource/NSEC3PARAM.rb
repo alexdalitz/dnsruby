@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
@@ -25,7 +25,7 @@ module Dnsruby
     class NSEC3PARAM < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::NSEC3PARAM #:nodoc: all
-      
+
       #The Hash Algorithm field identifies the cryptographic hash algorithm
       #used to construct the hash-value.
       attr_reader :hash_alg
@@ -64,11 +64,11 @@ module Dnsruby
           raise DecodeError.new(e)
         end
       end
-      
+
       def types=(t)
         @types = NSEC.get_types(t)
       end
-      
+
       def flags=(f)
         if (f==0 || f==1)
           @flags=f
@@ -76,7 +76,7 @@ module Dnsruby
           raise DecodeError.new("Unknown NSEC3 flags field - #{f}")
         end
       end
-      
+
       #      def salt_length=(l) # :nodoc: all
       #        if ((l < 0) || (l > 255))
       #          raise DecodeError.new("NSEC3 salt length must be between 0 and 255")
@@ -93,7 +93,7 @@ module Dnsruby
 #        self.salt=(salt)
         @salt=salt
       end
-      
+
       def from_string(input)
         if (input.length > 0)
           data = input.split(" ")
@@ -104,12 +104,12 @@ module Dnsruby
           #          self.salt_length=(data[3].length)
         end
       end
-      
+
       def rdata_to_string #:nodoc: all
           s = salt()
           return "#{@hash_alg.code} #{@flags} #{@iterations} #{s}"
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
 #        s = salt()
         s = @salt
@@ -123,13 +123,13 @@ module Dnsruby
           msg.put_bytes(s)
         end
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         hash_alg, flags, iterations, salt_length = msg.get_unpack("ccnc")
         salt = msg.get_bytes(salt_length)
         return self.new(
           [hash_alg, flags, iterations, salt_length, salt])
       end
-    end 
+    end
   end
 end

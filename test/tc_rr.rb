@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 
@@ -22,29 +22,29 @@ class TestRR < Minitest::Test
     #------------------------------------------------------------------------------
     # Canned data.
     #------------------------------------------------------------------------------
-    
+
     name			= "foo.example.com";
     klass			= "IN";
     ttl				= 43200;
-    
+
     rrs = [
     {  	#[0]
       :type        => Types.A,
-      :address     => '10.0.0.1',  
-    }, 
+      :address     => '10.0.0.1',
+    },
     {	#[1]
       :type      => Types::AAAA,
       :address     => '102:304:506:708:90a:b0c:d0e:ff10',
-    }, 
+    },
     {	#[2]
       :type         => 'AFSDB',
       :subtype      => 1,
       :hostname     => 'afsdb-hostname.example.com',
-    }, 
+    },
     {	#[3]
       :type         => Types.CNAME,
       :domainname        => 'cname-cname.example.com',
-    }, 
+    },
     {   #[4]
       :type         => Types.DNAME,
       :domainname        => 'dname.example.com',
@@ -53,29 +53,29 @@ class TestRR < Minitest::Test
       :type         => Types.HINFO,
       :cpu          => 'test-cpu',
       :os           => 'test-os',
-    }, 
+    },
     {	#[6]
       :type         => Types.ISDN,
       :address      => '987654321',
       :subaddress           => '001',
-    }, 
+    },
     {	#[7]
       :type         => Types.MB,
       :domainname      => 'mb-madname.example.com',
-    }, 
+    },
     {	#[8]
       :type         => Types.MG,
       :domainname   => 'mg-mgmname.example.com',
-    }, 
+    },
     {	#[9]
       :type         => Types.MINFO,
       :rmailbx      => 'minfo-rmailbx.example.com',
       :emailbx      => 'minfo-emailbx.example.com',
-    }, 
+    },
     {	#[10]
       :type         => Types.MR,
       :domainname      => 'mr-newname.example.com',
-    }, 
+    },
     {	#[11]
       :type         => Types.MX,
       :preference   => 10,
@@ -111,7 +111,7 @@ class TestRR < Minitest::Test
       :type         => Types.PTR,
       :domainname     => 'ptr-ptrdname.example.com',
     },
-    {	#[16] 
+    {	#[16]
       :type         => Types.PX,
       :preference   => 10,
       :map822       => 'px-map822.example.com',
@@ -179,38 +179,38 @@ class TestRR < Minitest::Test
       :exchange     => 'kx-exchange.example.com',
     },
     ]
-    
-    
+
+
     #------------------------------------------------------------------------------
     # Create the packet
     #------------------------------------------------------------------------------
-    
+
     message = Message.new
     assert(message,         'Message created');
-    
-    
+
+
     rrs.each do |data|
       data.update({	   :name => name,
         :ttl  => ttl,
       })
       rr=RR.create(data)
-      
+
       message.add_answer(rr);
     end
-    
+
     #------------------------------------------------------------------------------
     # Re-create the packet from data.
     #------------------------------------------------------------------------------
     data = message.encode;
     assert(data,            'Packet has data after pushes');
-    
+
     message=nil;
     message= Message.decode(data);
-    
+
     assert(message,          'Packet reconstructed from data');
-    
+
     answer = message.answer;
-    
+
     i = 0
     rrs.each do |rec|
       ret_rr = answer[i]
@@ -220,7 +220,7 @@ class TestRR < Minitest::Test
         x = ret_rr.send(key)
         if (ret_rr.kind_of?RR::CERT and (key == :alg or key == :certtype))
           assert_equal(value.to_s, x.code.to_s.downcase, "Packet returned wrong answer section for #{ret_rr.to_s}, #{key}")
-        elsif (ret_rr.kind_of?RR::TXT and (key == :strings)) 
+        elsif (ret_rr.kind_of?RR::TXT and (key == :strings))
           assert_equal(value.to_s.downcase, x[0].to_s.downcase, "TXT strings wrong")
         else
           if (key == :type)
@@ -231,25 +231,25 @@ class TestRR < Minitest::Test
         end
       end
     end
-    
-    
-    
+
+
+
     while (!answer.empty? and !rrs.empty?)
       data = rrs.shift;
       rr   = answer.shift;
       type = data[:type];
-      
-      assert(rr,                         "#{type} - RR defined");    
-      assert_equal(name,       	rr.name.to_s,    "#{type} - name() correct");         
+
+      assert(rr,                         "#{type} - RR defined");
+      assert_equal(name,       	rr.name.to_s,    "#{type} - name() correct");
       assert_equal(klass,      	rr.klass.to_s,   "#{type} - class() correct");
-      assert_equal(ttl,        	rr.ttl,     "#{type} - ttl() correct");                
-      
+      assert_equal(ttl,        	rr.ttl,     "#{type} - ttl() correct");
+
       #	foreach my $meth (keys %{data}) {
       data.keys.each do |meth|
         ret = rr.send(meth)
         if (rr.kind_of?RR::CERT and (meth == :alg or meth == :certtype))
           assert_equal(data[meth].to_s, ret.code.to_s.downcase, "#{type} - #{meth}() correct")
-        elsif (rr.kind_of?RR::TXT and (meth == :strings)) 
+        elsif (rr.kind_of?RR::TXT and (meth == :strings))
           assert_equal(data[meth].to_s, ret[0].to_s.downcase, "TXT strings wrong")
         else
           if (meth == :type)

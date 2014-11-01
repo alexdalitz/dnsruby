@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 
@@ -47,7 +47,7 @@ if (online)
   require_relative "tc_recur.rb"
   #  require_relative "tc_soak.rb"
 
-  # Check if we can contact the server - if we can't, then abort the test 
+  # Check if we can contact the server - if we can't, then abort the test
   # (but tell user that test has not been run due to connectivity problems)
   server_up = false
 
@@ -80,7 +80,7 @@ if (online)
       OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
       key = OpenSSL::PKey::RSA.new
       key.e = 111
-      
+
       have_openssl=true
     rescue Exception => e
       puts "-------------------------------------------------------------------------"
@@ -91,7 +91,7 @@ if (online)
       require_relative "tc_tsig.rb"
       puts "------------------------------------------------------"
       puts "Running DNSSEC test - may fail if OpenSSL not complete"
-      puts "------------------------------------------------------"      
+      puts "------------------------------------------------------"
       require_relative "tc_verifier.rb"
       require_relative "tc_dlv.rb"
       require_relative "tc_validator.rb"

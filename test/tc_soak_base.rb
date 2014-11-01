@@ -39,8 +39,8 @@ class TestSoakBase # < Minitest::Test
     :type		=> Types.TXT,
     :name		=> 'txt.t.dnsruby.validation-test-servers.nominet.org.uk',
     :strings		=> ['Net-DNS']
-  }		
-  ]		
+  }
+  ]
 
   def TestSoakBase.test_continuous_queries_asynch_single_res
     # Have two threads looping, with one sending, and one receiving queries.
@@ -71,7 +71,7 @@ class TestSoakBase # < Minitest::Test
           }
         end
       end
-      
+
     }
     receiver = Thread.new{
      (num_loops*4).times do |i|
@@ -95,7 +95,7 @@ class TestSoakBase # < Minitest::Test
     p "Query count : #{num_sent}, #{timed_out} timed out. #{time_taken} time taken"
     assert(timed_out < num_sent * 0.1, "#{timed_out} of #{num_sent} timed out!")
   end
-  
+
   def TestSoakBase.test_continuous_queries_asynch_resolver
     # Have two threads looping, with one sending, and one receiving queries.
     # Never exceed more than 250 concurrent queries, but make sure they're always running.

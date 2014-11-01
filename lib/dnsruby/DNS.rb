@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 require 'dnsruby/Hosts'
@@ -63,7 +63,7 @@ module Dnsruby
   #    ((|class|)) must be a member of Dnsruby::Classes
   #
   #    Resultant resource is represented as an instance of (a subclass of)
-  #    Dnsruby::RR. 
+  #    Dnsruby::RR.
   #    (Dnsruby::RR::IN::A, etc.)
   #
   #The searchlist and other Config info is applied to the domain name if appropriate. All the nameservers
@@ -72,14 +72,14 @@ module Dnsruby
   #This class uses Resolver to perform the queries.
   #
   #Information taken from the following places :
-  #* STD0013 
+  #* STD0013
   #* RFC 1035, etc.
   #* ftp://ftp.isi.edu/in-notes/iana/assignments/dns-parameters
   #* etc.
   class DNS
 
     attr_accessor :do_caching
-    
+
     #Creates a new DNS resolver. See Resolv::DNS.new for argument details.
     #
     #Yields the created DNS resolver to the block, if given, otherwise returns it.
@@ -92,17 +92,17 @@ module Dnsruby
         dns.close
       end
     end
-    
+
     #Closes the resolver
     def close
       @resolver.close
     end
-    
-    
+
+
     def to_s
       return "DNS : " + @config.to_s
     end
-    
+
     #Creates a new DNS resolver
     #
     #+config_info+ can be:
@@ -124,36 +124,36 @@ module Dnsruby
 #        raise ArgumentError.new("Must pass at least one valid resolver address")
 #      end
     end
-    
-    attr_reader :config    
-    
+
+    attr_reader :config
+
     #Gets the first IP address of +name+ from the DNS resolver
     #
-    #+name+ can be a Dnsruby::Name or a String. Retrieved address will be a 
+    #+name+ can be a Dnsruby::Name or a String. Retrieved address will be a
     #Dnsruby::IPv4 or a Dnsruby::IPv6
     def getaddress(name)
       each_address(name) {|address| return address}
       raise ResolvError.new("DNS result has no information for #{name}")
     end
-    
+
     #Gets all IP addresses of +name+ from the DNS resolver
     #
-    #+name+ can be a Dnsruby::Name or a String. Retrieved address will be a 
+    #+name+ can be a Dnsruby::Name or a String. Retrieved address will be a
     #Dnsruby::IPv4 or a Dnsruby::IPv6
     def getaddresses(name)
       ret = []
       each_address(name) {|address| ret << address}
       return ret
     end
-    
+
     #Iterates over all IP addresses of +name+ retrieved from the DNS resolver
     #
-    #+name+ can be a Dnsruby::Name or a String. Retrieved address will be a 
+    #+name+ can be a Dnsruby::Name or a String. Retrieved address will be a
     #Dnsruby::IPv4 or a Dnsruby::IPv6
     def each_address(name)
       each_resource(name) {|resource| yield resource.address}
     end
-    
+
     #Gets the first hostname for +address+ from the DNS resolver
     #
     #+address+ must be a Dnsruby::IPv4, Dnsruby::IPv6 or a String. Retrieved
@@ -162,7 +162,7 @@ module Dnsruby
       each_name(address) {|name| return name}
       raise ResolvError.new("DNS result has no information for #{address}")
     end
-    
+
     #Gets all hostnames for +address+ from the DNS resolver
     #
     #+address+ must be a Dnsruby::IPv4, Dnsruby::IPv6 or a String. Retrieved
@@ -172,7 +172,7 @@ module Dnsruby
       each_name(address) {|name| ret << name}
       return ret
     end
-    
+
     #Iterates over all hostnames for +address+ retrieved from the DNS resolver
     #
     #+address+ must be a Dnsruby::IPv4, Dnsruby::IPv6 or a String. Retrieved
@@ -192,38 +192,38 @@ module Dnsruby
       end
       each_resource(ptr, Types.PTR, Classes.IN) {|resource| yield resource.domainname}
     end
-    
+
     #Look up the first +type+, +klass+ resource for +name+
     #
     #+type+ defaults to Dnsruby::Types.A
     #+klass+ defaults to Dnsruby::Classes.IN
     #
-    #Returned resource is represented as a Dnsruby::RR instance, e.g. 
+    #Returned resource is represented as a Dnsruby::RR instance, e.g.
     #Dnsruby::RR::IN::A
     def getresource(name, type=Types.A, klass=Classes.IN)
       each_resource(name, type, klass) {|resource| return resource}
       raise ResolvError.new("DNS result has no information for #{name}")
     end
-    
+
     #Look up all +type+, +klass+ resources for +name+
     #
     #+type+ defaults to Dnsruby::Types.A
     #+klass+ defaults to Dnsruby::Classes.IN
     #
-    #Returned resource is represented as a Dnsruby::RR instance, e.g. 
+    #Returned resource is represented as a Dnsruby::RR instance, e.g.
     #Dnsruby::RR::IN::A
     def getresources(name, type=Types.A, klass=Classes.IN)
       ret = []
       each_resource(name, type, klass) {|resource| ret << resource}
       return ret
     end
-    
+
     #Iterates over all +type+, +klass+ resources for +name+
     #
     #+type+ defaults to Dnsruby::Types.A
     #+klass+ defaults to Dnsruby::Classes.IN
     #
-    #Yielded resource is represented as a Dnsruby::RR instance, e.g. 
+    #Yielded resource is represented as a Dnsruby::RR instance, e.g.
     #Dnsruby::RR::IN::A
     def each_resource(name, type=Types.A, klass=Classes.IN, &proc)
       type = Types.new(type)
@@ -239,9 +239,9 @@ module Dnsruby
       else
         Dnsruby.log.error{"Unexpected rcode : #{reply.rcode.string}"}
         raise Config::OtherResolvError.new(reply_name.to_s)
-      end      
+      end
     end
-    
+
     def extract_resources(msg, name, type, klass) # :nodoc:
       if type == Types.ANY
         n0 = Name.create(name)
@@ -297,7 +297,7 @@ module Dnsruby
       end
       raise exception
     end
-    
+
   end
 end
 #--
