@@ -17,7 +17,7 @@ require 'dnsruby/code_mapper'
 require 'dnsruby/ipv4'
 require 'dnsruby/ipv6'
 require 'timeout'
-require 'dnsruby/TheLog'
+require 'dnsruby/the_log'
 require 'dnsruby/version'
 #= Dnsruby library
 #Dnsruby is a thread-aware DNS stub resolver library written in Ruby.
@@ -581,9 +581,9 @@ module Dnsruby
     end
 
 
-    require 'dnsruby/Cache'
+    require 'dnsruby/cache'
     require 'dnsruby/DNS'
-    require 'dnsruby/Hosts'
+    require 'dnsruby/hosts'
     require 'dnsruby/message'
     require 'dnsruby/update'
     require 'dnsruby/zone_transfer'
