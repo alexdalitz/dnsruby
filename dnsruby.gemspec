@@ -1,4 +1,6 @@
-require_relative 'lib/dnsruby/version'
+lib = File.expand_path('../lib', __FILE__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+require 'dnsruby/version'
 
 SPEC = Gem::Specification.new do |s|
   s.name = "dnsruby"
