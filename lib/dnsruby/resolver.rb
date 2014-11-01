@@ -14,8 +14,8 @@
 #limitations under the License.
 #++
 #require "Dnsruby/resolver_register.rb"
-require "dnsruby/PacketSender"
-require "dnsruby/Recursor"
+require "dnsruby/packet_sender"
+require "dnsruby/recursor"
 module Dnsruby
   #== Description
   #Dnsruby::Resolver is a DNS stub resolver.
@@ -1223,4 +1223,4 @@ module Dnsruby
     end
   end
 end
-require "dnsruby/SingleResolver"
+require "dnsruby/single_resolver"
