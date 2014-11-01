@@ -53,7 +53,7 @@ res = Dnsruby::Recursor.new(resolver)
 name, type, klass = ARGV
 type  ||= "A"
 klass ||= "IN"
-  
+
   begin
     answer = nil
     answer = res.query(name, type, klass)

@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 
@@ -19,33 +19,33 @@ require_relative 'spec_helper'
 include Dnsruby
 class TestResOpt < Minitest::Test
   def test_dns_file
-    
+
     # .txt because this test will run under windows, unlike the other file
     # configuration tests.
     res = Dnsruby::DNS.new('test/custom.txt')
-    
+
     assert(res,                           'new() returned something')
     assert_instance_of(DNS, res, 'new() returns an object of the correct class.')
     assert(res.config.nameserver,       'nameservers() works')
-    
+
     servers = res.config.nameserver
-    
+
     assert_equal('10.0.1.42', servers[0],  'Nameserver set correctly')
     assert_equal('10.0.2.42',  servers[1], 'Nameserver set correctly')
-    
-    
+
+
     search = res.config.search
     assert(search.include?('alt.dnsruby.validation-test-servers.nominet.org.uk'), 'Search set correctly' )
     assert(search.include?('ext.dnsruby.validation-test-servers.nominet.org.uk'), 'Search set correctly' )
-    
+
     assert(res.config.domain == 't2.dnsruby.validation-test-servers.nominet.org.uk',  'Local domain works'  )
   end
-  
+
   def test_resolver_file
     res = Dnsruby::Resolver.new({:config_info => 'test/custom.txt'})
     assert(res.config.nameserver==['10.0.1.42', '10.0.2.42'], res.config.nameserver.to_s)
   end
-  
+
   def test_no_file
     Dnsruby.log.level=Logger::FATAL
     res=nil
@@ -61,7 +61,7 @@ class TestResOpt < Minitest::Test
     end
 #    Dnsruby.log.level=Logger::ERROR
   end
-  
+
   def test_config_hash_singleresolver
     # Resolver interface gives us : port, TCP, IgnoreTruncation, TSIGkey, timeout
     # SR : server, local_address, udp_size
@@ -77,13 +77,13 @@ class TestResOpt < Minitest::Test
       :packet_timeout    => 60, # SingleResolver and Multi-Resolver # Only have one timeout for both UDP and TCP
       :dnssec         => true,
     }
-    
+
     res = SingleResolver.new(test_config)
     test_config.keys.each do |item|
       assert_equal(test_config[item], res.send(item), "#{item} is correct")
-    end	
+    end
   end
-  
+
   def test_config_hash_multiresolver
     # Resolver interface gives us : port, TCP, IgnoreTruncation, TSIGkey, timeout
     # ER : retries, load_balance. Also loads servers from Config and configures SRs to point to them
@@ -98,12 +98,12 @@ class TestResOpt < Minitest::Test
       :retry_times		   => 5, # DNSand Multi-Resolver
       :use_tcp		   => true, # SingleResolver and Multi-Resolver
       :ignore_truncation          => true, # SingleResolver and Multi-Resolver
-      :recurse        => false, 
+      :recurse        => false,
       :packet_timeout    => 60, # SingleResolver and Multi-Resolver # Only have one timeout for both UDP and TCP
       :query_timeout    => 60, # Multi-Resolver only
       :dnssec         => true,
     }
-    
+
     res = Resolver.new(test_config)
     test_config.keys.each do |item|
       if (item==:nameserver)
@@ -111,36 +111,36 @@ class TestResOpt < Minitest::Test
       else
         assert_equal(res.send(item), test_config[item], "#{item} is correct")
       end
-    end	
+    end
   end
-  
+
   def test_config_hash_lookup
     # Lookup : can specify resolver, searchpath
     #
     # Check that we can set things in new()
     #
     res=nil
-    
+
     test_config = {
       :nameserver	   => ['10.0.0.1', '10.0.0.2'], # for Multi-Resolver & DNS
       :domain	       => 'dnsruby.validation-test-servers.nominet.org.uk', # one for DNS only?
       :search	   => ['dnsruby.validation-test-servers.nominet.org.uk', 't.dnsruby.validation-test-servers.nominet.org.uk'], # one for DNS
       :ndots          => 2, # DNS only
-      :apply_search_list         => false, # DNS only 
-      :apply_domain => false, # DNS only 
+      :apply_search_list         => false, # DNS only
+      :apply_domain => false, # DNS only
     }
-    
+
     res = DNS.new(test_config)
     test_config.keys.each do |item|
       assert_equal(res.config.send(item), test_config[item], "#{item} is correct")
-    end	
+    end
   end
-  
-  
+
+
   def test_bad_config
     res=nil
     Dnsruby.log.level=Logger::FATAL
-    
+
     bad_input = {
       :tsig_rr        => 'set',
       :errorstring    => 'set',
@@ -154,11 +154,11 @@ class TestResOpt < Minitest::Test
       :cdflag         => 'set',
     }
     res=nil
-    begin    
+    begin
       res = Resolver.new(bad_input)
-    rescue Exception 
+    rescue Exception
     end
-    if (res)    
+    if (res)
       bad_input.keys.each do |key|
         begin
           assert_not_equal(res.send(key), 'set', "#{key} is not set")
@@ -166,13 +166,13 @@ class TestResOpt < Minitest::Test
         end
       end
     end
-    
+
     res=nil
-    begin    
+    begin
       res = DNS.new(bad_input)
-    rescue Exception 
+    rescue Exception
     end
-    if (res)        
+    if (res)
       bad_input.keys.each do |key|
         begin
           assert_not_equal(res.send(key), 'set', "#{key} is not set")

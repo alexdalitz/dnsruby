@@ -2,44 +2,44 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
-  
+
   class Modes < CodeMapper
     # The key is assigned by the server (unimplemented)
     SERVERASSIGNED		= 1
-    
+
     # The key is computed using a Diffie-Hellman key exchange
     DIFFIEHELLMAN		= 2
-    
+
     # The key is computed using GSS_API (unimplemented)
     GSSAPI			= 3
-    
+
     # The key is assigned by the resolver (unimplemented)
     RESOLVERASSIGNED	= 4
-    
+
     # The key should be deleted
     DELETE			= 5
     update()
   end
-  
+
   class RR
     #RFC2930
     class TKEY < RR
       TypeValue = Types::TKEY #:nodoc: all
       ClassValue = nil #:nodoc: all
       ClassHash[[TypeValue, Classes::ANY]] = self #:nodoc: all
-      
+
       attr_reader :key_size
       attr_accessor :key
       #Gets or sets the domain name that specifies the name of the algorithm.
@@ -88,12 +88,12 @@ module Dnsruby
       #    print "other data = ", rr.other_data, "\n"
       #
       attr_reader :other_data
-      
+
       def other_data=(od)
         @other_data=od
         @other_size=@other_data.length
       end
-      
+
       def initialize
         @algorithm   = "gss.microsoft.com"
         @inception   = Time.now
@@ -102,32 +102,32 @@ module Dnsruby
         @error       = 0
         @other_size   = 0
         @other_data  = ""
-        
+
         # RFC 2845 Section 2.3
         @klass = Classes.ANY
         # RFC 2845 Section 2.3
-        @ttl = 0 
+        @ttl = 0
       end
-      
+
       def from_hash(hash)
         super(hash)
         if (algorithm)
         @algorithm = Name.create(hash[:algorithm])
         end
       end
-      
+
       def from_data(data) #:nodoc: all
         @algorithm, @inception, @expiration, @mode, @error, @key_size, @key, @other_size, @other_data = data
       end
-      
+
       # Create the RR from a standard string
       def from_string(string) #:nodoc: all
         Dnsruby.log.error("Dnsruby::RR::TKEY#from_string called, but no text format defined for TKEY")
       end
-      
-      def rdata_to_string     
+
+      def rdata_to_string
         rdatastr=""
-        
+
         if (@algorithm!=nil)
           error = @error
           error = "UNDEFINED" unless error!=nil
@@ -136,10 +136,10 @@ module Dnsruby
             rdatastr += " #{@other_data}"
           end
         end
-        
+
         return rdatastr
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
         msg.put_name(@algorithm, canonical)
         msg.put_pack("NNnn", @inception, @expiration, @mode, @error)
@@ -148,7 +148,7 @@ module Dnsruby
         msg.put_pack("n", @other_data.length)
         msg.put_bytes(@other_data)
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         alg=msg.get_name
         inc, exp, mode, error  = msg.get_unpack("NNnn")
@@ -159,5 +159,5 @@ module Dnsruby
         return self.new([alg, inc, exp, mode, error, key_size, key, other_size, other])
       end
     end
-  end   
+  end
 end

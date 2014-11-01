@@ -51,7 +51,7 @@ module Dnsruby
       # by the client as trust anchors. Use Dnssec#add_trust_anchor to add these
       @configured_ds_store = []
     end
-    
+
     def set_hints(hints)
       @@hints = hints
     end
@@ -476,7 +476,7 @@ module Dnsruby
       end
 
     end
-    
+
     def check_record_proves_no_wildcard(msg, nsec) # :nodoc:
       # Check that the NSEC goes from the SOA to a zone canonically after a wildcard
       #      print "Checking wildcard proof for #{nsec.name}\n"
@@ -817,7 +817,7 @@ module Dnsruby
 
       # @TODO@ REALLY NEED AGGRESSIVE NEGATIVE CACHING HERE!!
       # i.e. don't look up zones which we *know* we don't have a DLV anchor for
-      
+
       n = Name.create(name)
       root = Name.create(".")
       while (n != root)
@@ -1113,7 +1113,7 @@ module Dnsruby
             end
           end
         end
-        
+
         # Try to make the resolver from the authority/additional NS RRSets in DNSKEY response
         new_res = get_nameservers_from_message(child,  key_ret) # @TODO@ ?
         if (!new_res)

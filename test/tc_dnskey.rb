@@ -17,22 +17,22 @@
 require_relative 'spec_helper'
 
 class DnskeyTest < Minitest::Test
-  INPUT = "example.com. 86400 IN DNSKEY 256 3 5 ( AQPSKmynfzW4kyBv015MUG2DeIQ3" + 
-    "Cbl+BBZH4b/0PY1kxkmvHjcZc8no" + 
+  INPUT = "example.com. 86400 IN DNSKEY 256 3 5 ( AQPSKmynfzW4kyBv015MUG2DeIQ3" +
+    "Cbl+BBZH4b/0PY1kxkmvHjcZc8no" +
     "kfzj31GajIQKY+5CptLr3buXA10h" +
     "WqTkF7H6RfoRqXQeogmMHfpftf6z" +
-    "Mv1LyBUgia7za6ZEzOJBOztyvhjL" + 
+    "Mv1LyBUgia7za6ZEzOJBOztyvhjL" +
     "742iU/TpPSEDhm2SNKLijfUppn1U" +
     "aNvv4w==  )"
-  BADINPUT = "example.com. 86400 IN DNSKEY 384 3 5 ( AQPSKmynfzW4kyBv015MUG2DeIQ3" + 
-    "Cbl+BBZH4b/0PY1kxkmvHjcZc8no" + 
+  BADINPUT = "example.com. 86400 IN DNSKEY 384 3 5 ( AQPSKmynfzW4kyBv015MUG2DeIQ3" +
+    "Cbl+BBZH4b/0PY1kxkmvHjcZc8no" +
     "kfzj31GajIQKY+5CptLr3buXA10h" +
     "WqTkF7H6RfoRqXQeogmMHfpftf6z" +
-    "Mv1LyBUgia7za6ZEzOJBOztyvhjL" + 
+    "Mv1LyBUgia7za6ZEzOJBOztyvhjL" +
     "742iU/TpPSEDhm2SNKLijfUppn1U" +
     "aNvv4w==  )"
   #  def test_bad_flag
-  #    dnskey = Dnsruby::RR.create(BADINPUT)    
+  #    dnskey = Dnsruby::RR.create(BADINPUT)
   #    assert_equal(384, dnskey.flags)
   #    assert(dnskey.bad_flags?)
   #  end
@@ -44,7 +44,7 @@ class DnskeyTest < Minitest::Test
     assert_equal(Dnsruby::Algorithms::RSASHA1, dnskey.algorithm)
     assert_equal(Dnsruby::RR::DNSKEY::ZONE_KEY, dnskey.flags & Dnsruby::RR::DNSKEY::ZONE_KEY)
     assert_equal(0, dnskey.flags & Dnsruby::RR::DNSKEY::SEP_KEY)
-    
+
     dnskey2 = Dnsruby::RR.create(dnskey.to_s)
     assert(dnskey2.to_s == dnskey.to_s, "#{dnskey.to_s} not equal to \n#{dnskey2.to_s}")
   end
@@ -63,7 +63,7 @@ class DnskeyTest < Minitest::Test
     dnskey3 = m2.additional()[0]
     assert_equal(dnskey.to_s, dnskey3.to_s)
   end
-  
+
   def test_bad_values
     dnskey = Dnsruby::RR.create(INPUT)
     begin
@@ -83,6 +83,6 @@ class DnskeyTest < Minitest::Test
     dnskey.flags=1
     assert_equal(1, dnskey.flags)
     dnskey.protocol=3
-     
+
   end
 end

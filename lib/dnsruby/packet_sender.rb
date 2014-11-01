@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 require 'dnsruby/select_thread'
@@ -55,14 +55,14 @@ module Dnsruby
       @@authoritative_cache.clear
     end
     attr_accessor :packet_timeout
-    
+
     # The port on the resolver to send queries to.
-    # 
+    #
     # Defaults to 53
     attr_accessor :port
-    
+
     # Use TCP rather than UDP as the transport.
-    # 
+    #
     # Defaults to false
     attr_accessor :use_tcp
 
@@ -70,37 +70,37 @@ module Dnsruby
     # For test/debug purposes only
     # Defaults to false
     attr_accessor :no_tcp
-    
+
     # The TSIG record to sign/verify messages with
     attr_reader :tsig
-    
+
     # Don't worry if the response is truncated - return it anyway.
-    # 
+    #
     # Defaults to false
     attr_accessor :ignore_truncation
-    
+
     # The source address to send queries from
-    # 
+    #
     # Defaults to localhost
     attr_reader :src_address
-    
+
     # should the Recursion Desired bit be set on queries?
-    # 
+    #
     # Defaults to true
     attr_accessor :recurse
-    
+
     # The max UDP packet size
-    # 
+    #
     # Defaults to 512
     attr_reader :udp_size
-    
+
     # The address of the resolver to send queries to
     attr_reader :server
-    
+
     # Use DNSSEC for this PacketSender
     # dnssec defaults to ON
     attr_reader :dnssec
-    
+
     # Set the source address. If the arg is nil, do nothing
     def src_address6=(arg)
       if (not arg.nil?)
@@ -127,7 +127,7 @@ module Dnsruby
     def tsig=(*args)
       @tsig = Resolver.get_tsig(args)
     end
-    
+
     def dnssec=(on)
       @dnssec=on
       if (on)
@@ -137,20 +137,20 @@ module Dnsruby
         end
       end
     end
-    
-    
+
+
     def udp_size=(size)
       @udp_size = size
     end
-    
+
     def server=(server)
       Dnsruby.log.debug{"InternalResolver setting server to #{server}"}
       @server=Config.resolve_server(server)
       check_ipv6
     end
-    
-    # Can take a hash with the following optional keys : 
-    # 
+
+    # Can take a hash with the following optional keys :
+    #
     # * :server
     # * :port
     # * :use_tcp
@@ -178,7 +178,7 @@ module Dnsruby
       @src_address6        = '::'
       @src_port        = [0]
       @recurse = true
-      
+
       if (arg==nil)
         # Get default config
         config = Config.new
@@ -223,12 +223,12 @@ module Dnsruby
         end
       end
     end
-    
+
     def close
       # @TODO@ What about closing?
       # Any queries to complete? Sockets to close?
     end
-    
+
     #Asynchronously send a Message to the server. The send can be done using just
     #Dnsruby. Support for EventMachine has been deprecated.
     #
@@ -305,7 +305,7 @@ module Dnsruby
       if (!client_query_id)
         client_query_id = Time.now + rand(10000) # is this safe?!
       end
-      
+
       query_packet = make_query_packet(msg, use_tcp)
 
       if (msg.do_caching && (msg.class != Update))
@@ -405,7 +405,7 @@ module Dnsruby
       if (socket==nil)
         err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}")
         Dnsruby.log.error{"#{err}"}
-        st.push_exception_to_select(client_query_id, client_queue, err, nil) 
+        st.push_exception_to_select(client_query_id, client_queue, err, nil)
         return
       end
       Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
@@ -431,11 +431,11 @@ module Dnsruby
         end
         return
       end
-      
+
       Dnsruby.log.debug{"Packet sent to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
       #      print "Packet sent to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
     end
-    
+
     # The source port to send queries from
     # Returns either a single Fixnum or an Array
     # e.g. "0", or "[60001, 60002, 60007]"
@@ -460,7 +460,7 @@ module Dnsruby
       @src_port=[]
       add_src_port(p)
     end
-    
+
     # Can be a single Fixnum or a Range or an Array
     # If an invalid port is selected (one reserved by
     # IANA), then an ArgumentError will be raised.
@@ -484,8 +484,8 @@ module Dnsruby
         end
       end
     end
-    
-    
+
+
     def get_next_src_port
       #Different OSes have different interpretations of "random port" here.
       #Apparently, Linux will just give you the same port as last time, unless it is still
@@ -578,7 +578,7 @@ module Dnsruby
       end
       return :okay
     end
-    
+
     def make_query(name, type = Types::A, klass = Classes::IN, set_cd=@dnssec)
       msg = Message.new
       msg.header.rd = 1
@@ -588,7 +588,7 @@ module Dnsruby
       end
       return msg
     end
-    
+
     # Prepare the packet for sending
     def make_query_packet(packet, use_tcp = @use_tcp) #:nodoc: all
       if (!packet.send_raw) # Don't mess with this packet!
@@ -605,7 +605,7 @@ module Dnsruby
           add_opt_rr(packet)
         end
       end
-      
+
       if (@tsig && !packet.signed?)
         @tsig.apply(packet)
       end
@@ -644,7 +644,7 @@ module Dnsruby
       end
 
     end
-    
+
     # Return the packet size to use for UDP
     def udp_packet_size
       # if @udp_size > DefaultUDPSize then we use EDNS and

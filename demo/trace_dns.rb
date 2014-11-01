@@ -28,9 +28,9 @@ res = Dnsruby::Recursor.new
 
 
 res.recursion_callback=(Proc.new { |packet|
-	
+
     packet.additional.each { |a| print a.to_s + "\n" }
-	
+
     print(";; Received #{packet.answersize} bytes from #{packet.answerfrom}. Security Level = #{packet.security_level.string}\n\n")
   })
 

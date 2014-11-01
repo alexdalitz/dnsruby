@@ -67,4 +67,4 @@ class TestHIP < Minitest::Test
   end
 
 end
- 
+

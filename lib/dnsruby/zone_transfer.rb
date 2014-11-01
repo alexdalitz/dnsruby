@@ -15,7 +15,7 @@
 #++
 
 module Dnsruby
-  # This class performs zone transfers as per RFC1034 (AXFR) and RFC1995 (IXFR). 
+  # This class performs zone transfers as per RFC1034 (AXFR) and RFC1995 (IXFR).
   class ZoneTransfer
     # The nameserver to use for the zone transfer - defaults to system config
     attr_accessor :server
@@ -31,7 +31,7 @@ module Dnsruby
     attr_reader :tsig
     # Returns the tsigstate of the last transfer (nil if no TSIG signed transfer has occurred)
     attr_reader :last_tsigstate
-    
+
     #Sets the TSIG to sign the zone transfer with.
     #Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
     #Pass in nil to stop tsig signing.
@@ -41,7 +41,7 @@ module Dnsruby
     def tsig=(*args)
       @tsig = SingleResolver.get_tsig(args)
     end
-    
+
 
     def initialize
       @server=Config.new.nameserver[0]
@@ -52,14 +52,14 @@ module Dnsruby
       @tsig = nil
       @axfr = nil
     end
-    
+
     # Perform a zone transfer (RFC1995)
     # If an IXFR query is unsuccessful, then AXFR is tried (and @transfer_type is set
     # to AXFR)
     # TCP is used as the only transport
-    # 
+    #
     # If AXFR is performed, then the zone will be returned as a set of records :
-    # 
+    #
     #       zt = Dnsruby::ZoneTransfer.new
     #       zt.transfer_type = Dnsruby::Types.AXFR
     #       zt.server = "ns0.validation-test-servers.nominet.org.uk"
@@ -69,17 +69,17 @@ module Dnsruby
     #       print zone.to_s
     #
     #
-    # If IXFR is performed, then the incrementals will be returned as a set of Deltas. 
-    # Each Delta contains the start and end SOA serial number, as well as an array of 
+    # If IXFR is performed, then the incrementals will be returned as a set of Deltas.
+    # Each Delta contains the start and end SOA serial number, as well as an array of
     # adds and deletes that occurred between the start and end.
-    # 
+    #
     #        zt = Dnsruby::ZoneTransfer.new
     #        zt.transfer_type = Dnsruby::Types.IXFR
     #        zt.server = "ns0.validation-test-servers.nominet.org.uk"
     #        zt.serial = 2007090401
     #        deltas = zt.transfer("validation-test-servers.nominet.org.uk")
     #        assert_equal("Should show up in transfer", deltas[0].adds[1].data)
-    def transfer(zone)      
+    def transfer(zone)
       servers = @server
       if (servers.class == String)
         servers=[servers]
@@ -100,7 +100,7 @@ module Dnsruby
       end
       return xfr
     end
-      
+
     def do_transfer(zone, server) #:nodoc: all
       @transfer_type = Types.new(@transfer_type)
       @state = :InitialSoa
@@ -113,10 +113,10 @@ module Dnsruby
           msg.add_authority(rr)
         end
         send_message(socket, msg)
-        
+
         while (@state != :End)
           response = receive_message(socket)
-          
+
           if (@state == :InitialSoa)
             rcode = response.rcode
             if (rcode != RCode.NOERROR)
@@ -133,12 +133,12 @@ module Dnsruby
               end
               raise ResolvError.new(rcode.string);
             end
-            
+
             if (response.question[0].qtype != @transfer_type)
               raise ResolvError.new("invalid question section")
             end
-            
-            if (response.header.ancount == 0 && @transfer_type == Types.IXFR) 
+
+            if (response.header.ancount == 0 && @transfer_type == Types.IXFR)
               Dnsruby.log.debug("IXFR DID NOT WORK (ancount = 0) - TRYING AXFR!!")
               # IXFR didn't work - let's try AXFR
               @transfer_type=Types.AXFR
@@ -149,7 +149,7 @@ module Dnsruby
               next
             end
           end
-          
+
           response.each_answer { |rr|
             parseRR(rr)
           }
@@ -171,8 +171,8 @@ module Dnsruby
         # Unless we know we're definitely AXFR, we should be prepared for either IXFR or AXFR
         # AXFR response : The first and the last RR of the response is the SOA record of the zone.
         #                 The whole zone is returned inbetween.
-        # IXFR response : one or more difference sequences is returned.  The list of difference 
-        #                 sequences is preceded and followed by a copy of the server's current 
+        # IXFR response : one or more difference sequences is returned.  The list of difference
+        #                 sequences is preceded and followed by a copy of the server's current
         #                 version of the SOA.
         #                 Each difference sequence represents one update to the zone (one SOA
         #                 serial change) consisting of deleted RRs and added RRs.  The first RR
@@ -188,27 +188,27 @@ module Dnsruby
         raise e
       end
     end
-    
+
     # All changes between two versions of a zone in an IXFR response.
     class Delta
-      
+
       # The starting serial number of this delta.
       attr_accessor :start
-      
+
       # The ending serial number of this delta.
       attr_accessor :end
-      
+
       # A list of records added between the start and end versions
       attr_accessor :adds
-      
+
       # A list of records deleted between the start and end versions
       attr_accessor :deletes
-      
+
       def initialize()
         @adds = []
         @deletes = []
       end
-      
+
       def to_s
         ret = "Adds : " + @adds.join(",")
         ret +=", Deletes : " + @deletes.join(",")
@@ -240,7 +240,7 @@ module Dnsruby
       name = rec.name
       type = rec.type
       delta = Delta.new
-      
+
       case @state
       when :InitialSoa
         if (type != Types.SOA)
@@ -278,14 +278,14 @@ module Dnsruby
         end
         parseRR(rec) # Restart...
         return
-        
+
       when :Ixfr_DelSoa
         delta = Delta.new
         @ixfr.push(delta)
         delta.start = rec.serial
         delta.deletes << rec
         @state = :Ixfr_Del
-        
+
       when :Ixfr_Del
         if (type == Types.SOA)
           @current_serial = rec.serial
@@ -295,13 +295,13 @@ module Dnsruby
         end
         delta = @ixfr[@ixfr.length - 1]
         delta.deletes << rec
-        
+
       when :Ixfr_AddSoa
         delta = @ixfr[@ixfr.length - 1]
         delta.end = rec.serial
         delta.adds << rec
         @state = :Ixfr_Add
-        
+
       when :Ixfr_Add
         if (type == Types.SOA)
           soa_serial = rec.serial
@@ -319,7 +319,7 @@ module Dnsruby
         end
         delta = @ixfr[@ixfr.length - 1]
         delta.adds << rec
-        
+
       when :Axfr
         # Old BINDs sent cross class A records for non IN classes.
         if (type == Types.A && rec.klass() != @klass)
@@ -332,24 +332,24 @@ module Dnsruby
         end
       when :End
         raise ResolvError.new("extra data in zone transfer")
-        
+
       else
         raise ResolvError.new("invalid state for zone transfer")
       end
     end
-    
-    
+
+
     def send_message(socket, msg) #:nodoc: all
       if (@tsig)
-        @tsig.apply(msg)        
+        @tsig.apply(msg)
         @tsig = msg.tsig
       end
       query_packet = msg.encode
       lenmsg = [query_packet.length].pack('n')
       socket.send(lenmsg, 0)
-      socket.send(query_packet, 0)        
-    end  
-    
+      socket.send(query_packet, 0)
+    end
+
     def tcp_read(socket, len) #:nodoc: all
       buf=""
       while (buf.length < len) and not socket.eof? do
@@ -357,7 +357,7 @@ module Dnsruby
       end
       return buf
     end
-    
+
     def receive_message(socket) #:nodoc: all
       buf = tcp_read(socket, 2)
       answersize = buf.unpack('n')[0]
@@ -373,6 +373,6 @@ module Dnsruby
         end
       end
       return msg
-    end  
+    end
   end
 end

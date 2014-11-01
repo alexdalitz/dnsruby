@@ -1,4 +1,4 @@
- 
+
 #--
 #Copyright 2007 Nominet UK
 #
@@ -26,7 +26,7 @@ class TestSSHFP < Minitest::Test
     assert(sshfp.alg == RR::SSHFP::Algorithms.RSA)
     assert(sshfp.fptype == RR::SSHFP::FpTypes.SHA1)
     assert(sshfp.fp.unpack("H*")[0].upcase == "6D4CF7C68E3A959990855099E15D6E0D4DEA4FFF")
-    
+
     m = Dnsruby::Message.new
     m.add_additional(sshfp)
     data = m.encode

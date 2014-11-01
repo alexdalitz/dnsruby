@@ -20,7 +20,7 @@ class RrsetTest < Minitest::Test
   def test_rrset
     rrset = Dnsruby::RRSet.new
 
-      
+
     rr=Dnsruby::RR.create({	   :name => "example.com",
         :ttl  => 3600,
         :type         => 'MX',
@@ -33,13 +33,13 @@ class RrsetTest < Minitest::Test
     rrset.add(rr)
     rr.preference = 1
     rrset.add(rr)
-    
+
     canon = rrset.sort_canonical
-    
+
     assert(1 == canon[0].preference)
     assert(10 == canon[1].preference)
     assert(12 == canon[2].preference)
-    
+
     assert(rrset.sigs.length == 0)
     assert(rrset.num_sigs == 0)
     assert(rrset.rrs.length == 3)

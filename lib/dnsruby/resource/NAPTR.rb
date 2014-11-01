@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
@@ -20,20 +20,20 @@ module Dnsruby
     class NAPTR < RR
       ClassValue = nil #:nodoc: all
       TypeValue= Types::NAPTR #:nodoc: all
-      
-      # The NAPTR RR order field      
+
+      # The NAPTR RR order field
       attr_accessor :order
-      # The NAPTR RR preference field      
+      # The NAPTR RR preference field
       attr_accessor :preference
-      # The NAPTR RR flags field      
+      # The NAPTR RR flags field
       attr_accessor :flags
-      # The NAPTR RR service field      
+      # The NAPTR RR service field
       attr_accessor :service
-      # The NAPTR RR regexp field      
+      # The NAPTR RR regexp field
       attr_accessor :regexp
-      # The NAPTR RR replacement field      
+      # The NAPTR RR replacement field
       attr_accessor :replacement
-      
+
       def from_hash(hash) #:nodoc: all
         @order = hash[:order]
         @preference = hash[:preference]
@@ -42,7 +42,7 @@ module Dnsruby
         @regexp = hash[:regexp]
         @replacement = Name.create(hash[:replacement])
       end
-      
+
       def from_data(data) #:nodoc: all
         @order,  @preference, @flags, @service, @regexp, @replacement = data
       end
@@ -50,7 +50,7 @@ module Dnsruby
       def regexp=(s)
         @regexp = TXT.parse(s)[0]
       end
-      
+
       def from_string(input) #:nodoc: all
         if (input.length > 0)
           values = input.split(" ")
@@ -74,7 +74,7 @@ module Dnsruby
           return ""
         end
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
         msg.put_pack('n', @order)
         msg.put_pack('n', @preference)
@@ -83,7 +83,7 @@ module Dnsruby
         msg.put_string(@regexp)
         msg.put_name(@replacement, true)
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         order, = msg.get_unpack('n')
         preference, = msg.get_unpack('n')
@@ -95,4 +95,4 @@ module Dnsruby
       end
     end
   end
-end	    
+end

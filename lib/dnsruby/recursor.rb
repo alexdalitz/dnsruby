@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
@@ -163,7 +163,7 @@ module Dnsruby
     @@authority_cache = Hash.new
     @@zones_cache = nil
     @@nameservers = nil
-        
+
     def initialize(res = nil)
       if (res)
         @resolver = res
@@ -183,7 +183,7 @@ module Dnsruby
     #
     #  res.hints=(ips)
     #
-    #If no hints are passed, the default nameserver is asked for the hints. 
+    #If no hints are passed, the default nameserver is asked for the hints.
     #Normally these IPs can be obtained from the following location:
     #
     #  ftp://ftp.internic.net/domain/named.root
@@ -294,11 +294,11 @@ module Dnsruby
       else
         raise ResolvError.new( "Server ["+(@@nameservers)[0].to_s+".] did not give answers")
       end
-          
+
       # Disable recursion flag.
       resolver.recurse=(0)
       #      end
-          
+
       #  return $self->nameservers( map { @{ $_ } } values %{ $self->{'hints'} } );
       if (Array === @@hints)
         temp = []
@@ -343,8 +343,8 @@ module Dnsruby
 
       end
     end
-        
-        
+
+
     #This method takes a code reference, which is then invoked each time a
     #packet is received during the recursive lookup.  For example to emulate
     #dig's C<+trace> function:
@@ -362,7 +362,7 @@ module Dnsruby
       @callback = sub
       #          end
     end
-        
+
     def recursion_callback
       return @callback
     end
@@ -389,7 +389,7 @@ module Dnsruby
     #DNSSEC validation is performed unless true is passed as the fourth parameter.
     def query(name, type=Types.A, klass=Classes.IN, no_validation = false)
       # @TODO@ PROVIDE AN ASYNCHRONOUS SEND WHICH RETURNS MESSAGE WITH ERROR!!!
-          
+
       # Make sure the hint servers are initialized.
       @@mutex.synchronize {
         self.hints=(Hash.new) unless @@hints
@@ -475,7 +475,7 @@ module Dnsruby
       end
       return known_zone, known_authorities # @TODO@ Need to synchronize access to these!
     end
-        
+
     def _dorecursion(name, type, klass, known_zone, known_authorities, depth, no_validation) # :nodoc:
 
       if ( depth > 255 )
@@ -483,9 +483,9 @@ module Dnsruby
         @errorstring="Recursion too deep, aborted"
         return nil
       end
-          
+
       known_zone.sub!(/\.*$/, ".")
-          
+
       ns = [] # Array of AddressCaches (was array of array of addresses)
       @@mutex.synchronize{
         # Get IPs from authorities
@@ -498,7 +498,7 @@ module Dnsruby
             ns.push(@@authority_cache[ns_rec])
           end
         end
-          
+
         if (ns.length == 0)
           found_auth = 0
           TheLog.debug(";; _dorecursion() Failed to extract nameserver IPs:")
@@ -506,10 +506,10 @@ module Dnsruby
           known_authorities.keys.each do |ns_rec|
             if (known_authorities[ns_rec]==nil || known_authorities[ns_rec]==[])
               TheLog.debug(";; _dorecursion() Manual lookup for authority [#{ns_rec}]")
-                
+
               auth_packet=nil
               ans=[]
-                
+
               # Don't query for V6 if its not there.
               # Do this in parallel
               ip_mutex = Mutex.new
@@ -530,14 +530,14 @@ module Dnsruby
                   ".",               # known_zone
                   @@hints,  # known_authorities
                   depth+1);         # depth
-                
+
                 ip_mutex.synchronize {
                   ans.push(auth_packet.answer ) if auth_packet
                 }
               }
               ip6_thread.join
               ip4_thread.join
-                
+
               if ( ans.length > 0 )
                 TheLog.debug(";; _dorecursion() Answers found for [#{ns_rec}]")
                 #          foreach my $rr (@ans) {
@@ -590,14 +590,14 @@ module Dnsruby
           return nil
         end
       }
-          
+
       # Cut the deck of IPs in a random place.
       TheLog.debug(";; _dorecursion() cutting deck of (" + ns.length.to_s + ") authorities...")
       splitpos = rand(ns.length)
       start = ns[0, splitpos]
       endarr = ns[splitpos, ns.length - splitpos]
       ns = endarr + start
-          
+
       nameservers = []
       ns.each do |nss|
         nss.each {|n|
@@ -631,7 +631,7 @@ module Dnsruby
         if (@callback)
           @callback.call(packet)
         end
-              
+
         of = nil
         TheLog.debug(";; _dorecursion() Response received from [" + @answerfrom.to_s + "]")
         status = packet.rcode
@@ -663,7 +663,7 @@ module Dnsruby
                 elsif (of =~ /#{known_zone}/)
                   TheLog.debug(";; _dorecursion() FOUND closer authority for [#{of}] at [#{server}].")
                   auth[server] ||= AddressCache.new #[] @TODO@ If there is no additional record for this, then we want to use the authority!
-                  if (rr.type == Types.NS) 
+                  if (rr.type == Types.NS)
                       if ((packet.additional.rrset(rr.nsdname, Types::A).length == 0) &&
                             (packet.additional.rrset(rr.nsdname, Types::AAAA).length == 0))
                         auth[server].push([rr.nsdname, rr.ttl])
@@ -692,7 +692,7 @@ module Dnsruby
                     auth[server] = auth[cname]
                     next
                   end
-                        
+
                 end
               elsif (rr.type == Types::A || rr.type == Types::AAAA)
                 server = rr.name.to_s.downcase
@@ -724,7 +724,7 @@ module Dnsruby
           end
         end
       end
-          
+
       return nil
     end
 

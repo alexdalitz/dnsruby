@@ -52,7 +52,7 @@ raise RuntimeError, "Usage: #{$0}  name [ type [ class ] ]\n" unless (ARGV.lengt
 
 res = Dnsruby::Recursor.new
 zt=Dnsruby::ZoneTransfer.new
-  
+
 dlv_key = RR.create("dlv.isc.org. IN DNSKEY 257 3 5 BEAAAAPHMu/5onzrEE7z1egmhg/WPO0+juoZrW3euWEn4MxDCE1+lLy2 brhQv5rN32RKtMzX6Mj70jdzeND4XknW58dnJNPCxn8+jAGl2FZLK8t+ 1uq4W+nnA3qO2+DL+k6BD4mewMLbIYFwe0PG73Te9fZ2kJb56dhgMde5 ymX4BI/oQ+cAK50/xvJv00Frf8kw6ucMTwFlgPe+jnGxPPEmHAte/URk Y62ZfkLoBAADLHQ9IrS2tryAe7mbBZVcOwIeU/Rw/mRx/vwwMCTgNboM QKtUdvNXDrYJDSHZws3xiRXF1Rf+al9UmZfSav/4NWLKjHzpT59k/VSt TDN0YUuWrBNh")
 Dnssec.add_dlv_key(dlv_key)
 
@@ -60,10 +60,10 @@ Dnssec.add_dlv_key(dlv_key)
 name, type, klass = ARGV
 type  ||= "A"
 klass ||= "IN"
-  
+
 if (type.upcase == "AXFR")
   rrs = zt.transfer(name) # , klass)
-    
+
   if (rrs)
     rrs.each do |rr|
       print rr.to_s + "\n"
@@ -71,7 +71,7 @@ if (type.upcase == "AXFR")
   else
     raise RuntimeError, "zone transfer failed: ", res.errorstring, "\n"
   end
-    
+
 else
 
 #  Dnsruby::TheLog.level=Logger::DEBUG

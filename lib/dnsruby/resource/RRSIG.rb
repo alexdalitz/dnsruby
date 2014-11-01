@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
@@ -32,7 +32,7 @@ module Dnsruby
     class RRSIG < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::RRSIG #:nodoc: all
-      
+
       # 3.1.  RRSIG RDATA Wire Format
       #
       #   The RDATA for an RRSIG RR consists of a 2 octet Type Covered field, a
@@ -59,7 +59,7 @@ module Dnsruby
       #   /                                                               /
       #   /                            Signature                          /
       #   /                                                               /
-      #   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+    
+      #   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
       #The type covered by this RRSIG
       attr_reader :type_covered
@@ -71,13 +71,13 @@ module Dnsruby
       attr_accessor :labels
       #The TTL of the covered RRSet as it appears in the authoritative zone
       attr_accessor :original_ttl
-      #The signature expiration 
+      #The signature expiration
       attr_accessor :expiration
-      #The signature inception 
+      #The signature inception
       attr_accessor :inception
       #The key tag value of the DNSKEY RR that validates this signature
       attr_accessor :key_tag
-      #identifies the owner name of the DNSKEY RR that a validator is 
+      #identifies the owner name of the DNSKEY RR that a validator is
       #supposed to use to validate this signature
       attr_reader :signers_name
 
@@ -86,7 +86,7 @@ module Dnsruby
       #specified by the RRSIG owner name, RRSIG class, and RRSIG Type
       #Covered field
       attr_accessor :signature
-      
+
       def init_defaults
         @algorithm=Algorithms.RSASHA1
         @type_covered = Types::A
@@ -98,7 +98,7 @@ module Dnsruby
         self.signers_name="."
         @signature = "\0"
       end
-      
+
       def algorithm=(a)
         if (a.instance_of?String)
           if (a.to_i > 0)
@@ -110,30 +110,30 @@ module Dnsruby
           @algorithm = alg
         rescue ArgumentError => e
           raise DecodeError.new(e)
-        end        
+        end
       end
-      
+
       def type_covered=(t)
         begin
           type = Types.new(t)
           @type_covered = type
         rescue ArgumentError => e
           raise DecodeError.new(e)
-        end        
+        end
       end
-      
+
       def signers_name=(s)
         begin
           name = Name.create(s)
           @signers_name = name
         rescue ArgumentError => e
           raise DecodeError.new(e)
-        end        
+        end
       end
-      
+
 
       def from_data(data) #:nodoc: all
-        type_covered, algorithm, @labels, @original_ttl, expiration, inception, 
+        type_covered, algorithm, @labels, @original_ttl, expiration, inception,
           @key_tag, signers_name, @signature = data
         @expiration = expiration
         @inception = inception
@@ -141,7 +141,7 @@ module Dnsruby
         self.signers_name=(signers_name)
         self.algorithm=(algorithm)
       end
-      
+
       def from_string(input)
         if (input.length > 0)
           data = input.split(" ")
@@ -162,7 +162,7 @@ module Dnsruby
           self.signers_name=(data[index+2])
           # signature can include whitespace - include all text
           # until we come to " )" at the end, and then gsub
-          # the white space out 
+          # the white space out
           buf=""
           (index+3..end_index).each {|i|
             if (comment_index = data[i].index(";"))
@@ -216,28 +216,28 @@ module Dnsruby
           raise DecodeError.new("RRSIG : Illegal time value #{input} - see RFC 4034 section 3.2")
         end
       end
-      
+
       def get_time(input)
         return RRSIG.get_time(input)
       end
-      
+
       def format_time(time)
         return Time.at(time).gmtime.strftime("%Y%m%d%H%M%S")
       end
-      
+
       def rdata_to_string #:nodoc: all
         if (@type_covered!=nil)
 #          signature = Base64.encode64(@signature) # .gsub(/\n/, "")
           signature = [@signature].pack("m*").gsub(/\n/, "")
-          # @TODO@ Display the expiration and inception as 
-          return "#{@type_covered.string} #{@algorithm.string} #{@labels} #{@original_ttl} " + 
-            "#{format_time(@expiration)} ( #{format_time(@inception)} " + 
+          # @TODO@ Display the expiration and inception as
+          return "#{@type_covered.string} #{@algorithm.string} #{@labels} #{@original_ttl} " +
+            "#{format_time(@expiration)} ( #{format_time(@inception)} " +
             "#{@key_tag} #{@signers_name.to_s(true)} #{signature} )"
         else
           return ""
         end
       end
-      
+
       def encode_rdata(msg, canonical=false) #:nodoc: all
         # 2 octets, then 2 sets of 1 octet
         msg.put_pack('ncc', @type_covered.to_i, @algorithm.to_i, @labels)
@@ -246,7 +246,7 @@ module Dnsruby
         msg.put_name(@signers_name, canonical, false)
         msg.put_bytes(@signature)
       end
-      
+
       def self.decode_rdata(msg) #:nodoc: all
         type_covered, algorithm, labels = msg.get_unpack('ncc')
         original_ttl, expiration, inception = msg.get_unpack('NNN')
@@ -257,7 +257,7 @@ module Dnsruby
           [type_covered, algorithm, labels, original_ttl, expiration,
             inception, key_tag, signers_name, signature])
       end
-      
+
       def sig_data
         #RRSIG_RDATA is the wire format of the RRSIG RDATA fields
         #with the Signer's Name field in canonical form and
@@ -270,6 +270,6 @@ module Dnsruby
         }.to_s
         return data
       end
-    end 
+    end
   end
 end

@@ -2,15 +2,15 @@
 #Copyright 2007 Nominet UK
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License. 
+#you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0 
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#Unless required by applicable law or agreed to in writing, software 
-#distributed under the License is distributed on an "AS IS" BASIS, 
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-#See the License for the specific language governing permissions and 
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
 #limitations under the License.
 #++
 module Dnsruby
@@ -56,11 +56,11 @@ module Dnsruby
         #        return Name.new(Label.split(arg), /\.\z/ =~ arg ? true : false)
       when Array
         return Name.new(arg, /\.\z/ =~ (arg.last ? ((arg.last.kind_of?String)?arg.last : arg.last.string) : arg.last) ? true : false)
-      else        
+      else
         raise ArgumentError.new("cannot interpret as DNS name: #{arg.inspect}")
       end
     end
-    
+
     def self.split_escaped(arg) #:nodoc: all
       encodedlabels = name2encodedlabels(arg)
       return encodedlabels
@@ -71,36 +71,36 @@ module Dnsruby
       labels = encodedlabels.each  {|el| Name.decode(el.to_s)}
       return labels
     end
-    
+
     attr_accessor :labels
-    
+
     #This method should only be called internally.
     #Use Name::create to create a new Name
     def initialize(labels, absolute=true) #:nodoc: all
       total_length=labels.length-1
-      labels.each do |l| 
+      labels.each do |l|
         if (!l.kind_of?Label)
           raise ArgumentError.new("Name::new called with non-labels. Use Name::create instead?")
         end
-        total_length+=l.length 
+        total_length+=l.length
       end
-      if (total_length > MaxNameLength) 
+      if (total_length > MaxNameLength)
         raise ResolvError.new("Name length is #{total_length}, greater than max of #{MaxNameLength} octets!")
       end
       @labels = labels
       @absolute = absolute
     end
-    
+
     def downcase
       labels = []
       @labels.each do |label| labels << Label.new(label.downcase) end
       return Name.new(labels)
     end
-    
+
     def inspect # :nodoc:
       "#<#{self.class}: #{self.to_s}#{@absolute ? '.' : ''}>"
     end
-    
+
     #Returns true if this Name is absolute
     def absolute?
       return @absolute
@@ -114,7 +114,7 @@ module Dnsruby
       n = Name.new(self.labels()[1, self.labels.length-1], self.absolute?)
       return n
     end
-    
+
     #Is this name a wildcard?
     def wild?
       if (labels.length == 0)
@@ -170,14 +170,14 @@ module Dnsruby
       }
       return true
     end
-    
+
     def ==(other) # :nodoc:
       return false if other.class != Name
       return @labels == other.labels && @absolute == other.absolute?
     end
     alias eql? == # :nodoc:
-    
-    # Tests subdomain-of relation : returns true if this name 
+
+    # Tests subdomain-of relation : returns true if this name
     # is a subdomain of +other+.
     #
     #   domain = Resolv::Name.create("y.z")
@@ -194,29 +194,29 @@ module Dnsruby
       return false if @labels.length <= other_len
       return @labels[-other_len, other_len] == other.to_a
     end
-    
+
     def hash # :nodoc:
       return @labels.hash ^ @absolute.hash
     end
-    
+
     def to_a #:nodoc: all
       return @labels
     end
-    
+
     def length #:nodoc: all
       return @labels.length
     end
-    
+
     def [](i) #:nodoc: all
       return @labels[i]
     end
-    
+
     # returns the domain name as a string.
     #
     # The domain name doesn't have a trailing dot even if the name object is
     # absolute.
-    # 
-    # Example : 
+    #
+    # Example :
     #
     #   p Resolv::Name.create("x.y.z.").to_s #=> "x.y.z"
     #   p Resolv::Name.create("x.y.z").to_s #=> "x.y.z"
@@ -235,11 +235,11 @@ module Dnsruby
       return ls.join('.')
       #      return @labels.collect{|l| (l.kind_of?String) ? l : l.string}.join('.')
     end
-    
+
     # Utility function
     #
     # name2labels to translate names from presentation format into an
-    # array of "wire-format" labels.        
+    # array of "wire-format" labels.
     # in: dName a string with a domain name in presentation format (1035
     # sect 5.1)
     # out: an array of labels in wire format.
@@ -252,7 +252,7 @@ module Dnsruby
           names[j],dName = encode(dName)
           j+=1
         end
-      
+
         return names
       else
         labels = []
@@ -262,14 +262,14 @@ module Dnsruby
         return labels
       end
     end
-    
+
     def self.decode(wire) #:nodoc: all
       presentation=""
       length=wire.length
       # There must be a nice regexp to do this.. but since I failed to
       # find one I scan the name string until I find a '\', at that time
       # I start looking forward and do the magic.
-      
+
       i=0;
 
       unpacked = wire.unpack("C*")
@@ -302,9 +302,9 @@ module Dnsruby
       return presentation
       #      return Label.new(presentation)
     end
-    
-    
-    
+
+
+
     # wire,leftover=presentation2wire(leftover)
     # Will parse the input presentation format and return everything before
     # the first non-escaped "." in the first element of the return array and
@@ -313,7 +313,7 @@ module Dnsruby
       presentation=presentation.to_s
       wire="";
       length=presentation.length;
-    
+
       i=0;
 
       while (i < length )
@@ -353,13 +353,13 @@ module Dnsruby
         end
         i=i+1
       end
-    
+
       return Label.new(wire)
     end
-    
+
     #  end
-    
-    
+
+
     #== Dnsruby::Label class
     #
     #(RFC1035, section 3.1)
@@ -372,11 +372,11 @@ module Dnsruby
       def self.split(arg)
         return Name.split(arg)
       end
-      
+
       def self.set_max_length(l)
         @@max_length=l
       end
-      
+
       def initialize(string)
         if (string.length > @@max_length)
           raise ResolvError.new("Label too long (#{string.length}, max length=#{MaxLabelLength}). Label = #{string}")
@@ -386,15 +386,15 @@ module Dnsruby
         @string_length = string.length
       end
       attr_reader :string, :downcase
-      
+
       def to_s
         return @string.to_s # + "."
       end
-      
+
       def length
         return @string_length
       end
-      
+
       def inspect
         return "#<#{self.class} #{self.to_s}>"
       end
@@ -403,7 +403,7 @@ module Dnsruby
         return (@downcase <=> other.downcase)
       end
 
-      
+
       def ==(other)
         return @downcase == other.downcase
       end
