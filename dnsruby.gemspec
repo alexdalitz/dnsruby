@@ -1,4 +1,5 @@
-require_relative 'lib/dnsruby/version'
+# Note: require_relative will not work in 1.9; see (1) below.
+require File.expand_path(File.join(File.dirname(__FILE__), 'lib', 'dnsruby', 'version.rb'))
 
 SPEC = Gem::Specification.new do |s|
   s.name = "dnsruby"
@@ -28,3 +29,15 @@ DNSSEC NSEC3 support.'
   s.add_development_dependency 'minitest', '~> 5.4'
 end
 
+
+
+=begin
+(1) require_relative 'lib/dnsruby/version' works in Ruby versions >= 2.0,
+but in 1.9 results in the following error:
+
+ There was a LoadError while loading dnsruby.gemspec:
+cannot infer basepath from
+  /Users/kbennett/work/dnsruby/dnsruby.gemspec:1:in `require_relative'
+
+Does it try to require a relative path? That's been removed in Ruby 1.9.
+=end
