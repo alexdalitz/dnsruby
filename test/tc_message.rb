@@ -56,4 +56,11 @@ class TestMessage < Minitest::Test
     line_regex = /->>HEADER<<- opcode: .+, status: .+, id: \d+/
     assert line_regex.match(header_line)
   end
+
+  def test_getopt
+    msg = sample_message
+    assert msg.getopt.nil?
+
+    # TODO: Add OPT record and assert that getopt finds it.
+  end
 end

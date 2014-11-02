@@ -474,12 +474,7 @@ module Dnsruby
     end
 
     def get_opt
-      each_additional do |r|
-        if (r.type == Types::OPT)
-          return r
-        end
-      end
-      return nil
+      @additional.detect { |r| r.type == Types::OPT }
     end
 
     def rcode
