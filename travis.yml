@@ -9,4 +9,4 @@ rvm:
   - ruby-head
   - jruby-head
   - ree
-script: bundle exec rake test_offline
+script: bundle exec rake test
