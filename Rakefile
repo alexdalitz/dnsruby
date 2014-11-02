@@ -1,5 +1,6 @@
 require 'rake/testtask'
 require 'rdoc/task'
+require 'coveralls/rake/task'
 
 Rake::RDocTask.new do |rd|
   rd.rdoc_files.include("lib/**/*.rb")
@@ -7,7 +8,6 @@ Rake::RDocTask.new do |rd|
   rd.main = "Dnsruby"
 #  rd.options << "--ri"
 end
-
 
 def create_task(task_name, test_suite_filespec)
   Rake::TestTask.new do |t|
@@ -17,6 +17,7 @@ def create_task(task_name, test_suite_filespec)
   end
 end
 
+Coveralls::RakeTask.new
 
 create_task(:test,         'test/ts_dnsruby.rb')
 create_task(:test_offline, 'test/ts_offline.rb')
