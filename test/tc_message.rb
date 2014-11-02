@@ -20,7 +20,8 @@ class TestMessage < Minitest::Test
 
   include Dnsruby
 
-  # Sample request message:
+  # Creates and returns sample message:
+  #
   #
   # ;; QUESTION SECTION (1  record)
   # ;; cnn.com.	IN	A
@@ -70,5 +71,18 @@ class TestMessage < Minitest::Test
     opt = message.get_opt
     assert opt.is_a?(Dnsruby::RR::OPT),
            "Expected get_opt to return a Dnsruby::RR::OPT, but it returned a #{opt.class}"
+  end
+
+  def test_2eq
+    test = ->(msg1, msg2, expected_result) do
+      assert (msg1 == msg2) == expected_result
+    end
+    msg_a = sample_message
+    msg_b = sample_message; msg_b.header.rd = (! msg_b.header.rd)
+    test.(msg_a, msg_a, true)
+    test.(msg_a, msg_b, false)
+    test.(msg_a, msg_a.to_s, false)
+    test.(msg_a, nil, false)
+    # TODO: Add more tests.
   end
 end
