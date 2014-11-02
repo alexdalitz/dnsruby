@@ -1,14 +1,15 @@
-require 'coveralls'
-Coveralls.wear!
+if ENV['RUN_EXTRA_TASK'] == 'TRUE'
+  require 'coveralls'
+  Coveralls.wear!
 
-require 'simplecov'
+  require 'simplecov'
 
-SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter[
-  SimpleCov::Formatter::HTMLFormatter,
-  Coveralls::SimpleCov::Formatter
-]
-SimpleCov.start do
-  add_filter 'test/'
+  SimpleCov.formatter =
+    SimpleCov::Formatter::MultiFormatter[SimpleCov::Formatter::HTMLFormatter,
+                                         Coveralls::SimpleCov::Formatter]
+  SimpleCov.start do
+    add_filter 'test/'
+  end
 end
 
 require 'minitest/autorun'

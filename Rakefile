@@ -1,12 +1,20 @@
 require 'rake/testtask'
-require 'rdoc/task'
-require 'coveralls/rake/task'
 
-Rake::RDocTask.new do |rd|
-  rd.rdoc_files.include("lib/**/*.rb")
-  rd.rdoc_files.exclude("lib/Dnsruby/iana_ports.rb")
-  rd.main = "Dnsruby"
-#  rd.options << "--ri"
+ENV['RUN_EXTRA_TASK'] = 'TRUE' if
+  RUBY_VERSION >= "1.9.3" && defined?(RUBY_ENGINE) && RUBY_ENGINE == 'ruby'
+
+if ENV['RUN_EXTRA_TASK'] == 'TRUE'
+  require 'rdoc/task'
+
+  Rake::RDocTask.new do |rd|
+    rd.rdoc_files.include("lib/**/*.rb")
+    rd.rdoc_files.exclude("lib/Dnsruby/iana_ports.rb")
+    rd.main = "Dnsruby"
+    #  rd.options << "--ri"
+  end
+
+  require 'coveralls/rake/task'
+  Coveralls::RakeTask.new
 end
 
 def create_task(task_name, test_suite_filespec)
@@ -16,8 +24,6 @@ def create_task(task_name, test_suite_filespec)
     t.verbose = true
   end
 end
-
-Coveralls::RakeTask.new
 
 create_task(:test,         'test/ts_dnsruby.rb')
 create_task(:test_offline, 'test/ts_offline.rb')
