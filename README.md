@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/alexdalitz/dnsruby.svg?branch=master)](https://travis-ci.org/alexdalitz/dnsruby)
+[![Coverage Status](https://img.shields.io/coveralls/alexdalitz/dnsruby.svg)](https://coveralls.io/r/alexdalitz/dnsruby?branch=master)
 
 Dnsruby
 =======
