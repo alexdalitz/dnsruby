@@ -16,13 +16,14 @@
 
 require 'dnsruby/name'
 require 'dnsruby/resource/resource'
+
 module Dnsruby
-  #===Defines a DNS packet.
+  # ===Defines a DNS packet.
   #
-  #RFC 1035 Section 4.1, RFC 2136 Section 2, RFC 2845
+  # RFC 1035 Section 4.1, RFC 2136 Section 2, RFC 2845
   #
-  #===Sections
-  #Message objects have five sections:
+  # ===Sections
+  # Message objects have five sections:
   #
   #* The header section, a Dnsruby::Header object.
   #
@@ -36,8 +37,8 @@ module Dnsruby
   #
   #* The answer section, an array of Dnsruby::RR objects.
   #
-  #      msg.add_answer(RR.create({:name    => "a2.example.com",
-  #		      :type    => "A", :address => "10.0.0.2"}))
+  #      msg.add_answer(RR.create({:name    => 'a2.example.com',
+  #		      :type    => 'A', :address => '10.0.0.2'}))
   #      msg.each_answer {|answer| ... }
   #
   #* The authority section, an array of Dnsruby::RR objects.
@@ -50,22 +51,23 @@ module Dnsruby
   #      msg.add_additional(rr)
   #      msg.each_additional {|rr| ... }
   #
-  #In addition, each_resource iterates the answer, additional
-  #and authority sections :
+  # In addition, each_resource iterates the answer, additional
+  # and authority sections :
   #
   #      msg.each_resource {|rr| ... }
   #
-  #===Packet format encoding
+  # ===Packet format encoding
   #
   #      Dnsruby::Message#encode
   #      Dnsruby::Message::decode(data)
   #
-  #===Additional information
-  #security_level records the current DNSSEC status of this Message.
-  #answerfrom records the server which this Message was received from.
-  #cached records whether this response came from the cache.
+  # ===Additional information
+  # security_level records the current DNSSEC status of this Message.
+  # answerfrom records the server which this Message was received from.
+  # cached records whether this response came from the cache.
   #
   class Message
+
     # The security level (see RFC 4035 section 4.3)
     class SecurityLevel < CodeMapper
       INDETERMINATE = -2
@@ -73,14 +75,16 @@ module Dnsruby
       UNCHECKED = 0
       INSECURE = 1
       SECURE = 2
-      update()
+      update
     end
+
     # If dnssec is set on, then each message will have the security level set
     # To find the precise error (if any), call Dnsruby::Dnssec::validate(msg) -
     # the resultant exception will define the error.
     attr_accessor :security_level
+
     # If there was a problem verifying this message with DNSSEC, then securiy_error
-    # will hold a description of the problem. It defaults to ""
+    # will hold a description of the problem. It defaults to ''
     attr_accessor :security_error
 
     # If the Message was returned from the cache, the cached flag will be set
@@ -89,19 +93,21 @@ module Dnsruby
 
 
     class Section < Array
+
       def initialize(msg = nil)
         @msg = msg
         super(0)
       end
+
       # Return the rrset of the specified type in this section
       def rrset(name, type=Types.A, klass=Classes::IN)
         rrs = select{|rr|
           type_ok = (rr.type==type)
-          if (rr.type == Types::RRSIG)
+          if rr.type == Types::RRSIG
             type_ok = (rr.type_covered == type)
           end
-          if (!(/\.\z/ =~ name.to_s))
-            name = name.to_s + "."
+          unless /\.\z/ =~ name.to_s
+            name = name.to_s + '.'
           end
           type_ok && (rr.klass == klass) && (rr.name.to_s(true).downcase == name.to_s().downcase)
         }
@@ -109,12 +115,12 @@ module Dnsruby
         rrs.each do |rr|
           rrset.add(rr)
         end
-        return rrset
+        rrset
       end
 
       # Return an array of all the rrsets in the section
       def rrsets(type = nil, include_opt = false)
-        if (type && !(Types === type))
+        if type && !(Types === type)
           type = Types.new(type)
         end
         ret = []
@@ -128,13 +134,13 @@ module Dnsruby
             # if this is an rrsig type, then :
             #    only include it if the type_covered is the type requested,
             #    OR if the type requested is an RRSIG
-            if (rr.type == Types::RRSIG)
-              if ((rr.type_covered == type) || (type == Types::RRSIG))
+            if rr.type == Types::RRSIG
+              if (rr.type_covered == type) || (type == Types::RRSIG)
               else
                 next
               end
               #              next if ((rr.type_covered != type) || (type != Types.RRSIG))
-            elsif (rr.type != type)
+            elsif rr.type != type
               next
             end
           end
@@ -144,20 +150,23 @@ module Dnsruby
             found_rrset = rrset.add(rr)
             break if found_rrset
           end
-          if (!found_rrset)
+          unless found_rrset
             ret.push(RRSet.new(rr))
           end
         end
-        return ret
+        ret
       end
+
       def ==(other)
-        return false unless (other.instance_of?Message::Section)
-        return false if (other.rrsets(nil, true).length != self.rrsets(nil, true).length)
+        return false unless (other.instance_of?(Message::Section))
+        return false if other.rrsets(nil, true).length != self.rrsets(nil, true).length
+
         otherrrsets = other.rrsets(nil, true)
         self.rrsets(nil, true).each {|rrset|
-          return false unless otherrrsets.include?rrset
+          return false unless otherrrsets.include?(rrset)
         }
-        return true
+
+        true
       end
 
       def remove_rrset(name, type)
@@ -167,25 +176,24 @@ module Dnsruby
         rrs_to_delete = []
         each do |rr|
           next if rr.rr_type == Types::OPT
-          if ((rr.name.to_s.downcase == name.to_s.downcase) &&
+          if (rr.name.to_s.downcase == name.to_s.downcase) &&
               ((rr.type == type) ||
-                  ((rr.type == Types::RRSIG) && (rr.type_covered == type)) ))
+                  ((rr.type == Types::RRSIG) && (rr.type_covered == type)))
             rrs_to_delete.push(rr)
           end
         end
-        rrs_to_delete.each {|rr|
-          delete(rr)
-        }
+        rrs_to_delete.each { |rr| delete(rr) }
         @msg.update_counts if @msg
       end
     end
-    #Create a new Message. Takes optional name, type and class
+
+    # Create a new Message. Takes optional name, type and class
     #
-    #type defaults to A, and klass defaults to IN
+    # type defaults to A, and klass defaults to IN
     #
-    #*  Dnsruby::Message.new("example.com") # defaults to A, IN
-    #*  Dnsruby::Message.new("example.com", 'AAAA')
-    #*  Dnsruby::Message.new("example.com", Dnsruby::Types.PTR, "HS")
+    #*  Dnsruby::Message.new('example.com') # defaults to A, IN
+    #*  Dnsruby::Message.new('example.com', 'AAAA')
+    #*  Dnsruby::Message.new('example.com', Dnsruby::Types.PTR, 'HS')
     #
     def initialize(*args)
       @header = Header.new()
@@ -277,30 +285,30 @@ module Dnsruby
 
     def get_exception
       exception = nil
-      if (rcode==RCode.NXDOMAIN)
+      if rcode == RCode.NXDOMAIN
         exception = NXDomain.new
-      elsif (rcode==RCode.SERVFAIL)
+      elsif rcode == RCode.SERVFAIL
         exception = ServFail.new
-      elsif (rcode==RCode.FORMERR)
+      elsif rcode == RCode.FORMERR
         exception = FormErr.new
-      elsif (rcode==RCode.NOTIMP)
+      elsif rcode == RCode.NOTIMP
         exception = NotImp.new
-      elsif (rcode==RCode.REFUSED)
+      elsif rcode == RCode.REFUSED
         exception = Refused.new
-      elsif (rcode==RCode.NOTZONE)
+      elsif rcode == RCode.NOTZONE
         exception = NotZone.new
-      elsif (rcode==RCode.NOTAUTH)
+      elsif rcode == RCode.NOTAUTH
         exception = NotAuth.new
-      elsif (rcode==RCode.NXRRSET)
+      elsif rcode == RCode.NXRRSET
         exception = NXRRSet.new
-      elsif (rcode==RCode.YXRRSET)
+      elsif rcode == RCode.YXRRSET
         exception = YXRRSet.new
-      elsif (rcode==RCode.YXDOMAIN)
+      elsif rcode == RCode.YXDOMAIN
         exception = YXDomain.new
-      elsif (rcode >= RCode.BADSIG && rcode <= RCode.BADALG)
+      elsif rcode >= RCode.BADSIG && rcode <= RCode.BADALG
         return VerifyError.new # @TODO@
       end
-      return exception
+      exception
     end
 
     def ==(other)
@@ -320,44 +328,42 @@ module Dnsruby
     # Return the first rrset of the specified attributes in the message
     def rrset(name, type, klass = Classes::IN)
       [@answer, @authority, @additional].each do |section|
-        if ((rrset = section.rrset(name, type, klass)).length > 0)
+        if (rrset = section.rrset(name, type, klass)).length > 0
           return rrset
         end
       end
-      return RRSet.new
+      RRSet.new
     end
 
     # Return the rrsets of the specified type in the message
     def rrsets(type, klass=Classes::IN)
       rrsetss = []
       [@answer, @authority, @additional].each do |section|
-        if ((rrsets = section.rrsets(type, klass)).length > 0)
-          rrsets.each {|rrset|
-            rrsetss.push(rrset)
-          }
+        if (rrsets = section.rrsets(type, klass)).length > 0
+          rrsets.each { |rrset| rrsetss.push(rrset) }
         end
       end
-      return rrsetss
+      rrsetss
     end
 
     # Return a hash, with the section as key, and the RRSets in that
     # section as the data : {section => section_rrs}
     def section_rrsets(type = nil, include_opt = false)
       ret = {}
-      ["answer", "authority", "additional"].each do |section|
+      %w(answer authority additional).each do |section|
         ret[section] = self.send(section).rrsets(type, include_opt)
       end
-      return ret
+      ret
     end
 
-    #Add a new Question to the Message. Takes either a Question,
-    #or a name, and an optional type and class.
+    # Add a new Question to the Message. Takes either a Question,
+    # or a name, and an optional type and class.
     #
-    #* msg.add_question(Question.new("example.com", 'MX'))
-    #* msg.add_question("example.com") # defaults to Types.A, Classes.IN
-    #* msg.add_question("example.com", Types.LOC)
+    #* msg.add_question(Question.new('example.com', 'MX'))
+    #* msg.add_question('example.com') # defaults to Types.A, Classes.IN
+    #* msg.add_question('example.com', Types.LOC)
     def add_question(question, type=Types.A, klass=Classes.IN)
-      if (!question.kind_of?Question)
+      unless question.kind_of?(Question)
         question = Question.new(question, type, klass)
       end
       @question << question
@@ -379,7 +385,7 @@ module Dnsruby
 
 
     def add_answer(rr) #:nodoc: all
-      if (!@answer.include?rr)
+      unless @answer.include?(rr)
         @answer << rr
         update_counts
       end
@@ -392,7 +398,7 @@ module Dnsruby
     end
 
     def add_authority(rr) #:nodoc: all
-      if (!@authority.include?rr)
+      unless @authority.include?(rr)
         @authority << rr
         update_counts
       end
@@ -405,24 +411,22 @@ module Dnsruby
     end
 
     def add_additional(rr) #:nodoc: all
-      if (!@additional.include?rr)
+      unless @additional.include?(rr)
         @additional << rr
         update_counts
       end
     end
 
     def each_additional
-      @additional.each {|rec|
-        yield rec
-      }
+      @additional.each { |rec| yield rec }
     end
 
-    #Yields each section (question, answer, authority, additional)
+    # Yields each section (question, answer, authority, additional)
     def each_section
-      [@answer, @authority, @additional].each {|section| yield section}
+      [@answer, @authority, @additional].each { |section| yield section}
     end
 
-    #Calls each_answer, each_authority, each_additional
+    # Calls each_answer, each_authority, each_additional
     def each_resource
       each_answer {|rec| yield rec}
       each_authority {|rec| yield rec}
@@ -431,43 +435,43 @@ module Dnsruby
 
     # Returns the TSIG record from the ADDITIONAL section, if one is present.
     def tsig
-      if (@additional.last)
-        if (@additional.last.rr_type == Types.TSIG)
+      if @additional.last
+        if @additional.last.rr_type == Types.TSIG
           return @additional.last
         end
       end
-      return nil
+      nil
     end
 
-    #Sets the TSIG to sign this message with. Can either be a Dnsruby::RR::TSIG
-    #object, or it can be a (name, key) tuple, or it can be a hash which takes
-    #Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
+    # Sets the TSIG to sign this message with. Can either be a Dnsruby::RR::TSIG
+    # object, or it can be a (name, key) tuple, or it can be a hash which takes
+    # Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
     def set_tsig(*args)
-      if (args.length == 1)
-        if (args[0].instance_of?RR::TSIG)
+      if args.length == 1
+        if args[0].instance_of?(RR::TSIG)
           @tsigkey = args[0]
-        elsif (args[0].instance_of?Hash)
+        elsif args[0].instance_of?(Hash)
           @tsigkey = RR.create({:type=>'TSIG', :klass=>'ANY'}.merge(args[0]))
         else
-          raise ArgumentError.new("Wrong type of argument to Dnsruby::Message#set_tsig - should be TSIG or Hash")
+          raise ArgumentError.new('Wrong type of argument to Dnsruby::Message#set_tsig - should be TSIG or Hash')
         end
-      elsif (args.length == 2)
+      elsif args.length == 2
         @tsigkey = RR.create({:type=>'TSIG', :klass=>'ANY', :name=>args[0], :key=>args[1]})
       else
-        raise ArgumentError.new("Wrong number of arguments to Dnsruby::Message#set_tsig")
+        raise ArgumentError.new('Wrong number of arguments to Dnsruby::Message#set_tsig')
       end
     end
 
     #Was this message signed by a TSIG?
     def signed?
-      return (@tsigstate == :Signed ||
+      @tsigstate == :Signed ||
           @tsigstate == :Verified ||
-          @tsigstate == :Failed)
+          @tsigstate == :Failed
     end
 
-    #If this message was signed by a TSIG, was the TSIG verified?
+    # If this message was signed by a TSIG, was the TSIG verified?
     def verified?
-      return (@tsigstate == :Verified)
+      @tsigstate == :Verified
     end
 
     def get_opt
@@ -477,11 +481,11 @@ module Dnsruby
     def rcode
       rcode = @header.get_header_rcode
       opt = get_opt
-      if (opt != nil)
+      if opt
         rcode = rcode.code + (opt.xrcode.code << 4)
         rcode = RCode.new(rcode)
       end
-      return rcode;
+      rcode
     end
 
     def to_s
@@ -502,20 +506,20 @@ module Dnsruby
         s << "#{@header}\n"
       end
 
-      section = (@header.opcode == OpCode.UPDATE) ? "ZONE" : "QUESTION"
+      section = (@header.opcode == OpCode.UPDATE) ? 'ZONE' : 'QUESTION'
       s <<  ";; #{section} SECTION (#{@header.qdcount}  record#{@header.qdcount == 1 ? '' : 's'})\n"
       each_question { |qr| s << ";; #{qr}\n" }
 
       if @answer.size > 0
         s << "\n"
-        section = (@header.opcode == OpCode.UPDATE) ? "PREREQUISITE" : "ANSWER"
+        section = (@header.opcode == OpCode.UPDATE) ? 'PREREQUISITE' : 'ANSWER'
         s << ";; #{section} SECTION (#{@header.ancount}  record#{@header.ancount == 1 ? '' : 's'})\n"
         each_answer { |rr| s << "#{rr}\n" }
       end
 
       if @authority.size > 0
         s << "\n"
-        section = (@header.opcode == OpCode.UPDATE) ? "UPDATE" : "AUTHORITY"
+        section = (@header.opcode == OpCode.UPDATE) ? 'UPDATE' : 'AUTHORITY'
         s << ";; #{section} SECTION (#{@header.nscount}  record#{@header.nscount == 1 ? '' : 's'})\n"
         each_authority { |rr| s << rr.to_s + "\n" }
       end
@@ -534,14 +538,15 @@ module Dnsruby
 
 
     def old_to_s
-      retval = "";
+      retval = ''
 
-      if (@answerfrom != nil && @answerfrom != "")
-        retval = retval + ";; Answer received from #{@answerfrom} (#{@answersize} bytes)\n;;\n";
+      if (@answerfrom != nil && @answerfrom != '')
+        retval = retval + ";; Answer received from #{@answerfrom} (#{@answersize} bytes)\n;;\n"
       end
       retval = retval + ";; Security Level : #{@security_level.string}\n"
 
       retval = retval + ";; HEADER SECTION\n"
+
       # OPT pseudosection? EDNS flags, udpsize
       opt = get_opt
       if (!opt)
@@ -556,33 +561,33 @@ module Dnsruby
         retval = retval + "\n"
       end
 
-      section = (@header.opcode == OpCode.UPDATE) ? "ZONE" : "QUESTION";
-      retval = retval +  ";; #{section} SECTION (#{@header.qdcount}  record#{@header.qdcount == 1 ? '' : 's'})\n";
+      section = (@header.opcode == OpCode.UPDATE) ? "ZONE" : "QUESTION"
+      retval = retval +  ";; #{section} SECTION (#{@header.qdcount}  record#{@header.qdcount == 1 ? '' : 's'})\n"
       each_question { |qr|
-        retval = retval + ";; #{qr.to_s}\n";
+        retval = retval + ";; #{qr.to_s}\n"
       }
 
       if (@answer.size > 0)
-        retval = retval + "\n";
-        section = (@header.opcode == OpCode.UPDATE) ? "PREREQUISITE" : "ANSWER";
-        retval = retval + ";; #{section} SECTION (#{@header.ancount}  record#{@header.ancount == 1 ? '' : 's'})\n";
+        retval = retval + "\n"
+        section = (@header.opcode == OpCode.UPDATE) ? "PREREQUISITE" : "ANSWER"
+        retval = retval + ";; #{section} SECTION (#{@header.ancount}  record#{@header.ancount == 1 ? '' : 's'})\n"
         each_answer { |rr|
-          retval = retval + rr.to_s + "\n";
+          retval = retval + rr.to_s + "\n"
         }
       end
 
       if (@authority.size > 0)
-        retval = retval + "\n";
-        section = (@header.opcode == OpCode.UPDATE) ? "UPDATE" : "AUTHORITY";
-        retval = retval + ";; #{section} SECTION (#{@header.nscount}  record#{@header.nscount == 1 ? '' : 's'})\n";
+        retval = retval + "\n"
+        section = (@header.opcode == OpCode.UPDATE) ? "UPDATE" : "AUTHORITY"
+        retval = retval + ";; #{section} SECTION (#{@header.nscount}  record#{@header.nscount == 1 ? '' : 's'})\n"
         each_authority { |rr|
-          retval = retval + rr.to_s + "\n";
+          retval = retval + rr.to_s + "\n"
         }
       end
 
       if ((@additional.size > 0 && !opt) || (@additional.size > 1))
-        retval = retval + "\n";
-        retval = retval + ";; ADDITIONAL SECTION (#{@header.arcount}  record#{@header.arcount == 1 ? '' : 's'})\n";
+        retval = retval + "\n"
+        retval = retval + ";; ADDITIONAL SECTION (#{@header.arcount}  record#{@header.arcount == 1 ? '' : 's'})\n"
         each_additional { |rr|
           if (rr.type != Types::OPT)
             retval = retval + rr.to_s+ "\n"
@@ -590,44 +595,45 @@ module Dnsruby
         }
       end
 
-      return retval;
+      retval
     end
 
-    #Signs the message. If used with no arguments, then the message must have already
-    #been set (set_tsig). Otherwise, the arguments can either be a Dnsruby::RR::TSIG
-    #object, or a (name, key) tuple, or a hash which takes
-    #Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
+    # Signs the message. If used with no arguments, then the message must have already
+    # been set (set_tsig). Otherwise, the arguments can either be a Dnsruby::RR::TSIG
+    # object, or a (name, key) tuple, or a hash which takes
+    # Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
     #
-    #NOTE that this method should only be called by the resolver, rather than the
-    #client code. To use signing from the client, call Dnsruby::Resolver#tsig=
+    # NOTE that this method should only be called by the resolver, rather than the
+    # client code. To use signing from the client, call Dnsruby::Resolver#tsig=
     def sign!(*args) #:nodoc: all
-      if (args.length > 0)
+      if args.length > 0
         set_tsig(*args)
         sign!
       else
-        if ((@tsigkey) && @tsigstate == :Unsigned)
+        if @tsigkey && (@tsigstate == :Unsigned)
           @tsigkey.apply(self)
         end
       end
     end
 
-    #Return the encoded form of the message
+    # Return the encoded form of the message
     # If there is a TSIG record present and the record has not been signed
     # then sign it
     def encode
-      if ((@tsigkey) && @tsigstate == :Unsigned && !@signing)
+      if @tsigkey && (@tsigstate == :Unsigned) && !@signing
         @signing = true
         sign!
         @signing = false
       end
-      return MessageEncoder.new {|msg|
+
+      return MessageEncoder.new { |msg|
         header = @header
         header.encode(msg)
-        @question.each {|q|
+        @question.each { |q|
           msg.put_name(q.qname)
           msg.put_pack('nn', q.qtype.code, q.qclass.code)
         }
-        [@answer, @authority, @additional].each {|rr|
+        [@answer, @authority, @additional].each { |rr|
           rr.each { |r|
             msg.put_rr(r)
           }
@@ -635,7 +641,7 @@ module Dnsruby
       }.to_s
     end
 
-    #Decode the encoded message
+    # Decode the encoded message
     def Message.decode(m)
       o = Message.new()
       begin
@@ -656,10 +662,10 @@ module Dnsruby
           o.header.arcount.times { |count|
             start = msg.index
             rr = msg.get_rr
-            if (rr.type == Types::TSIG)
-              if (count!=o.header.arcount-1)
-                Dnsruby.log.Error("Incoming message has TSIG record before last record")
-                raise DecodeError.new("TSIG record present before last record")
+            if rr.type == Types::TSIG
+              if count != o.header.arcount-1
+                Dnsruby.log.Error('Incoming message has TSIG record before last record')
+                raise DecodeError.new('TSIG record present before last record')
               end
               o.tsigstart = start # needed for TSIG verification
             end
@@ -673,32 +679,35 @@ module Dnsruby
         e.partial_message = o
         raise e
       end
-      return o
+      o
     end
 
     def clone
       Message.decode(self.encode)
     end
 
-    #In dynamic update packets, the question section is known as zone and
-    #specifies the zone to be updated.
+    # In dynamic update packets, the question section is known as zone and
+    # specifies the zone to be updated.
     alias :zone :question
     alias :add_zone :add_question
     alias :each_zone :each_question
-    #In dynamic update packets, the answer section is known as pre or
-    #prerequisite and specifies the RRs or RRsets which must or
-    #must not preexist.
+
+    # In dynamic update packets, the answer section is known as pre or
+    # prerequisite and specifies the RRs or RRsets which must or
+    # must not preexist.
     alias :pre :answer
     alias :add_pre :add_answer
     alias :each_pre :each_answer
-    #In dynamic update packets, the answer section is known as pre or
-    #prerequisite and specifies the RRs or RRsets which must or
-    #must not preexist.
+
+    # In dynamic update packets, the answer section is known as pre or
+    # prerequisite and specifies the RRs or RRsets which must or
+    # must not preexist.
     alias :prerequisite :pre
     alias :add_prerequisite :add_pre
     alias :each_prerequisite :each_pre
-    #In dynamic update packets, the authority section is known as update and
-    #specifies the RRs or RRsets to be added or delted.
+
+    # In dynamic update packets, the authority section is known as update and
+    # specifies the RRs or RRsets to be added or delted.
     alias :update :authority
     alias :add_update :add_authority
     alias :each_update :each_authority
@@ -714,36 +723,36 @@ module Dnsruby
     # The header ID
     attr_accessor :id
 
-    #The query response flag
+    # The query response flag
     attr_accessor :qr
 
-    #Authoritative answer flag
+    # Authoritative answer flag
     attr_accessor :aa
 
-    #Truncated flag
+    # Truncated flag
     attr_accessor :tc
 
-    #Recursion Desired flag
+    # Recursion Desired flag
     attr_accessor :rd
 
-    #The Checking Disabled flag
+    # The Checking Disabled flag
     attr_accessor :cd
 
-    #The Authenticated Data flag
-    #Relevant in DNSSEC context.
-    #(The AD bit is only set on answers where signatures have been
-    #cryptographically verified or the server is authoritative for the data
-    #and is allowed to set the bit by policy.)
+    # The Authenticated Data flag
+    # Relevant in DNSSEC context.
+    # (The AD bit is only set on answers where signatures have been
+    # cryptographically verified or the server is authoritative for the data
+    # and is allowed to set the bit by policy.)
     attr_accessor :ad
 
-    #The query response flag
+    # The query response flag
     attr_accessor :qr
 
-    #Recursion available flag
+    # Recursion available flag
     attr_accessor :ra
 
-    #Query response code
-    #deprecated - use Message#rcode
+    # Query response code
+    # deprecated - use Message#rcode
     #    attr_reader :rcode
 
     # This new get_header_rcode method is intended for use only by the Message class.
@@ -757,32 +766,32 @@ module Dnsruby
     # The header opcode
     attr_reader :opcode
 
-    #The number of records in the question section of the message
+    # The number of records in the question section of the message
     attr_accessor :qdcount
-    #The number of records in the authoriy section of the message
+    # The number of records in the authoriy section of the message
     attr_accessor :nscount
-    #The number of records in the answer section of the message
+    # The number of records in the answer section of the message
     attr_accessor :ancount
-    #The number of records in the additional record section og the message
+    # The number of records in the additional record section og the message
     attr_accessor :arcount
 
     def initialize(*args)
       if (args.length == 0)
         @id = rand(MAX_ID)
         @qr = false
-        @opcode=OpCode.Query
+        @opcode = OpCode.Query
         @aa = false
-        @ad=false
+        @ad = false
         @tc = false
         @rd = false # recursion desired
         @ra = false # recursion available
-        @cd=false
-        @rcode=RCode.NoError
+        @cd = false
+        @rcode = RCode.NoError
         @qdcount = 0
         @nscount = 0
         @ancount = 0
         @arcount = 0
-      elsif (args.length == 1)
+      elsif args.length == 1
         decode(args[0])
       end
     end
@@ -797,15 +806,12 @@ module Dnsruby
 
     def Header.new_from_data(data)
       header = Header.new
-      MessageDecoder.new(data) {|msg|
-        header.decode(msg)}
-      return header
+      MessageDecoder.new(data) { |msg| header.decode(msg) }
+      header
     end
 
     def data
-      return MessageEncoder.new {|msg|
-        self.encode(msg)
-      }.to_s
+      MessageEncoder.new { |msg| self.encode(msg) }.to_s
     end
 
     def encode(msg)
@@ -829,18 +835,17 @@ module Dnsruby
     def Header.decrement_arcount_encoded(bytes)
       header = Header.new
       header_end = 0
-      MessageDecoder.new(bytes) {|msg|
+      MessageDecoder.new(bytes) do |msg|
         header.decode(msg)
         header_end = msg.index
-      }
-      header.arcount = header.arcount - 1
-      bytes[0,header_end]=MessageEncoder.new {|msg|
-        header.encode(msg)}.to_s
-      return bytes
+      end
+      header.arcount -= 1
+      bytes[0, header_end] = MessageEncoder.new { |msg| header.encode(msg) }.to_s
+      bytes
     end
 
     def ==(other)
-      return @qr == other.qr &&
+      @qr == other.qr &&
           @opcode == other.opcode &&
           @aa == other.aa &&
           @tc == other.tc &&
@@ -861,7 +866,7 @@ module Dnsruby
 
     def to_s_with_rcode(rcode)
 
-      if (@opcode == OpCode::Update)
+      if @opcode == OpCode::Update
         s = ";; id = #{@id}\n"
         s << ";; qr = #{@qr}    opcode = #{@opcode.string}    rcode = #{@rcode.string}\n"
         s << ";; zocount = #{@qdcount}  "
@@ -896,49 +901,49 @@ module Dnsruby
 
 
     def old_to_s_with_rcode(rcode)
-      retval = ";; id = #{@id}\n";
+      retval = ";; id = #{@id}\n"
 
       if (@opcode == OpCode::Update)
         retval += ";; qr = #{@qr}    " +\
           "opcode = #{@opcode.string}    "+\
-          "rcode = #{@rcode.string}\n";
+          "rcode = #{@rcode.string}\n"
 
         retval += ";; zocount = #{@qdcount}  "+\
           "prcount = #{@ancount}  " +\
           "upcount = #{@nscount}  "  +\
-          "adcount = #{@arcount}\n";
+          "adcount = #{@arcount}\n"
       else
         retval += ";; qr = #{@qr}    "  +\
           "opcode = #{@opcode.string}    " +\
           "aa = #{@aa}    "  +\
           "tc = #{@tc}    " +\
-          "rd = #{@rd}\n";
+          "rd = #{@rd}\n"
 
         retval += ";; ra = #{@ra}    " +\
           "ad = #{@ad}    "  +\
           "cd = #{@cd}    "  +\
-          "rcode  = #{rcode.string}\n";
+          "rcode  = #{rcode.string}\n"
 
         retval += ";; qdcount = #{@qdcount}  " +\
           "ancount = #{@ancount}  " +\
           "nscount = #{@nscount}  " +\
-          "arcount = #{@arcount}\n";
+          "arcount = #{@arcount}\n"
       end
 
-      return retval;
+      retval
     end
 
     def decode(msg)
       @id, flag, @qdcount, @ancount, @nscount, @arcount =
           msg.get_unpack('nnnnnn')
-      @qr = (((flag >> 15)&1)==1)?true:false
+      @qr = ((flag >> 15) & 1) == 1
       @opcode = OpCode.new((flag >> 11) & 15)
-      @aa = (((flag >> 10)&1)==1)?true:false
-      @tc = (((flag >> 9)&1)==1)?true:false
-      @rd = (((flag >> 8)&1)==1)?true:false
-      @ra = (((flag >> 7)&1)==1)?true:false
-      @ad = (((flag >> 5)&1)==1)?true:false
-      @cd = (((flag >> 4)&1)==1)?true:false
+      @aa = ((flag >> 10) & 1) == 1
+      @tc = ((flag >> 9)  & 1) == 1
+      @rd = ((flag >> 8)  & 1) == 1
+      @ra = ((flag >> 7)  & 1) == 1
+      @ad = ((flag >> 5)  & 1) == 1
+      @cd = ((flag >> 4)  & 1) == 1
       @rcode = RCode.new(flag & 15)
     end
 
@@ -966,7 +971,7 @@ module Dnsruby
     end
 
     def has_remaining
-      return @limit-@index > 0
+      @limit - @index > 0
     end
 
     def get_length16
@@ -975,18 +980,18 @@ module Dnsruby
       @limit = @index + len
       d = yield(len)
       if @index < @limit
-        raise DecodeError.new("junk exists")
+        raise DecodeError.new('junk exists')
       elsif @limit < @index
-        raise DecodeError.new("limit exceeded")
+        raise DecodeError.new('limit exceeded')
       end
       @limit = save_limit
-      return d
+      d
     end
 
     def get_bytes(len = @limit - @index)
       d = @data[@index, len]
       @index += len
-      return d
+      d
     end
 
     def get_unpack(template)
@@ -998,6 +1003,7 @@ module Dnsruby
       littlen = ?n
       bign = ?N
       star = ?*
+
       if (littlec.class != Fixnum)
         # We're using Ruby 1.9 - convert the codes
         littlec = littlec.getbyte(0)
@@ -1008,6 +1014,7 @@ module Dnsruby
         bign = bign.getbyte(0)
         star = star.getbyte(0)
       end
+
       template.each_byte {|byte|
         case byte
           when littlec, bigc
@@ -1019,26 +1026,26 @@ module Dnsruby
           when bign
             len += 4
           when star
-            len = @limit-@index
+            len = @limit - @index
           else
             raise StandardError.new("unsupported template: '#{byte.chr}' in '#{template}'")
         end
       }
-      raise DecodeError.new("limit exceeded") if @limit < @index + len
+      raise DecodeError.new('limit exceeded') if @limit < @index + len
       arr = @data.unpack("@#{@index}#{template}")
       @index += len
-      return arr
+      arr
     end
 
     def get_string
       len = @data[@index]
-      if (len.class == String)
+      if len.class == String
         len = len.getbyte(0)
       end
       raise DecodeError.new("limit exceeded\nlimit = #{@limit}, index = #{@index}, len = #{len}\n") if @limit < @index + 1 + (len ? len : 0)
       d = @data[@index + 1, len]
       @index += 1 + len
-      return d
+      d
     end
 
     def get_string_list
@@ -1050,7 +1057,7 @@ module Dnsruby
     end
 
     def get_name
-      return Name.new(self.get_labels)
+      Name.new(self.get_labels)
     end
 
     def get_labels(limit=nil)
@@ -1058,8 +1065,8 @@ module Dnsruby
       d = []
       while true
         temp = @data[@index]
-        if (temp.class == String)
-          temp = (temp.getbyte(0))
+        if temp.class == String
+          temp = temp.getbyte(0)
         end
         case temp # @data[@index]
           when 0
@@ -1068,7 +1075,7 @@ module Dnsruby
           when 192..255
             idx = self.get_unpack('n')[0] & 0x3fff
             if limit <= idx
-              raise DecodeError.new("non-backward name pointer")
+              raise DecodeError.new('non-backward name pointer')
             end
             save_index = @index
             @index = idx
@@ -1079,7 +1086,7 @@ module Dnsruby
             d << self.get_label
         end
       end
-      return d
+      d
     end
 
     def get_label
@@ -1095,9 +1102,9 @@ module Dnsruby
 
     def get_question
       name = self.get_name
-      type, klass = self.get_unpack("nn")
+      type, klass = self.get_unpack('nn')
       q = Question.new(name, type, klass)
-      return q
+      q
     end
 
     def get_rr
@@ -1107,12 +1114,12 @@ module Dnsruby
       typeclass = RR.get_class(type, klass)
       # @TODO@ Trap decode errors here, and somehow mark the record as bad.
       # Need some way to represent raw data only
-      rec = self.get_length16 {typeclass.decode_rdata(self)}
-      rec.name=name
-      rec.ttl=ttl
+      rec = self.get_length16 { typeclass.decode_rdata(self) }
+      rec.name = name
+      rec.ttl = ttl
       rec.type = type
       rec.klass = klass
-      return rec
+      rec
     end
   end
 
@@ -1124,7 +1131,7 @@ module Dnsruby
     end
 
     def to_s
-      return @data
+      @data
     end
 
     def put_bytes(d)
@@ -1150,38 +1157,34 @@ module Dnsruby
     end
 
     def put_string_list(ds)
-      ds.each {|d|
-        self.put_string(d)
-      }
+      ds.each { |d| self.put_string(d) }
     end
 
     def put_rr(rr, canonical=false)
       # RFC4034 Section 6.2
       put_name(rr.name, canonical)
-      put_pack("nnN", rr.type.code, rr.klass.code, rr.ttl)
-      put_length16 {rr.encode_rdata(self, canonical)}
+      put_pack('nnN', rr.type.code, rr.klass.code, rr.ttl)
+      put_length16 { rr.encode_rdata(self, canonical) }
     end
 
-    def put_name(d, canonical=false, downcase = canonical)
+    def put_name(d, canonical = false, downcase = canonical)
       # DNSSEC requires some records (e.g. NSEC, RRSIG) to be canonicalised, but
       # not downcased. YUK!
-      if (downcase)
-        d = d.downcase
-      end
+      d = d.downcase if downcase
       put_labels(d.to_a, canonical)
     end
 
     def put_labels(d, do_canonical)
-      d.each_index {|i|
-        domain = d[i..-1].join(".")
-        if (!do_canonical && (idx = @names[domain]))
-          self.put_pack("n", 0xc000 | idx)
+      d.each_index do |i|
+        domain = d[i..-1].join('.')
+        if !do_canonical && (idx = @names[domain])
+          self.put_pack('n', 0xc000 | idx)
           return
         else
           @names[domain] = @data.length
           self.put_label(d[i])
         end
-      }
+      end
       @data << "\0"
     end
 
@@ -1199,6 +1202,7 @@ module Dnsruby
   #
   #RFC 1035 Section 4.1.2
   class Question
+
     # The Question name
     attr_reader :qname
     # The Question type
@@ -1206,15 +1210,15 @@ module Dnsruby
     # The Question class
     attr_reader :qclass
 
-    #Creates a question object from the domain, type, and class passed
-    #as arguments.
+    # Creates a question object from the domain, type, and class passed
+    # as arguments.
     #
-    #If a String is passed in, a Name, IPv4 or IPv6 object is created.
+    # If a String is passed in, a Name, IPv4 or IPv6 object is created.
     #
-    #If an IPv4 or IPv6 object is used then the type is set to PTR.
+    # If an IPv4 or IPv6 object is used then the type is set to PTR.
     def initialize(qname, qtype = :not_provided, qclass = :not_provided)
 
-      raise ArgumentError.new("qname must not be nil") if qname.nil?
+      raise ArgumentError.new('qname must not be nil') if qname.nil?
 
       @qtype  = (qtype  == :not_provided) ? Types::A    : Types.new(qtype)
       @qclass = (qclass == :not_provided) ? Classes::IN : Classes.new(qclass)
