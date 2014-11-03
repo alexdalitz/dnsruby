@@ -1212,31 +1212,20 @@ module Dnsruby
     #If a String is passed in, a Name, IPv4 or IPv6 object is created.
     #
     #If an IPv4 or IPv6 object is used then the type is set to PTR.
-    def initialize(*args)
-      @qtype = Types::A
-      @qclass = Classes::IN
-      type_given = false
-      if (args.length > 0)
-        if (args.length > 1)
-          @qtype = Types.new(args[1])
-          type_given = true
-          if (args.length > 2)
-            @qclass = Classes.new(args[2])
-          end
-        end
-      else
-        raise ArgumentError.new("Must pass at least a name!")
-      end
+    def initialize(qname, qtype = :not_provided, qclass = :not_provided)
+      @qtype  = (qtype  == :not_provided) ? Types::A            : Types.new(qtype)
+      @qclass = (qclass == :not_provided) ? Classes.new(qclass) : Classes::IN
+
       # If the name looks like an IP address then do an appropriate
       # PTR query, unless the user specified the qtype
-      @qname=args[0]
-      if (!type_given)
-        case @qname.to_s
+      if qtype == :not_provided
+
+        case qname.to_s
           when IPv4::Regex
-            @qname = IPv4.create(@qname).to_name
+            @qname = IPv4.create(qname).to_name
             @qtype = Types.PTR
           when IPv6::Regex
-            @qname = IPv6.create(@qname).to_name
+            @qname = IPv6.create(qname).to_name
             @qtype = Types.PTR
           when Name
           when IPv6
@@ -1244,9 +1233,10 @@ module Dnsruby
           when IPv4
             @qtype = Types.PTR
           else
-            @qname = Name.create(@qname)
+            @qname = Name.create(qname)
         end
       else
+        @qtype = qtype
         case @qtype
           when Types.PTR
             case @qname.to_s
