@@ -39,68 +39,77 @@ class TestResolver < Minitest::Test
     Dnsruby::Config.reset
   end
 
+  def assert_valid_response(response)
+    assert(response.kind_of?(Message), "Expected response to be a message but was a #{response.class}")
+  end
+
+  def assert_nil_response(response)
+    assert(response.nil?, "Expected no response but got a #{response.class}:\n#{response}")
+  end
+
+  def assert_error_is_exception(error, error_class = Exception)
+    assert(error.is_a?(error_class), "Expected error to be an #{error_class}, but was a #{error.class}:\n#{error}")
+  end
+
+  def assert_nil_error(error)
+    assert(error.nil?, "Expected no error but got a #{error.class}:\n#{error}")
+  end
+
   def test_send_message
-    res = Resolver.new
-    ret = res.send_message(Message.new("example.com", Types.A))
-    assert(ret.kind_of?(Message))
+    response = Resolver.new.send_message(Message.new("example.com", Types.A))
+    assert_valid_response(response)
   end
 
   def test_send_message_bang_noerror
-    res = Resolver.new
-    response, error = res.send_message!(Message.new(GOOD_DOMAIN_NAME, Types.A))
-    assert(response.kind_of?(Message), "Response was not a message, was:\n#{response}")
-    assert(error.nil?, "Error was not nil, was:\n#{error}")
+    response, error = Resolver.new.send_message!(Message.new(GOOD_DOMAIN_NAME, Types.A))
+    assert_nil_error(error)
+    assert_valid_response(response)
   end
 
   def test_send_message_bang_error
-    res = Resolver.new
     message = Message.new(BAD_DOMAIN_NAME, Types.A)
-    response, error = res.send_message!(message)
-    assert(response.nil?, "Response was not nil, was:\n#{response}")
-    assert(error.is_a?(Exception), "error was not an exception, was:\n#{error}")
+    response, error = Resolver.new.send_message!(message)
+    assert_nil_response(response)
+    assert_error_is_exception(error)
   end
 
   def test_send_plain_message
-    res = Resolver.new
-    response, _error = res.send_plain_message(Message.new("example.com"))
-    assert(response.kind_of?(Message))
+    resolver = Resolver.new
+    response, error = resolver.send_plain_message(Message.new("cnn.com"))
+    assert_nil_error(error)
+    assert_valid_response(response)
 
     m = Message.new(BAD_DOMAIN_NAME)
     m.header.rd = true
-    response, error = res.send_plain_message(m)
-    assert(response.kind_of?(Message), "Expected response to be a message but was a #{response.class}")
-    assert(error, "Error expected but was a #{error.class} for request:\n#{m}")
-    assert(error.kind_of?(NXDomain), "Expected error to be an NXDomain but was #{error}")
+    response, error = resolver.send_plain_message(m)
+    assert_valid_response(response)
+    assert_error_is_exception(error, NXDomain)
   end
 
   def test_query
-    res = Resolver.new
-    ret = res.query("example.com")
-    assert(ret.kind_of?(Message))
+    response = Resolver.new.query("example.com")
+    assert_valid_response(response)
   end
 
   def test_query_bang_noerror
-    res = Resolver.new
-    response, error = res.query!(GOOD_DOMAIN_NAME)
-    assert(error.nil?, "Error was not nil, was a: #{error.class}: #{error}")
-    assert(response.kind_of?(Message), "Response was not a message, was:\n#{response.inspect}")
+    response, error = Resolver.new.query!(GOOD_DOMAIN_NAME)
+    assert_nil_error(error)
+    assert_valid_response(response)
   end
 
   def test_query_bang_error
-    res = Resolver.new
-    response, error = res.query!(BAD_DOMAIN_NAME)
-    assert(response.nil?, "Response was not nil, was a #{response.class}: #{response}")
-    assert(error.is_a?(Exception), "error was not an exception, was:\n#{error.inspect}")
+    response, error = Resolver.new.query!(BAD_DOMAIN_NAME)
+    assert_nil_response(response)
+    assert_error_is_exception(error)
   end
 
   def test_query_async
-    res = Resolver.new
     q = Queue.new
-    res.send_async(Message.new("example.com", Types.A),q,q)
-    id, ret, error = q.pop
+    Resolver.new.send_async(Message.new("example.com", Types.A),q,q)
+    id, response, error = q.pop
     assert_equal(id, q, "Id wrong!")
-    assert(ret.kind_of?(Message), "Ret wrong!")
-    assert(error==nil)
+    assert_valid_response(response)
+    assert_nil_error(error)
   end
 
   def test_query_one_duff_server_one_good
@@ -108,10 +117,10 @@ class TestResolver < Minitest::Test
     res.retry_delay=1
     q = Queue.new
     res.send_async(Message.new("example.com", Types.A),q,q)
-    id, ret, error = q.pop
+    id, response, error = q.pop
     assert_equal(id, q, "Id wrong!")
-    assert(ret.kind_of?(Message), "Ret wrong! (#{ret.class}")
-    assert(error==nil)
+    assert_valid_response(response)
+    assert_nil_error(error)
   end
 
   # @TODO@ Implement!!  But then, why would anyone want to do this?
@@ -156,7 +165,7 @@ class TestResolver < Minitest::Test
     id, m, err = q.pop
     assert(id==1, "Id should have been 1 but was #{id}")
     assert(m.rcode == RCode.NXDOMAIN, "Expected NXDOMAIN but got #{m.rcode} instead.")
-    assert(err.is_a?(NXDomain), "Expected error to be an NXDomain, but was #{err}.")
+    assert_error_is_exception(error, NXDomain)
   end
 
   def test_timeouts
