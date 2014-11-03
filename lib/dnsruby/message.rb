@@ -1213,47 +1213,33 @@ module Dnsruby
     #
     #If an IPv4 or IPv6 object is used then the type is set to PTR.
     def initialize(qname, qtype = :not_provided, qclass = :not_provided)
-      @qtype  = (qtype  == :not_provided) ? Types::A            : Types.new(qtype)
-      @qclass = (qclass == :not_provided) ? Classes.new(qclass) : Classes::IN
+
+      raise ArgumentError.new("qname must not be nil") if qname.nil?
+
+      @qtype  = (qtype  == :not_provided) ? Types::A    : Types.new(qtype)
+      @qclass = (qclass == :not_provided) ? Classes::IN : Classes.new(qclass)
+
+      is_ipv4_addr_string = qname.is_a?(String) && IPv4::Regex.match(qname)
+      is_ipv6_addr_string = qname.is_a?(String) && IPv6::Regex.match(qname)
+      is_ip_addr_string = is_ipv4_addr_string || is_ipv6_addr_string
+
+      is_ip_addr = [IPv4, IPv6].any? { |klass| qname.is_a?(klass) }
+
+      if is_ipv4_addr_string
+        @qname = IPv4.create(qname).to_name
+      elsif is_ipv6_addr_string
+        @qname = IPv6.create(qname).to_name
+      else
+        @qname = Name.create(qname)
+      end
 
       # If the name looks like an IP address then do an appropriate
       # PTR query, unless the user specified the qtype
-      if qtype == :not_provided
-
-        case qname.to_s
-          when IPv4::Regex
-            @qname = IPv4.create(qname).to_name
-            @qtype = Types.PTR
-          when IPv6::Regex
-            @qname = IPv6.create(qname).to_name
-            @qtype = Types.PTR
-          when Name
-          when IPv6
-            @qtype = Types.PTR
-          when IPv4
-            @qtype = Types.PTR
-          else
-            @qname = Name.create(qname)
-        end
-      else
-        @qtype = qtype
-        case @qtype
-          when Types.PTR
-            case @qname.to_s
-              when IPv4::Regex
-                @qname = IPv4.create(@qname).to_name
-              when IPv6::Regex
-                @qname = IPv6.create(@qname).to_name
-              when IPv6
-              when IPv4
-              else
-                @qname = Name.create(@qname)
-            end
-          else
-            @qname = Name.create(@qname)
-        end
+      if qtype == :not_provided && (is_ip_addr || is_ip_addr_string)
+        @qtype = Types.PTR
       end
-      qname.absolute = true
+
+      @qname.absolute = true
     end
 
     def qtype=(qtype)
@@ -1290,9 +1276,9 @@ module Dnsruby
           self.qclass == other.qclass
     end
 
-    #Returns a string representation of the question record.
+    # Returns a string representation of the question record.
     def to_s
-      return "#{@qname}.\t#{@qclass.string}\t#{@qtype.string}";
+      "#{@qname}.\t#{@qclass.string}\t#{@qtype.string}"
     end
 
     # For Updates, the qname field is redefined to zname (RFC2136, section 2.3)
