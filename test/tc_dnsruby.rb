@@ -22,8 +22,14 @@ class TestDnsruby < Minitest::Test
     a = Resolv.getaddress("google-public-dns-a.google.com.")
     assert_equal(a.to_s, "8.8.8.8")
     a = Resolv.getaddresses("google-public-dns-a.google.com.")
-    assert(a.length==1, a.to_s + " should only have one response. Had " + a.length.to_s)
-    assert_equal(a[0].to_s, "8.8.8.8")
+    if (a.length == 2) 
+      assert(a.length==1, a.to_s + " should only have one response. Had " + a.length.to_s)
+      assert_equal(a[0].to_s, "8.8.8.8")
+    else 
+      assert(a.length==2, a.to_s + " should have had two responses. Had " + a.length.to_s)
+      assert_equal(a[0].to_s, "8.8.8.8")
+      assert_equal(a[1].to_s, "2001:4860:4860::8888")
+    end
     Resolv.each_address("google-public-dns-a.google.com.") {|address| assert_equal(address, "8.8.8.8")}
 
     n = Resolv.getname("8.8.8.8")
