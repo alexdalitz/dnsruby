@@ -1218,7 +1218,18 @@ module Dnsruby
 
       @qtype  = (qtype  == :not_provided) ? Types::A    : Types.new(qtype)
       @qclass = (qclass == :not_provided) ? Classes::IN : Classes.new(qclass)
+      set_qname(qname, qtype == :not_provided)
+    end
 
+    def qtype=(qtype)
+      @qtype = Types.new(qtype)
+    end
+
+    def qclass=(qclass)
+      @qclass = Classes.new(qclass)
+    end
+
+    def set_qname(qname, write_PTR_to_qtype_if_ip = true)
       is_ipv4_addr_string = qname.is_a?(String) && IPv4::Regex.match(qname)
       is_ipv6_addr_string = qname.is_a?(String) && IPv6::Regex.match(qname)
       is_ip_addr_string = is_ipv4_addr_string || is_ipv6_addr_string
@@ -1235,38 +1246,14 @@ module Dnsruby
 
       # If the name looks like an IP address then do an appropriate
       # PTR query, unless the user specified the qtype
-      if qtype == :not_provided && (is_ip_addr || is_ip_addr_string)
+      if write_PTR_to_qtype_if_ip && (is_ip_addr || is_ip_addr_string)
         @qtype = Types.PTR
       end
-
       @qname.absolute = true
-    end
-
-    def qtype=(qtype)
-      @qtype = Types.new(qtype)
-    end
-
-    def qclass=(qclass)
-      @qclass = Classes.new(qclass)
     end
 
     def qname=(qname)
-      case qname
-        when IPv4::Regex
-          @qname = IPv4.create(qname).to_name
-          @qtype = Types.PTR
-        when IPv6::Regex
-          @qname = IPv6.create(qname).to_name
-          @qtype = Types.PTR
-        when Name
-        when IPv6
-          @qtype = Types.PTR
-        when IPv4
-          @qtype = Types.PTR
-        else
-          @qname = Name.create(qname)
-      end
-      @qname.absolute = true
+      set_qname(qname, true)
     end
 
     def ==(other)
