@@ -305,11 +305,11 @@ module Dnsruby
 
     def ==(other)
       other.kind_of?(Message) &&
-          @header     == other.header &&
-          @question   == other.question &&
-          @answer     == other.answer &&
-          @authority  == other.authority &&
-          @additional == other.additional
+          @header      == other.header &&
+          @question[0] == other.question[0] &&
+          @answer      == other.answer &&
+          @authority   == other.authority &&
+          @additional  == other.additional
     end
 
     def remove_additional
@@ -1290,6 +1290,13 @@ module Dnsruby
         else
           @qname = Name.create(qname)
       end
+    end
+
+    def ==(other)
+      other.is_a?(Question) &&
+          self.qname  == other.qname  &&
+          self.qtype  == other.qtype  &&
+          self.qclass == other.qclass
     end
 
     #Returns a string representation of the question record.
