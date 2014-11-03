@@ -22,7 +22,7 @@ class TestDnsruby < Minitest::Test
     a = Resolv.getaddress("google-public-dns-a.google.com.")
     assert_equal(a.to_s, "8.8.8.8")
     a = Resolv.getaddresses("google-public-dns-a.google.com.")
-    assert(a.length==1)
+    assert(a.length==1, a.to_s + " should only have one response. Had " + a.length.to_s)
     assert_equal(a[0].to_s, "8.8.8.8")
     Resolv.each_address("google-public-dns-a.google.com.") {|address| assert_equal(address, "8.8.8.8")}
 
