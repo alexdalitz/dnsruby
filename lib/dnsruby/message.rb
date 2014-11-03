@@ -1290,6 +1290,7 @@ module Dnsruby
         else
           @qname = Name.create(qname)
       end
+      @qname.absolute = true
     end
 
     def ==(other)
