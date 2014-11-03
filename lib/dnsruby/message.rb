@@ -304,15 +304,12 @@ module Dnsruby
     end
 
     def ==(other)
-      ret = false
-      if (other.kind_of?Message)
-        ret = @header == other.header &&
-            @question[0] == other.question[0] &&
-            @answer == other.answer &&
-            @authority == other.authority &&
-            @additional == other.additional
-      end
-      return ret
+      other.kind_of?(Message) &&
+          @header      == other.header &&
+          @question[0] == other.question[0] &&
+          @answer      == other.answer &&
+          @authority   == other.authority &&
+          @additional  == other.additional
     end
 
     def remove_additional
@@ -681,10 +678,6 @@ module Dnsruby
 
     def clone
       Message.decode(self.encode)
-    end
-
-    def ==(msg2)
-      return self.to_s == msg2.to_s
     end
 
     #In dynamic update packets, the question section is known as zone and
@@ -1270,6 +1263,7 @@ module Dnsruby
             @qname = Name.create(@qname)
         end
       end
+      qname.absolute = true
     end
 
     def qtype=(qtype)
@@ -1296,6 +1290,14 @@ module Dnsruby
         else
           @qname = Name.create(qname)
       end
+      @qname.absolute = true
+    end
+
+    def ==(other)
+      other.is_a?(Question) &&
+          self.qname  == other.qname  &&
+          self.qtype  == other.qtype  &&
+          self.qclass == other.qclass
     end
 
     #Returns a string representation of the question record.
