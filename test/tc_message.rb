@@ -63,10 +63,9 @@ class TestMessage < Minitest::Test
     message = sample_message
     assert message.get_opt.nil?
 
-    # Force the addition of an OPT record
-    resolver = Resolver.new('8.8.8.8')
-    resolver.udp_size = 4096
-    resolver.send_message(message)
+    # Add an OPT record
+    opt = RR::OPT.new(4096, 32768)
+    message.additional << opt
 
     opt = message.get_opt
     assert opt.is_a?(Dnsruby::RR::OPT),
