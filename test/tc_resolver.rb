@@ -48,29 +48,29 @@ class TestResolver < Minitest::Test
   def test_send_message_bang_noerror
     res = Resolver.new
     response, error = res.send_message!(Message.new(GOOD_DOMAIN_NAME, Types.A))
-    assert(response.kind_of?(Message), "Response was not a message, was: #{response}")
-    assert(error.nil?, "Error was not nil, was: #{error}")
+    assert(response.kind_of?(Message), "Response was not a message, was:\n#{response}")
+    assert(error.nil?, "Error was not nil, was:\n#{error}")
   end
 
   def test_send_message_bang_error
     res = Resolver.new
-    response, error = res.send_message!(Message.new(BAD_DOMAIN_NAME, Types.A))
-    assert(response.nil?, "Response was not nil, was: #{response}")
-    assert(error.is_a?(Exception), "error was not an exception, was: #{error}")
+    message = Message.new(BAD_DOMAIN_NAME, Types.A)
+    response, error = res.send_message!(message)
+    assert(response.nil?, "Response was not nil, was:\n#{response}")
+    assert(error.is_a?(Exception), "error was not an exception, was:\n#{error}")
   end
 
   def test_send_plain_message
     res = Resolver.new
-    response, error = res.send_plain_message(Message.new("example.com"))
+    response, _error = res.send_plain_message(Message.new("example.com"))
     assert(response.kind_of?(Message))
+
     m = Message.new(BAD_DOMAIN_NAME)
     m.header.rd = true
     response, error = res.send_plain_message(m)
-#    print "Response : #{response}\n"
-#    print "Error : #{error}\n"
-    assert(response.kind_of?(Message))
-    assert(error)
-    assert(error.kind_of?(NXDomain))
+    assert(response.kind_of?(Message), "Expected response to be a message but was a #{response.class}")
+    assert(error, "Error expected but was a #{error.class} for request:\n#{m}")
+    assert(error.kind_of?(NXDomain), "Expected error to be an NXDomain but was #{error}")
   end
 
   def test_query
@@ -82,15 +82,15 @@ class TestResolver < Minitest::Test
   def test_query_bang_noerror
     res = Resolver.new
     response, error = res.query!(GOOD_DOMAIN_NAME)
-    assert(error.nil?, "Error was not nil, was a: #{error.class}")
-    assert(response.kind_of?(Message), "Response was not a message, was a #{response.inspect}")
+    assert(error.nil?, "Error was not nil, was a: #{error.class}: #{error}")
+    assert(response.kind_of?(Message), "Response was not a message, was:\n#{response.inspect}")
   end
 
   def test_query_bang_error
     res = Resolver.new
     response, error = res.query!(BAD_DOMAIN_NAME)
-    assert(response.nil?, "Response was not nil, was a #{response.class}")
-    assert(error.is_a?(Exception), "error was not an exception, was a #{error.inspect}")
+    assert(response.nil?, "Response was not nil, was a #{response.class}: #{response}")
+    assert(error.is_a?(Exception), "error was not an exception, was:\n#{error.inspect}")
   end
 
   def test_query_async
@@ -154,9 +154,9 @@ class TestResolver < Minitest::Test
     q = Queue.new
     res.send_async(Message.new(BAD_DOMAIN_NAME, Types.A), q, 1)
     id, m, err = q.pop
-    assert(id==1)
-    assert(m.rcode == RCode.NXDOMAIN)
-    assert(NXDomain === err)
+    assert(id==1, "Id should have been 1 but was #{id}")
+    assert(m.rcode == RCode.NXDOMAIN, "Expected NXDOMAIN but got #{m.rcode} instead.")
+    assert(err.is_a?(NXDomain), "Expected error to be an NXDomain, but was #{err}.")
   end
 
   def test_timeouts
