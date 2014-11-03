@@ -22,7 +22,6 @@ class TestMessage < Minitest::Test
 
   # Creates and returns sample message:
   #
-  #
   # ;; QUESTION SECTION (1  record)
   # ;; cnn.com.	IN	A
   # ;; Security Level : UNCHECKED
