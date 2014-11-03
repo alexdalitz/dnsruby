@@ -18,15 +18,17 @@ require_relative 'spec_helper'
 
 class TestMessage < Minitest::Test
 
+  include Dnsruby
+
+  # Sample request message:
+  #
+  # ;; QUESTION SECTION (1  record)
+  # ;; cnn.com.	IN	A
+  # ;; Security Level : UNCHECKED
+  # ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 7195
+  # ;; flags: ; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
   def sample_message
-    Dnsruby::Message.new('cnn.com', 'A')
-=begin
-;; QUESTION SECTION (1  record)
-;; cnn.com.	IN	A
-.;; Security Level : UNCHECKED
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 7195
-;; flags: ; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
-=end
+    Message.new('cnn.com', 'A')
   end
 
   def test_question_section_formatted_ok
@@ -58,9 +60,16 @@ class TestMessage < Minitest::Test
   end
 
   def test_getopt
-    msg = sample_message
-    assert msg.getopt.nil?
+    message = sample_message
+    assert message.get_opt.nil?
 
-    # TODO: Add OPT record and assert that getopt finds it.
+    # Force the addition of an OPT record
+    resolver = Resolver.new('8.8.8.8')
+    resolver.udp_size = 4096
+    resolver.send_message(message)
+
+    opt = message.get_opt
+    assert opt.is_a?(Dnsruby::RR::OPT),
+           "Expected get_opt to return a Dnsruby::RR::OPT, but it returned a #{opt.class}"
   end
 end
