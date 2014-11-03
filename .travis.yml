@@ -1,7 +1,7 @@
 language: ruby
 cache: bundler
 
-script: "bundle exec rake test_offline"
+script: "bundle exec rake test"
 
 rvm:
   - 1.9.3
