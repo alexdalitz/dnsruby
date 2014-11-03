@@ -18,15 +18,17 @@ require_relative 'spec_helper'
 
 class TestMessage < Minitest::Test
 
+  include Dnsruby
+
+  # Sample request message:
+  #
+  # ;; QUESTION SECTION (1  record)
+  # ;; cnn.com.	IN	A
+  # ;; Security Level : UNCHECKED
+  # ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 7195
+  # ;; flags: ; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
   def sample_message
-    Dnsruby::Message.new('cnn.com', 'A')
-=begin
-;; QUESTION SECTION (1  record)
-;; cnn.com.	IN	A
-.;; Security Level : UNCHECKED
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 7195
-;; flags: ; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
-=end
+    Message.new('cnn.com', 'A')
   end
 
   def test_question_section_formatted_ok
@@ -55,5 +57,18 @@ class TestMessage < Minitest::Test
     header_line = message.to_s.split("\n").grep(/->>HEADER<<-/).first
     line_regex = /->>HEADER<<- opcode: .+, status: .+, id: \d+/
     assert line_regex.match(header_line)
+  end
+
+  def test_getopt
+    message = sample_message
+    assert message.get_opt.nil?
+
+    # Add an OPT record
+    opt = RR::OPT.new(4096, 32768)
+    message.additional << opt
+
+    opt = message.get_opt
+    assert opt.is_a?(Dnsruby::RR::OPT),
+           "Expected get_opt to return a Dnsruby::RR::OPT, but it returned a #{opt.class}"
   end
 end
