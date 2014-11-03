@@ -159,10 +159,10 @@ class TestResolver < Minitest::Test
 #  end
 #
   def test_nxdomain
-    res=Resolver.new
+    resolver = Resolver.new
     q = Queue.new
-    res.send_async(Message.new(BAD_DOMAIN_NAME, Types.A), q, 1)
-    id, m, err = q.pop
+    resolver .send_async(Message.new(BAD_DOMAIN_NAME, Types.A), q, 1)
+    id, m, error = q.pop
     assert(id==1, "Id should have been 1 but was #{id}")
     assert(m.rcode == RCode.NXDOMAIN, "Expected NXDOMAIN but got #{m.rcode} instead.")
     assert_error_is_exception(error, NXDomain)
