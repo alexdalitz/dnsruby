@@ -622,8 +622,8 @@ module Dnsruby
   end
 end
 
-require 'dnsruby/message_section'
-require 'dnsruby/message_header'
-require 'dnsruby/message_decoder'
-require 'dnsruby/message_encoder'
-require 'dnsruby/message_question'
+require 'dnsruby/message/section'
+require 'dnsruby/message/header'
+require 'dnsruby/message/decoder'
+require 'dnsruby/message/encoder'
+require 'dnsruby/message/question'

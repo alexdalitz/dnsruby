@@ -584,7 +584,7 @@ module Dnsruby
     require 'dnsruby/cache'
     require 'dnsruby/DNS'
     require 'dnsruby/hosts'
-    require 'dnsruby/message'
+    require 'dnsruby/message/message'
     require 'dnsruby/update'
     require 'dnsruby/zone_transfer'
     require 'dnsruby/dnssec'
