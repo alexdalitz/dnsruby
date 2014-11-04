@@ -14,7 +14,7 @@
 #limitations under the License.
 #++
 require 'dnsruby/code_mappers'
-require 'dnsruby/message'
+require 'dnsruby/message/message'
 require 'dnsruby/ipv4'
 require 'dnsruby/ipv6'
 require 'timeout'
@@ -108,6 +108,20 @@ require 'dnsruby/zone_reader'
 #DNSSEC support is on by default - but no trust anchors are configured by default.
 #See Dnsruby::Dnssec for more details.
 #
+#== Codes
+# Dnsruby makes extensive use of several different types of codes.  These are implemented
+# in the form of subclasses of CodeMapper and are located in lib/code_mappers.rb.  They are:
+#
+# * OpCode - e.g. Query, Status, Notify
+# * RCode - e.g. NOERROR, NXDOMAIN
+# * ExtendedRCode - currently only BADVERS
+# * Classes - IN, CH, HS, NONE, ANY
+# * Types - RR types, e.g. A, NS, SOA
+# * QTypes - IXFR, AXFR, MAILB, MAILA, ANY
+# * MetaTypes - TKEY, TSIG, OPT
+# * Algorithms - e.g. RSAMD5, DH, DSA
+# * Nsec3HashAlgorithms - currently only SHA-1
+
 #== Bugs
 #* NIS is not supported.
 #* /etc/nsswitch.conf is not supported.
