@@ -1,8 +1,8 @@
-#Superclass for all Dnsruby resource records.
+# Superclass for all Dnsruby resource records.
 #
-#Represents a DNS RR (resource record) [RFC1035, section 3.2]
+# Represents a DNS RR (resource record) [RFC1035, section 3.2]
 #
-#Use Dnsruby::RR::create(...) to create a new RR record.
+# Use Dnsruby::RR::create(...) to create a new RR record.
 #
 #   mx = Dnsruby::RR.create("example.com. 7200 MX 10 mailhost.example.com.")
 #
@@ -12,6 +12,10 @@
 #   s = rr.to_s # Get a String representation of the RR (in zone file format)
 #   rr_again = Dnsruby::RR.create(s)
 #
+
+require 'dnsruby/code_mappers'
+
+module Dnsruby
 class RR
 
   include Comparable
@@ -465,4 +469,5 @@ class RR
     }
     return ret
   end
+end
 end

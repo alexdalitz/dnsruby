@@ -1,3 +1,5 @@
+module Dnsruby
+
 # RFC2181, section 5
 # "It is however possible for most record types to exist
 # with the same label, class and type, but with different data.  Such a
@@ -184,4 +186,5 @@ class RRSet
   def length
     return @rrs.length
   end
+end
 end
