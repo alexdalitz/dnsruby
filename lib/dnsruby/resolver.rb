@@ -308,7 +308,7 @@ module Dnsruby
       message.send_raw = true
       q = Queue.new
       send_async(message, q)
-      id, result, error = q.pop
+      _id, result, error = q.pop
       [result, error]
     end
 
@@ -423,18 +423,18 @@ module Dnsruby
       reset_attributes
 
       # Process args
-      if args.length==1
+      if args.length == 1
         if args[0].class == Hash
           args[0].keys.each do |key|
             begin
               if key == :config_info
                 @config.set_config_info(args[0][:config_info])
-              elsif key==:nameserver
+              elsif key == :nameserver
                 set_config_nameserver(args[0][:nameserver])
-              elsif key==:nameservers
+              elsif key == :nameservers
                 set_config_nameserver(args[0][:nameservers])
               else
-                send(key.to_s+"=", args[0][key])
+                send(key.to_s + "=", args[0][key])
               end
             rescue Exception => e
               Dnsruby.log.error{"Argument # {key} not valid : #{e}\n"}
@@ -488,10 +488,10 @@ module Dnsruby
         @config.get_ready
       end
       @configured = true
-      if (n).kind_of?String
-        @config.nameserver=[n]
+      if n.kind_of?(String)
+        @config.nameserver = [n]
       else
-        @config.nameserver=n
+        @config.nameserver = n
       end
       add_config_nameservers
     end
@@ -521,9 +521,9 @@ module Dnsruby
       @tsig = nil
       @ignore_truncation = false
       @config = Config.new()
-      @src_address        = nil
-      @src_address6        = nil
-      @src_port        = [0]
+      @src_address = nil
+      @src_address6 = nil
+      @src_port = [0]
       @recurse = true
       @single_res_mutex.synchronize {
         @single_resolvers=[]
@@ -563,7 +563,7 @@ module Dnsruby
         :src_address, :src_address6, :src_port, :recurse,
         :udp_size, :dnssec].each do |param|
 
-        res.send(param.to_s+"=", instance_variable_get("@"+param.to_s))
+        res.send(param.to_s + "=", instance_variable_get("@" + param.to_s))
       end
     end
 
@@ -703,7 +703,7 @@ module Dnsruby
     # * res.tsig=(key_name, key, alg) # e.g. alg = "hmac-sha1"
     # * res.tsig=nil # Stop the resolver from signing
     def tsig=(t)
-      @tsig=t
+      @tsig = t
       update
     end
 
@@ -712,7 +712,7 @@ module Dnsruby
 
       options = { type: Types.TSIG, klass: Classes.ANY }
       if args.length >= 2
-        options.merge!( { name: args[0], key: args[1] })
+        options.merge!({ name: args[0], key: args[1] })
       end
       if args.length == 3
         options[:algorithm] == args[2]
@@ -728,9 +728,9 @@ module Dnsruby
 
       if args.length == 1
         if args[0]
-          if args[0].instance_of?RR::TSIG
+          if args[0].instance_of?(RR::TSIG)
             tsig = args[0]
-          elsif args[0].instance_of?Array
+          elsif args[0].instance_of?(Array)
             tsig = RR.new_from_hash(create_tsig_options(args))
           end
         else
@@ -812,22 +812,22 @@ module Dnsruby
       retry_delay = @retry_delay
       #      @single_res_mutex.synchronize {
       @retry_times.times do |retry_count|
-        if retry_count>0
+        if retry_count > 0
           retry_delay *= 2
         end
 
         @single_resolvers.delete(nil) # Just in case...
         @single_resolvers.each_index do |i|
           res= @single_resolvers[i]
-          offset = (i*@retry_delay.to_f/@single_resolvers.length)
-          if retry_count==0
-            timeouts[base+offset]=[res, retry_count]
+          offset = (i * @retry_delay.to_f / @single_resolvers.length)
+          if retry_count == 0
+            timeouts[base + offset]=[res, retry_count]
           else
-            if timeouts.has_key?(base+retry_delay+offset)
+            if timeouts.has_key?(base + retry_delay + offset)
               Dnsruby.log.error{"Duplicate timeout key!"}
               raise RuntimeError.new("Duplicate timeout key!")
             end
-            timeouts[base+retry_delay+offset]=[res, retry_count]
+            timeouts[base + retry_delay + offset]=[res, retry_count]
           end
         end
       end
@@ -861,7 +861,7 @@ module Dnsruby
       # to the client queue.
 
       q = Queue.new
-      if client_query_id==nil
+      if client_query_id == nil
         client_query_id = Time.now + rand(10000)
       end
 
@@ -879,7 +879,7 @@ module Dnsruby
         return
       end
 
-      tick_needed=false
+      tick_needed = false
       # add to our data structures
       #      @mutex.synchronize{
       @parent.single_res_mutex.synchronize {
@@ -893,11 +893,11 @@ module Dnsruby
         outstanding = []
         @query_list[client_query_id]=[msg, client_queue, q, outstanding]
 
-        query_timeout = Time.now+@parent.query_timeout
+        query_timeout = Time.now + @parent.query_timeout
         if @parent.query_timeout == 0
           query_timeout = Time.now+31536000 # a year from now
         end
-        @timeouts[client_query_id]=[query_timeout, generate_timeouts()]
+        @timeouts[client_query_id]=[query_timeout, generate_timeouts]
       }
 
       # Now do querying stuff using SingleResolver
@@ -908,14 +908,14 @@ module Dnsruby
       client_query_id
     end
 
-    def generate_timeouts() # :nodoc: all
+    def generate_timeouts # :nodoc: all
       # Create the timeouts for the query from the retry_times and retry_delay attributes.
       # These are created at the same time in case the parameters change during the life of the query.
       # 
       # These should be absolute, rather than relative
       # The first value should be Time.now[
       time_now = Time.now
-      timeouts=@parent.generate_timeouts(time_now)
+      timeouts = @parent.generate_timeouts(time_now)
       timeouts
     end
 
@@ -1059,7 +1059,7 @@ module Dnsruby
       end
       #      @mutex.synchronize{
       @parent.single_res_mutex.synchronize {
-        if @query_list[client_query_id]==nil
+        if @query_list[client_query_id] == nil
           #          print "Dead query response - ignoring\n"
           Dnsruby.log.debug{"Ignoring response for dead query"}
           return
@@ -1067,7 +1067,7 @@ module Dnsruby
         _msg, _client_queue, _select_queue, outstanding = @query_list[client_query_id]
         if event_type == Resolver::EventType::RECEIVED ||
               event_type == Resolver::EventType::ERROR
-          unless outstanding.include?id
+          unless outstanding.include?(id)
             Dnsruby.log.error{"Query id not on outstanding list! # {outstanding.length} items. #{id} not on #{outstanding}"}
 #            raise RuntimeError.new("Query id not on outstanding!")
           end
@@ -1104,7 +1104,7 @@ module Dnsruby
       Dnsruby.log.debug{"handling error # {error.class}, #{error}"}
       # Check what sort of error it was :
       resolver, _msg, client_query_id, _retry_count = query_id
-      msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
+      _msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
       if error.kind_of?(ResolvTimeout)
         #   - if it was a timeout, then check which number it was, and how many retries are expected on that server
         #       - if it was the last retry, on the last server, then return a timeout to the client (and clean up)
@@ -1117,7 +1117,7 @@ module Dnsruby
           Dnsruby.log.debug{"Sending timeout to client"}
           send_result_and_stop_querying(client_queue, client_query_id, select_queue, response, error)
         end
-      elsif error.kind_of?NXDomain
+      elsif error.kind_of?(NXDomain)
         #   - if it was an NXDomain, then return that to the client, and stop all new queries (and clean up)
         #        send_result_and_stop_querying(client_queue, client_query_id, select_queue, response, error)
         increment_resolver_priority(resolver) unless response.cached
