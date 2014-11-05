@@ -907,7 +907,7 @@ module Dnsruby
       #      @mutex.synchronize {
       @parent.single_res_mutex.synchronize {
         @query_list.each do |client_query_id, values|
-          msg, client_queue, q, outstanding = values
+         _msg, client_queue, q, _outstanding = values
           send_result_and_stop_querying(client_queue, client_query_id, q, nil, OtherResolvError.new("Resolver closing!"))
         end
       }
@@ -1035,7 +1035,7 @@ module Dnsruby
       end
       event_id, event_type, response, error = queue.pop
       # We should remove this packet from the list of outstanding packets for this query
-      resolver, msg, client_query_id, retry_count = id
+      _resolver, _msg, client_query_id, _retry_count = id
       if id != event_id
         Dnsruby.log.error{"Serious internal error!! # {id} expected, #{event_id} received"}
         raise RuntimeError.new("Serious internal error!! # {id} expected, #{event_id} received")
@@ -1047,7 +1047,7 @@ module Dnsruby
           Dnsruby.log.debug{"Ignoring response for dead query"}
           return
         end
-        msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
+        _msg, _client_queue, _select_queue, outstanding = @query_list[client_query_id]
         if event_type == Resolver::EventType::RECEIVED ||
               event_type == Resolver::EventType::ERROR
           unless outstanding.include?id
@@ -1086,7 +1086,7 @@ module Dnsruby
       #      @mutex.synchronize{
       Dnsruby.log.debug{"handling error # {error.class}, #{error}"}
       # Check what sort of error it was :
-      resolver, msg, client_query_id, retry_count = query_id
+      resolver, _msg, client_query_id, _retry_count = query_id
       msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
       if error.kind_of?(ResolvTimeout)
         #   - if it was a timeout, then check which number it was, and how many retries are expected on that server
@@ -1189,9 +1189,9 @@ module Dnsruby
     end
 
     def handle_validation_response(select_queue, query_id, response) # :nodoc: all
-      resolver, msg, client_query_id, retry_count = query_id
+      _resolver, _msg, client_query_id, _retry_count = query_id
       #      @mutex.synchronize {
-      query, client_queue, s_queue, outstanding = @query_list[client_query_id]
+      _query, client_queue, s_queue, _outstanding = @query_list[client_query_id]
       if s_queue != select_queue
         Dnsruby.log.error{"Serious internal error : expected select queue # {s_queue}, got #{select_queue}"}
         raise RuntimeError.new("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
@@ -1207,8 +1207,8 @@ module Dnsruby
     end
 
     def handle_validation_error(select_queue, query_id, error, response)
-      resolver, msg, client_query_id, retry_count = query_id
-      query, client_queue, s_queue, outstanding = @query_list[client_query_id]
+      _resolver, _msg, client_query_id, _retry_count = query_id
+      _query, client_queue, s_queue, _outstanding = @query_list[client_query_id]
       if s_queue != select_queue
         Dnsruby.log.error{"Serious internal error : expected select queue # {s_queue}, got #{select_queue}"}
         raise RuntimeError.new("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
