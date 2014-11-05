@@ -464,11 +464,19 @@ module Dnsruby
       @single_res_mutex.synchronize {
         # Add the Config nameservers
         @config.nameserver.each do |ns|
-          res = PacketSender.new({:server=>ns, :dnssec=>@dnssec,
-              :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
-              :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
-              :src_address=>@src_address, :src_address6=>@src_address6, :src_port=>@src_port,
-              :recurse=>@recurse, :udp_size=>@udp_size})
+          res = PacketSender.new({
+              server:             ns,
+              dnssec:             @dnssec,
+              use_tcp:            @use_tcp,
+              no_tcp:             @no_tcp,
+              packet_timeout:     @packet_timeout,
+              tsig:               @tsig,
+              ignore_truncation:  @ignore_truncation,
+              src_address:        @src_address,
+              src_address6:       @src_address6,
+              src_port:           @src_port,
+              recurse:            @recurse,
+              udp_size:           @udp_size})
           @single_resolvers.push(res) if res
         end
       }
@@ -699,29 +707,38 @@ module Dnsruby
       update
     end
 
+    def create_tsig_options(args)
+      raise "Illegal number of arguments (#{args.size}; must be 1, 2, or 3." if args.size > 3
+
+      options = { type: Types.TSIG, klass: Classes.ANY }
+      if args.length >= 2
+        options.merge!( { name: args[0], key: args[1] })
+      end
+      if args.length == 3
+        options[:algorithm] == args[2]
+      end
+
+      options
+    end; private :create_tsig_options
+
+
     def Resolver.get_tsig(args)
+
       tsig = nil
+
       if args.length == 1
         if args[0]
           if args[0].instance_of?RR::TSIG
             tsig = args[0]
           elsif args[0].instance_of?Array
-            if args[0].length > 2
-              tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1], :algorithm => args[0][2]})
-            else
-              tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0][0], :key => args[0][1]})
-            end
+            tsig = RR.new_from_hash(create_tsig_options(args))
           end
         else
           #          Dnsruby.log.debug{"TSIG signing switched off"}
           return nil
         end
-      elsif args.length ==2
-        tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0], :key => args[1]})
-      elsif args.length ==3
-        tsig = RR.new_from_hash({:type => Types.TSIG, :klass => Classes.ANY, :name => args[0], :key => args[1], :algorithm => args[2]})
       else
-        raise ArgumentError.new("Wrong number of arguments to tsig=")
+        tsig = RR.new_from_hash(create_tsig_options(args))
       end
       Dnsruby.log.info{"TSIG signing now using # {tsig.name}, key=#{tsig.key}"}
       tsig
