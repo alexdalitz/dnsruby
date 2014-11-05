@@ -1,6 +1,3 @@
-hello
-lib/dnsruby/resolver.rb
-Found 1226 lines.
 # --
 # Copyright 2007 Nominet UK
 # 
@@ -133,7 +130,7 @@ module Dnsruby
       #      }
     end
     def single_resolvers # :nodoc:
-      if !@configured
+      unless @configured
         add_config_nameservers
       end
       return @single_resolvers
@@ -370,11 +367,11 @@ module Dnsruby
     #   end
     # 
     def send_async(msg, client_queue, client_query_id = nil)
-      if !@configured
+      unless @configured
         add_config_nameservers
       end
       #      @single_res_mutex.synchronize {
-      if !@resolver_ruby # @TODO@ Synchronize this?
+      unless @resolver_ruby # @TODO@ Synchronize this?
         @resolver_ruby = ResolverRuby.new(self)
       end
       #      }
@@ -460,7 +457,7 @@ module Dnsruby
     end
 
     def add_config_nameservers # :nodoc: all
-      if !@configured
+      unless @configured
         @config.get_ready
       end
       @configured = true
@@ -479,7 +476,7 @@ module Dnsruby
 
     def set_config_nameserver(n)
       # @TODO@ Should we allow NS RRSet here? If so, then .sort_by {rand}
-      if !@configured
+      unless @configured
         @config.get_ready
       end
       @configured = true
@@ -546,7 +543,7 @@ module Dnsruby
     def add_server(server)# :nodoc:
       @configured = true
       res = PacketSender.new(server)
-      raise ArgumentError.new("Can't create server # {server}") if !res
+      raise ArgumentError.new("Can't create server # {server}") unless res
       update_internal_res(res)
       @single_res_mutex.synchronize {
         @single_resolvers.push(res)
@@ -640,7 +637,7 @@ module Dnsruby
       if p.class != Fixnum
         tmp_src_ports = Array.new(src_port)
         p.each do |x|
-          if !Resolver.check_port(x, tmp_src_ports)
+          unless Resolver.check_port(x, tmp_src_ports)
             return false
           end
           tmp_src_ports.push(x)
@@ -851,14 +848,14 @@ module Dnsruby
         client_query_id = Time.now + rand(10000)
       end
 
-      if !client_queue.kind_of?Queue
+      unless client_queue.kind_of?Queue
         Dnsruby.log.error{"Wrong type for client_queue in Resolver# send_async"}
         # @TODO@ Handle different queue tuples - push this to generic send_error method
         client_queue.push([client_query_id, ArgumentError.new("Wrong type of client_queue passed to Dnsruby::Resolver# send_async - should have been Queue, was #{client_queue.class}")])
         return
       end
 
-      if !msg.kind_of?Message
+      unless msg.kind_of?Message
         Dnsruby.log.error{"Wrong type for msg in Resolver# send_async"}
         # @TODO@ Handle different queue tuples - push this to generic send_error method
         client_queue.push([client_query_id, ArgumentError.new("Wrong type of msg passed to Dnsruby::Resolver# send_async - should have been Message, was #{msg.class}")])
@@ -1053,7 +1050,7 @@ module Dnsruby
         msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
         if event_type == Resolver::EventType::RECEIVED ||
               event_type == Resolver::EventType::ERROR
-          if !outstanding.include?id
+          unless outstanding.include?id
             Dnsruby.log.error{"Query id not on outstanding list! # {outstanding.length} items. #{id} not on #{outstanding}"}
 #            raise RuntimeError.new("Query id not on outstanding!")
           end
@@ -1106,14 +1103,14 @@ module Dnsruby
       elsif error.kind_of?NXDomain
         #   - if it was an NXDomain, then return that to the client, and stop all new queries (and clean up)
         #        send_result_and_stop_querying(client_queue, client_query_id, select_queue, response, error)
-        increment_resolver_priority(resolver) if !response.cached
+        increment_resolver_priority(resolver) unless response.cached
         stop_querying(client_query_id)
         # @TODO@ Does the client want notified at this point?
       else
         #   - if it was any other error, then remove that server from the list for that query
         #   If a Too Many Open Files error, then don't remove, but let retry work.
         timeouts = @timeouts[client_query_id]
-        if !(error.to_s=~/Errno::EMFILE/)
+        unless error.to_s =~ /Errno::EMFILE/
           Dnsruby.log.debug{"Removing # {resolver.server} from resolver list for this query"}
           if timeouts
             timeouts[1].each do |key, value|
@@ -1178,7 +1175,7 @@ module Dnsruby
       # Should also stick resolver more to the front of the list for future queries
       Dnsruby.log.debug{"Handling good response"}
       resolver, msg, client_query_id, retry_count = query_id
-      increment_resolver_priority(resolver) if !response.cached
+      increment_resolver_priority(resolver) unless response.cached
       #      @mutex.synchronize{
       query, client_queue, s_queue, outstanding = @query_list[client_query_id]
       if s_queue != select_queue
