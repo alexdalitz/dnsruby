@@ -133,7 +133,7 @@ module Dnsruby
       unless @configured
         add_config_nameservers
       end
-      return @single_resolvers
+      @single_resolvers
     end
 
     # The timeout for any individual packet. This is the timeout used by SingleResolver
@@ -190,7 +190,7 @@ module Dnsruby
       if @dnssec
         msg.header.cd = set_cd # We do our own validation by default
       end
-      return send_message(msg)
+      send_message(msg)
     end
 
     # Like query, but does not raise an error when an error occurs.
@@ -215,7 +215,7 @@ module Dnsruby
       if @dnssec
         msg.header.cd = true # We do our own validation by default
       end
-      return send_message(msg)
+      send_message(msg)
     end
 
     # Send a message, and wait for the response. If a valid Message is received, then it is returned
@@ -258,7 +258,7 @@ module Dnsruby
       if error != nil
         raise error
       else
-        return result
+        result
       end
     end
 
@@ -309,7 +309,7 @@ module Dnsruby
       q = Queue.new
       send_async(message, q)
       id, result, error = q.pop
-      return [result, error]
+      [result, error]
     end
 
 
@@ -382,7 +382,7 @@ module Dnsruby
           client_queue.push([client_query_id, nil, ResolvTimeout.new("Query timed out - no nameservers configured")])
         }
       end
-      return client_query_id
+      client_query_id
     end
 
     # Close the Resolver. Unfinished queries are terminated with OtherResolvError.
@@ -590,7 +590,7 @@ module Dnsruby
       if @src_port.length == 1
         return @src_port[0]
       end
-      return @src_port
+      @src_port
     end
 
     # Can be a single Fixnum or a Range or an Array
@@ -662,7 +662,7 @@ module Dnsruby
         #              (p > 1024) && (p < 65535)))
         return true
       end
-      return false
+      false
     end
 
     def Resolver.get_ports_from(p)
@@ -674,7 +674,7 @@ module Dnsruby
           a.push(x)
         end
       end
-      return a
+      a
     end
 
     def use_tcp=(on)
@@ -724,7 +724,7 @@ module Dnsruby
         raise ArgumentError.new("Wrong number of arguments to tsig=")
       end
       Dnsruby.log.info{"TSIG signing now using # {tsig.name}, key=#{tsig.key}"}
-      return tsig
+      tsig
     end
 
 
@@ -785,7 +785,7 @@ module Dnsruby
     end
 
     def single_res_mutex # :nodoc: all
-      return @single_res_mutex
+      @single_res_mutex
     end
 
     def generate_timeouts(base=0) # :nodoc: all
@@ -815,7 +815,7 @@ module Dnsruby
         end
       end
       #      }
-      return timeouts
+      timeouts
     end
   end
 
@@ -888,7 +888,7 @@ module Dnsruby
       st = SelectThread.instance
       st.add_observer(q, self)
       tick if tick_needed
-      return client_query_id
+      client_query_id
     end
 
     def generate_timeouts() # :nodoc: all
@@ -899,7 +899,7 @@ module Dnsruby
       # The first value should be Time.now[
       time_now = Time.now
       timeouts=@parent.generate_timeouts(time_now)
-      return timeouts
+      timeouts
     end
 
     # Close the Resolver. Unfinished queries are terminated with OtherResolvError.
