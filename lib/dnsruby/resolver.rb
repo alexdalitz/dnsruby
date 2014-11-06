@@ -829,15 +829,13 @@ module Dnsruby
       end
 
       unless client_queue.kind_of?(Queue)
-        # TODO: Raise here?
-        Dnsruby.log.error('Wrong type for client_queue in Resolver# send_async')
+        log_and_raise('Wrong type for client_queue in Resolver# send_async')
         # @TODO@ Handle different queue tuples - push this to generic send_error method
         client_queue.push([client_query_id, ArgumentError.new('Wrong type of client_queue passed to Dnsruby::Resolver# send_async - should have been Queue, was #{client_queue.class}')])
         return
       end
 
       unless msg.kind_of?Message
-        # TODO: Raise here?
         Dnsruby.log.error{'Wrong type for msg in Resolver# send_async'}
         # @TODO@ Handle different queue tuples - push this to generic send_error method
         client_queue.push([client_query_id, ArgumentError.new("Wrong type of msg passed to Dnsruby::Resolver# send_async - should have been Message, was #{msg.class}")])
