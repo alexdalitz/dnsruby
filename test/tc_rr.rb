@@ -1,27 +1,27 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
 include Dnsruby
 class TestRR < Minitest::Test
   def test_rr
-    #------------------------------------------------------------------------------
-    # Canned data.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Canned data.
+    # ------------------------------------------------------------------------------
 
     name			= "foo.example.com";
     klass			= "IN";
@@ -104,8 +104,8 @@ class TestRR < Minitest::Test
       :area         => '0020',
       :id           => '00800a123456',
       :sel          => '00',
-      #      #:address => '4700580005a001000002000800a12345600'
-      #      :address => '47000580005a0000001000002000800a12345600'
+      #       #:address => '4700580005a001000002000800a12345600'
+      #       :address => '47000580005a0000001000002000800a12345600'
     },
     {	#[15]
       :type         => Types.PTR,
@@ -181,9 +181,9 @@ class TestRR < Minitest::Test
     ]
 
 
-    #------------------------------------------------------------------------------
-    # Create the packet
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Create the packet
+    # ------------------------------------------------------------------------------
 
     message = Message.new
     assert(message,         'Message created');
@@ -198,9 +198,9 @@ class TestRR < Minitest::Test
       message.add_answer(rr);
     end
 
-    #------------------------------------------------------------------------------
-    # Re-create the packet from data.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Re-create the packet from data.
+    # ------------------------------------------------------------------------------
     data = message.encode;
     assert(data,            'Packet has data after pushes');
 
@@ -216,7 +216,7 @@ class TestRR < Minitest::Test
       ret_rr = answer[i]
       i += 1
       rec.each do |key, value|
-        #        method = key+'=?'
+        #         method = key+'=?'
         x = ret_rr.send(key)
         if (ret_rr.kind_of?RR::CERT and (key == :alg or key == :certtype))
           assert_equal(value.to_s, x.code.to_s.downcase, "Packet returned wrong answer section for #{ret_rr.to_s}, #{key}")
@@ -244,7 +244,7 @@ class TestRR < Minitest::Test
       assert_equal(klass,      	rr.klass.to_s,   "#{type} - class() correct");
       assert_equal(ttl,        	rr.ttl,     "#{type} - ttl() correct");
 
-      #	foreach my $meth (keys %{data}) {
+      # 	foreach my $meth (keys %{data}) {
       data.keys.each do |meth|
         ret = rr.send(meth)
         if (rr.kind_of?RR::CERT and (meth == :alg or meth == :certtype))

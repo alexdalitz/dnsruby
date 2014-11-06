@@ -6,7 +6,7 @@ class Section < Array
     super(0)
   end
 
-  # Return the rrset of the specified type in this section
+  #  Return the rrset of the specified type in this section
   def rrset(name, type=Types.A, klass=Classes::IN)
     rrs = select{|rr|
       type_ok = (rr.type==type)
@@ -25,7 +25,7 @@ class Section < Array
     rrset
   end
 
-  # Return an array of all the rrsets in the section
+  #  Return an array of all the rrsets in the section
   def rrsets(type = nil, include_opt = false)
     if type && !(Types === type)
       type = Types.new(type)
@@ -33,20 +33,20 @@ class Section < Array
     ret = []
     each do |rr|
       next if (!include_opt && (rr.type == Types::OPT))
-      #          if (type)
-      #            next if ((rr.type == Types.RRSIG) && (type != Types.RRSIG) && (rr.type_covered != type))
-      #            next if (rr.type != type)
-      #          end
+      #           if (type)
+      #             next if ((rr.type == Types.RRSIG) && (type != Types.RRSIG) && (rr.type_covered != type))
+      #             next if (rr.type != type)
+      #           end
       if (type)
-        # if this is an rrsig type, then :
-        #    only include it if the type_covered is the type requested,
-        #    OR if the type requested is an RRSIG
+        #  if this is an rrsig type, then :
+        #     only include it if the type_covered is the type requested,
+        #     OR if the type requested is an RRSIG
         if rr.type == Types::RRSIG
           if (rr.type_covered == type) || (type == Types::RRSIG)
           else
             next
           end
-          #              next if ((rr.type_covered != type) || (type != Types.RRSIG))
+          #               next if ((rr.type_covered != type) || (type != Types.RRSIG))
         elsif rr.type != type
           next
         end
@@ -77,9 +77,9 @@ class Section < Array
   end
 
   def remove_rrset(name, type)
-    # Remove all RRs with the name and type from the section.
-    # Need to worry about header counts here - can we get Message to
-    # update the counts itself, rather than the section worrying about it?
+    #  Remove all RRs with the name and type from the section.
+    #  Need to worry about header counts here - can we get Message to
+    #  update the counts itself, rather than the section worrying about it?
     rrs_to_delete = []
     each do |rr|
       next if rr.rr_type == Types::OPT

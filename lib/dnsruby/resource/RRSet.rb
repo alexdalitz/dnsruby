@@ -8,7 +8,7 @@ module Dnsruby
 # This class also stores the RRSIG records which cover the RRSet
 class RRSet
   include Comparable
-  # The number of RRSIGs stored in this RRSet
+  #  The number of RRSIGs stored in this RRSet
   attr_reader :num_sigs
   def initialize(rrs = [])
     if (!rrs.instance_of?Array)
@@ -27,7 +27,7 @@ class RRSet
   def sigs
     return @rrs[@rrs.length-@num_sigs, @num_sigs]
   end
-  # The RRs (not RRSIGs) stored in this RRSet
+  #  The RRs (not RRSIGs) stored in this RRSet
   def rrs
     return @rrs[0, @rrs.length-@num_sigs]
   end
@@ -50,16 +50,16 @@ class RRSet
     return true
   end
 
-  #Add the RR to this RRSet
-  #Takes a copy of the RR by default. To suppress this, pass false
-  #as the second parameter.
+  # Add the RR to this RRSet
+  # Takes a copy of the RR by default. To suppress this, pass false
+  # as the second parameter.
   def add(rin, do_clone = true)
     if (rin.instance_of?RRSet)
       ret = false
       [rin.rrs, rin.sigs].each {|rr| ret = add(rr)}
       return ret
     end
-    #      r = RR.create(r.to_s) # clone the record
+    #       r = RR.create(r.to_s) # clone the record
     r = nil
     if do_clone
       r = rin.clone
@@ -69,11 +69,11 @@ class RRSet
     if (@rrs.size() == 0) #  && !(r.type == Types.RRSIG))
       return privateAdd(r)
     end
-    # Check the type, klass and ttl are correct
+    #  Check the type, klass and ttl are correct
     first = @rrs[0]
     if (!r.sameRRset(first))
       return false
-      #        raise ArgumentError.new("record does not match rrset")
+      #         raise ArgumentError.new("record does not match rrset")
     end
 
     if (!(r.type == Types::RRSIG) && (!(first.type == Types::RRSIG)))
@@ -89,12 +89,12 @@ class RRSet
     end
 
     return privateAdd(r)
-    #      return true
+    #       return true
   end
 
   def <=>(other)
-    #      return 1 if ((!other) || !(other.name) || !(other.type))
-    #      return -1 if (!@name)
+    #       return 1 if ((!other) || !(other.name) || !(other.type))
+    #       return -1 if (!@name)
     if (name.canonical == other.name.canonical)
       return type.code <=> other.type.code
     else
@@ -103,8 +103,8 @@ class RRSet
   end
 
   def sort_canonical
-    #Make a list, for all the RRs, where each RR contributes
-    #the canonical RDATA encoding
+    # Make a list, for all the RRs, where each RR contributes
+    # the canonical RDATA encoding
     canonical_rrs = {}
     self.rrs.each do |rr|
       data = MessageEncoder.new {|msg|
@@ -135,7 +135,7 @@ class RRSet
     }
     return true
   end
-  #Delete the RR from this RRSet
+  # Delete the RR from this RRSet
   def delete(rr)
     @rrs.delete(rr)
   end
@@ -147,18 +147,18 @@ class RRSet
   def [](index)
     return @rrs[index]
   end
-  #Return the type of this RRSet
+  # Return the type of this RRSet
   def type
     if (@rrs[0])
       return @rrs[0].type
     end
     return nil
   end
-  #Return the klass of this RRSet
+  # Return the klass of this RRSet
   def klass
     return @rrs[0].klass
   end
-  #Return the ttl of this RRSet
+  # Return the ttl of this RRSet
   def ttl
     return @rrs[0].ttl
   end

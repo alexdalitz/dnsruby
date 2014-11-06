@@ -1,29 +1,29 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
   class RR
     module IN
       class PX < RR
         ClassHash[[TypeValue = Types::PX, ClassValue = Classes::IN]] = self #:nodoc: all
 
-        #The preference given to this RR.
+        # The preference given to this RR.
         attr_accessor :preference
-        #The RFC822 part of the RFC1327 mapping information.
+        # The RFC822 part of the RFC1327 mapping information.
         attr_accessor :map822
-        #The X.400 part of the RFC1327 mapping information.
+        # The X.400 part of the RFC1327 mapping information.
         attr_accessor :mapx400
 
         def from_hash(hash) #:nodoc: all

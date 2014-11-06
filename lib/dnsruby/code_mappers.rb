@@ -25,7 +25,7 @@ module Dnsruby
     NOTAUTH = 9       # RFC 2136
     NOTZONE = 10       # RFC 2136
 
-    #    BADVERS = 16 # an EDNS ExtendedRCode
+    #     BADVERS = 16 # an EDNS ExtendedRCode
     BADSIG = 16
     BADKEY = 17
     BADTIME = 18
@@ -44,9 +44,9 @@ module Dnsruby
   class Classes < CodeMapper
     IN        = 1       # RFC 1035
     CH        = 3       # RFC 1035
-    #    CHAOS        = 3       # RFC 1035
+    #     CHAOS        = 3       # RFC 1035
     HS        = 4       # RFC 1035
-    #    HESIOD        = 4       # RFC 1035
+    #     HESIOD        = 4       # RFC 1035
     NONE      = 254     # RFC 2136
     ANY       = 255     # RFC 1035
     update()
@@ -65,10 +65,10 @@ module Dnsruby
       set_code(arg)
     end
 
-    # classesbyval and classesbyname functions are wrappers around the
-    # similarly named hashes. They are used for 'unknown' DNS RR classess
-    # (RFC3597)
-    # See typesbyval and typesbyname, these beasts have the same functionality
+    #  classesbyval and classesbyname functions are wrappers around the
+    #  similarly named hashes. They are used for 'unknown' DNS RR classess
+    #  (RFC3597)
+    #  See typesbyval and typesbyname, these beasts have the same functionality
     def Classes.classesbyname(name) #:nodoc: all
       name.upcase!;
       if to_code(name)
@@ -93,7 +93,7 @@ module Dnsruby
       if (val.class == String)
         if ((val =~ /^\s*0*([0-9]+)\s*$/) == nil)
           raise ArgumentError,  "classesbybal() argument is not numeric (#{val})" # unless  val.gsub!("^\s*0*([0-9]+)\s*$", "$1")
-          #          val =~ s/^\s*0*([0-9]+)\s*$/$1/o;#
+          #           val =~ s/^\s*0*([0-9]+)\s*$/$1/o;#
         end
         val = $1.to_i
       end
@@ -106,9 +106,9 @@ module Dnsruby
     end
   end
 
-  # The RR types explicitly supported by Dnsruby.
-  #
-  # New RR types should be added to this set
+  #  The RR types explicitly supported by Dnsruby.
+  # 
+  #  New RR types should be added to this set
   class Types < CodeMapper
     SIGZERO   = 0       # RFC2931 consider this a pseudo type
     A         = 1       # RFC 1035, Section 3.4.1
@@ -150,7 +150,7 @@ module Dnsruby
     CERT      = 37      # RFC 2538
     DNAME     = 39      # RFC 2672
     OPT       = 41      # RFC 2671
-    #    APL       = 42      # RFC 3123
+    #     APL       = 42      # RFC 3123
     DS        = 43      # RFC 4034
     SSHFP     = 44      # RFC 4255
     IPSECKEY  = 45      # RFC 4025
@@ -190,12 +190,12 @@ module Dnsruby
       set_code(arg)
     end
 
-    #--
-    # typesbyval and typesbyname functions are wrappers around the similarly named
-    # hashes. They are used for 'unknown' DNS RR types (RFC3597)
-    # typesbyname returns they TYPEcode as a function of the TYPE
-    # mnemonic. If the TYPE mapping is not specified the generic mnemonic
-    # TYPE### is returned.
+    # --
+    #  typesbyval and typesbyname functions are wrappers around the similarly named
+    #  hashes. They are used for 'unknown' DNS RR types (RFC3597)
+    #  typesbyname returns they TYPEcode as a function of the TYPE
+    #  mnemonic. If the TYPE mapping is not specified the generic mnemonic
+    #  TYPE### is returned.
     def Types.typesbyname(name)  #:nodoc: all
       name.upcase!
 
@@ -217,19 +217,19 @@ module Dnsruby
     end
 
 
-    # typesbyval returns they TYPE mnemonic as a function of the TYPE
-    # code. If the TYPE mapping is not specified the generic mnemonic
-    # TYPE### is returned.
+    #  typesbyval returns they TYPE mnemonic as a function of the TYPE
+    #  code. If the TYPE mapping is not specified the generic mnemonic
+    #  TYPE### is returned.
     def Types.typesbyval(val) #:nodoc: all
       if (!defined?val)
         raise ArgumentError,  "Net::DNS::typesbyval() argument is not defined"
       end
 
       if val.class == String
-        #      if val.gsub!("^\s*0*(\d+)\s*$", "$1")
+        #       if val.gsub!("^\s*0*(\d+)\s*$", "$1")
         if ((val =~ /^\s*0*(\d+)\s*$", "$1/o) == nil)
           raise ArgumentError,  "Net::DNS::typesbyval() argument (#{val}) is not numeric"
-          #          val =~s/^\s*0*(\d+)\s*$/$1/o;
+          #           val =~s/^\s*0*(\d+)\s*$/$1/o;
         end
 
         val = $1.to_i
@@ -262,7 +262,7 @@ module Dnsruby
     OPT         = 41     # RFC 2671
   end
 
-  # http://www.iana.org/assignments/dns-sec-alg-numbers/
+  #  http://www.iana.org/assignments/dns-sec-alg-numbers/
   class Algorithms < CodeMapper
     RESERVED   = 0
     RSAMD5     = 1
@@ -277,15 +277,15 @@ module Dnsruby
     PRIVATEDNS = 253
     PRIVATEOID = 254
     update()
-    # Referred to as Algorithms.DSA_NSEC3_SHA1
+    #  Referred to as Algorithms.DSA_NSEC3_SHA1
     add_pair("DSA-NSEC3-SHA1", 6)
-    # Referred to as Algorithms.RSASHA1_NSEC3_SHA1
+    #  Referred to as Algorithms.RSASHA1_NSEC3_SHA1
     add_pair("RSASHA1-NSEC3-SHA1", 7)
-    # Referred to as Algorithms.ECC_GOST
+    #  Referred to as Algorithms.ECC_GOST
     add_pair("ECC-GOST",12)
   end
 
-  # http://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml
+  #  http://www.iana.org/assignments/dnssec-nsec3-parameters/dnssec-nsec3-parameters.xhtml
   class Nsec3HashAlgorithms < CodeMapper
     RESERVED = 0
     update()

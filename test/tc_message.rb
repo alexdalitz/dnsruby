@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -20,13 +20,13 @@ class TestMessage < Minitest::Test
 
   include Dnsruby
 
-  # Creates and returns sample message:
-  #
-  # ;; QUESTION SECTION (1  record)
-  # ;; cnn.com.	IN	A
-  # ;; Security Level : UNCHECKED
-  # ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 7195
-  # ;; flags: ; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+  #  Creates and returns sample message:
+  # 
+  #  ;; QUESTION SECTION (1  record)
+  #  ;; cnn.com.	IN	A
+  #  ;; Security Level : UNCHECKED
+  #  ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 7195
+  #  ;; flags: ; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
   def sample_message
     Message.new('cnn.com', 'A')
   end
@@ -63,7 +63,7 @@ class TestMessage < Minitest::Test
     message = sample_message
     assert message.get_opt.nil?
 
-    # Add an OPT record
+    #  Add an OPT record
     opt = RR::OPT.new(4096, 32768)
     message.additional << opt
 
@@ -82,6 +82,6 @@ class TestMessage < Minitest::Test
     test.(msg_a, msg_b, false)
     test.(msg_a, msg_a.to_s, false)
     test.(msg_a, nil, false)
-    # TODO: Add more tests.
+    #  TODO: Add more tests.
   end
 end

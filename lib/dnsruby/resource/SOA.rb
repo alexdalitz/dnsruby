@@ -1,45 +1,45 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
   class RR
     class SOA < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::SOA #:nodoc: all
 
-      #The domain name of the original or primary nameserver for
-      #this zone.
+      # The domain name of the original or primary nameserver for
+      # this zone.
       attr_accessor :mname
-      #A domain name that specifies the mailbox for the person
-      #responsible for this zone.
+      # A domain name that specifies the mailbox for the person
+      # responsible for this zone.
       attr_accessor :rname
-      #The zone's serial number.
+      # The zone's serial number.
       attr_accessor :serial
-      #The zone's refresh interval.
-      #How often, in seconds, a secondary nameserver is to check for
-      #updates from the primary nameserver.
+      # The zone's refresh interval.
+      # How often, in seconds, a secondary nameserver is to check for
+      # updates from the primary nameserver.
       attr_accessor :refresh
-      #The zone's retry interval.
-      #How often, in seconds, a secondary nameserver is to retry, after a
-      #failure to check for a refresh
+      # The zone's retry interval.
+      # How often, in seconds, a secondary nameserver is to retry, after a
+      # failure to check for a refresh
       attr_accessor :retry
-      #The zone's expire interval.
-      #How often, in seconds, a secondary nameserver is to use the data
-      #before refreshing from the primary nameserver
+      # The zone's expire interval.
+      # How often, in seconds, a secondary nameserver is to use the data
+      # before refreshing from the primary nameserver
       attr_accessor :expire
-      #The minimum (default) TTL for records in this zone.
+      # The minimum (default) TTL for records in this zone.
       attr_accessor :minimum
 
       def from_data(data) #:nodoc: all

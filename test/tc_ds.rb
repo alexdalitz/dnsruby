@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -62,11 +62,11 @@ class DsTest < Minitest::Test
   def test_ds_values
     ds = Dnsruby::RR.create(INPUT)
     ds.digest_type = 2
-    # Be liberal in what you accept...
+    #  Be liberal in what you accept...
 #    begin
 #      ds.digest_type = 3
 #      fail
-#
+# 
 #    rescue DecodeError
 #    end
   end
@@ -74,17 +74,17 @@ class DsTest < Minitest::Test
   def test_ds_digest
      key = Dnsruby::RR.create(DNSKEY)
 
-     # and check it is the same as DS
+     #  and check it is the same as DS
      right_ds = Dnsruby::RR.create(DS1)
      ds = Dnsruby::RR::DS.from_key(key, 1);
      assert_equal(ds.to_s, right_ds.to_s)
   end
 
   def test_sha2
-     # Create a new DS from the DNSKEY,
+     #  Create a new DS from the DNSKEY,
      key = Dnsruby::RR.create(DNSKEY)
 
-     # and check it is the same as DS
+     #  and check it is the same as DS
      right_ds = Dnsruby::RR.create(DS2)
      ds = Dnsruby::RR::DS.from_key(key, 2);
      assert_equal(ds.to_s, right_ds.to_s)

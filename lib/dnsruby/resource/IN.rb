@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
   class RR
     ClassInsensitiveTypes = {
@@ -55,20 +55,20 @@ module Dnsruby
       Types::DHCID => DHCID
     } #:nodoc: all
 
-    # module IN contains ARPA Internet specific RRs
+    #  module IN contains ARPA Internet specific RRs
     module IN
       ClassValue = Classes::IN
 
       ClassInsensitiveTypes::values::each {|s|
         c = Class.new(s)
-        #          c < Record
+        #           c < Record
         c.const_set(:TypeValue, s::TypeValue)
         c.const_set(:ClassValue, ClassValue)
         ClassHash[[s::TypeValue, ClassValue]] = c
         self.const_set(s.name.sub(/.*::/, ''), c)
       }
 
-      # RFC 1035, Section 3.4.2 (deprecated)
+      #  RFC 1035, Section 3.4.2 (deprecated)
       class WKS < RR
         ClassHash[[TypeValue = Types::WKS, ClassValue = ClassValue]] = self  #:nodoc: all
 

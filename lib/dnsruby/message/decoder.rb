@@ -43,7 +43,7 @@ class MessageDecoder #:nodoc: all
     star = ?*
 
     if (littlec.class != Fixnum)
-      # We're using Ruby 1.9 - convert the codes
+      #  We're using Ruby 1.9 - convert the codes
       littlec = littlec.getbyte(0)
       bigc = bigc.getbyte(0)
       littleh = littleh.getbyte(0)
@@ -129,10 +129,10 @@ class MessageDecoder #:nodoc: all
 
   def get_label
     begin
-      #        label = Name::Label.new(Name::decode(self.get_string))
+      #         label = Name::Label.new(Name::decode(self.get_string))
       label = Name::Label.new(self.get_string)
       return label
-        #         return Name::Label::Str.new(self.get_string)
+        #          return Name::Label::Str.new(self.get_string)
     rescue ResolvError => e
       raise DecodeError.new(e) # Turn it into something more suitable
     end
@@ -150,8 +150,8 @@ class MessageDecoder #:nodoc: all
     type, klass, ttl = self.get_unpack('nnN')
     klass = Classes.new(klass)
     typeclass = RR.get_class(type, klass)
-    # @TODO@ Trap decode errors here, and somehow mark the record as bad.
-    # Need some way to represent raw data only
+    #  @TODO@ Trap decode errors here, and somehow mark the record as bad.
+    #  Need some way to represent raw data only
     rec = self.get_length16 { typeclass.decode_rdata(self) }
     rec.name = name
     rec.ttl = ttl

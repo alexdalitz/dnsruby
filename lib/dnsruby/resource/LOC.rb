@@ -1,66 +1,66 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
   class RR
-      #Class for DNS Location (LOC) resource records.  See RFC 1876 for
-      #details.
+      # Class for DNS Location (LOC) resource records.  See RFC 1876 for
+      # details.
     class LOC < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::LOC #:nodoc: all
 
-      #The version number of the representation; programs should
-      #always check this.  Dnsruby currently supports only version 0.
+      # The version number of the representation; programs should
+      # always check this.  Dnsruby currently supports only version 0.
       attr_accessor :version
       @version = 0
 
-      #The diameter of a sphere enclosing the described entity,
-      #in centimeters.
+      # The diameter of a sphere enclosing the described entity,
+      # in centimeters.
       attr_accessor :size
-      #The horizontal precision of the data, in centimeters.
+      # The horizontal precision of the data, in centimeters.
       attr_accessor :horiz_pre
-      #The vertical precision of the data, in centimeters.
+      # The vertical precision of the data, in centimeters.
       attr_accessor :vert_pre
-      #The latitude of the center of the sphere described by
-      #the size method, in thousandths of a second of arc.  2**31
-      #represents the equator; numbers above that are north latitude.
+      # The latitude of the center of the sphere described by
+      # the size method, in thousandths of a second of arc.  2**31
+      # represents the equator; numbers above that are north latitude.
       attr_accessor :latitude
-      #The longitude of the center of the sphere described by
-      #the size method, in thousandths of a second of arc.  2**31
-      #represents the prime meridian; numbers above that are east
-      #longitude.
+      # The longitude of the center of the sphere described by
+      # the size method, in thousandths of a second of arc.  2**31
+      # represents the prime meridian; numbers above that are east
+      # longitude.
       attr_accessor :longitude
-      #The altitude of the center of the sphere described by
-      #the size method, in centimeters, from a base of 100,000m
-      #below the WGS 84 reference spheroid used by GPS.
+      # The altitude of the center of the sphere described by
+      # the size method, in centimeters, from a base of 100,000m
+      # below the WGS 84 reference spheroid used by GPS.
       attr_accessor :altitude
-      # Powers of 10 from 0 to 9 (used to speed up calculations).
+      #  Powers of 10 from 0 to 9 (used to speed up calculations).
       POWEROFTEN = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, 100_000_000, 1_000_000_000]
 
-      # Reference altitude in centimeters (see RFC 1876).
+      #  Reference altitude in centimeters (see RFC 1876).
       REFERENCE_ALT = 100_000 * 100;
 
-      # Reference lat/lon (see RFC 1876).
+      #  Reference lat/lon (see RFC 1876).
       REFERENCE_LATLON = 2**31;
 
-      # Conversions to/from thousandths of a degree.
+      #  Conversions to/from thousandths of a degree.
       CONV_SEC = 1000;
       CONV_MIN = 60 * CONV_SEC;
       CONV_DEG = 60 * CONV_MIN;
 
-      # Defaults (from RFC 1876, Section 3).
+      #  Defaults (from RFC 1876, Section 3).
       DEFAULT_MIN       = 0;
       DEFAULT_SEC       = 0;
       DEFAULT_SIZE      = 1;
@@ -69,8 +69,8 @@ module Dnsruby
 
 
       def latlon2dms(rawmsec, hems)
-        # Tried to use modulus here, but Perl dumped core if
-        # the value was >= 2**31.
+        #  Tried to use modulus here, but Perl dumped core if
+        #  the value was >= 2**31.
 
         abs  = (rawmsec - REFERENCE_LATLON).abs;
         deg  = (abs / CONV_DEG).round;
@@ -95,13 +95,13 @@ module Dnsruby
         return retval;
       end
 
-      #Returns the latitude and longitude as floating-point degrees.
-      #Positive numbers represent north latitude or east longitude;
-      #negative numbers represent south latitude or west longitude.
-      #
-      #    lat, lon = rr.latlon
-      #    system("xearth", "-pos", "fixed #{lat} #{lon}")
-      #
+      # Returns the latitude and longitude as floating-point degrees.
+      # Positive numbers represent north latitude or east longitude;
+      # negative numbers represent south latitude or west longitude.
+      # 
+      #     lat, lon = rr.latlon
+      #     system("xearth", "-pos", "fixed #{lat} #{lon}")
+      # 
       def latlon
         retlat, retlon = nil
 
@@ -142,7 +142,7 @@ module Dnsruby
 
           size = DEFAULT_SIZE
 
-          # What to do for other versions?
+          #  What to do for other versions?
           version = 0;
 
           horiz_pre = DEFAULT_HORIZ_PRE

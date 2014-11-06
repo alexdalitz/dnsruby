@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 require 'base64'
 begin
 require 'Digest/sha2'
@@ -21,16 +21,16 @@ rescue LoadError
 end
 module Dnsruby
   class RR
-    #RFC4034, section 4
-    #The DS Resource Record refers to a DNSKEY RR and is used in the DNS
-    #DNSKEY authentication process.  A DS RR refers to a DNSKEY RR by
-    #storing the key tag, algorithm number, and a digest of the DNSKEY RR.
-    #Note that while the digest should be sufficient to identify the
-    #public key, storing the key tag and key algorithm helps make the
-    #identification process more efficient.  By authenticating the DS
-    #record, a resolver can authenticate the DNSKEY RR to which the DS
-    #record points.  The key authentication process is described in
-    #[RFC4035].
+    # RFC4034, section 4
+    # The DS Resource Record refers to a DNSKEY RR and is used in the DNS
+    # DNSKEY authentication process.  A DS RR refers to a DNSKEY RR by
+    # storing the key tag, algorithm number, and a digest of the DNSKEY RR.
+    # Note that while the digest should be sufficient to identify the
+    # public key, storing the key tag and key algorithm helps make the
+    # identification process more efficient.  By authenticating the DS
+    # record, a resolver can authenticate the DNSKEY RR to which the DS
+    # record points.  The key authentication process is described in
+    # [RFC4035].
 
     class DS < RR
       class DigestTypes < CodeMapper
@@ -43,32 +43,32 @@ module Dnsruby
       ClassValue = nil #:nodoc: all
       TypeValue = Types::DS #:nodoc: all
 
-      #The RDATA for a DS RR consists of a 2 octet Key Tag field, a 1 octet
-      #Algorithm field, a 1 octet Digest Type field, and a Digest field.
-      #
-      #                     1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
-      # 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-      #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-      #|           Key Tag             |  Algorithm    |  Digest Type  |
-      #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-      #/                                                               /
-      #/                            Digest                             /
-      #/                                                               /
-      #+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      # The RDATA for a DS RR consists of a 2 octet Key Tag field, a 1 octet
+      # Algorithm field, a 1 octet Digest Type field, and a Digest field.
+      # 
+      #                      1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
+      #  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      # |           Key Tag             |  Algorithm    |  Digest Type  |
+      # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      # /                                                               /
+      # /                            Digest                             /
+      # /                                                               /
+      # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 
-      #The Key Tag field lists the key tag of the DNSKEY RR referred to by
-      #the DS record, in network byte order.
+      # The Key Tag field lists the key tag of the DNSKEY RR referred to by
+      # the DS record, in network byte order.
       attr_accessor :key_tag
-      #The algorithm used for this key
-      #See Dnsruby::Algorithms for permitted values
+      # The algorithm used for this key
+      # See Dnsruby::Algorithms for permitted values
       attr_reader :algorithm
-      #The DS RR refers to a DNSKEY RR by including a digest of that DNSKEY
-      #RR.  The Digest Type field identifies the algorithm used to construct
-      #the digest.
+      # The DS RR refers to a DNSKEY RR by including a digest of that DNSKEY
+      # RR.  The Digest Type field identifies the algorithm used to construct
+      # the digest.
       attr_reader :digest_type
-      #The DS record refers to a DNSKEY RR by including a digest of that
-      #DNSKEY RR.
+      # The DS record refers to a DNSKEY RR by including a digest of that
+      # DNSKEY RR.
       attr_accessor :digest
       attr_accessor :digestbin
 
@@ -105,7 +105,7 @@ module Dnsruby
         end
       end
 
-      # Return the digest of the specified DNSKEY RR
+      #  Return the digest of the specified DNSKEY RR
       def digest_key(*args) # key, digest_type)
         digest_type = @digest_type
         key = args[0]
@@ -133,7 +133,7 @@ module Dnsruby
 
       end
 
-      # Check if the key's digest is the same as that stored in the DS record
+      #  Check if the key's digest is the same as that stored in the DS record
       def check_key(key)
         if ((key.key_tag == @key_tag) && (key.algorithm == @algorithm))
 
@@ -151,35 +151,35 @@ module Dnsruby
 
 
       def DS.from_key(key, digest_type)
-## The key must not be a NULL key.
+# # The key must not be a NULL key.
 #    if ((key.flags & 0xc000 ) == 0xc000 )
-#	puts "\nCreating a DS record for a NULL key is illegal"
+# 	puts "\nCreating a DS record for a NULL key is illegal"
 #        return
 #    end
-#
+# 
 #    # Bit 0 must not be set.
 #    if (key.flags & 0x8000)
-#	puts "\nCreating a DS record for a key with flag bit 0 set " +
-#	    "to 0 is illegal"
+# 	puts "\nCreating a DS record for a key with flag bit 0 set " +
+# 	    "to 0 is illegal"
 #          return
 #    end
-#
-    # Bit 6 must be set to 0 bit 7 must be set to 1
+# 
+    #  Bit 6 must be set to 0 bit 7 must be set to 1
     if (( key.flags & 0x300) != 0x100)
 	puts "\nCreating a DS record for a key with flags 6 and 7 not set "+
 	    "0  and 1 respectively is illegal"
          return
     end
-#
-#
+# 
+# 
 #    if (key.protocol  != 3 )
-#	puts "\nCreating a DS record for a non DNSSEC (protocol=3) " +
-#	    "key is illegal"
+# 	puts "\nCreating a DS record for a non DNSSEC (protocol=3) " +
+# 	    "key is illegal"
 #          return
 #    end
-#
+# 
         digest_type = get_digest_type(digest_type)
-        # Create a new DS record from the specified key
+        #  Create a new DS record from the specified key
         ds = RR.create(:name => key.name, :type => "DS", :ttl => key.ttl,
                       :key_tag => key.key_tag,
                      :digest_type => digest_type, :algorithm => key.algorithm)
@@ -215,7 +215,7 @@ module Dnsruby
           (index..end_index).each {|i|
             if (comment_index = data[i].index(";"))
               buf += data[i].slice(0, comment_index)
-              # @TODO@ We lose the comments here - we should really keep them for when we write back to string format?
+              #  @TODO@ We lose the comments here - we should really keep them for when we write back to string format?
               break
             else
               buf += data[i]

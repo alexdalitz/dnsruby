@@ -1,25 +1,25 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
 class TestMisc < Minitest::Test
   def test_wildcard
-    # test to make sure that wildcarding works.
-    #
+    #  test to make sure that wildcarding works.
+    # 
     rr = Dnsruby::RR.create('*.t.dnsruby.validation-test-servers.nominet.org.uk 60 IN A 10.0.0.1')
 
     assert(rr, 'RR got made')
@@ -33,17 +33,17 @@ class TestMisc < Minitest::Test
 
   def test_misc
 
-    #
-    # Make sure the underscore in SRV hostnames work.
-    #
+    # 
+    #  Make sure the underscore in SRV hostnames work.
+    # 
     srv = Dnsruby::RR.create('_rvp._tcp.t.dnsruby.validation-test-servers.nominet.org.uk. 60 IN SRV 0 0 80 im.bastardsinc.biz')
 
     assert(!$@,  'No errors')
     assert(srv, 'SRV got made')
 
 
-    #~ # Test that the 5.005 Use of uninitialized value at
-    #~ # /usr/local/lib/perl5/site_perl/5.005/Net/DNS/RR.pm line 639. bug is gone
+    # ~ # Test that the 5.005 Use of uninitialized value at
+    # ~ # /usr/local/lib/perl5/site_perl/5.005/Net/DNS/RR.pm line 639. bug is gone
     rr = Dnsruby::RR.create('mx.t.dnsruby.validation-test-servers.nominet.org.uk 60 IN MX 10 a.t.dnsruby.validation-test-servers.nominet.org.uk')
     assert(rr, 'RR created')
 
@@ -69,27 +69,27 @@ class TestMisc < Minitest::Test
 
   def test_TXT_RR
 
-    #
-    #
-    # Below are some thests that have to do with TXT RRs
-    #
-    #
+    # 
+    # 
+    #  Below are some thests that have to do with TXT RRs
+    # 
+    # 
 
 
-    # QUESTION SECTION:
-    #txt2.t.net-dns.org.		IN	TXT
+    #  QUESTION SECTION:
+    # txt2.t.net-dns.org.		IN	TXT
 
-    # ANSWER SECTION:
-    #txt2.t.net-dns.org.	60	IN	TXT	"Net-DNS\ complicated $tuff" "sort of \" text\ and binary \000 data"
+    #  ANSWER SECTION:
+    # txt2.t.net-dns.org.	60	IN	TXT	"Net-DNS\ complicated $tuff" "sort of \" text\ and binary \000 data"
 
-    # AUTHORITY SECTION:
-    #net-dns.org.		3600	IN	NS	ns1.net-dns.org.
-    #net-dns.org.		3600	IN	NS	ns.ripe.net.
-    #net-dns.org.		3600	IN	NS	ns.hactrn.net.
+    #  AUTHORITY SECTION:
+    # net-dns.org.		3600	IN	NS	ns1.net-dns.org.
+    # net-dns.org.		3600	IN	NS	ns.ripe.net.
+    # net-dns.org.		3600	IN	NS	ns.hactrn.net.
 
-    # ADDITIONAL SECTION:
-    #ns1.net-dns.org.	3600	IN	A	193.0.4.49
-    #ns1.net-dns.org.	3600	IN	AAAA
+    #  ADDITIONAL SECTION:
+    # ns1.net-dns.org.	3600	IN	A	193.0.4.49
+    # ns1.net-dns.org.	3600	IN	AAAA
 
     uuencodedPacket=%w{
 11 99 85 00 00 01
@@ -117,11 +117,11 @@ class TestMisc < Minitest::Test
     txtRr=(packet.answer)[0]
     assert_equal('Net-DNS; complicated $tuff',txtRr.strings[0],"First Char string in TXT RR read from wireformat")
 
-    # Compare the second char_str this contains a NULL byte (space NULL
-    # space=200020 in hex)
+    #  Compare the second char_str this contains a NULL byte (space NULL
+    #  space=200020 in hex)
 
     temp = (txtRr.strings)[1].unpack('H*')[0]
-    #    #assert_equal(unpack('H*',(TXTrr.char_str_list())[1]),"736f7274206f66202220746578743b20616e642062696e61727920002064617461", "Second Char string in TXT RR read from wireformat")
+    #     #assert_equal(unpack('H*',(TXTrr.char_str_list())[1]),"736f7274206f66202220746578743b20616e642062696e61727920002064617461", "Second Char string in TXT RR read from wireformat")
     assert_equal("736f7274206f66202220746578743b20616e642062696e61727920002064617461", temp,"Second Char string in TXT RR read from wireformat")
 
 
@@ -131,7 +131,7 @@ class TestMisc < Minitest::Test
     assert_equal((txtRr2.strings)[1],'Test2',"Second Char string in TXT RR read from zonefileformat")
 
 
-    #    txtRr3   = RR.create("baz.example.com 3600 HS TXT '\"' 'Char Str2'")
+    #     txtRr3   = RR.create("baz.example.com 3600 HS TXT '\"' 'Char Str2'")
     txtRr3   = Dnsruby::RR.create("baz.example.com 3600 IN TXT '\"' 'Char Str2'")
 
     assert_equal( (txtRr3.strings)[0],'"',"Escaped \" between the  single quotes")

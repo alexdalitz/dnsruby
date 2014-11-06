@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -53,10 +53,10 @@ class TestCache < Minitest::Test
   end
 
   def test_opt_record
-    # Create a very large message, encode it and decode it - there should be an opt record
-    # test getting that in and out the cache
-    # We should be able to do this in the online test by getting back a very big
-    # record from the test zone
+    #  Create a very large message, encode it and decode it - there should be an opt record
+    #  test getting that in and out the cache
+    #  We should be able to do this in the online test by getting back a very big
+    #  record from the test zone
   end
 
   def test_negative
@@ -64,7 +64,7 @@ class TestCache < Minitest::Test
   end
 
   def test_resolver_do_caching
-    # Get the records back from the test zone
+    #  Get the records back from the test zone
     Dnsruby::PacketSender.clear_caches
     res = Resolver.new("ns0.validation-test-servers.nominet.org.uk.")
     res.do_caching = false
@@ -75,12 +75,12 @@ class TestCache < Minitest::Test
     assert(!ret.cached)
     assert(ret.rcode == RCode.NoError)
     assert(ret.header.aa)
-    # Store the ttls
+    #  Store the ttls
     first_ttls = ret.answer.rrset(
       "overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT).ttl
-    # Wait a while
+    #  Wait a while
     sleep(1)
-    # Ask for the same records
+    #  Ask for the same records
     ret = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
 #    print "#{ret}\n"
     assert(ret.rcode == RCode.NoError)
@@ -88,7 +88,7 @@ class TestCache < Minitest::Test
   end
 
   def test_online
-    # Get the records back from the test zone
+    #  Get the records back from the test zone
     Dnsruby::PacketSender.clear_caches
     Dnsruby::Recursor.clear_caches
     res = SingleResolver.new("ns0.validation-test-servers.nominet.org.uk.")
@@ -99,12 +99,12 @@ class TestCache < Minitest::Test
     assert(!ret.cached)
     assert(ret.rcode == RCode.NoError)
     assert(ret.header.aa)
-    # Store the ttls
+    #  Store the ttls
     first_ttls = ret.answer.rrset(
       "overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT).ttl
-    # Wait a while
+    #  Wait a while
     sleep(1)
-    # Ask for the same records
+    #  Ask for the same records
     query = Message.new("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
     ret = res.send_message(query)
 #    print "#{ret}\n"
@@ -112,16 +112,16 @@ class TestCache < Minitest::Test
     assert(ret.cached)
     second_ttls = ret.answer.rrset(
       "overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT).ttl
-    # make sure the ttl is less the time we waited
+    #  make sure the ttl is less the time we waited
     assert((second_ttls == first_ttls - 1) || (second_ttls == first_ttls - 2),
             "First ttl = #{first_ttls}, second = #{second_ttls}\n")
-    # make sure the header flags (and ID) are right
+    #  make sure the header flags (and ID) are right
     assert(ret.header.id == query.header.id, "First id = #{query.header.id}, cached response was #{ret.header.id}\n")
     assert(!ret.header.aa)
   end
 
   def test_online_uncached
-    # @TODO@ Check that wildcard queries are not cached
+    #  @TODO@ Check that wildcard queries are not cached
   end
 
 end

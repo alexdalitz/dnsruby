@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -24,12 +24,12 @@ class TestResolverConfig < Minitest::Test
     "src_address6"        => 'fc00::1:2:3',
     "src_port"        => 56453,
     "use_tcp"		   => true,
-    #	"stayopen"       => 1,
+    # 	"stayopen"       => 1,
     "ignore_truncation"          => true,
     "recurse"        => false,
     "packet_timeout"    => 5,
-    #	"dnssec"         => 1,
-    #	"force_v4"       => 1,
+    # 	"dnssec"         => 1,
+    # 	"force_v4"       => 1,
   };
 
   ExtendedInput={
@@ -54,18 +54,18 @@ class TestResolverConfig < Minitest::Test
     assert(res, "new returned something");
     assert_instance_of(Dnsruby::Resolver, res, "new() returns an object of the correct class.");
 
-    #    assert(res.config.nameserver,       'nameserver() works');
+    #     assert(res.config.nameserver,       'nameserver() works');
 
     searchlist = ["t.dnsruby.validation-test-servers.nominet.org.uk", "t2.dnsruby.validation-test-servers.nominet.org.uk"];
     assert_equal(res.config.search=searchlist, searchlist, 'setting searchlist returns correctly.');
     assert_equal(res.config.search,               searchlist, 'setting searchlist stickts.');
 
 
-    #~ #diag "\n\nIf you do not have Net::DNS::SEC installed you will see a warning.\n";
-    #~ #diag "It is safe to ignore this\n";
+    # ~ #diag "\n\nIf you do not have Net::DNS::SEC installed you will see a warning.\n";
+    # ~ #diag "It is safe to ignore this\n";
 
     (GoodInput.merge(ExtendedInput)).each do | param, value |
-      #      puts("Setting " + param);
+      #       puts("Setting " + param);
       res.send(param+"=", value)
       assert_equal(res.send(param), value,       "setting #param sticks");
     end;
@@ -76,7 +76,7 @@ class TestResolverConfig < Minitest::Test
     [Dnsruby::SingleResolver.new({:nameserver => ["127.0.0.1"]}),
       Dnsruby::SingleResolver.new({:nameserver => ["::1"]})].each {|res|
       GoodInput.each do | param, value |
-        #      puts("Setting " + param);
+        #       puts("Setting " + param);
         res.send(param+"=", value)
         assert_equal(res.send(param), value,       "setting #param sticks");
       end;

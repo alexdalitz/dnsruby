@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -25,9 +25,9 @@ class TestTKey < Minitest::Test
   def test_tkey
 
 
-    #------------------------------------------------------------------------------
-    # Canned data.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Canned data.
+    # ------------------------------------------------------------------------------
 
     zone	= "example.com"
     name	= "123456789-test"
@@ -36,14 +36,14 @@ class TestTKey < Minitest::Test
     algorithm   = "fake.algorithm.example.com"
     key         = "fake key"
     inception   = 100000 # use a strange fixed inception time to give a fixed
-    # checksum
+    #  checksum
     expiration  = inception + 24*60*60
 
     rr = nil
 
-    #------------------------------------------------------------------------------
-    # Packet creation.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Packet creation.
+    # ------------------------------------------------------------------------------
 
     rr = Dnsruby::RR.create(
       :name       => name,
@@ -69,7 +69,7 @@ class TestTKey < Minitest::Test
     assert_equal(Dnsruby::Classes.IN,                       z.zclass, 'zclass correct')         #5
     assert_equal(Dnsruby::Types.TKEY,                     z.ztype,  'ztype correct')          #6
 
-    #@TODO@ Test TKEY against server!
+    # @TODO@ Test TKEY against server!
 
   end
 

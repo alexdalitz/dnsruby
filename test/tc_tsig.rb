@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -25,26 +25,26 @@ class TestTSig < Minitest::Test
     return (string == "; no data" || string == "; rdlength = 0")
   end
   def test_signed_update
-    #    Dnsruby::Resolver::use_eventmachine(false)
+    #     Dnsruby::Resolver::use_eventmachine(false)
     run_test_client_signs
     run_test_resolver_signs
   end
-  #  def test_signed_update_em
-  #    begin
-  #      Dnsruby::Resolver::use_eventmachine(true)
-  #    rescue RuntimeError
-  #      Dnsruby.log.error("EventMachine not installed - not running tsig EM tests")
-  #      return
-  #    end
-  #    run_test_client_signs
-  #    run_test_resolver_signs
-  #    Dnsruby::Resolver::use_eventmachine(false)
-  #  end
+  #   def test_signed_update_em
+  #     begin
+  #       Dnsruby::Resolver::use_eventmachine(true)
+  #     rescue RuntimeError
+  #       Dnsruby.log.error("EventMachine not installed - not running tsig EM tests")
+  #       return
+  #     end
+  #     run_test_client_signs
+  #     run_test_resolver_signs
+  #     Dnsruby::Resolver::use_eventmachine(false)
+  #   end
 
   def run_test_client_signs
-    # NOTE - client signing is only appropriate if DNSSEC and EDNS are switched
-    # off. Otherwise, the resolver will attempt to alter the flags and add an
-    # EDNS OPT psuedo-record to the query message, invalidating the signing.
+    #  NOTE - client signing is only appropriate if DNSSEC and EDNS are switched
+    #  off. Otherwise, the resolver will attempt to alter the flags and add an
+    #  EDNS OPT psuedo-record to the query message, invalidating the signing.
     tsig = Dnsruby::RR.create({
         :name        => KEY_NAME,
         :type        => "TSIG",
@@ -57,7 +57,7 @@ class TestTSig < Minitest::Test
       })
 
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
-    # Generate update record name, and test it has been made. Then delete it and check it has been deleted
+    #  Generate update record name, and test it has been made. Then delete it and check it has been deleted
     update_name = generate_update_name
     update.absent(update_name)
     update.add(update_name, 'TXT', 100, "test signed update")
@@ -74,11 +74,11 @@ class TestTSig < Minitest::Test
     assert_equal( Dnsruby::RCode.NOERROR, response.rcode)
     assert(response.verified?, "Response has not been verified")
 
-    # Now check the record exists
+    #  Now check the record exists
     rr = res.query(update_name, 'TXT')
     assert_equal("test signed update", rr.answer()[0].strings.join(" "), "TXT record has not been created in zone")
 
-    # Now delete the record
+    #  Now delete the record
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
     update.present(update_name, 'TXT')
     update.delete(update_name)
@@ -88,9 +88,9 @@ class TestTSig < Minitest::Test
     assert_equal( Dnsruby::RCode.NOERROR, response.rcode)
     assert(response.verified?, "Response has not been verified")
 
-    # Now check the record does not exist
+    #  Now check the record does not exist
     Dnsruby::PacketSender.clear_caches
-    # Or else the cache will tell us it still deos!
+    #  Or else the cache will tell us it still deos!
     begin
       rr = res.query(update_name, 'TXT')
       assert(false)
@@ -112,7 +112,7 @@ class TestTSig < Minitest::Test
     res.tsig=KEY_NAME, KEY
 
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
-    # Generate update record name, and test it has been made. Then delete it and check it has been deleted
+    #  Generate update record name, and test it has been made. Then delete it and check it has been deleted
     update_name = generate_update_name
     update.absent(update_name)
     update.add(update_name, 'TXT', 100, "test signed update")
@@ -123,11 +123,11 @@ class TestTSig < Minitest::Test
     assert_equal( Dnsruby::RCode.NOERROR, response.rcode)
     assert(response.verified?, "Response has not been verified")
 
-    # Now check the record exists
+    #  Now check the record exists
     rr = res.query(update_name, 'TXT')
     assert_equal("test signed update", rr.answer()[0].strings.join(" "), "TXT record has not been created in zone")
 
-    # Now delete the record
+    #  Now delete the record
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
     update.present(update_name, 'TXT')
     update.delete(update_name)
@@ -144,9 +144,9 @@ class TestTSig < Minitest::Test
     assert_equal( Dnsruby::RCode.NOERROR, response.rcode)
     assert(response.verified?, "Response has not been verified")
 
-    # Now check the record does not exist
+    #  Now check the record does not exist
     Dnsruby::PacketSender.clear_caches
-    # Make sure the cache doesn't have an old copy!
+    #  Make sure the cache doesn't have an old copy!
     begin
       rr = res.query(update_name, 'TXT')
       assert(false)
@@ -174,7 +174,7 @@ class TestTSig < Minitest::Test
   end
 
   def test_signed_zone_transfer
-    # test TSIG over TCP session
+    #  test TSIG over TCP session
     axfr
     ixfr
   end
@@ -189,20 +189,20 @@ class TestTSig < Minitest::Test
     assert(zt.last_tsigstate==:Verified)
   end
 
-  # We also test IXFR here - this is because we need to update a record (using
-  # TSIG) before we can test ixfr...
+  #  We also test IXFR here - this is because we need to update a record (using
+  #  TSIG) before we can test ixfr...
   def ixfr
-    # Check the SOA serial, do an update, check that the IXFR for that soa serial gives us the update we did,
-    # then delete the updated record
+    #  Check the SOA serial, do an update, check that the IXFR for that soa serial gives us the update we did,
+    #  then delete the updated record
     start_soa_serial = get_soa_serial("validation-test-servers.nominet.org.uk")
 
-    # Now do an update
+    #  Now do an update
     res = Dnsruby::Resolver.new("ns0.validation-test-servers.nominet.org.uk")
     res.query_timeout=10
     res.tsig=KEY_NAME, KEY
 
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
-    # Generate update record name, and test it has been made. Then delete it and check it has been deleted
+    #  Generate update record name, and test it has been made. Then delete it and check it has been deleted
     update_name = Time.now.to_i.to_s + rand(100).to_s + ".update.validation-test-servers.nominet.org.uk"
     update.absent(update_name)
     update.add(update_name, 'TXT', 100, "test zone transfer")
@@ -223,7 +223,7 @@ class TestTSig < Minitest::Test
     assert_equal("test zone transfer", deltas.last.adds.last.strings.join(" "))
     assert(zt.last_tsigstate==nil)
 
-    # Now delete the updated record
+    #  Now delete the updated record
     update = Dnsruby::Update.new("validation-test-servers.nominet.org.uk")
     update.present(update_name, 'TXT')
     update.delete(update_name)

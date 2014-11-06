@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -66,18 +66,18 @@ class TestDNS < Minitest::Test
   end
 
   def test_async_api
-    #@TODO@ Do we really want an async API for Resolv/DNS?
-    #Or would users be better off with Resolver async API?
+    # @TODO@ Do we really want an async API for Resolv/DNS?
+    # Or would users be better off with Resolver async API?
   end
 
   def test_concurrent
-    #@TODO@ What kind of concurrent testing are we going to do on the top-level API?
+    # @TODO@ What kind of concurrent testing are we going to do on the top-level API?
   end
 
   def test_bad_input
-    #
-    # Check that new() is vetting things properly.
-    #
+    # 
+    #  Check that new() is vetting things properly.
+    # 
     Dnsruby.log.level=Logger::FATAL
     [:nameserver].each do |test|
 #      [{}, 'kjghdfkjhase',1,'\1',nil].each do |input|
@@ -155,9 +155,9 @@ class TestDNS < Minitest::Test
   end # test_online
 
   def test_search_query_reverse
-    #
-    # test that getname() DTRT with reverse lookups
-    #
+    # 
+    #  test that getname() DTRT with reverse lookups
+    # 
     tests = [
     {
       :ip => '198.41.0.4',
@@ -187,11 +187,11 @@ class TestDNS < Minitest::Test
     :search => ["t.dnsruby.validation-test-servers.nominet.org.uk", "dnsruby.validation-test-servers.nominet.org.uk"]
     )
 
-    #
-    # test the send_query() appends the default domain and
-    # searchlist correctly.
-    #
-    #@TODO@ Should really be done in Config test!
+    # 
+    #  test the send_query() appends the default domain and
+    #  searchlist correctly.
+    # 
+    # @TODO@ Should really be done in Config test!
 
     tests = [
     {

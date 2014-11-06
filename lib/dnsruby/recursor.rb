@@ -1,118 +1,118 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
-  #Dnsruby::Recursor - Perform recursive dns lookups
-  #
-  #  require 'Dnsruby'
-  #  rec = Dnsruby::Recursor.new()
-  #  answer = rec.recurse("rob.com.au")
-  #
-  #This module uses a Dnsruby::Resolver to perform recursive queries.
-  #
-  #=== AUTHOR
-  #
-  #Rob Brown, bbb@cpan.org
-  #Alex Dalitz, alexd@nominet.org.uk
-  #
-  #=== SEE ALSO
-  #
-  #Dnsruby::Resolver,
-  #
-  #=== COPYRIGHT
-  #
-  #Copyright (c) 2002, Rob Brown.  All rights reserved.
-  #Portions Copyright (c) 2005, Olaf M Kolkman.
-  #Ruby version with caching and validation Copyright (c) 2008, AlexD (Nominet UK)
-  #
-  #Example lookup process:
-  #
-  #[root@box root]# dig +trace www.rob.com.au.
-  #
-  #; <<>> DiG 9.2.0 <<>> +trace www.rob.com.au.
-  #;; global options:  printcmd
-  #.                       507343  IN      NS      C.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      D.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      E.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      F.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      G.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      H.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      I.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      J.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      K.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      L.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      M.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      A.ROOT-SERVERS.NET.
-  #.                       507343  IN      NS      B.ROOT-SERVERS.NET.
-  #;; Received 436 bytes from 127.0.0.1#53(127.0.0.1) in 9 ms
-  #  ;;; But these should be hard coded as the hints
-  #
-  #  ;;; Ask H.ROOT-SERVERS.NET gave:
-  #au.                     172800  IN      NS      NS2.BERKELEY.EDU.
-  #au.                     172800  IN      NS      NS1.BERKELEY.EDU.
-  #au.                     172800  IN      NS      NS.UU.NET.
-  #au.                     172800  IN      NS      BOX2.AUNIC.NET.
-  #au.                     172800  IN      NS      SEC1.APNIC.NET.
-  #au.                     172800  IN      NS      SEC3.APNIC.NET.
-  #;; Received 300 bytes from 128.63.2.53#53(H.ROOT-SERVERS.NET) in 322 ms
-  #  ;;; A little closer than before
-  #
-  #  ;;; Ask NS2.BERKELEY.EDU gave:
-  #com.au.                 259200  IN      NS      ns4.ausregistry.net.
-  #com.au.                 259200  IN      NS      dns1.telstra.net.
-  #com.au.                 259200  IN      NS      au2ld.CSIRO.au.
-  #com.au.                 259200  IN      NS      audns01.syd.optus.net.
-  #com.au.                 259200  IN      NS      ns.ripe.net.
-  #com.au.                 259200  IN      NS      ns1.ausregistry.net.
-  #com.au.                 259200  IN      NS      ns2.ausregistry.net.
-  #com.au.                 259200  IN      NS      ns3.ausregistry.net.
-  #com.au.                 259200  IN      NS      ns3.melbourneit.com.
-  #;; Received 387 bytes from 128.32.206.12#53(NS2.BERKELEY.EDU) in 10312 ms
-  #  ;;; A little closer than before
-  #
-  #  ;;; Ask ns4.ausregistry.net gave:
-  #com.au.                 259200  IN      NS      ns1.ausregistry.net.
-  #com.au.                 259200  IN      NS      ns2.ausregistry.net.
-  #com.au.                 259200  IN      NS      ns3.ausregistry.net.
-  #com.au.                 259200  IN      NS      ns4.ausregistry.net.
-  #com.au.                 259200  IN      NS      ns3.melbourneit.com.
-  #com.au.                 259200  IN      NS      dns1.telstra.net.
-  #com.au.                 259200  IN      NS      au2ld.CSIRO.au.
-  #com.au.                 259200  IN      NS      ns.ripe.net.
-  #com.au.                 259200  IN      NS      audns01.syd.optus.net.
-  #;; Received 259 bytes from 137.39.1.3#53(ns4.ausregistry.net) in 606 ms
-  #  ;;; Uh... yeah... I already knew this
-  #  ;;; from what NS2.BERKELEY.EDU told me.
-  #  ;;; ns4.ausregistry.net must have brain damage
-  #
-  #  ;;; Ask ns1.ausregistry.net gave:
-  #rob.com.au.             86400   IN      NS      sy-dns02.tmns.net.au.
-  #rob.com.au.             86400   IN      NS      sy-dns01.tmns.net.au.
-  #;; Received 87 bytes from 203.18.56.41#53(ns1.ausregistry.net) in 372 ms
-  #  ;;; Ah, much better.  Something more useful.
-  #
-  #  ;;; Ask sy-dns02.tmns.net.au gave:
-  #www.rob.com.au.         7200    IN      A       139.134.5.123
-  #rob.com.au.             7200    IN      NS      sy-dns01.tmns.net.au.
-  #rob.com.au.             7200    IN      NS      sy-dns02.tmns.net.au.
-  #;; Received 135 bytes from 139.134.2.18#53(sy-dns02.tmns.net.au) in 525 ms
-  #  ;;; FINALLY, THE ANSWER!
-  # Now,DNSSEC validation is performed (unless disabled).
+  # Dnsruby::Recursor - Perform recursive dns lookups
+  # 
+  #   require 'Dnsruby'
+  #   rec = Dnsruby::Recursor.new()
+  #   answer = rec.recurse("rob.com.au")
+  # 
+  # This module uses a Dnsruby::Resolver to perform recursive queries.
+  # 
+  # === AUTHOR
+  # 
+  # Rob Brown, bbb@cpan.org
+  # Alex Dalitz, alexd@nominet.org.uk
+  # 
+  # === SEE ALSO
+  # 
+  # Dnsruby::Resolver,
+  # 
+  # === COPYRIGHT
+  # 
+  # Copyright (c) 2002, Rob Brown.  All rights reserved.
+  # Portions Copyright (c) 2005, Olaf M Kolkman.
+  # Ruby version with caching and validation Copyright (c) 2008, AlexD (Nominet UK)
+  # 
+  # Example lookup process:
+  # 
+  # [root@box root]# dig +trace www.rob.com.au.
+  # 
+  # ; <<>> DiG 9.2.0 <<>> +trace www.rob.com.au.
+  # ;; global options:  printcmd
+  # .                       507343  IN      NS      C.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      D.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      E.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      F.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      G.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      H.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      I.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      J.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      K.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      L.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      M.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      A.ROOT-SERVERS.NET.
+  # .                       507343  IN      NS      B.ROOT-SERVERS.NET.
+  # ;; Received 436 bytes from 127.0.0.1#53(127.0.0.1) in 9 ms
+  #   ;;; But these should be hard coded as the hints
+  # 
+  #   ;;; Ask H.ROOT-SERVERS.NET gave:
+  # au.                     172800  IN      NS      NS2.BERKELEY.EDU.
+  # au.                     172800  IN      NS      NS1.BERKELEY.EDU.
+  # au.                     172800  IN      NS      NS.UU.NET.
+  # au.                     172800  IN      NS      BOX2.AUNIC.NET.
+  # au.                     172800  IN      NS      SEC1.APNIC.NET.
+  # au.                     172800  IN      NS      SEC3.APNIC.NET.
+  # ;; Received 300 bytes from 128.63.2.53#53(H.ROOT-SERVERS.NET) in 322 ms
+  #   ;;; A little closer than before
+  # 
+  #   ;;; Ask NS2.BERKELEY.EDU gave:
+  # com.au.                 259200  IN      NS      ns4.ausregistry.net.
+  # com.au.                 259200  IN      NS      dns1.telstra.net.
+  # com.au.                 259200  IN      NS      au2ld.CSIRO.au.
+  # com.au.                 259200  IN      NS      audns01.syd.optus.net.
+  # com.au.                 259200  IN      NS      ns.ripe.net.
+  # com.au.                 259200  IN      NS      ns1.ausregistry.net.
+  # com.au.                 259200  IN      NS      ns2.ausregistry.net.
+  # com.au.                 259200  IN      NS      ns3.ausregistry.net.
+  # com.au.                 259200  IN      NS      ns3.melbourneit.com.
+  # ;; Received 387 bytes from 128.32.206.12#53(NS2.BERKELEY.EDU) in 10312 ms
+  #   ;;; A little closer than before
+  # 
+  #   ;;; Ask ns4.ausregistry.net gave:
+  # com.au.                 259200  IN      NS      ns1.ausregistry.net.
+  # com.au.                 259200  IN      NS      ns2.ausregistry.net.
+  # com.au.                 259200  IN      NS      ns3.ausregistry.net.
+  # com.au.                 259200  IN      NS      ns4.ausregistry.net.
+  # com.au.                 259200  IN      NS      ns3.melbourneit.com.
+  # com.au.                 259200  IN      NS      dns1.telstra.net.
+  # com.au.                 259200  IN      NS      au2ld.CSIRO.au.
+  # com.au.                 259200  IN      NS      ns.ripe.net.
+  # com.au.                 259200  IN      NS      audns01.syd.optus.net.
+  # ;; Received 259 bytes from 137.39.1.3#53(ns4.ausregistry.net) in 606 ms
+  #   ;;; Uh... yeah... I already knew this
+  #   ;;; from what NS2.BERKELEY.EDU told me.
+  #   ;;; ns4.ausregistry.net must have brain damage
+  # 
+  #   ;;; Ask ns1.ausregistry.net gave:
+  # rob.com.au.             86400   IN      NS      sy-dns02.tmns.net.au.
+  # rob.com.au.             86400   IN      NS      sy-dns01.tmns.net.au.
+  # ;; Received 87 bytes from 203.18.56.41#53(ns1.ausregistry.net) in 372 ms
+  #   ;;; Ah, much better.  Something more useful.
+  # 
+  #   ;;; Ask sy-dns02.tmns.net.au gave:
+  # www.rob.com.au.         7200    IN      A       139.134.5.123
+  # rob.com.au.             7200    IN      NS      sy-dns01.tmns.net.au.
+  # rob.com.au.             7200    IN      NS      sy-dns02.tmns.net.au.
+  # ;; Received 135 bytes from 139.134.2.18#53(sy-dns02.tmns.net.au) in 525 ms
+  #   ;;; FINALLY, THE ANSWER!
+  #  Now,DNSSEC validation is performed (unless disabled).
   class Recursor
     class AddressCache # :nodoc: all
-      # Like an array, but stores the expiration of each record.
+      #  Like an array, but stores the expiration of each record.
       def initialize(*args)
         @hash = Hash.new # stores addresses against their expiration
         @mutex = Mutex.new # This class is thread-safe
@@ -154,10 +154,10 @@ module Dnsruby
     end
     attr_accessor :nameservers, :callback, :recurse, :ipv6_ok
     attr_reader :hints
-    # The resolver to use for the queries
+    #  The resolver to use for the queries
     attr_accessor :resolver
 
-    # For guarding access to shared caches.
+    #  For guarding access to shared caches.
     @@mutex = Mutex.new # :nodoc: all
     @@hints = nil
     @@authority_cache = Hash.new
@@ -176,18 +176,18 @@ module Dnsruby
       end
       @ipv6_ok = false
     end
-    #Initialize the hint servers.  Recursive queries need a starting name
-    #server to work off of. This method takes a list of IP addresses to use
-    #as the starting servers.  These name servers should be authoritative for
-    #the root (.) zone.
-    #
-    #  res.hints=(ips)
-    #
-    #If no hints are passed, the default nameserver is asked for the hints.
-    #Normally these IPs can be obtained from the following location:
-    #
-    #  ftp://ftp.internic.net/domain/named.root
-    #
+    # Initialize the hint servers.  Recursive queries need a starting name
+    # server to work off of. This method takes a list of IP addresses to use
+    # as the starting servers.  These name servers should be authoritative for
+    # the root (.) zone.
+    # 
+    #   res.hints=(ips)
+    # 
+    # If no hints are passed, the default nameserver is asked for the hints.
+    # Normally these IPs can be obtained from the following location:
+    # 
+    #   ftp://ftp.internic.net/domain/named.root
+    # 
     def hints=(hints)
       Recursor.set_hints(hints, @resolver)
     end
@@ -214,12 +214,12 @@ module Dnsruby
         @@hints = hints
       end
       TheLog.debug(";; verifying (root) zone...\n")
-      # bind always asks one of the hint servers
-      # for who it thinks is authoritative for
-      # the (root) zone as a sanity check.
-      # Nice idea.
+      #  bind always asks one of the hint servers
+      #  for who it thinks is authoritative for
+      #  the (root) zone as a sanity check.
+      #  Nice idea.
 
-      #      if (!@@hints || @@hints.length == 0)
+      #       if (!@@hints || @@hints.length == 0)
       resolver.recurse=(1)
       packet=resolver.query_no_validation_or_recursion(".", "NS", "IN")
       hints = Hash.new
@@ -228,7 +228,7 @@ module Dnsruby
           ans.each do |rr|
             if (rr.name.to_s =~ /^\.?$/ and
                   rr.type == Types::NS)
-              # Found root authority
+              #  Found root authority
               server = rr.nsdname.to_s.downcase
               server.sub!(/\.$/,"")
               TheLog.debug(";; FOUND HINT: #{server}\n")
@@ -237,13 +237,13 @@ module Dnsruby
           end
           if ((packet.additional.length == 0) ||
                  ((packet.additional.length == 1) && (packet.additional()[0].type == Types.OPT)))
-            # Some resolvers (e.g. 8.8.8.8) do not send an additional section -
-            # need to make explicit queries for these :(
-            # Probably best to limit the number of outstanding queries - extremely bursty behaviour otherwise
-            # What happens if we select only name
+            #  Some resolvers (e.g. 8.8.8.8) do not send an additional section -
+            #  need to make explicit queries for these :(
+            #  Probably best to limit the number of outstanding queries - extremely bursty behaviour otherwise
+            #  What happens if we select only name
             q = Queue.new
             hints.keys.each {|server|
-              # Query for the server address and add it to hints.
+              #  Query for the server address and add it to hints.
               ['A', 'AAAA'].each {|type|
                 msg = Message.new
                 msg.do_caching = @do_caching
@@ -273,10 +273,10 @@ module Dnsruby
             end
           end
         end
-        #                      foreach my $server (keys %hints) {
+        #                       foreach my $server (keys %hints) {
         hints.keys.each do |server|
           if (!hints[server] || hints[server].length == 0)
-            # Wipe the servers without lookups
+            #  Wipe the servers without lookups
             hints.delete(server)
           end
         end
@@ -295,11 +295,11 @@ module Dnsruby
         raise ResolvError.new( "Server ["+(@@nameservers)[0].to_s+".] did not give answers")
       end
 
-      # Disable recursion flag.
+      #  Disable recursion flag.
       resolver.recurse=(0)
-      #      end
+      #       end
 
-      #  return $self->nameservers( map { @{ $_ } } values %{ $self->{'hints'} } );
+      #   return $self->nameservers( map { @{ $_ } } values %{ $self->{'hints'} } );
       if (Array === @@hints)
         temp = []
         @@hints.each {|hint|
@@ -327,14 +327,14 @@ module Dnsruby
       server.sub!(/\.$/,"")
       if (server)
         if ( rr.type == Types::A)
-          #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
+          # print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
           if (hints[server]!=nil)
             TheLog.debug(";; STORING IP: #{server} IN A "+rr.address.to_s+"\n")
             hints[server].push([rr.address.to_s, rr.ttl])
           end
         end
         if ( rr.type == Types::AAAA)
-          #print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
+          # print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
           if (hints[server])
             TheLog.debug(";; STORING IP6: #{server} IN AAAA "+rr.address.to_s+"\n")
             hints[server].push([rr.address.to_s, rr.ttl])
@@ -345,22 +345,22 @@ module Dnsruby
     end
 
 
-    #This method takes a code reference, which is then invoked each time a
-    #packet is received during the recursive lookup.  For example to emulate
-    #dig's C<+trace> function:
-    #
-    # res.recursion_callback(Proc.new { |packet|
-    #     print packet.additional.inspect
-    #
-    #     print";; Received %d bytes from %s\n\n",
-    #         packetanswersize,
-    #         packet.answerfrom);
-    # })
-    #
+    # This method takes a code reference, which is then invoked each time a
+    # packet is received during the recursive lookup.  For example to emulate
+    # dig's C<+trace> function:
+    # 
+    #  res.recursion_callback(Proc.new { |packet|
+    #      print packet.additional.inspect
+    # 
+    #      print";; Received %d bytes from %s\n\n",
+    #          packetanswersize,
+    #          packet.answerfrom);
+    #  })
+    # 
     def recursion_callback=(sub)
-      #          if (sub && UNIVERSAL::isa(sub, 'CODE'))
+      #           if (sub && UNIVERSAL::isa(sub, 'CODE'))
       @callback = sub
-      #          end
+      #           end
     end
 
     def recursion_callback
@@ -379,51 +379,51 @@ module Dnsruby
       return query(name, type, klass, true)
     end
 
-    #This method is much like the normal query() method except it disables
-    #the recurse flag in the packet and explicitly performs the recursion.
-    #
-    #  packet = res.query( "www.netscape.com.", "A")
-    #  packet = res.query( "www.netscape.com.", "A", "IN", true) # no validation
-    #
-    #The Recursor maintains a cache of known nameservers.
-    #DNSSEC validation is performed unless true is passed as the fourth parameter.
+    # This method is much like the normal query() method except it disables
+    # the recurse flag in the packet and explicitly performs the recursion.
+    # 
+    #   packet = res.query( "www.netscape.com.", "A")
+    #   packet = res.query( "www.netscape.com.", "A", "IN", true) # no validation
+    # 
+    # The Recursor maintains a cache of known nameservers.
+    # DNSSEC validation is performed unless true is passed as the fourth parameter.
     def query(name, type=Types.A, klass=Classes.IN, no_validation = false)
-      # @TODO@ PROVIDE AN ASYNCHRONOUS SEND WHICH RETURNS MESSAGE WITH ERROR!!!
+      #  @TODO@ PROVIDE AN ASYNCHRONOUS SEND WHICH RETURNS MESSAGE WITH ERROR!!!
 
-      # Make sure the hint servers are initialized.
+      #  Make sure the hint servers are initialized.
       @@mutex.synchronize {
         self.hints=(Hash.new) unless @@hints
       }
       @resolver.recurse=(0)
-      # Make sure the authority cache is clean.
-      # It is only used to store A and AAAA records of
-      # the suposedly authoritative name servers.
-      # TTLs are respected
+      #  Make sure the authority cache is clean.
+      #  It is only used to store A and AAAA records of
+      #  the suposedly authoritative name servers.
+      #  TTLs are respected
       @@mutex.synchronize {
         if (!@@zones_cache)
           Recursor.clear_caches(@resolver)
         end
       }
 
-      # So we have normal hashes, but the array of addresses at the end is now an AddressCache
-      # which respects the ttls of the A/AAAA records
+      #  So we have normal hashes, but the array of addresses at the end is now an AddressCache
+      #  which respects the ttls of the A/AAAA records
 
-      # Now see if we already know the zone in question
-      # Otherwise, see if we know any of its parents (will know at least ".")
+      #  Now see if we already know the zone in question
+      #  Otherwise, see if we know any of its parents (will know at least ".")
       known_zone, known_authorities = get_closest_known_zone_authorities_for(name) # ".", @hints if nothing else
 
-      # Seed name servers with the closest known authority
-      #      ret =  _dorecursion( name, type, klass, ".", @hints, 0)
+      #  Seed name servers with the closest known authority
+      #       ret =  _dorecursion( name, type, klass, ".", @hints, 0)
       ret =  _dorecursion( name, type, klass, known_zone, known_authorities, 0, no_validation)
       Dnssec.validate(ret) if !no_validation
-      #      print "\n\nRESPONSE:\n#{ret}\n"
+      #       print "\n\nRESPONSE:\n#{ret}\n"
       return ret
     end
 
     def get_closest_known_zone_for(n) # :nodoc:
-      # Find the closest parent of name that we know
-      # e.g. for nominet.org.uk, try nominet.org.uk., org.uk., uk., .
-      # does @zones_cache contain the name we're after
+      #  Find the closest parent of name that we know
+      #  e.g. for nominet.org.uk, try nominet.org.uk., org.uk., uk., .
+      #  does @zones_cache contain the name we're after
       if (Name === n)
         n = n.to_s # @TODO@ This is a bit crap!
       end
@@ -433,7 +433,7 @@ module Dnsruby
       end
 
       while (true)
-        #        print "Checking for known zone : #{name}\n"
+        #         print "Checking for known zone : #{name}\n"
         zone = nil
         @@mutex.synchronize{
           zone = @@zones_cache[name]
@@ -442,7 +442,7 @@ module Dnsruby
           end
         }
         return false if name=="."
-        # strip the name up to the first dot
+        #  strip the name up to the first dot
         first_dot = name.index(".")
         if (first_dot == (name.length-1))
           name = "."
@@ -457,14 +457,14 @@ module Dnsruby
       known_authorities, known_zone = nil
       while (!done)
         known_zone = get_closest_known_zone_for(name)
-        #        print "GOT KNOWN ZONE : #{known_zone}\n"
+        #         print "GOT KNOWN ZONE : #{known_zone}\n"
         @@mutex.synchronize {
           known_authorities = @@zones_cache[known_zone] # ".", @hints if nothing else
         }
-        #        print "Known authorities : #{known_authorities}\n"
+        #         print "Known authorities : #{known_authorities}\n"
 
-        # Make sure that known_authorities still contains some authorities!
-        # If not, remove the zone from zones_cache, and start again
+        #  Make sure that known_authorities still contains some authorities!
+        #  If not, remove the zone from zones_cache, and start again
         if (known_authorities && known_authorities.values.length > 0)
           done = true
         else
@@ -488,7 +488,7 @@ module Dnsruby
 
       ns = [] # Array of AddressCaches (was array of array of addresses)
       @@mutex.synchronize{
-        # Get IPs from authorities
+        #  Get IPs from authorities
         known_authorities.keys.each do |ns_rec|
           if (known_authorities[ns_rec] != nil  && known_authorities[ns_rec] != [] )
             @@authority_cache[ns_rec] = known_authorities[ns_rec]
@@ -510,8 +510,8 @@ module Dnsruby
               auth_packet=nil
               ans=[]
 
-              # Don't query for V6 if its not there.
-              # Do this in parallel
+              #  Don't query for V6 if its not there.
+              #  Do this in parallel
               ip_mutex = Mutex.new
               ip6_thread = Thread.start {
                 if ( @ipv6_ok)
@@ -540,12 +540,12 @@ module Dnsruby
 
               if ( ans.length > 0 )
                 TheLog.debug(";; _dorecursion() Answers found for [#{ns_rec}]")
-                #          foreach my $rr (@ans) {
+                #           foreach my $rr (@ans) {
                 ans.each do |rr_arr|
                   rr_arr.each do |rr|
                     TheLog.debug(";; RR:" + rr.inspect + "")
                     if (rr.type == Types::CNAME)
-                      # Follow CNAME
+                      #  Follow CNAME
                       server = rr.name.to_s.downcase
                       if (server)
                         server.sub!(/\.*$/, ".")
@@ -591,7 +591,7 @@ module Dnsruby
         end
       }
 
-      # Cut the deck of IPs in a random place.
+      #  Cut the deck of IPs in a random place.
       TheLog.debug(";; _dorecursion() cutting deck of (" + ns.length.to_s + ") authorities...")
       splitpos = rand(ns.length)
       start = ns[0, splitpos]
@@ -611,19 +611,19 @@ module Dnsruby
       }
       resolver.retry_delay = nameservers.length
       begin
-        # Should construct packet ourselves and clear RD bit
+        #  Should construct packet ourselves and clear RD bit
         query = Message.new(name, type, klass)
         query.header.rd = false
         query.do_validation = true
         query.do_caching = false
         query.do_validation = false if no_validation
-        #            print "Sending msg from resolver, dnssec = #{resolver.dnssec}, do_validation = #{query.do_validation}\n"
+        #             print "Sending msg from resolver, dnssec = #{resolver.dnssec}, do_validation = #{query.do_validation}\n"
         packet = resolver.send_message(query)
-        # @TODO@ Now prune unrelated RRSets (RFC 5452 section 6)
+        #  @TODO@ Now prune unrelated RRSets (RFC 5452 section 6)
         prune_rrsets_to_rfc5452(packet, known_zone)
       rescue ResolvTimeout, IOError => e
-        #            TheLog.debug(";; nameserver #{levelns.to_s} didn't respond")
-        #            next
+        #             TheLog.debug(";; nameserver #{levelns.to_s} didn't respond")
+        #             next
         TheLog.debug("No response!")
         return nil
       end
@@ -638,7 +638,7 @@ module Dnsruby
         authority = packet.authority
         if (status)
           if (status == "NXDOMAIN")
-            # I guess NXDOMAIN is the best we'll ever get
+            #  I guess NXDOMAIN is the best we'll ever get
             TheLog.debug(";; _dorecursion() returning NXDOMAIN")
             return packet
           elsif (packet.answer.length > 0)
@@ -649,7 +649,7 @@ module Dnsruby
             return packet
           elsif (authority.length > 0)
             auth = Hash.new
-            #	 foreach my $rr (@authority) {
+            # 	 foreach my $rr (@authority) {
             authority.each do |rr|
               if (rr.type.to_s =~ /^(NS|SOA)$/)
                 server = (rr.type == Types::NS ? rr.nsdname : rr.mname).to_s.downcase
@@ -677,10 +677,10 @@ module Dnsruby
                 TheLog.debug(";; _dorecursion() Ignoring NON NS entry found in authority section: " + rr.inspect)
               end
             end
-            #	 foreach my $rr ($packet->additional)
+            # 	 foreach my $rr ($packet->additional)
             packet.additional.each do |rr|
               if (rr.type == Types::CNAME)
-                # Store this CNAME into %auth too
+                #  Store this CNAME into %auth too
                 server = rr.name.to_s.downcase
                 if (server)
                   server.sub!(/\.*$/, ".")
@@ -713,7 +713,7 @@ module Dnsruby
               TheLog.debug(";; _dorecursion() Ignoring useless: " + rr.inspect)
             end
             if (of =~ /#{known_zone}/)
-              #                  print "Adding #{of} with :\n#{auth}\nto zones_cache\n"
+              #                   print "Adding #{of} with :\n#{auth}\nto zones_cache\n"
               @@mutex.synchronize{
                 @@zones_cache[of]=auth
               }
@@ -729,9 +729,9 @@ module Dnsruby
     end
 
     def prune_rrsets_to_rfc5452(packet, zone)
-      # Now prune the response of any unrelated rrsets (RFC5452 section6)
-      # "One very simple way to achieve this is to only accept data if it is
-      # part of the domain for which the query was intended."
+      #  Now prune the response of any unrelated rrsets (RFC5452 section6)
+      #  "One very simple way to achieve this is to only accept data if it is
+      #  part of the domain for which the query was intended."
       if (!packet.header.aa)
         return
       end
@@ -747,9 +747,9 @@ module Dnsruby
           if ((n.to_s == zone) || (n.to_s == Name.create(zone).to_s) ||
                 (n.subdomain_of?(Name.create(zone))) ||
                 (rrset.type == Types::OPT))
-            #            # @TODO@ Leave in the response if it is an SOA, NSEC or RRSIGfor the parent zone
-            ##          elsif ((query_name.subdomain_of?rrset.name) &&
-            #          elsif  ((rrset.type == Types.SOA) || (rrset.type == Types.NSEC) || (rrset.type == Types.NSEC3)) #)
+            #             # @TODO@ Leave in the response if it is an SOA, NSEC or RRSIGfor the parent zone
+            # #          elsif ((query_name.subdomain_of?rrset.name) &&
+            #           elsif  ((rrset.type == Types.SOA) || (rrset.type == Types.NSEC) || (rrset.type == Types.NSEC3)) #)
           else
             TheLog.debug"Removing #{rrset.name}, #{rrset.type} from response from server for #{zone}"
             packet.send(section).remove_rrset(rrset.name, rrset.type)

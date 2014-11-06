@@ -1,75 +1,75 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require 'dnsruby/name'
 require 'dnsruby/resource/resource'
 
 
 module Dnsruby
-  # ===Defines a DNS packet.
-  #
-  # RFC 1035 Section 4.1, RFC 2136 Section 2, RFC 2845
-  #
-  # ===Sections
-  # Message objects have five sections:
-  #
-  #* The header section, a Dnsruby::Header object.
-  #
-  #      msg.header=Header.new(...)
-  #      header = msg.header
-  #
-  #* The question section, an array of Dnsruby::Question objects.
-  #
-  #      msg.add_question(Question.new(domain, type, klass))
-  #      msg.each_question do |question|  ....   end
-  #
-  #* The answer section, an array of Dnsruby::RR objects.
-  #
-  #      msg.add_answer(RR.create({:name    => 'a2.example.com',
-  #		      :type    => 'A', :address => '10.0.0.2'}))
-  #      msg.each_answer {|answer| ... }
-  #
-  #* The authority section, an array of Dnsruby::RR objects.
-  #
-  #      msg.add_authority(rr)
-  #      msg.each_authority {|rr| ... }
-  #
-  #* The additional section, an array of Dnsruby::RR objects.
-  #
-  #      msg.add_additional(rr)
-  #      msg.each_additional {|rr| ... }
-  #
-  # In addition, each_resource iterates the answer, additional
-  # and authority sections :
-  #
-  #      msg.each_resource {|rr| ... }
-  #
-  # ===Packet format encoding
-  #
-  #      Dnsruby::Message#encode
-  #      Dnsruby::Message::decode(data)
-  #
-  # ===Additional information
-  # security_level records the current DNSSEC status of this Message.
-  # answerfrom records the server which this Message was received from.
-  # cached records whether this response came from the cache.
-  #
+  #  ===Defines a DNS packet.
+  # 
+  #  RFC 1035 Section 4.1, RFC 2136 Section 2, RFC 2845
+  # 
+  #  ===Sections
+  #  Message objects have five sections:
+  # 
+  # * The header section, a Dnsruby::Header object.
+  # 
+  #       msg.header=Header.new(...)
+  #       header = msg.header
+  # 
+  # * The question section, an array of Dnsruby::Question objects.
+  # 
+  #       msg.add_question(Question.new(domain, type, klass))
+  #       msg.each_question do |question|  ....   end
+  # 
+  # * The answer section, an array of Dnsruby::RR objects.
+  # 
+  #       msg.add_answer(RR.create({:name    => 'a2.example.com',
+  # 		      :type    => 'A', :address => '10.0.0.2'}))
+  #       msg.each_answer {|answer| ... }
+  # 
+  # * The authority section, an array of Dnsruby::RR objects.
+  # 
+  #       msg.add_authority(rr)
+  #       msg.each_authority {|rr| ... }
+  # 
+  # * The additional section, an array of Dnsruby::RR objects.
+  # 
+  #       msg.add_additional(rr)
+  #       msg.each_additional {|rr| ... }
+  # 
+  #  In addition, each_resource iterates the answer, additional
+  #  and authority sections :
+  # 
+  #       msg.each_resource {|rr| ... }
+  # 
+  #  ===Packet format encoding
+  # 
+  #       Dnsruby::Message#encode
+  #       Dnsruby::Message::decode(data)
+  # 
+  #  ===Additional information
+  #  security_level records the current DNSSEC status of this Message.
+  #  answerfrom records the server which this Message was received from.
+  #  cached records whether this response came from the cache.
+  # 
   class Message
 
-    # The security level (see RFC 4035 section 4.3)
+    #  The security level (see RFC 4035 section 4.3)
     class SecurityLevel < CodeMapper
       INDETERMINATE = -2
       BOGUS = -1
@@ -79,32 +79,32 @@ module Dnsruby
       update
     end
 
-    # If dnssec is set on, then each message will have the security level set
-    # To find the precise error (if any), call Dnsruby::Dnssec::validate(msg) -
-    # the resultant exception will define the error.
+    #  If dnssec is set on, then each message will have the security level set
+    #  To find the precise error (if any), call Dnsruby::Dnssec::validate(msg) -
+    #  the resultant exception will define the error.
     attr_accessor :security_level
 
-    # If there was a problem verifying this message with DNSSEC, then securiy_error
-    # will hold a description of the problem. It defaults to ''
+    #  If there was a problem verifying this message with DNSSEC, then securiy_error
+    #  will hold a description of the problem. It defaults to ''
     attr_accessor :security_error
 
-    # If the Message was returned from the cache, the cached flag will be set
-    # true. It will be false otherwise.
+    #  If the Message was returned from the cache, the cached flag will be set
+    #  true. It will be false otherwise.
     attr_accessor :cached
 
 
 
-    # Create a new Message. Takes optional name, type and class
-    #
-    # type defaults to A, and klass defaults to IN
-    #
-    #*  Dnsruby::Message.new('example.com') # defaults to A, IN
-    #*  Dnsruby::Message.new('example.com', 'AAAA')
-    #*  Dnsruby::Message.new('example.com', Dnsruby::Types.PTR, 'HS')
-    #
+    #  Create a new Message. Takes optional name, type and class
+    # 
+    #  type defaults to A, and klass defaults to IN
+    # 
+    # *  Dnsruby::Message.new('example.com') # defaults to A, IN
+    # *  Dnsruby::Message.new('example.com', 'AAAA')
+    # *  Dnsruby::Message.new('example.com', Dnsruby::Types.PTR, 'HS')
+    # 
     def initialize(*args)
       @header = Header.new()
-      #      @question = Section.new(self)
+      #       @question = Section.new(self)
       @question = []
       @answer = Section.new(self)
       @authority = Section.new(self)
@@ -134,60 +134,60 @@ module Dnsruby
       end
     end
 
-    #The question section, an array of Dnsruby::Question objects.
+    # The question section, an array of Dnsruby::Question objects.
     attr_reader :question
 
-    #The answer section, an array of Dnsruby::RR objects.
+    # The answer section, an array of Dnsruby::RR objects.
     attr_reader :answer
-    #The authority section, an array of Dnsruby::RR objects.
+    # The authority section, an array of Dnsruby::RR objects.
     attr_reader :authority
-    #The additional section, an array of Dnsruby::RR objects.
+    # The additional section, an array of Dnsruby::RR objects.
     attr_reader :additional
-    #The header section, a Dnsruby::Header object.
+    # The header section, a Dnsruby::Header object.
     attr_accessor :header
 
-    #If this Message is a response from a server, then answerfrom contains the address of the server
+    # If this Message is a response from a server, then answerfrom contains the address of the server
     attr_accessor :answerfrom
 
-    #If this Message is a response from a server, then answerfrom contains the IP address of the server
+    # If this Message is a response from a server, then answerfrom contains the IP address of the server
     attr_accessor :answerip
 
-    #If this Message is a response from a server, then answersize contains the size of the response
+    # If this Message is a response from a server, then answersize contains the size of the response
     attr_accessor :answersize
 
-    #If this message has been verified using a TSIG RR then tsigerror contains
-    #the error code returned by the TSIG verification. The error will be an RCode
+    # If this message has been verified using a TSIG RR then tsigerror contains
+    # the error code returned by the TSIG verification. The error will be an RCode
     attr_accessor :tsigerror
 
-    #Can be
-    #* :Unsigned - the default state
-    #* :Signed - the outgoing message has been signed
-    #* :Verified - the incoming message has been verified by TSIG
-    #* :Intermediate - the incoming message is an intermediate envelope in a TCP session
-    #in which only every 100th envelope must be signed
-    #* :Failed - the incoming response failed verification
+    # Can be
+    # * :Unsigned - the default state
+    # * :Signed - the outgoing message has been signed
+    # * :Verified - the incoming message has been verified by TSIG
+    # * :Intermediate - the incoming message is an intermediate envelope in a TCP session
+    # in which only every 100th envelope must be signed
+    # * :Failed - the incoming response failed verification
     attr_accessor :tsigstate
 
-    #--
+    # --
     attr_accessor :tsigstart
-    #++
+    # ++
 
-    #Set send_raw if you wish to send and receive the response to this Message
-    #with no additional processing. In other words, if set, then Dnsruby will
-    #not touch the Header of the outgoing Message. This option does not affect
-    #caching or dnssec validation
-    #
-    #This option should not normally be set.
+    # Set send_raw if you wish to send and receive the response to this Message
+    # with no additional processing. In other words, if set, then Dnsruby will
+    # not touch the Header of the outgoing Message. This option does not affect
+    # caching or dnssec validation
+    # 
+    # This option should not normally be set.
     attr_accessor :send_raw
 
-    #do_validation is set by default. If you do not wish dnsruby to validate
-    #this message (on a Resolver with @dnssec==true), then set do_validation
-    #to false. This option does not affect caching, or the header options
+    # do_validation is set by default. If you do not wish dnsruby to validate
+    # this message (on a Resolver with @dnssec==true), then set do_validation
+    # to false. This option does not affect caching, or the header options
     attr_accessor :do_validation
 
-    #do_caching is set by default. If you do not wish dnsruby to inspect the
-    #cache before sending the query, nor cache the result of the query, then
-    #set do_caching to false.
+    # do_caching is set by default. If you do not wish dnsruby to inspect the
+    # cache before sending the query, nor cache the result of the query, then
+    # set do_caching to false.
     attr_accessor :do_caching
 
     def get_exception
@@ -232,7 +232,7 @@ module Dnsruby
       @header.arcount = 0
     end
 
-    # Return the first rrset of the specified attributes in the message
+    #  Return the first rrset of the specified attributes in the message
     def rrset(name, type, klass = Classes::IN)
       [@answer, @authority, @additional].each do |section|
         if (rrset = section.rrset(name, type, klass)).length > 0
@@ -242,7 +242,7 @@ module Dnsruby
       RRSet.new
     end
 
-    # Return the rrsets of the specified type in the message
+    #  Return the rrsets of the specified type in the message
     def rrsets(type, klass=Classes::IN)
       rrsetss = []
       [@answer, @authority, @additional].each do |section|
@@ -253,8 +253,8 @@ module Dnsruby
       rrsetss
     end
 
-    # Return a hash, with the section as key, and the RRSets in that
-    # section as the data : {section => section_rrs}
+    #  Return a hash, with the section as key, and the RRSets in that
+    #  section as the data : {section => section_rrs}
     def section_rrsets(type = nil, include_opt = false)
       ret = {}
       %w(answer authority additional).each do |section|
@@ -263,12 +263,12 @@ module Dnsruby
       ret
     end
 
-    # Add a new Question to the Message. Takes either a Question,
-    # or a name, and an optional type and class.
-    #
-    #* msg.add_question(Question.new('example.com', 'MX'))
-    #* msg.add_question('example.com') # defaults to Types.A, Classes.IN
-    #* msg.add_question('example.com', Types.LOC)
+    #  Add a new Question to the Message. Takes either a Question,
+    #  or a name, and an optional type and class.
+    # 
+    # * msg.add_question(Question.new('example.com', 'MX'))
+    # * msg.add_question('example.com') # defaults to Types.A, Classes.IN
+    # * msg.add_question('example.com', Types.LOC)
     def add_question(question, type=Types.A, klass=Classes.IN)
       unless question.kind_of?(Question)
         question = Question.new(question, type, klass)
@@ -328,19 +328,19 @@ module Dnsruby
       @additional.each { |rec| yield rec }
     end
 
-    # Yields each section (question, answer, authority, additional)
+    #  Yields each section (question, answer, authority, additional)
     def each_section
       [@answer, @authority, @additional].each { |section| yield section}
     end
 
-    # Calls each_answer, each_authority, each_additional
+    #  Calls each_answer, each_authority, each_additional
     def each_resource
       each_answer {|rec| yield rec}
       each_authority {|rec| yield rec}
       each_additional {|rec| yield rec}
     end
 
-    # Returns the TSIG record from the ADDITIONAL section, if one is present.
+    #  Returns the TSIG record from the ADDITIONAL section, if one is present.
     def tsig
       if @additional.last
         if @additional.last.rr_type == Types.TSIG
@@ -350,9 +350,9 @@ module Dnsruby
       nil
     end
 
-    # Sets the TSIG to sign this message with. Can either be a Dnsruby::RR::TSIG
-    # object, or it can be a (name, key) tuple, or it can be a hash which takes
-    # Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
+    #  Sets the TSIG to sign this message with. Can either be a Dnsruby::RR::TSIG
+    #  object, or it can be a (name, key) tuple, or it can be a hash which takes
+    #  Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
     def set_tsig(*args)
       if args.length == 1
         if args[0].instance_of?(RR::TSIG)
@@ -369,14 +369,14 @@ module Dnsruby
       end
     end
 
-    #Was this message signed by a TSIG?
+    # Was this message signed by a TSIG?
     def signed?
       @tsigstate == :Signed ||
           @tsigstate == :Verified ||
           @tsigstate == :Failed
     end
 
-    # If this message was signed by a TSIG, was the TSIG verified?
+    #  If this message was signed by a TSIG, was the TSIG verified?
     def verified?
       @tsigstate == :Verified
     end
@@ -404,7 +404,7 @@ module Dnsruby
 
       s << ";; Security Level : #{@security_level.string}\n"
 
-      # OPT pseudosection? EDNS flags, udpsize
+      #  OPT pseudosection? EDNS flags, udpsize
       opt = get_opt
 
       if opt
@@ -454,7 +454,7 @@ module Dnsruby
 
       retval = retval + ";; HEADER SECTION\n"
 
-      # OPT pseudosection? EDNS flags, udpsize
+      #  OPT pseudosection? EDNS flags, udpsize
       opt = get_opt
       if (!opt)
         retval = retval + @header.old_to_s
@@ -505,13 +505,13 @@ module Dnsruby
       retval
     end
 
-    # Signs the message. If used with no arguments, then the message must have already
-    # been set (set_tsig). Otherwise, the arguments can either be a Dnsruby::RR::TSIG
-    # object, or a (name, key) tuple, or a hash which takes
-    # Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
-    #
-    # NOTE that this method should only be called by the resolver, rather than the
-    # client code. To use signing from the client, call Dnsruby::Resolver#tsig=
+    #  Signs the message. If used with no arguments, then the message must have already
+    #  been set (set_tsig). Otherwise, the arguments can either be a Dnsruby::RR::TSIG
+    #  object, or a (name, key) tuple, or a hash which takes
+    #  Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
+    # 
+    #  NOTE that this method should only be called by the resolver, rather than the
+    #  client code. To use signing from the client, call Dnsruby::Resolver#tsig=
     def sign!(*args) #:nodoc: all
       if args.length > 0
         set_tsig(*args)
@@ -523,9 +523,9 @@ module Dnsruby
       end
     end
 
-    # Return the encoded form of the message
-    # If there is a TSIG record present and the record has not been signed
-    # then sign it
+    #  Return the encoded form of the message
+    #  If there is a TSIG record present and the record has not been signed
+    #  then sign it
     def encode
       if @tsigkey && (@tsigstate == :Unsigned) && !@signing
         @signing = true
@@ -548,7 +548,7 @@ module Dnsruby
       }.to_s
     end
 
-    # Decode the encoded message
+    #  Decode the encoded message
     def Message.decode(m)
       o = Message.new()
       begin
@@ -580,9 +580,9 @@ module Dnsruby
           }
         }
       rescue DecodeError => e
-        # So we got a decode error
-        # However, we might have been able to fill in many parts of the message
-        # So let's raise the DecodeError, but add the partially completed message
+        #  So we got a decode error
+        #  However, we might have been able to fill in many parts of the message
+        #  So let's raise the DecodeError, but add the partially completed message
         e.partial_message = o
         raise e
       end
@@ -593,28 +593,28 @@ module Dnsruby
       Message.decode(self.encode)
     end
 
-    # In dynamic update packets, the question section is known as zone and
-    # specifies the zone to be updated.
+    #  In dynamic update packets, the question section is known as zone and
+    #  specifies the zone to be updated.
     alias :zone :question
     alias :add_zone :add_question
     alias :each_zone :each_question
 
-    # In dynamic update packets, the answer section is known as pre or
-    # prerequisite and specifies the RRs or RRsets which must or
-    # must not preexist.
+    #  In dynamic update packets, the answer section is known as pre or
+    #  prerequisite and specifies the RRs or RRsets which must or
+    #  must not preexist.
     alias :pre :answer
     alias :add_pre :add_answer
     alias :each_pre :each_answer
 
-    # In dynamic update packets, the answer section is known as pre or
-    # prerequisite and specifies the RRs or RRsets which must or
-    # must not preexist.
+    #  In dynamic update packets, the answer section is known as pre or
+    #  prerequisite and specifies the RRs or RRsets which must or
+    #  must not preexist.
     alias :prerequisite :pre
     alias :add_prerequisite :add_pre
     alias :each_prerequisite :each_pre
 
-    # In dynamic update packets, the authority section is known as update and
-    # specifies the RRs or RRsets to be added or delted.
+    #  In dynamic update packets, the authority section is known as update and
+    #  specifies the RRs or RRsets to be added or delted.
     alias :update :authority
     alias :add_update :add_authority
     alias :each_update :each_authority

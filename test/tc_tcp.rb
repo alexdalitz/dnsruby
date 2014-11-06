@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -25,7 +25,7 @@ class TestTcp < Minitest::Test
     assert(ret.is_a?(Dnsruby::Message))
   end
   def test_TCP_port
-    # Need a test server so we can tell what port this message was actually sent on!
+    #  Need a test server so we can tell what port this message was actually sent on!
     port = nil
     src_port = 57923
     Dnsruby::PacketSender.clear_caches
@@ -34,7 +34,7 @@ class TestTcp < Minitest::Test
       ts = TCPServer.new(0)
       port = ts.addr[1]
         t = ts.accept
-      # Check that the source port was src_port
+      #  Check that the source port was src_port
       received_port = t.peeraddr()[1]
       packet = t.recvfrom(2)[0]
 
@@ -83,7 +83,7 @@ class TestTcp < Minitest::Test
       @additional = Dnsruby::Message::Section.new(self)
     end
 
-    #Decode the encoded message
+    # Decode the encoded message
     def HackMessage.decode(m)
       o = HackMessage.new()
       begin
@@ -115,9 +115,9 @@ class TestTcp < Minitest::Test
           }
         }
       rescue Dnsruby::DecodeError => e
-        # So we got a decode error
-        # However, we might have been able to fill in many parts of the message
-        # So let's raise the DecodeError, but add the partially completed message
+        #  So we got a decode error
+        #  However, we might have been able to fill in many parts of the message
+        #  So let's raise the DecodeError, but add the partially completed message
         e.partial_message = o
         raise e
       end
@@ -127,10 +127,10 @@ class TestTcp < Minitest::Test
   end
 
   def test_bad_truncation
-    # Some servers don't do truncation properly.
-    # Make a UDP server which returns large badly formatted packets (arcount > num_additional), with TC bit set
-    # And make a TCP server which returns large well formatted packets
-    # Then make sure that Dnsruby recieves response correctly.
+    #  Some servers don't do truncation properly.
+    #  Make a UDP server which returns large badly formatted packets (arcount > num_additional), with TC bit set
+    #  And make a TCP server which returns large well formatted packets
+    #  Then make sure that Dnsruby recieves response correctly.
         Dnsruby::PacketSender.clear_caches
     socket = UDPSocket.new
     socket.bind("127.0.0.1", 0)
@@ -173,7 +173,7 @@ class TestTcp < Minitest::Test
 
 
 
-        # Now send query
+        #  Now send query
     res = Dnsruby::Resolver.new("127.0.0.1")
     res.port = port
     res.udp_size = 4096
@@ -187,5 +187,5 @@ class TestTcp < Minitest::Test
 
   end
 
-  #@TODO@ Check stuff like persistent sockets
+  # @TODO@ Check stuff like persistent sockets
 end

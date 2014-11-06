@@ -37,15 +37,15 @@ class MessageEncoder #:nodoc: all
   end
 
   def put_rr(rr, canonical=false)
-    # RFC4034 Section 6.2
+    #  RFC4034 Section 6.2
     put_name(rr.name, canonical)
     put_pack('nnN', rr.type.code, rr.klass.code, rr.ttl)
     put_length16 { rr.encode_rdata(self, canonical) }
   end
 
   def put_name(d, canonical = false, downcase = canonical)
-    # DNSSEC requires some records (e.g. NSEC, RRSIG) to be canonicalised, but
-    # not downcased. YUK!
+    #  DNSSEC requires some records (e.g. NSEC, RRSIG) to be canonicalised, but
+    #  not downcased. YUK!
     d = d.downcase if downcase
     put_labels(d.to_a, canonical)
   end
@@ -66,7 +66,7 @@ class MessageEncoder #:nodoc: all
 
 
   def put_label(d)
-    #      s, = Name.encode(d)
+    #       s, = Name.encode(d)
     s = d
     raise RuntimeError, "length of #{s} is #{s.string.length} (larger than 63 octets)" if s.string.length > 63
     self.put_string(s.string)

@@ -1,57 +1,57 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
-  #Dnsruby::IPv6 class
+  # Dnsruby::IPv6 class
   class IPv6
-    #IPv6 address format a:b:c:d:e:f:g:h
+    # IPv6 address format a:b:c:d:e:f:g:h
     Regex_8Hex = /\A
      (?:[0-9A-Fa-f]{1,4}:){7}
     [0-9A-Fa-f]{1,4}
     \z/x
 
-    #Compresses IPv6 format a::b
+    # Compresses IPv6 format a::b
     Regex_CompressedHex = /\A
      ((?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?) ::
      ((?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?)
     \z/x
 
-    # IPv4 mapped IPv6 address format a:b:c:d:e:f:w.x.y.z
+    #  IPv4 mapped IPv6 address format a:b:c:d:e:f:w.x.y.z
     Regex_6Hex4Dec = /\A
      ((?:[0-9A-Fa-f]{1,4}:){6,6})
      (\d+)\.(\d+)\.(\d+)\.(\d+)
     \z/x
 
-    # Compressed IPv4 mapped IPv6 address format a::b:w.x.y.z
+    #  Compressed IPv4 mapped IPv6 address format a::b:w.x.y.z
     Regex_CompressedHex4Dec = /\A
      ((?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?) ::
      ((?:[0-9A-Fa-f]{1,4}:)*)
      (\d+)\.(\d+)\.(\d+)\.(\d+)
     \z/x
 
-    # A composite IPv6 address RegExp
+    #  A composite IPv6 address RegExp
     Regex = /
      (?:#{Regex_8Hex}) |
      (?:#{Regex_CompressedHex}) |
      (?:#{Regex_6Hex4Dec}) |
      (?:#{Regex_CompressedHex4Dec})/x
 
-    # Created a new IPv6 address from +arg+ which may be:
-    #
-    #* IPv6:: returns +arg+
-    #* String:: +arg+ must match one of the IPv6::Regex* constants
+    #  Created a new IPv6 address from +arg+ which may be:
+    # 
+    # * IPv6:: returns +arg+
+    # * String:: +arg+ must match one of the IPv6::Regex* constants
     def self.create(arg)
       case arg
       when IPv6
@@ -105,7 +105,7 @@ module Dnsruby
       @address = address
     end
 
-    # The raw IPv6 address as a String
+    #  The raw IPv6 address as a String
     attr_reader :address
 
     def to_s
@@ -120,12 +120,12 @@ module Dnsruby
       return "#<#{self.class} #{self.to_s}>"
     end
 
-    #Turns this IPv6 address into a Dnsruby::Name
-    #--
-    # ip6.arpa should be searched too. [RFC3152]
+    # Turns this IPv6 address into a Dnsruby::Name
+    # --
+    #  ip6.arpa should be searched too. [RFC3152]
     def to_name
       return Name.create(
-        #                           @address.unpack("H32")[0].split(//).reverse + ['ip6', 'arpa'])
+        #                            @address.unpack("H32")[0].split(//).reverse + ['ip6', 'arpa'])
         @address.unpack("H32")[0].split(//).reverse.join(".") + ".ip6.arpa")
     end
 

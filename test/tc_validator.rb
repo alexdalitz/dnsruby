@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -41,11 +41,11 @@ class TestValidator < Minitest::Test
     ret = Dnsruby::Dnssec.validate(r)
     assert(ret, "Dnssec validation failed")
 
-    # @TODO@ Test other validation policies!!
+    #  @TODO@ Test other validation policies!!
   end
 
   def test_resolver_cd_validation_fails
-    # Should be able to check Nominet test-zone here - no keys point to it
+    #  Should be able to check Nominet test-zone here - no keys point to it
     res = Resolver.new
     res.dnssec=true
     r = res.query("uk-dnssec.nic.uk", Dnsruby::Types.A)
@@ -53,20 +53,20 @@ class TestValidator < Minitest::Test
   end
 
   def test_eventtype_api
-    # @TODO@ TEST THE Resolver::EventType interface!
+    #  @TODO@ TEST THE Resolver::EventType interface!
     print "Test EventType API!\n"
   end
 
   def test_config_api
-    # @TODO@ Test the different configuration options for the validator,
-    # and their defaults
-    #
-    # Should be able to set :
-    #  o Whether or not validation happens
-    #  o The async API queue tuples etc.
-    #  o Whether to use authoritative nameservers for validation
-    #  o Whether to use authoritative nameservers generally
-    #
+    #  @TODO@ Test the different configuration options for the validator,
+    #  and their defaults
+    # 
+    #  Should be able to set :
+    #   o Whether or not validation happens
+    #   o The async API queue tuples etc.
+    #   o Whether to use authoritative nameservers for validation
+    #   o Whether to use authoritative nameservers generally
+    # 
     print "Test validation configuration options!\n"
   end
 

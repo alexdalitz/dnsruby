@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -59,7 +59,7 @@ class TestRrUnknown < Minitest::Test
       res=RR.new_from_string('e.example IN A \# 4  0A0000 01 11 ')
       flunk "Should fail on inconsistent length and hex presentation"
     rescue Exception
-      #like($@, '/\\\# 4  0A0000 01 11 assert_equal inconsistent\ length does not match content/', 'Fails on inconsassert_equaltent length and hex presentation')
+      # like($@, '/\\\# 4  0A0000 01 11 assert_equal inconsistent\ length does not match content/', 'Fails on inconsassert_equaltent length and hex presentation')
     end
 
 
@@ -80,8 +80,8 @@ dd ee c0 11 00 02 00 01  00 00 03 84 00 05 02 6e
 73 c0 11 c0 44 00 01 00  01 00 00 03 84 00 04 7f
 00 00 01}
 
-    #    packetdata = uuencodedPacket.pack('H*')
-    #    packetdata = packetdata.gsub("\s*", "")
+    #     packetdata = uuencodedPacket.pack('H*')
+    #     packetdata = packetdata.gsub("\s*", "")
 
     uuencodedPacket.map!{|e| e.hex}
     packetdata = uuencodedPacket.pack('c*')
@@ -89,7 +89,7 @@ dd ee c0 11 00 02 00 01  00 00 03 84 00 05 02 6e
     packet = Message.decode(packetdata)
 
     string_representation = (packet.answer)[0].to_s
-    #string_representation =~ s/\s+/ /g,
+    # string_representation =~ s/\s+/ /g,
     string_representation = string_representation.gsub(/\s+/, " ")
     assert_equal(
 	'TEST.example.com. 123 IN TYPE12345 \# 10 1122334455aabbccddee',

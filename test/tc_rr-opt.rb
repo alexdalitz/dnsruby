@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -41,9 +41,9 @@ class TestRrOpt < Minitest::Test
 
   def test_resolver_opt_application
     return if (/java/ =~ RUBY_PLATFORM) # @TODO@ Check if this is fixed with JRuby yet
-    # Set up a server running on localhost. Get the resolver to send a
-    # query to it with the UDP size set to 4096. Make sure that it is received
-    # correctly.
+    #  Set up a server running on localhost. Get the resolver to send a
+    #  query to it with the UDP size set to 4096. Make sure that it is received
+    #  correctly.
     Dnsruby::PacketSender.clear_caches
     socket = UDPSocket.new
     socket.bind("127.0.0.1", 0)
@@ -57,24 +57,24 @@ class TestRrOpt < Minitest::Test
       socket.send(received_query,0)
     }
 
-    # Now send query
+    #  Now send query
     res = Resolver.new("127.0.0.1")
     res.port = port
     res.udp_size = 4096
     assert(res.udp_size == 4096)
     res.query("example.com")
 
-    # Now get received query from the server
+    #  Now get received query from the server
     p = q.pop
-    # Now check the query was what we expected
+    #  Now check the query was what we expected
     assert(p.header.arcount == 1)
     assert(p.additional()[0].type = Types.OPT)
     assert(p.additional()[0].klass.code == 4096)
   end
 
   def test_large_packet
-    # Query TXT for overflow.dnsruby.validation-test-servers.nominet.org.uk
-    # with a large udp_size
+    #  Query TXT for overflow.dnsruby.validation-test-servers.nominet.org.uk
+    #  with a large udp_size
     res = SingleResolver.new
     res.udp_size = 4096
     ret = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
@@ -82,36 +82,36 @@ class TestRrOpt < Minitest::Test
   end
 
   def test_decode_opt
-    # Create an OPT RR
+    #  Create an OPT RR
     size=2048;
     ednsflags=0x9e22;
     optrr = RR::OPT.new(size, ednsflags)
 
-    # Add it to a message
+    #  Add it to a message
     m = Message.new
     m.add_additional(optrr)
 
-    # Encode the message
+    #  Encode the message
     data = m.encode
 
-    # Decode it
+    #  Decode it
     m2 = Message.decode(data)
 
-    # Make sure there is an OPT RR there
+    #  Make sure there is an OPT RR there
     assert(m2.rcode == RCode.NOERROR  )
   end
 
   def test_formerr_response
-    # If we get a FORMERR back from the remote resolver, we should retry with no OPT record
-    # So, we need a server which sends back FORMERR for OPT records, and is OK without them.
-    # Then, we need to get a client to send a request to it (by default adorned with EDNS0),
-    # and make sure that the response is returned to the client OK.
-    # We should then check that the server only received one message with EDNS0, and one message
-    # without.
+    #  If we get a FORMERR back from the remote resolver, we should retry with no OPT record
+    #  So, we need a server which sends back FORMERR for OPT records, and is OK without them.
+    #  Then, we need to get a client to send a request to it (by default adorned with EDNS0),
+    #  and make sure that the response is returned to the client OK.
+    #  We should then check that the server only received one message with EDNS0, and one message
+    #  without.
     return if (/java/ =~ RUBY_PLATFORM) # @TODO@ Check if this is fixed with JRuby yet
-    # Set up a server running on localhost. Get the resolver to send a
-    # query to it with the UDP size set to 4096. Make sure that it is received
-    # correctly.
+    #  Set up a server running on localhost. Get the resolver to send a
+    #  query to it with the UDP size set to 4096. Make sure that it is received
+    #  correctly.
     Dnsruby::PacketSender.clear_caches
     socket = UDPSocket.new
     socket.bind("127.0.0.1", 0)
@@ -124,7 +124,7 @@ class TestRrOpt < Minitest::Test
         m = Message.decode(received_query)
         q.push(m)
         if (m.header.arcount > 0)
-          # send back FORMERR
+          #  send back FORMERR
           m.header.rcode = RCode.FORMERR
           socket.send(m.encode,0,s[1][2], s[1][1])
         else
@@ -133,7 +133,7 @@ class TestRrOpt < Minitest::Test
       }
 
     }
-    # Now send query
+    #  Now send query
     res = Resolver.new("127.0.0.1")
     res.port = port
     res.udp_size = 4096
@@ -142,14 +142,14 @@ class TestRrOpt < Minitest::Test
     assert(ret.header.get_header_rcode == RCode.NOERROR)
     assert(ret.header.arcount == 0)
 
-    # Now get received query from the server
+    #  Now get received query from the server
     p = q.pop
-    # Now check the query was what we expected
+    #  Now check the query was what we expected
     assert(p.header.arcount == 1)
     assert(p.additional()[0].type = Types.OPT)
     assert(p.additional()[0].klass.code == 4096)
 
-    # Now check the second message
+    #  Now check the second message
     assert (!(q.empty?))
     p2 = q.pop
     assert (p2)

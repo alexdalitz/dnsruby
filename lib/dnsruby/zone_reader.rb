@@ -1,18 +1,18 @@
-#--
-#Copyright 2009 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2009 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 # This class provides the facility to load a zone file.
 # It can either process one line at a time, or return an entire zone as a list of
@@ -22,8 +22,8 @@ module Dnsruby
     class ParseException < Exception
 
     end
-    # Create a new ZoneReader. The zone origin is required. If the desired SOA minimum
-    # and TTL are passed in, then they are used as default values.
+    #  Create a new ZoneReader. The zone origin is required. If the desired SOA minimum
+    #  and TTL are passed in, then they are used as default values.
     def initialize(origin, soa_minimum = nil, soa_ttl = nil)
       @origin = origin.to_s
 
@@ -42,8 +42,8 @@ module Dnsruby
       @in_quoted_section = false
     end
 
-    # Takes a filename string and attempts to load a zone. Returns a list
-    # of RRs if successful, nil otherwise.
+    #  Takes a filename string and attempts to load a zone. Returns a list
+    #  of RRs if successful, nil otherwise.
     def process_file(file)
       line_num = 0
       zone = nil
@@ -65,8 +65,8 @@ module Dnsruby
       return zone
     end
 
-    # Process the next line of the file
-    # Returns a string representing the normalised line.
+    #  Process the next line of the file
+    #  Returns a string representing the normalised line.
     def process_line(line, do_prefix_hack = false)
       return nil if (line[0,1] == ";")
       return nil if (line.strip.length == 0)
@@ -77,30 +77,30 @@ module Dnsruby
 
       if (line.index("$ORIGIN") == 0)
         @origin = line.split()[1].strip #  $ORIGIN <domain-name> [<comment>]
-        #                print "Setting $ORIGIN to #{@origin}\n"
+        #                 print "Setting $ORIGIN to #{@origin}\n"
         return nil
       end
       if (line.index("$TTL") == 0)
         @last_explicit_ttl = get_ttl(line.split()[1].strip) #  $TTL <ttl>
-        #                print "Setting $TTL to #{ttl}\n"
+        #                 print "Setting $TTL to #{ttl}\n"
         return nil
       end
       if (@continued_line)
-        # Add the next line until we see a ")"
-        # REMEMBER TO STRIP OFF COMMENTS!!!
+        #  Add the next line until we see a ")"
+        #  REMEMBER TO STRIP OFF COMMENTS!!!
         @continued_line = strip_comments(@continued_line)
         line = @continued_line.rstrip.chomp + " " + line
         if (line.index(")"))
-          # OK
+          #  OK
           @continued_line = false
         end
       end
       open_bracket = line.index("(")
       if (open_bracket)
-        # Keep going until we see ")"
+        #  Keep going until we see ")"
         index = line.index(")")
         if (index && (index > open_bracket))
-          # OK
+          #  OK
           @continued_line = false
         else
           @continued_line = line
@@ -110,45 +110,45 @@ module Dnsruby
 
       line = strip_comments(line) + "\n"
 
-      # If SOA, then replace "3h" etc. with expanded seconds
-      #      begin
+      #  If SOA, then replace "3h" etc. with expanded seconds
+      #       begin
       return normalise_line(line, do_prefix_hack)
-      #      rescue Exception => e
-      #        print "ERROR parsing line #{@line_num} : #{line}\n"
-      #        return "\n", Types::ANY
-      #      end
+      #       rescue Exception => e
+      #         print "ERROR parsing line #{@line_num} : #{line}\n"
+      #         return "\n", Types::ANY
+      #       end
     end
 
     def strip_comments(line)
       last_index = 0
-      # Are we currently in a quoted section?
-      # Does a quoted section begin or end in this line?
-      # Are there any semi-colons?
-      # Ary any of the semi-colons inside a quoted section?
-      # Handle escape characters
+      #  Are we currently in a quoted section?
+      #  Does a quoted section begin or end in this line?
+      #  Are there any semi-colons?
+      #  Ary any of the semi-colons inside a quoted section?
+      #  Handle escape characters
       if (line.index"\\")
         return strip_comments_meticulously(line)
       end
       while (next_index = line.index(";", last_index + 1))
-        # Have there been any quotes since we last looked?
+        #  Have there been any quotes since we last looked?
         process_quotes(line[last_index, next_index - last_index])
 
-        # Now use @in_quoted_section to work out if the ';' terminates the line
+        #  Now use @in_quoted_section to work out if the ';' terminates the line
         if (!@in_quoted_section)
           return line[0,next_index]
         end
 
         last_index = next_index
       end
-      # Check out the quote situation to the end of the line
+      #  Check out the quote situation to the end of the line
       process_quotes(line[last_index, line.length-1])
 
       return line
     end
 
     def strip_comments_meticulously(line)
-      # We have escape characters in the text. Go through it character by
-      # character and work out what's escaped and quoted and what's not
+      #  We have escape characters in the text. Go through it character by
+      #  character and work out what's escaped and quoted and what's not
       escaped = false
       quoted = false
       pos = 0
@@ -188,8 +188,8 @@ module Dnsruby
     end
 
     def process_quotes(section)
-      # Look through the section of text and set the @in_quoted_section
-      # as it should be at the end of the given section
+      #  Look through the section of text and set the @in_quoted_section
+      #  as it should be at the end of the given section
       last_index = 0
       while (next_index = section.index("\"", last_index + 1))
         @in_quoted_section = !@in_quoted_section
@@ -197,14 +197,14 @@ module Dnsruby
       end
     end
 
-    # Take a line from the input zone file, and return the normalised form
-    # do_prefix_hack should always be false
+    #  Take a line from the input zone file, and return the normalised form
+    #  do_prefix_hack should always be false
     def normalise_line(line, do_prefix_hack = false)
-      # Note that a freestanding "@" is used to denote the current origin - we can simply replace that straight away
-      # Remove the ( and )
-      # Note that no domain name may be specified in the RR - in that case, last_name should be used. How do we tell? Tab or space at start of line.
+      #  Note that a freestanding "@" is used to denote the current origin - we can simply replace that straight away
+      #  Remove the ( and )
+      #  Note that no domain name may be specified in the RR - in that case, last_name should be used. How do we tell? Tab or space at start of line.
 
-      # If we have text in the record, then ignore that in the parsing, and stick it on again at the end
+      #  If we have text in the record, then ignore that in the parsing, and stick it on again at the end
       stored_line = "";
       if (line.index('"') != nil)
           stored_line = line[line.index('"'), line.length];
@@ -220,7 +220,7 @@ module Dnsruby
       line.strip!
 
 
-      # o We need to identify the domain name in the record, and then
+      #  o We need to identify the domain name in the record, and then
       split = line.split(' ') # split on whitespace
       name = split[0].strip
       if (name.index"\\")
@@ -240,7 +240,7 @@ module Dnsruby
         line += "\n"
         name = new_name
         split = line.split
-        # o add $ORIGIN to it if it is not absolute
+        #  o add $ORIGIN to it if it is not absolute
       elsif !(/\.\z/ =~ name)
         new_name = name + "." + @origin
         line.sub!(name, new_name)
@@ -248,11 +248,11 @@ module Dnsruby
         split = line.split
       end
 
-      # If the second field is not a number, then we should add the TTL to the line
-      # Remember we can get "m" "w" "y" here! So need to check for appropriate regexp...
+      #  If the second field is not a number, then we should add the TTL to the line
+      #  Remember we can get "m" "w" "y" here! So need to check for appropriate regexp...
       found_ttl_regexp = (split[1]=~/^[0-9]+[smhdwSMHDW]/)
       if (found_ttl_regexp == 0)
-        # Replace the formatted ttl with an actual number
+        #  Replace the formatted ttl with an actual number
         ttl = get_ttl(split[1])
         line = name + " #{ttl} "
         @last_explicit_ttl = ttl
@@ -260,16 +260,16 @@ module Dnsruby
         line += "\n"
         split = line.split
       elsif (((split[1]).to_i == 0) && (split[1] != "0"))
-        # Add the TTL
+        #  Add the TTL
         if (!@last_explicit_ttl)
-          # If this is the SOA record, and no @last_explicit_ttl is defined,
-          # then we need to try the SOA TTL element from the config. Otherwise,
-          # find the SOA Minimum field, and use that.
-          # We should also generate a warning to that effect
-          # How do we know if it is an SOA record at this stage? It must be, or
-          # else @last_explicit_ttl should be defined
-          # We could put a marker in the RR for now - and replace it once we know
-          # the actual type. If the type is not SOA then, then we can raise an error
+          #  If this is the SOA record, and no @last_explicit_ttl is defined,
+          #  then we need to try the SOA TTL element from the config. Otherwise,
+          #  find the SOA Minimum field, and use that.
+          #  We should also generate a warning to that effect
+          #  How do we know if it is an SOA record at this stage? It must be, or
+          #  else @last_explicit_ttl should be defined
+          #  We could put a marker in the RR for now - and replace it once we know
+          #  the actual type. If the type is not SOA then, then we can raise an error
           line = name + " %MISSING_TTL% "
         else
           line = name + " #{@last_explicit_ttl} "
@@ -281,13 +281,13 @@ module Dnsruby
         @last_explicit_ttl = split[1].to_i
       end
 
-      # Now see if the clas is included. If not, then we should default to the last class used.
+      #  Now see if the clas is included. If not, then we should default to the last class used.
       begin
         klass = Classes.new(split[2])
         @last_explicit_class = klass
       rescue ArgumentError
-        # Wasn't a CLASS
-        # So add the last explicit class in
+        #  Wasn't a CLASS
+        #  So add the last explicit class in
         line = ""
         (2).times {|i| line += "#{split[i]} "}
         line += " #{@last_explicit_class} "
@@ -297,12 +297,12 @@ module Dnsruby
       rescue Error => e
       end
 
-      # Add the type so we can load the zone one RRSet at a time.
+      #  Add the type so we can load the zone one RRSet at a time.
       type = Types.new(split[3].strip)
       is_soa = (type == Types::SOA)
       type_was = type
       if (type == Types.RRSIG)
-        # If this is an RRSIG record, then add the TYPE COVERED rather than the type - this allows us to load a complete RRSet at a time
+        #  If this is an RRSIG record, then add the TYPE COVERED rather than the type - this allows us to load a complete RRSet at a time
         type = Types.new(split[4].strip)
       end
 
@@ -316,10 +316,10 @@ module Dnsruby
 
       if (is_soa)
         if (@soa_ttl)
-          # Replace the %MISSING_TTL% text with the SOA TTL from the config
+          #  Replace the %MISSING_TTL% text with the SOA TTL from the config
           line.sub!(" %MISSING_TTL% ", " #{@soa_ttl} ")
         else
-          # Can we try the @last_explicit_ttl?
+          #  Can we try the @last_explicit_ttl?
           if (@last_explicit_ttl)
             line.sub!(" %MISSING_TTL% ", " #{@last_explicit_ttl} ")
           end
@@ -337,20 +337,20 @@ module Dnsruby
         line += " " + stored_line.strip
       end
 
-      # We need to fix up any non-absolute names in the RR
-      # Some RRs have a single name, at the end of the string -
-      #   to do these, we can just check the last character for "." and add the
-      #   "." + origin string if necessary
+      #  We need to fix up any non-absolute names in the RR
+      #  Some RRs have a single name, at the end of the string -
+      #    to do these, we can just check the last character for "." and add the
+      #    "." + origin string if necessary
       if ([Types::MX, Types::NS, Types::AFSDB, Types::NAPTR, Types::RT,
             Types::SRV, Types::CNAME, Types::MB, Types::MG, Types::MR,
             Types::PTR, Types::DNAME].include?type_was)
-        #        if (line[line.length-1, 1] != ".")
+        #         if (line[line.length-1, 1] != ".")
         if (!(/\.\z/ =~ line))
           line = line + "." + @origin.to_s + "."
         end
       end
-      # Other RRs have several names. These should be parsed by Dnsruby,
-      #   and the names adjusted there.
+      #  Other RRs have several names. These should be parsed by Dnsruby,
+      #    and the names adjusted there.
       if ([Types::MINFO, Types::PX, Types::RP].include?type_was)
         parsed_rr = Dnsruby::RR.create(line)
         case parsed_rr.type
@@ -384,11 +384,11 @@ module Dnsruby
       return line+"\n"
     end
 
-    # Get the TTL in seconds from the m, h, d, w format
+    #  Get the TTL in seconds from the m, h, d, w format
     def get_ttl(ttl_text_in)
-      # If no letter afterwards, then in seconds already
-      # Could be e.g. "3d4h12m" - unclear if "4h5w" is legal - best assume it is
-      # So, search out each letter in the string, and get the number before it.
+      #  If no letter afterwards, then in seconds already
+      #  Could be e.g. "3d4h12m" - unclear if "4h5w" is legal - best assume it is
+      #  So, search out each letter in the string, and get the number before it.
       ttl_text = ttl_text_in.downcase
       index = ttl_text.index(/[whdms]/)
       if (!index)
@@ -421,7 +421,7 @@ module Dnsruby
     end
 
     def replace_soa_ttl_fields(line)
-      # Replace any fields which evaluate to 0
+      #  Replace any fields which evaluate to 0
       split = line.split
       4.times {|i|
         x = i + 7
@@ -431,16 +431,16 @@ module Dnsruby
       return split.join(" ") + "\n"
     end
 
-    # This method is included only for OpenDNSSEC support. It should not be
-    # used otherwise.
-    # Frig the RR type so that NSEC records appear last in the RRSets.
-    # Also make sure that DNSKEYs come first (so we have a key to verify
-    # the RRSet with!).
+    #  This method is included only for OpenDNSSEC support. It should not be
+    #  used otherwise.
+    #  Frig the RR type so that NSEC records appear last in the RRSets.
+    #  Also make sure that DNSKEYs come first (so we have a key to verify
+    #  the RRSet with!).
     def prefix_for_rrset_order(type, type_was) # :nodoc: all
-      # Now make sure that NSEC(3) RRs go to the back of the list
+      #  Now make sure that NSEC(3) RRs go to the back of the list
       if ['NSEC', 'NSEC3'].include?type.string
         if (type_was == Types::RRSIG)
-          # Get the RRSIG first
+          #  Get the RRSIG first
           type_string = "ZZ" + type.string
         else
           type_string = "ZZZ" + type.string
@@ -448,7 +448,7 @@ module Dnsruby
       elsif type == Types::DNSKEY
         type_string = "0" + type.string
       elsif type == Types::NS
-        # Make sure that we see the NS records first so we know the delegation status
+        #  Make sure that we see the NS records first so we know the delegation status
         type_string = "1" + type.string
       else
         type_string = type.string

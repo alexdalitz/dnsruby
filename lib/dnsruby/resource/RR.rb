@@ -1,17 +1,17 @@
 # Superclass for all Dnsruby resource records.
-#
+# 
 # Represents a DNS RR (resource record) [RFC1035, section 3.2]
-#
+# 
 # Use Dnsruby::RR::create(...) to create a new RR record.
-#
+# 
 #   mx = Dnsruby::RR.create("example.com. 7200 MX 10 mailhost.example.com.")
-#
+# 
 #   rr = Dnsruby::RR.create({:name => "example.com", :type => "MX", :ttl => 7200,
 #                                  :preference => 10, :exchange => "mailhost.example.com"})
-#
+# 
 #   s = rr.to_s # Get a String representation of the RR (in zone file format)
 #   rr_again = Dnsruby::RR.create(s)
-#
+# 
 
 require 'dnsruby/code_mappers'
 
@@ -21,8 +21,8 @@ class RR
   include Comparable
 
   def <=>(other)
-    #      return 1 if ((!other) || !(other.name) || !(other.type))
-    #      return -1 if (!@name)
+    #       return 1 if ((!other) || !(other.name) || !(other.type))
+    #       return -1 if (!@name)
     if (@name.canonical == other.name.canonical)
       if (@type.code == other.type.code)
         return (@rdata <=> other.rdata)
@@ -34,21 +34,21 @@ class RR
     end
   end
 
-  # A regular expression which catches any valid resource record.
+  #  A regular expression which catches any valid resource record.
   @@RR_REGEX = Regexp.new("^\\s*(\\S+)\\s*(\\d+)?\\s*(#{Classes.regexp +
       "|CLASS\\d+"})?\\s*(#{Types.regexp + '|TYPE\\d+'})?\\s*([\\s\\S]*)\$") #:nodoc: all
 
   @@implemented_rr_map = nil
 
-  #The Resource's domain name
+  # The Resource's domain name
   attr_reader :name
-  #The Resource type
+  # The Resource type
   attr_reader :type
-  #The Resource class
+  # The Resource class
   attr_reader :klass
-  #The Resource Time-To-Live
+  # The Resource Time-To-Live
   attr_accessor :ttl
-  #The Resource data section
+  # The Resource data section
   attr_accessor :rdata
 
   def rdlength
@@ -89,9 +89,9 @@ class RR
 
   end
 
-  # Determines if two Records could be part of the same RRset.
-  # This compares the name, type, and class of the Records; the ttl and
-  # rdata are not compared.
+  #  Determines if two Records could be part of the same RRset.
+  #  This compares the name, type, and class of the Records; the ttl and
+  #  rdata are not compared.
   def sameRRset(rec)
     if (@klass != rec.klass || @name.downcase != rec.name.downcase)
       return false
@@ -108,7 +108,7 @@ class RR
   end
 
   def init_defaults
-    # Default to do nothing
+    #  Default to do nothing
   end
 
   private
@@ -120,7 +120,7 @@ class RR
         return
       else
         @rdata = args[0]
-        #          print "Loading RR from #{args[0]}, class : #{args[0].class}\n"
+        #           print "Loading RR from #{args[0]}, class : #{args[0].class}\n"
         if (args[0].class == String)
           from_string(args[0])
           return
@@ -130,7 +130,7 @@ class RR
         end
       end
     end
-    #      raise ArgumentError.new("Don't call new! Use Dnsruby::RR::create() instead")
+    #       raise ArgumentError.new("Don't call new! Use Dnsruby::RR::create() instead")
   end
   public
 
@@ -140,16 +140,16 @@ class RR
     end
   end
 
-  #Create a new RR from the hash. The name is required; all other fields are optional.
-  #Type defaults to ANY and the Class defaults to IN. The TTL defaults to 0.
-  #
-  #If the type is specified, then it is necessary to provide ALL of the resource record fields which
-  #are specific to that record; i.e. for
-  #an MX record, you would need to specify the exchange and the preference
-  #
-  #   require 'Dnsruby'
-  #   rr = Dnsruby::RR.new_from_hash({:name => "example.com"})
-  #   rr = Dnsruby::RR.new_from_hash({:name => "example.com", :type => Types.MX, :ttl => 10, :preference => 5, :exchange => "mx1.example.com"})
+  # Create a new RR from the hash. The name is required; all other fields are optional.
+  # Type defaults to ANY and the Class defaults to IN. The TTL defaults to 0.
+  # 
+  # If the type is specified, then it is necessary to provide ALL of the resource record fields which
+  # are specific to that record; i.e. for
+  # an MX record, you would need to specify the exchange and the preference
+  # 
+  #    require 'Dnsruby'
+  #    rr = Dnsruby::RR.new_from_hash({:name => "example.com"})
+  #    rr = Dnsruby::RR.new_from_hash({:name => "example.com", :type => Types.MX, :ttl => 10, :preference => 5, :exchange => "mx1.example.com"})
   def RR.new_from_hash(inhash)
     hash = inhash.clone
     type = hash[:type] || Types::ANY
@@ -172,27 +172,27 @@ class RR
     return record
   end
 
-  #Returns a Dnsruby::RR object of the appropriate type and
-  #initialized from the string passed by the user.  The format of the
-  #string is that used in zone files, and is compatible with the string
-  #returned by Net::DNS::RR.inspect
-  #
-  #The name and RR type are required; all other information is optional.
-  #If omitted, the TTL defaults to 0 and the RR class defaults to IN.
-  #
-  #All names must be fully qualified.  The trailing dot (.) is optional.
-  #
-  #
-  #   a     = Dnsruby::RR.new_from_string("foo.example.com. 86400 A 10.1.2.3")
-  #   mx    = Dnsruby::RR.new_from_string("example.com. 7200 MX 10 mailhost.example.com.")
-  #   cname = Dnsruby::RR.new_from_string("www.example.com 300 IN CNAME www1.example.com")
-  #   txt   = Dnsruby::RR.new_from_string('baz.example.com 3600 HS TXT "text record"')
-  #
-  #
+  # Returns a Dnsruby::RR object of the appropriate type and
+  # initialized from the string passed by the user.  The format of the
+  # string is that used in zone files, and is compatible with the string
+  # returned by Net::DNS::RR.inspect
+  # 
+  # The name and RR type are required; all other information is optional.
+  # If omitted, the TTL defaults to 0 and the RR class defaults to IN.
+  # 
+  # All names must be fully qualified.  The trailing dot (.) is optional.
+  # 
+  # 
+  #    a     = Dnsruby::RR.new_from_string("foo.example.com. 86400 A 10.1.2.3")
+  #    mx    = Dnsruby::RR.new_from_string("example.com. 7200 MX 10 mailhost.example.com.")
+  #    cname = Dnsruby::RR.new_from_string("www.example.com 300 IN CNAME www1.example.com")
+  #    txt   = Dnsruby::RR.new_from_string('baz.example.com 3600 HS TXT "text record"')
+  # 
+  # 
   def RR.new_from_string(rrstring)
-    # strip out comments
-    # Test for non escaped ";" by means of the look-behind assertion
-    # (the backslash is escaped)
+    #  strip out comments
+    #  Test for non escaped ";" by means of the look-behind assertion
+    #  (the backslash is escaped)
     rrstring = rrstring.gsub(/(\?<!\\);.*/o, "");
 
     if ((rrstring =~/#{@@RR_REGEX}/xo) == nil)
@@ -211,8 +211,8 @@ class RR
       rdata.gsub!(/\s+$/o, "")
     end
 
-    # RFC3597 tweaks
-    # This converts to known class and type if specified as TYPE###
+    #  RFC3597 tweaks
+    #  This converts to known class and type if specified as TYPE###
     if rrtype  =~/^TYPE\d+/o
       rrtype  = Dnsruby::Types.typesbyval(Dnsruby::Types::typesbyname(rrtype))
     end
@@ -258,7 +258,7 @@ class RR
 
       return new_from_data(name, rrtype, rrclass, ttl, rdlength, rdata, 0) # rdata.length() - rdlength);
     elsif (rdata=~/\s*\\\#\s+\d+\s+/o)
-      #We are now dealing with the truly unknown.
+      # We are now dealing with the truly unknown.
       raise Exception, 'Expected RFC3597 representation of RDATA' unless rdata =~/\\\#\s+(\d+)\s+(.*)$/o;
 
       rdlength = $1.to_i;
@@ -273,7 +273,7 @@ class RR
 
       return new_from_data(name,rrtype,rrclass,ttl,rdlength,rdata,0) # rdata.length() - rdlength);
     else
-      #God knows how to handle these...
+      # God knows how to handle these...
       subclass = _get_subclass(name, rrtype, rrclass, ttl, "")
       return subclass
     end
@@ -304,7 +304,7 @@ class RR
     return record
   end
 
-  #Return an array of all the currently implemented RR types
+  # Return an array of all the currently implemented RR types
   def RR.implemented_rrs
     if (!@@implemented_rr_map)
       @@implemented_rr_map = ClassHash.keys.map {|k| Dnsruby::Types.to_string(k[0])}
@@ -324,12 +324,12 @@ class RR
   end
   public
 
-  #Returns a string representation of the RR in zone file format
+  # Returns a string representation of the RR in zone file format
   def to_s
     return (@name ? @name.to_s(true):"") + "\t" +(@ttl ? @ttl.to_s():"") + "\t" + (klass() ? klass.to_s():"") + "\t" + (type() ? type.to_s():"") + "\t" + rdata_to_string
   end
 
-  #Get a string representation of the data section of the RR (in zone file format)
+  # Get a string representation of the data section of the RR (in zone file format)
   def rdata_to_string
     if (@rdata && @rdata.length > 0)
       return @rdata
@@ -339,22 +339,22 @@ class RR
   end
 
   def from_data(data) #:nodoc: all
-    # to be implemented by subclasses
+    #  to be implemented by subclasses
     raise NotImplementedError.new
   end
 
   def from_string(input) #:nodoc: all
-    # to be implemented by subclasses
-    #      raise NotImplementedError.new
+    #  to be implemented by subclasses
+    #       raise NotImplementedError.new
   end
 
   def encode_rdata(msg, canonical=false) #:nodoc: all
-    # to be implemented by subclasses
+    #  to be implemented by subclasses
     raise EncodeError.new("#{self.class} is RR.")
   end
 
   def self.decode_rdata(msg) #:nodoc: all
-    # to be implemented by subclasses
+    #  to be implemented by subclasses
     raise DecodeError.new("#{self.class} is RR.")
   end
 
@@ -413,7 +413,7 @@ class RR
     end
   end
 
-  #Get an RR of the specified type and class
+  # Get an RR of the specified type and class
   def self.get_class(type_value, class_value) #:nodoc: all
     if (type_value == Types::OPT)
       return Class.new(OPT)
@@ -438,18 +438,18 @@ class RR
   end
 
 
-  #Create a new RR from the arguments, which can be either a String or a Hash.
-  #See new_from_string and new_from_hash for details
-  #
-  #   a     = Dnsruby::RR.create("foo.example.com. 86400 A 10.1.2.3")
-  #   mx    = Dnsruby::RR.create("example.com. 7200 MX 10 mailhost.example.com.")
-  #   cname = Dnsruby::RR.create("www.example.com 300 IN CNAME www1.example.com")
-  #   txt   = Dnsruby::RR.create('baz.example.com 3600 HS TXT "text record"')
-  #
-  #   rr = Dnsruby::RR.create({:name => "example.com"})
-  #   rr = Dnsruby::RR.create({:name => "example.com", :type => "MX", :ttl => 10,
-  #                                  :preference => 5, :exchange => "mx1.example.com"})
-  #
+  # Create a new RR from the arguments, which can be either a String or a Hash.
+  # See new_from_string and new_from_hash for details
+  # 
+  #    a     = Dnsruby::RR.create("foo.example.com. 86400 A 10.1.2.3")
+  #    mx    = Dnsruby::RR.create("example.com. 7200 MX 10 mailhost.example.com.")
+  #    cname = Dnsruby::RR.create("www.example.com 300 IN CNAME www1.example.com")
+  #    txt   = Dnsruby::RR.create('baz.example.com 3600 HS TXT "text record"')
+  # 
+  #    rr = Dnsruby::RR.create({:name => "example.com"})
+  #    rr = Dnsruby::RR.create({:name => "example.com", :type => "MX", :ttl => 10,
+  #                                   :preference => 5, :exchange => "mx1.example.com"})
+  # 
   def RR.create(*args)
     if (args.length == 1) && (args[0].class == String)
       return new_from_string(args[0])
