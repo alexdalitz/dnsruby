@@ -659,7 +659,7 @@ module Dnsruby
         end
         return true
       else
-        Dnsruby.log.error("Illegal port (# {p})")
+        Dnsruby.log.error("Illegal port (#{p})")
         log_and_raise("Illegal port #{p}", ArgumentError)
       end
     end
@@ -743,7 +743,7 @@ module Dnsruby
       else
         tsig = RR.new_from_hash(create_tsig_options(args))
       end
-      Dnsruby.log.info{"TSIG signing now using # {tsig.name}, key=#{tsig.key}"}
+      Dnsruby.log.info{"TSIG signing now using #{tsig.name}, key=#{tsig.key}"}
       tsig
     end
 
@@ -887,7 +887,7 @@ module Dnsruby
       @parent.single_res_mutex.synchronize {
         tick_needed = true if @query_list.empty?
         if @query_list.has_key?client_query_id
-          Dnsruby.log.error{"Duplicate query id requested (# {client_query_id}"}
+          Dnsruby.log.error{"Duplicate query id requested (#{client_query_id}"}
           # @TODO@ Handle different queue tuples - push this to generic send_error method
           client_queue.push([client_query_id, ArgumentError.new("Client query ID already in use")])
           return
@@ -994,7 +994,7 @@ module Dnsruby
               # Send the next query
               res, retry_count = timeouts[timeout]
               id = [res, msg, client_query_id, retry_count]
-              Dnsruby.log.debug{"Sending msg to # {res.server}"}
+              Dnsruby.log.debug{"Sending msg to #{res.server}"}
               # We should keep a list of the queries which are outstanding
               outstanding.push(id)
               timeouts_done.push(timeout)
@@ -1055,7 +1055,7 @@ module Dnsruby
       # We should remove this packet from the list of outstanding packets for this query
       _resolver, _msg, client_query_id, _retry_count = id
       if id != event_id
-        log_and_raise("Serious internal error!! # {id} expected, #{event_id} received")
+        log_and_raise("Serious internal error!! #{id} expected, #{event_id} received")
       end
       #      @mutex.synchronize{
       @parent.single_res_mutex.synchronize {
@@ -1092,7 +1092,7 @@ module Dnsruby
           handle_error_response(queue, event_id, error, response)
         else
           #          print "ERROR - UNKNOWN EVENT TYPE IN RESOLVER : #{event_type}\n"
-          TheLog.error("ERROR - UNKNOWN EVENT TYPE IN RESOLVER : # {event_type}")
+          TheLog.error("ERROR - UNKNOWN EVENT TYPE IN RESOLVER : #{event_type}")
         end
       }
     end
@@ -1100,7 +1100,7 @@ module Dnsruby
     def handle_error_response(select_queue, query_id, error, response) # :nodoc: all
       # Handle an error
       #      @mutex.synchronize{
-      Dnsruby.log.debug{"handling error # {error.class}, #{error}"}
+      Dnsruby.log.debug{"handling error #{error.class}, #{error}"}
       # Check what sort of error it was :
       resolver, _msg, client_query_id, _retry_count = query_id
       _msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
@@ -1127,7 +1127,7 @@ module Dnsruby
         #   If a Too Many Open Files error, then don't remove, but let retry work.
         timeouts = @timeouts[client_query_id]
         unless error.to_s =~ /Errno::EMFILE/
-          Dnsruby.log.debug{"Removing # {resolver.server} from resolver list for this query"}
+          Dnsruby.log.debug{"Removing #{resolver.server} from resolver list for this query"}
           if timeouts
             timeouts[1].each do |key, value|
               res = value[0]
@@ -1139,7 +1139,7 @@ module Dnsruby
           # Also stick it to the back of the list for future queries
           demote_resolver(resolver)
         else
-          Dnsruby.log.debug{"NOT Removing # {resolver.server} due to Errno::EMFILE"}
+          Dnsruby.log.debug{"NOT Removing #{resolver.server} due to Errno::EMFILE"}
         end
         #        - if it was the last server, then return an error to the client (and clean up)
         if outstanding.empty? && ((!timeouts) || (timeouts && timeouts[1].values.empty?))
@@ -1155,7 +1155,7 @@ module Dnsruby
 
     # TO BE CALLED IN A SYNCHRONIZED BLOCK
     def increment_resolver_priority(res)
-      TheLog.debug("Incrementing resolver priority for # {res.server}\n")
+      TheLog.debug("Incrementing resolver priority for #{res.server}\n")
       #      @parent.single_res_mutex.synchronize {
       index = @parent.single_resolvers.index(res)
       if index > 0
@@ -1167,7 +1167,7 @@ module Dnsruby
 
     # TO BE CALLED IN A SYNCHRONIZED BLOCK
     def decrement_resolver_priority(res)
-      TheLog.debug("Decrementing resolver priority for # {res.server}\n")
+      TheLog.debug("Decrementing resolver priority for #{res.server}\n")
       #      @parent.single_res_mutex.synchronize {
       index = @parent.single_resolvers.index(res)
       if index < @parent.single_resolvers.length
@@ -1179,7 +1179,7 @@ module Dnsruby
 
     # TO BE CALLED IN A SYNCHRONIZED BLOCK
     def demote_resolver(res)
-      TheLog.debug("Demoting resolver priority for # {res.server} to bottom\n")
+      TheLog.debug("Demoting resolver priority for #{res.server} to bottom\n")
       #      @parent.single_res_mutex.synchronize {
       @parent.single_resolvers.delete(res)
       @parent.single_resolvers.push(res)
@@ -1195,7 +1195,7 @@ module Dnsruby
       #      @mutex.synchronize{
       query, client_queue, s_queue, outstanding = @query_list[client_query_id]
       if s_queue != select_queue
-        log_and_raise("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
+        log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
       end
       stop_querying(client_query_id)
       # @TODO@ Does the client want notified at this point?
@@ -1208,7 +1208,7 @@ module Dnsruby
       #      @mutex.synchronize {
       _query, client_queue, s_queue, _outstanding = @query_list[client_query_id]
       if s_queue != select_queue
-        log_and_raise("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
+        log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
       end
       if response.rcode == RCode.NXDOMAIN
         send_result(client_queue, client_query_id, select_queue, response, NXDomain.new)
@@ -1224,7 +1224,7 @@ module Dnsruby
       _resolver, _msg, client_query_id, _retry_count = query_id
       _query, client_queue, s_queue, _outstanding = @query_list[client_query_id]
       if s_queue != select_queue
-        log_and_raise("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
+        log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
       end
       #      For some errors, we immediately send result. For others, should we retry?
       #      Either :
