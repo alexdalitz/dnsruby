@@ -241,19 +241,6 @@ module Dnsruby
       Dnsruby.log.debug{'Resolver : sending message'}
       q = Queue.new
       send_async(message, q)
-      #      # @TODO@ Add new queue tuples, e.g. :
-      #      event_type = EventType::RECEIVED
-      #      reply = nil
-      #      while event_type == EventType::RECEIVED
-      #        id, event_type, reply, error = q.pop
-      #        Dnsruby.log.debug{'Resolver : result received'}
-      #        if (error != nil) && (event_type == EventType::ERROR)
-      #          raise error
-      #        end
-      #        print "Reply = #{reply}\n"
-      #      end
-      #      print "Reply = #{reply}\n"
-      #      return reply
 
       _id, result, error = q.pop
 
@@ -451,11 +438,7 @@ module Dnsruby
       else
         # Anything to do?
       end
-      #      if @single_resolvers==[]
-      #        add_config_nameservers
-      #      end
       update
-      #      ResolverRegister::register_resolver(self)
     end
 
     def add_config_nameservers # :nodoc: all
@@ -650,9 +633,6 @@ module Dnsruby
 
     def Resolver.port_in_range(p)
       (p == 0) || ((p >= 50000) && (p <= 65535))
-        # @TODO@ IANA port bitmap - use 50000 - 65535 for now
-        #            ((Iana::IANA_PORTS.index(p)) == nil &&
-        #              (p > 1024) && (p < 65535)))
     end
 
     def Resolver.get_ports_from(p)
@@ -849,15 +829,13 @@ module Dnsruby
       end
 
       unless client_queue.kind_of?(Queue)
-        # TODO: Raise here?
-        Dnsruby.log.error('Wrong type for client_queue in Resolver# send_async')
+        log_and_raise('Wrong type for client_queue in Resolver# send_async')
         # @TODO@ Handle different queue tuples - push this to generic send_error method
         client_queue.push([client_query_id, ArgumentError.new('Wrong type of client_queue passed to Dnsruby::Resolver# send_async - should have been Queue, was #{client_queue.class}')])
         return
       end
 
       unless msg.kind_of?Message
-        # TODO: Raise here?
         Dnsruby.log.error{'Wrong type for msg in Resolver# send_async'}
         # @TODO@ Handle different queue tuples - push this to generic send_error method
         client_queue.push([client_query_id, ArgumentError.new("Wrong type of msg passed to Dnsruby::Resolver# send_async - should have been Message, was #{msg.class}")])
@@ -944,11 +922,6 @@ module Dnsruby
       #      }
       # Return the response to the client
       client_queue.push([client_query_id, msg, error])
-      # if error != nil
-        #        client_queue.push([client_query_id, Resolver::EventType::ERROR, msg, error])
-      # else
-        #        client_queue.push([client_query_id, Resolver::EventType::VALIDATED, msg, error])
-      # end
     end
 
     # This method is called twice a second from the select loop, in the select thread.
