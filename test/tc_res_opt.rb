@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -20,8 +20,8 @@ include Dnsruby
 class TestResOpt < Minitest::Test
   def test_dns_file
 
-    # .txt because this test will run under windows, unlike the other file
-    # configuration tests.
+    #  .txt because this test will run under windows, unlike the other file
+    #  configuration tests.
     res = Dnsruby::DNS.new('test/custom.txt')
 
     assert(res,                           'new() returned something')
@@ -63,8 +63,8 @@ class TestResOpt < Minitest::Test
   end
 
   def test_config_hash_singleresolver
-    # Resolver interface gives us : port, TCP, IgnoreTruncation, TSIGkey, timeout
-    # SR : server, local_address, udp_size
+    #  Resolver interface gives us : port, TCP, IgnoreTruncation, TSIGkey, timeout
+    #  SR : server, local_address, udp_size
     test_config = {
       :server	   => '10.0.0.1',
       :port		   => 54, # SingleResolver and Multi-Resolver
@@ -85,9 +85,9 @@ class TestResOpt < Minitest::Test
   end
 
   def test_config_hash_multiresolver
-    # Resolver interface gives us : port, TCP, IgnoreTruncation, TSIGkey, timeout
-    # ER : retries, load_balance. Also loads servers from Config and configures SRs to point to them
-    #   Also implements Resolver interface - but iterates this through *all* SRs
+    #  Resolver interface gives us : port, TCP, IgnoreTruncation, TSIGkey, timeout
+    #  ER : retries, load_balance. Also loads servers from Config and configures SRs to point to them
+    #    Also implements Resolver interface - but iterates this through *all* SRs
     test_config = {
       :nameserver	   => ['10.0.0.1', '10.0.0.2'], # for Multi-Resolver & DNS
       :port		   => 54, # SingleResolver and Multi-Resolver
@@ -115,10 +115,10 @@ class TestResOpt < Minitest::Test
   end
 
   def test_config_hash_lookup
-    # Lookup : can specify resolver, searchpath
-    #
-    # Check that we can set things in new()
-    #
+    #  Lookup : can specify resolver, searchpath
+    # 
+    #  Check that we can set things in new()
+    # 
     res=nil
 
     test_config = {

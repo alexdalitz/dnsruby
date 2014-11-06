@@ -1,18 +1,18 @@
-#--
-#Copyright 2009 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2009 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
   class RR
     class IPSECKEY < RR
@@ -20,21 +20,21 @@ module Dnsruby
       ClassValue = nil #:nodoc: all
       TypeValue = Types::IPSECKEY #:nodoc: all
 
-      #An 8-bit precedence for this field. Lower values are preferred.
+      # An 8-bit precedence for this field. Lower values are preferred.
       attr_accessor :precedence
-      #Specifies the type of gateway :
-      # 0 - no gateway present
-      # 1 - 4 byte IPv4 address present
-      # 2 - 16 byte IPv6 address present
-      # 3 - wire-encoded domain name present
+      # Specifies the type of gateway :
+      #  0 - no gateway present
+      #  1 - 4 byte IPv4 address present
+      #  2 - 16 byte IPv6 address present
+      #  3 - wire-encoded domain name present
       attr_accessor :gateway_type
-      #The algorithm used by this key :
-      # 0 - no key present
-      # 1 - DSA key present
-      # 2 - RSA key present
+      # The algorithm used by this key :
+      #  0 - no key present
+      #  1 - DSA key present
+      #  2 - RSA key present
       attr_accessor :algorithm
-      #The gateway. May either be a 32-bit network order IPv4 address, or a
-      #128-bit IPv6 address, or a domain name, or may not be present.
+      # The gateway. May either be a 32-bit network order IPv4 address, or a
+      # 128-bit IPv6 address, or a domain name, or may not be present.
       attr_accessor :gateway
 
       def from_data(data) #:nodoc: all
@@ -63,13 +63,13 @@ module Dnsruby
         if (gateway_type == 0)
           gateway = nil
         elsif (gateway_type == 1)
-          # Load IPv4 gateway
+          #  Load IPv4 gateway
           gateway = IPv4.create(s)
         elsif (gateway_type == 2)
-          # Load IPv6 gateway
+          #  Load IPv6 gateway
           gateway = IPv6.create(s)
         else
-          # Load gateway domain name
+          #  Load gateway domain name
           gateway = Name.create(s)
         end
         return gateway

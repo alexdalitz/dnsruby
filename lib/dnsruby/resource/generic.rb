@@ -1,23 +1,23 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
   class RR
-    #Class to store generic RRs (RFC 3597)
+    # Class to store generic RRs (RFC 3597)
     class Generic < RR # RFC 3597
-      #data for the generic resource record
+      # data for the generic resource record
       attr_reader :data
 
       def from_data(data) #:nodoc: all
@@ -45,8 +45,8 @@ module Dnsruby
 
       def self.create(type_value, class_value) #:nodoc:
         c = Class.new(Generic)
-        #          c.type = type_value
-        #          c.klass = class_value
+        #           c.type = type_value
+        #           c.klass = class_value
         c.const_set(:TypeValue, type_value)
         c.const_set(:ClassValue, class_value)
         Generic.const_set("Type#{type_value}_Class#{class_value}", c)
@@ -55,11 +55,11 @@ module Dnsruby
       end
     end
 
-    #--
-    # Standard (class generic) RRs
-    #++
-    #NS RR
-    #Nameserver resource record
+    # --
+    #  Standard (class generic) RRs
+    # ++
+    # NS RR
+    # Nameserver resource record
     class NS < DomainName
       ClassValue = nil #:nodoc: all
       TypeValue = Types::NS #:nodoc: all
@@ -68,8 +68,8 @@ module Dnsruby
       alias nsdname= domainname=
     end
 
-    #CNAME RR
-    #The canonical name for an alias
+    # CNAME RR
+    # The canonical name for an alias
     class CNAME < DomainName
       ClassValue = nil #:nodoc: all
       TypeValue = Types::CNAME #:nodoc: all
@@ -78,7 +78,7 @@ module Dnsruby
       alias cname= domainname=
     end
 
-    #DNAME RR
+    # DNAME RR
     class DNAME < DomainName
       ClassValue = nil #:nodoc: all
       TypeValue = Types::DNAME #:nodoc: all
@@ -87,7 +87,7 @@ module Dnsruby
       alias dname= domainname=
     end
 
-    #MB RR
+    # MB RR
     class MB < DomainName
       ClassValue = nil #:nodoc: all
       TypeValue = Types::MB #:nodoc: all
@@ -95,7 +95,7 @@ module Dnsruby
       alias madname= domainname=
     end
 
-    #MG RR
+    # MG RR
     class MG < DomainName
       ClassValue = nil #:nodoc: all
       TypeValue = Types::MG #:nodoc: all
@@ -103,7 +103,7 @@ module Dnsruby
       alias mgmname= domainname=
     end
 
-    #MR RR
+    # MR RR
     class MR < DomainName
       ClassValue = nil #:nodoc: all
       TypeValue = Types::MR #:nodoc: all
@@ -111,14 +111,14 @@ module Dnsruby
       alias newname= domainname=
     end
 
-    #PTR RR
+    # PTR RR
     class PTR < DomainName
       ClassValue = nil #:nodoc: all
       TypeValue = Types::PTR #:nodoc: all
     end
 
-    #ANY RR
-    # A Query type requesting any RR
+    # ANY RR
+    #  A Query type requesting any RR
     class ANY < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::ANY #:nodoc: all

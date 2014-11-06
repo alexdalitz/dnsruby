@@ -1,25 +1,25 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
 class VerifierTest < Minitest::Test
 
   def test_sha2
-    # Check if OpenSSL supports SHA2
+    #  Check if OpenSSL supports SHA2
     have_sha2 = false
     begin
       OpenSSL::Digest::SHA256.new
@@ -27,7 +27,7 @@ class VerifierTest < Minitest::Test
     rescue Exception
     end
     if (have_sha2)
-      #      print "OpenSSL supports SHA2\n"
+      #       print "OpenSSL supports SHA2\n"
       do_test_sha256
       do_test_sha512
       do_test_nsec
@@ -71,13 +71,13 @@ class VerifierTest < Minitest::Test
   end
 
   def test_se_query
-    # Run some queries on the .se zone
+    #  Run some queries on the .se zone
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     res = Dnsruby::Resolver.new(Dnsruby::Resolv.getaddress("a.ns.se"))
     res.dnssec = true
     r = res.query("se", Dnsruby::Types.ANY)
-    # See comment below
+    #  See comment below
     Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset("se", 'DNSKEY'))
     nss = r.answer.rrset("se", 'NS')
     ret = Dnsruby::Dnssec.verify_rrset(nss)
@@ -90,10 +90,10 @@ class VerifierTest < Minitest::Test
     res = Dnsruby::Resolver.new(Dnsruby::Resolv.getaddress("a.ns.se"))
     res.udp_size = 5000
     r = res.query("se", Dnsruby::Types.DNSKEY)
-    # This shouldn't be in the code - but the key is rotated by the .se registry
-    # so we can't keep up with it in the test code.
-    # Oh, for a signed root...
-    #    print "Adding keys : #{r.answer.rrset("se", 'DNSKEY')}\n"
+    #  This shouldn't be in the code - but the key is rotated by the .se registry
+    #  so we can't keep up with it in the test code.
+    #  Oh, for a signed root...
+    #     print "Adding keys : #{r.answer.rrset("se", 'DNSKEY')}\n"
     Dnsruby::Dnssec.anchor_verifier.add_trusted_key(r.answer.rrset("se", 'DNSKEY'))
     ret = Dnsruby::Dnssec.verify(r)
     assert(ret, "Dnssec message verification failed : #{ret}")
@@ -104,13 +104,13 @@ class VerifierTest < Minitest::Test
     Dnsruby::Dnssec.clear_trust_anchors
     res = Dnsruby::Resolver.new("a.ns.se")
     r = res.query("se", Dnsruby::Types.ANY)
-    # Haven't configured key for this, so should fail
+    #  Haven't configured key for this, so should fail
     begin
       ret = Dnsruby::Dnssec.verify(r)
       fail("Message shouldn't have verified")
     rescue (Dnsruby::VerifyError)
     end
-    #    assert(!ret, "Dnssec message verification failed")
+    #     assert(!ret, "Dnssec message verification failed")
   end
 
   def test_trusted_key
@@ -128,7 +128,7 @@ class VerifierTest < Minitest::Test
       ret = Dnsruby::Dnssec.verify(r)
       fail("Dnssec trusted key message verification should have failed with bad key")
     rescue (Dnsruby::VerifyError)
-      #    assert(!ret, "Dnssec trusted key message verification should have failed with bad key")
+      #     assert(!ret, "Dnssec trusted key message verification should have failed with bad key")
     end
     trusted_key = Dnsruby::RR.create({:name => "uk-dnssec.nic.uk.",
         :type => Dnsruby::Types.DNSKEY,
@@ -141,14 +141,14 @@ class VerifierTest < Minitest::Test
     ret = Dnsruby::Dnssec.verify(r)
     assert(ret, "Dnssec trusted key message verification failed")
 
-    #    # Check that keys have been added to trusted key cache
-    #    ret = Dnsruby::Dnssec.verify(r)
-    #    assert(ret, "Dnssec trusted key cache failed")
+    #     # Check that keys have been added to trusted key cache
+    #     ret = Dnsruby::Dnssec.verify(r)
+    #     assert(ret, "Dnssec trusted key cache failed")
   end
 
   def test_expired_keys
-    # Add some keys with an expiration of 1 second.
-    # Then wait a second or two, and check they are not available any more.
+    #  Add some keys with an expiration of 1 second.
+    #  Then wait a second or two, and check they are not available any more.
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     assert(Dnsruby::Dnssec.anchor_verifier.trusted_keys.length==0)
@@ -163,30 +163,30 @@ class VerifierTest < Minitest::Test
   end
 
   def test_tcp
-    #These queries work:
-    #		 dig @194.0.1.13 isoc.lu dnskey
-    #		 dig @194.0.1.13 isoc.lu dnskey +dnssec
-    #		 dig @194.0.1.13 isoc.lu dnskey +tcp
+    # These queries work:
+    # 		 dig @194.0.1.13 isoc.lu dnskey
+    # 		 dig @194.0.1.13 isoc.lu dnskey +dnssec
+    # 		 dig @194.0.1.13 isoc.lu dnskey +tcp
 
-    #This one does not
-    #
-    #		 dig @194.0.1.13 isoc.lu dnskey +dnssec +tcp
+    # This one does not
+    # 
+    # 		 dig @194.0.1.13 isoc.lu dnskey +dnssec +tcp
     r = Dnsruby::SingleResolver.new()# "194.0.1.13")
     r.dnssec = true
     r.use_tcp = true
     ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
-    #    print ret.to_s+"\n"
+    #     print ret.to_s+"\n"
 
     r = Dnsruby::SingleResolver.new("194.0.1.13")
     r.dnssec = true
-    #r.use_tcp = true
+    # r.use_tcp = true
     ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
-    #    print ret.to_s+"\n"
+    #     print ret.to_s+"\n"
 
     r.use_tcp = true
     r.dnssec = false
     ret = r.query("isoc.lu", Dnsruby::Types.DNSKEY)
-    #    print ret.to_s+"\n"
+    #     print ret.to_s+"\n"
 
     r.dnssec = true
     begin
@@ -213,7 +213,7 @@ class VerifierTest < Minitest::Test
   end
 
   def test_dsa
-    # Let's check sources.org for DSA keys
+    #  Let's check sources.org for DSA keys
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
     res = Dnsruby::Recursor.new()
@@ -227,11 +227,11 @@ class VerifierTest < Minitest::Test
       end
     }
     assert(dsa)
-    # Now do something with it
+    #  Now do something with it
 
     response = res.query("sources.org", Dnsruby::Types.ANY)
     verified = 0
-    #    response.each_section {|sec|
+    #     response.each_section {|sec|
     response.answer.rrsets.each {|rs|
       if (rs.sigs()[0].algorithm == Dnsruby::Algorithms.DSA &&
             rs.sigs()[0].key_tag == dsa.key_tag)
@@ -240,7 +240,7 @@ class VerifierTest < Minitest::Test
         verified+=1
       end
     }
-    #   }
+    #    }
     assert(verified > 0)
   end
 
@@ -324,42 +324,42 @@ class VerifierTest < Minitest::Test
 #     zone2 = reader.process_file("cacert.signed.txt")
 #     assert(zone[1].to_s.index("DAQAB\""))
 #     assert(zone2[1].to_s.index("DAQAB\""))
-#
+# 
 #     assert(zone[1].to_s == zone2[1].to_s)
 #  end
-#
-  #  def test_txt_from_zone
-  #    reader = Dnsruby::ZoneReader.new("all.rr.org.")
-  #    zone = reader.process_file("zone.txt")
-  #    rrset = Dnsruby::RRSet.new
-  #    key_rrset = Dnsruby::RRSet.new
-  #    zone.each {|rr|
-  #      if ( (rr.type == Dnsruby::Types.TXT) || ((rr.type == Dnsruby::Types.RRSIG) && (rr.type_covered == Dnsruby::Types.TXT)))
-  #        rrset.add(rr)
-  #      end
-  #      if (rr.type == Dnsruby::Types.DNSKEY)
-  #        key_rrset.add(rr)
-  #      end
-  #    }
-  #     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
-  #    verifier.verify_rrset(rrset, key_rrset)
-  #  end
+# 
+  #   def test_txt_from_zone
+  #     reader = Dnsruby::ZoneReader.new("all.rr.org.")
+  #     zone = reader.process_file("zone.txt")
+  #     rrset = Dnsruby::RRSet.new
+  #     key_rrset = Dnsruby::RRSet.new
+  #     zone.each {|rr|
+  #       if ( (rr.type == Dnsruby::Types.TXT) || ((rr.type == Dnsruby::Types.RRSIG) && (rr.type_covered == Dnsruby::Types.TXT)))
+  #         rrset.add(rr)
+  #       end
+  #       if (rr.type == Dnsruby::Types.DNSKEY)
+  #         key_rrset.add(rr)
+  #       end
+  #     }
+  #      verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+  #     verifier.verify_rrset(rrset, key_rrset)
+  #   end
 
-  #  def test_naptr_from_zone
-  #    reader = Dnsruby::ZoneReader.new("all.rr.org.")
-  #    zone = reader.process_file("zone.txt")
-  #    rrset = Dnsruby::RRSet.new
-  #    key_rrset = Dnsruby::RRSet.new
-  #    zone.each {|rr|
-  #      if ((rr.type == Dnsruby::Types.NAPTR) || ((rr.type == Dnsruby::Types.RRSIG) && (rr.type_covered == Dnsruby::Types.NAPTR)))
-  #        rrset.add(rr)
-  #      end
-  #      if (rr.type == Dnsruby::Types.DNSKEY)
-  #        key_rrset.add(rr)
-  #      end
-  #    }
-  #     verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
-  #    verifier.verify_rrset(rrset, key_rrset)
-  #  end
+  #   def test_naptr_from_zone
+  #     reader = Dnsruby::ZoneReader.new("all.rr.org.")
+  #     zone = reader.process_file("zone.txt")
+  #     rrset = Dnsruby::RRSet.new
+  #     key_rrset = Dnsruby::RRSet.new
+  #     zone.each {|rr|
+  #       if ((rr.type == Dnsruby::Types.NAPTR) || ((rr.type == Dnsruby::Types.RRSIG) && (rr.type_covered == Dnsruby::Types.NAPTR)))
+  #         rrset.add(rr)
+  #       end
+  #       if (rr.type == Dnsruby::Types.DNSKEY)
+  #         key_rrset.add(rr)
+  #       end
+  #     }
+  #      verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
+  #     verifier.verify_rrset(rrset, key_rrset)
+  #   end
 end
 

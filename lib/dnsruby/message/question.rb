@@ -1,23 +1,23 @@
 # A Dnsruby::Question object represents a record in the
 # question section of a DNS packet.
-#
+# 
 # RFC 1035 Section 4.1.2
 module Dnsruby
 class Question
 
-  # The Question name
+  #  The Question name
   attr_reader :qname
-  # The Question type
+  #  The Question type
   attr_reader :qtype
-  # The Question class
+  #  The Question class
   attr_reader :qclass
 
-  # Creates a question object from the domain, type, and class passed
-  # as arguments.
-  #
-  # If a String is passed in, a Name, IPv4 or IPv6 object is created.
-  #
-  # If an IPv4 or IPv6 object is used then the type is set to PTR.
+  #  Creates a question object from the domain, type, and class passed
+  #  as arguments.
+  # 
+  #  If a String is passed in, a Name, IPv4 or IPv6 object is created.
+  # 
+  #  If an IPv4 or IPv6 object is used then the type is set to PTR.
   def initialize(qname, qtype = :not_provided, qclass = :not_provided)
 
     raise ArgumentError.new('qname must not be nil') if qname.nil?
@@ -50,8 +50,8 @@ class Question
       @qname = Name.create(qname)
     end
 
-    # If the name looks like an IP address then do an appropriate
-    # PTR query, unless the user specified the qtype
+    #  If the name looks like an IP address then do an appropriate
+    #  PTR query, unless the user specified the qtype
     if write_PTR_to_qtype_if_ip && (is_ip_addr || is_ip_addr_string)
       @qtype = Types.PTR
     end
@@ -69,16 +69,16 @@ class Question
         self.qclass == other.qclass
   end
 
-  # Returns a string representation of the question record.
+  #  Returns a string representation of the question record.
   def to_s
     "#{@qname}.\t#{@qclass.string}\t#{@qtype.string}"
   end
 
-  # For Updates, the qname field is redefined to zname (RFC2136, section 2.3)
+  #  For Updates, the qname field is redefined to zname (RFC2136, section 2.3)
   alias zname qname
-  # For Updates, the qtype field is redefined to ztype (RFC2136, section 2.3)
+  #  For Updates, the qtype field is redefined to ztype (RFC2136, section 2.3)
   alias ztype qtype
-  # For Updates, the qclass field is redefined to zclass (RFC2136, section 2.3)
+  #  For Updates, the qclass field is redefined to zclass (RFC2136, section 2.3)
   alias zclass qclass
 
   alias type qtype

@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -53,9 +53,9 @@ class TestSingleResolverSoak < Minitest::Test
     end
     res_pos = 0
     start = Time.now
-    # @todo@ On windows, MAX_FILES is 256. This means that we have to limit
-    # this test while we're not using single sockets.
-    # We run four queries per iteration, so we're limited to 64 runs.
+    #  @todo@ On windows, MAX_FILES is 256. This means that we have to limit
+    #  this test while we're not using single sockets.
+    #  We run four queries per iteration, so we're limited to 64 runs.
     63.times do |i|
       rr_count = 0
       TestSoakBase::Rrs.each do |data|
@@ -66,7 +66,7 @@ class TestSingleResolverSoak < Minitest::Test
           res_pos = 0
         end
         res.send_async(Message.new(data[:name], data[:type]), q, [i,rr_count])
-        #        p "Sent #{i}, #{rr_count}, Queue #{q}"
+        #         p "Sent #{i}, #{rr_count}, Queue #{q}"
         query_count+=1
       end
     end
@@ -87,8 +87,8 @@ class TestSingleResolverSoak < Minitest::Test
 
 
   def test_many_threads_on_one_single_resolver_synchronous
-    # Test multi-threaded behaviour
-    # Check the header IDs to make sure they're all different
+    #  Test multi-threaded behaviour
+    #  Check the header IDs to make sure they're all different
     threads = Array.new
     res = SingleResolver.new
     ids = []
@@ -97,10 +97,10 @@ class TestSingleResolverSoak < Minitest::Test
     query_count = 0
     res.packet_timeout=4
     start=Time.now
-    # Windows limits us to 256 sockets
+    #  Windows limits us to 256 sockets
     num_times=250
     if (/java/ =~ RUBY_PLATFORM)
-      # JRuby threads are native threads, so let's not go too mad!
+      #  JRuby threads are native threads, so let's not go too mad!
       num_times=50
     end
     num_times.times do |i|
@@ -132,7 +132,7 @@ class TestSingleResolverSoak < Minitest::Test
     stop=Time.now
     time_taken=stop-start
     p "Query count : #{query_count}, #{timed_out} timed out. #{time_taken} time taken"
-    #    check_ids(ids) # only do this if we expect all different IDs - e.g. if we stream over a single socket
+    #     check_ids(ids) # only do this if we expect all different IDs - e.g. if we stream over a single socket
     assert(timed_out < query_count * 0.1, "#{timed_out} of #{query_count} timed out!")
   end
 
@@ -148,8 +148,8 @@ class TestSingleResolverSoak < Minitest::Test
   end
 
   def test_many_threads_on_many_single_resolvers
-    # Test multi-threaded behaviour
-    # @todo@ Check the header IDs to make sure they're all different
+    #  Test multi-threaded behaviour
+    #  @todo@ Check the header IDs to make sure they're all different
     threads = Array.new
     mutex = Mutex.new
     timed_out = 0
@@ -157,7 +157,7 @@ class TestSingleResolverSoak < Minitest::Test
     start=Time.now
     num_times=250
     if (/java/ =~ RUBY_PLATFORM)
-      # JRuby threads are native threads, so let's not go too mad!
+      #  JRuby threads are native threads, so let's not go too mad!
       num_times=50
     end
     num_times.times do |i|

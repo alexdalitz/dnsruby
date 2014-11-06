@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -47,8 +47,8 @@ class NsecTest < Minitest::Test
   end
 
   def test_nsec_types
-    # Test types in last section to 65536.
-    #Test no zeros
+    #  Test types in last section to 65536.
+    # Test no zeros
     nsec = Dnsruby::RR.create(INPUT)
     nsec.add_type(Types.TYPE65534)
     assert(nsec.types.include?(Types.TYPE65534))
@@ -56,9 +56,9 @@ class NsecTest < Minitest::Test
   end
 
   def test_examples_from_rfc_4035_name_error
-    # Grab the example responses from RFC4035 and make sure that they pass.
-    # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
-    # and make sure that they fail verification for that reason
+    #  Grab the example responses from RFC4035 and make sure that they pass.
+    #  Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
+    #  and make sure that they fail verification for that reason
     m = Message.new
     m.header.rcode = 3
     m.add_question(Question.new("m1.example."))
@@ -95,9 +95,9 @@ class NsecTest < Minitest::Test
   end
 
   def test_examples_from_rfc_4035_no_data
-    # Grab the example responses from RFC4035 and make sure that they pass.
-    # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
-    # and make sure that they fail verification for that reason
+    #  Grab the example responses from RFC4035 and make sure that they pass.
+    #  Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
+    #  and make sure that they fail verification for that reason
     m = Message.new
     m.header.rcode = 0
     m.add_question(Question.new("ns1.example.", Types.MX))
@@ -127,9 +127,9 @@ class NsecTest < Minitest::Test
   end
 
   def test_examples_from_rfc_4035_wildcard_expansion
-    # Grab the example responses from RFC4035 and make sure that they pass.
-    # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
-    # and make sure that they fail verification for that reason
+    #  Grab the example responses from RFC4035 and make sure that they pass.
+    #  Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
+    #  and make sure that they fail verification for that reason
     m = Message.new
     m.header.rcode =
       m.add_question(Question.new("a.z.w.example.", Types.MX))
@@ -172,9 +172,9 @@ class NsecTest < Minitest::Test
   end
 
   def test_examples_from_rfc_4035_wildcard_no_data
-    # Grab the example responses from RFC4035 and make sure that they pass.
-    # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
-    # and make sure that they fail verification for that reason
+    #  Grab the example responses from RFC4035 and make sure that they pass.
+    #  Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
+    #  and make sure that they fail verification for that reason
     m = Message.new
     m.header.rcode = 0
     m.add_question(Question.new("a.z.w.example.", Types.AAAA))
@@ -194,7 +194,7 @@ class NsecTest < Minitest::Test
     end
     m.authority.delete(RR.create("*.w.example.   3600 NSEC   x.y.example. MX RRSIG NSEC"))
     m.add_authority(RR.create("*.w.example.   3600 NSEC   x.w.example. MX RRSIG NSEC"))
-    #  Test bad versions of wildcard no data
+    #   Test bad versions of wildcard no data
     Dnssec.anchor_verifier.verify_nsecs(m)
     m.authority.delete(RR.create("x.y.w.example. 3600 NSEC   xx.example. MX RRSIG NSEC"))
     begin
@@ -204,23 +204,23 @@ class NsecTest < Minitest::Test
     end
   end
 
-  # @TODO@ Test referrals
-  #  def test_examples_from_rfc_4035_referral_signed
-  #    # Grab the example responses from RFC4035 and make sure that they pass.
-  #    # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
-  #    # and make sure that they fail verification for that reason
-  #    m = Message.new
-  #    m.header.rcode = 3
-  #    fail
-  #  end
-  #
-  #  def test_examples_from_rfc_4035_referral_unsigned
-  #    # Grab the example responses from RFC4035 and make sure that they pass.
-  #    # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
-  #    # and make sure that they fail verification for that reason
-  #    m = Message.new
-  #    m.header.rcode = 3
-  #    fail
-  #  end
-  #
+  #  @TODO@ Test referrals
+  #   def test_examples_from_rfc_4035_referral_signed
+  #     # Grab the example responses from RFC4035 and make sure that they pass.
+  #     # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
+  #     # and make sure that they fail verification for that reason
+  #     m = Message.new
+  #     m.header.rcode = 3
+  #     fail
+  #   end
+  # 
+  #   def test_examples_from_rfc_4035_referral_unsigned
+  #     # Grab the example responses from RFC4035 and make sure that they pass.
+  #     # Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
+  #     # and make sure that they fail verification for that reason
+  #     m = Message.new
+  #     m.header.rcode = 3
+  #     fail
+  #   end
+  # 
 end

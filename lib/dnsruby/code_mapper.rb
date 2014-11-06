@@ -1,28 +1,28 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
-  # CodeMapper superclass looks after String to code mappings (e.g. OpCode, RCode, etc.)
-  #
-  # Subclasses simply define a mapping of codes to variable names, and CodeMapper provides utility methods.
-  #
-  # All strings will come out as upper case
-  #
-  # Example :
-  #   Types::AAAA or Types.AAAA
-  #   rcode.string or rcode.code
+  #  CodeMapper superclass looks after String to code mappings (e.g. OpCode, RCode, etc.)
+  # 
+  #  Subclasses simply define a mapping of codes to variable names, and CodeMapper provides utility methods.
+  # 
+  #  All strings will come out as upper case
+  # 
+  #  Example :
+  #    Types::AAAA or Types.AAAA
+  #    rcode.string or rcode.code
   class CodeMapper # :nodoc: all
     include Comparable
 
@@ -50,7 +50,7 @@ module Dnsruby
       return strings
     end
 
-    # Creates the CodeMapper from the defined constants
+    #  Creates the CodeMapper from the defined constants
     def CodeMapper.update
 
       @@arrays[self] = Arrays.new
@@ -67,7 +67,7 @@ module Dnsruby
       end
     end
 
-    # Add new a code to the CodeMapper
+    #  Add new a code to the CodeMapper
     def CodeMapper.add_pair(string, code)
       array = @@arrays[self]
       array.strings.store(string, code)
@@ -81,8 +81,8 @@ module Dnsruby
     end
 
     def unknown_code(arg) #:nodoc: all
-      # Be liberal in what you accept...
-      #      raise ArgumentError.new("Code #{arg} not a member of #{self.class}")
+      #  Be liberal in what you accept...
+      #       raise ArgumentError.new("Code #{arg} not a member of #{self.class}")
       Classes.add_pair(arg.to_s, arg)
       set_code(arg)
     end
@@ -170,9 +170,9 @@ module Dnsruby
     end
     alias eql? == # :nodoc:
 
-    # Return a regular expression which matches any codes or strings from the CodeMapper.
+    #  Return a regular expression which matches any codes or strings from the CodeMapper.
     def self.regexp
-      # Longest ones go first, so the regex engine will match AAAA before A, etc.
+      #  Longest ones go first, so the regex engine will match AAAA before A, etc.
       return @@arrays[self].strings.keys.sort { |a, b| b.length <=> a.length }.join('|')
     end
 

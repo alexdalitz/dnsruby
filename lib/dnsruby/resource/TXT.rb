@@ -1,31 +1,31 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 begin
   require 'jcode'
 rescue LoadError => e
 end
 module Dnsruby
   class RR
-    #Class for DNS Text (TXT) resource records.
-    #RFC 1035 Section 3.3.14
+    # Class for DNS Text (TXT) resource records.
+    # RFC 1035 Section 3.3.14
     class TXT < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::TXT #:nodoc: all
 
-      #List of the individual elements
+      # List of the individual elements
       attr_accessor :strings
 
       def data
@@ -50,10 +50,10 @@ module Dnsruby
       end
 
       def TXT.parse(input)
-        # Need to look out for special characters.
-        # Need to split the input up into strings (which are defined by non-escaped " characters)
-        # Then need to fix up any \ escape characters (should just be " and ; and binary?)
-        # Sadly, it's going to be easiest just to scan through this character by character...
+        #  Need to look out for special characters.
+        #  Need to split the input up into strings (which are defined by non-escaped " characters)
+        #  Then need to fix up any \ escape characters (should just be " and ; and binary?)
+        #  Sadly, it's going to be easiest just to scan through this character by character...
         in_escaped = false
         in_string = false
         count = -1
@@ -106,7 +106,7 @@ module Dnsruby
               end
             else
               if (in_escaped)
-                # Build up the binary
+                #  Build up the binary
                 if (c == ";") || (c == '"')
                   strings[count]+=c
                   in_escaped = false
@@ -117,7 +117,7 @@ module Dnsruby
                   in_escaped = false
                   strings[count]+=c
                 else
-                  # Must be building up three digit string to identify binary value?
+                  #  Must be building up three digit string to identify binary value?
 #                  if (c >= "0" && c <= "9")
                     current_binary += c
 #                  end
@@ -139,9 +139,9 @@ module Dnsruby
 
       def TXT.display(str, do_escapes = true)
         output = ""
-        # Probably need to scan through each string manually
-        # Make sure to remember to escape binary characters.
-        # Go through copying to output, and adding "\" characters as necessary?
+        #  Probably need to scan through each string manually
+        #  Make sure to remember to escape binary characters.
+        #  Go through copying to output, and adding "\" characters as necessary?
         str.each_byte {|c|
           if (c == 34) || (c == 92) # || (c == 59)
             if (do_escapes)

@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 require 'digest/sha1'
 module Base32
   module_function
@@ -42,55 +42,55 @@ end
 
 module Dnsruby
   class RR
-    #The NSEC3 Resource Record (RR) provides authenticated denial of
-    #existence for DNS Resource Record Sets.
-    #
-    #The NSEC3 RR lists RR types present at the original owner name of the
-    #NSEC3 RR.  It includes the next hashed owner name in the hash order
-    #of the zone.  The complete set of NSEC3 RRs in a zone indicates which
-    #RRSets exist for the original owner name of the RR and form a chain
-    #of hashed owner names in the zone.  This information is used to
-    #provide authenticated denial of existence for DNS data.  To provide
-    #protection against zone enumeration, the owner names used in the
-    #NSEC3 RR are cryptographic hashes of the original owner name
-    #prepended as a single label to the name of the zone.  The NSEC3 RR
-    #indicates which hash function is used to construct the hash, which
-    #salt is used, and how many iterations of the hash function are
-    #performed over the original owner name.
+    # The NSEC3 Resource Record (RR) provides authenticated denial of
+    # existence for DNS Resource Record Sets.
+    # 
+    # The NSEC3 RR lists RR types present at the original owner name of the
+    # NSEC3 RR.  It includes the next hashed owner name in the hash order
+    # of the zone.  The complete set of NSEC3 RRs in a zone indicates which
+    # RRSets exist for the original owner name of the RR and form a chain
+    # of hashed owner names in the zone.  This information is used to
+    # provide authenticated denial of existence for DNS data.  To provide
+    # protection against zone enumeration, the owner names used in the
+    # NSEC3 RR are cryptographic hashes of the original owner name
+    # prepended as a single label to the name of the zone.  The NSEC3 RR
+    # indicates which hash function is used to construct the hash, which
+    # salt is used, and how many iterations of the hash function are
+    # performed over the original owner name.
     class NSEC3 < RR
       ClassValue = nil #:nodoc: all
       TypeValue = Types::NSEC3 #:nodoc: all
 
-      #The Hash Algorithm field identifies the cryptographic hash algorithm
-      #used to construct the hash-value.
+      # The Hash Algorithm field identifies the cryptographic hash algorithm
+      # used to construct the hash-value.
       attr_reader :hash_alg
-      #The Flags field contains 8 one-bit flags that can be used to indicate
-      #different processing.  All undefined flags must be zero.  The only
-      #flag defined by the NSEC3 specification is the Opt-Out flag.
+      # The Flags field contains 8 one-bit flags that can be used to indicate
+      # different processing.  All undefined flags must be zero.  The only
+      # flag defined by the NSEC3 specification is the Opt-Out flag.
       attr_reader :flags
-      #The Iterations field defines the number of additional times the hash
-      #function has been performed.
+      # The Iterations field defines the number of additional times the hash
+      # function has been performed.
       attr_accessor :iterations
-      #The Salt Length field defines the length of the Salt field in octets,
-      #ranging in value from 0 to 255.
+      # The Salt Length field defines the length of the Salt field in octets,
+      # ranging in value from 0 to 255.
       attr_reader :salt_length
-      #The Hash Length field defines the length of the Next Hashed Owner
-      #Name field, ranging in value from 1 to 255 octets.
+      # The Hash Length field defines the length of the Next Hashed Owner
+      # Name field, ranging in value from 1 to 255 octets.
       attr_reader :hash_length
-      #The Next Hashed Owner Name field contains the next hashed owner name
-      #in hash order.
+      # The Next Hashed Owner Name field contains the next hashed owner name
+      # in hash order.
       attr_accessor :next_hashed
-      #The Type Bit Maps field identifies the RRset types that exist at the
-      #NSEC RR's owner name
+      # The Type Bit Maps field identifies the RRset types that exist at the
+      # NSEC RR's owner name
       attr_reader :types
 
       def check_name_in_range(name)
-        # @TODO@ Check if the name is covered by this record
+        #  @TODO@ Check if the name is covered by this record
         return false
       end
 
       def check_name_in_wildcard_range(name)
-        # @TODO@ Check if the name is covered by this record
+        #  @TODO@ Check if the name is covered by this record
         return false
       end
 
@@ -99,35 +99,35 @@ module Dnsruby
       end
 
       def NSEC3.calculate_hash(name, iterations, salt, hash_alg)
-        # RFC5155
-        #5.  Calculation of the Hash
+        #  RFC5155
+        # 5.  Calculation of the Hash
 
-        #   Define H(x) to be the hash of x using the Hash Algorithm selected by
-        #   the NSEC3 RR, k to be the number of Iterations, and || to indicate
-        #   concatenation.  Then define:
-        #
-        #      IH(salt, x, 0) = H(x || salt), and
-        #
-        #      IH(salt, x, k) = H(IH(salt, x, k-1) || salt), if k > 0
-        #
-        #   Then the calculated hash of an owner name is
-        #
-        #      IH(salt, owner name, iterations),
-        #
-        #   where the owner name is in the canonical form, defined as:
-        #
-        #   The wire format of the owner name where:
-        #
-        #   1.  The owner name is fully expanded (no DNS name compression) and
-        #       fully qualified;
-        #   2.  All uppercase US-ASCII letters are replaced by the corresponding
-        #       lowercase US-ASCII letters;
-        #   3.  If the owner name is a wildcard name, the owner name is in its
-        #       original unexpanded form, including the "*" label (no wildcard
-        #       substitution);
-        #
-        #   This form is as defined in Section 6.2 of [RFC 4034].
-        #
+        #    Define H(x) to be the hash of x using the Hash Algorithm selected by
+        #    the NSEC3 RR, k to be the number of Iterations, and || to indicate
+        #    concatenation.  Then define:
+        # 
+        #       IH(salt, x, 0) = H(x || salt), and
+        # 
+        #       IH(salt, x, k) = H(IH(salt, x, k-1) || salt), if k > 0
+        # 
+        #    Then the calculated hash of an owner name is
+        # 
+        #       IH(salt, owner name, iterations),
+        # 
+        #    where the owner name is in the canonical form, defined as:
+        # 
+        #    The wire format of the owner name where:
+        # 
+        #    1.  The owner name is fully expanded (no DNS name compression) and
+        #        fully qualified;
+        #    2.  All uppercase US-ASCII letters are replaced by the corresponding
+        #        lowercase US-ASCII letters;
+        #    3.  If the owner name is a wildcard name, the owner name is in its
+        #        original unexpanded form, including the "*" label (no wildcard
+        #        substitution);
+        # 
+        #    This form is as defined in Section 6.2 of [RFC 4034].
+        # 
 
         n = Name.create(name)
         out = n.canonical
@@ -188,19 +188,19 @@ module Dnsruby
         end
       end
 
-      #If the Opt-Out flag is set, the NSEC3 record covers zero or more
-      #unsigned delegations.
+      # If the Opt-Out flag is set, the NSEC3 record covers zero or more
+      # unsigned delegations.
       def opt_out?
         return (@flags==OPT_OUT)
       end
 
-      #      def salt_length=(l)
-      #        if ((l < 0) || (l > 255))
-      #          raise DecodeError.new("NSEC3 salt length must be between 0 and 255")
-      #        end
-      #        @salt_length = l
-      #      end
-      #
+      #       def salt_length=(l)
+      #         if ((l < 0) || (l > 255))
+      #           raise DecodeError.new("NSEC3 salt length must be between 0 and 255")
+      #         end
+      #         @salt_length = l
+      #       end
+      # 
       def hash_length=(l)
         if ((l < 0) || (l > 255))
           raise DecodeError.new("NSEC3 hash length must be between 0 and 255")
@@ -221,8 +221,8 @@ module Dnsruby
         self.types=(types)
       end
 
-      #The Salt field is appended to the original owner name before hashing
-      #in order to defend against pre-calculated dictionary attacks.
+      # The Salt field is appended to the original owner name before hashing
+      # in order to defend against pre-calculated dictionary attacks.
       def salt
         return NSEC3.encode_salt(@salt)
       end
@@ -271,7 +271,7 @@ module Dnsruby
           self.salt=(data[3])
 
           len = data[0].length + data[1].length + data[2].length + data[3].length + 4
-          # There may or may not be brackets around next_hashed
+          #  There may or may not be brackets around next_hashed
           if (data[4] == "(")
             len = len + data[4].length + 1
           end
@@ -283,9 +283,9 @@ module Dnsruby
           self.hash_length=(@next_hashed.length)
           len2 = data2[0].length + 1
           self.types = next_hashed_and_types[len2, next_hashed_and_types.length - len2]
-          #          self.types=data2[1]
-          #          #          len = data[0].length + data[1].length + data[2].length + data[3].length + data[5].length + 7
-          #          #          self.types=(input[len, input.length-len])
+          #           self.types=data2[1]
+          #           #          len = data[0].length + data[1].length + data[2].length + data[3].length + data[5].length + 7
+          #           #          self.types=(input[len, input.length-len])
         end
       end
 
@@ -295,7 +295,7 @@ module Dnsruby
           @types.each do |t|
             type_strings.push(t.string)
           end
-          #          salt = NSEC3.encode_salt(@salt)
+          #           salt = NSEC3.encode_salt(@salt)
           salt = salt()
           next_hashed = encode_next_hashed(@next_hashed)
           types = type_strings.join(" ")
@@ -324,7 +324,7 @@ module Dnsruby
 
       def self.decode_rdata(msg) #:nodoc: all
         hash_alg, flags, iterations, salt_length = msg.get_unpack("ccnc")
-        # Salt may be omitted
+        #  Salt may be omitted
         salt = []
         if (salt_length > 0)
           salt = msg.get_bytes(salt_length)

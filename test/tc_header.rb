@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -68,9 +68,9 @@ class TestHeader < Minitest::Test
     header.arcount=3
 
 
-    # Reenable when support for CD is there
-    #header.cd=0
-    #assert_equal(header.cd, 0, "cd() works")
+    #  Reenable when support for CD is there
+    # header.cd=0
+    # assert_equal(header.cd, 0, "cd() works")
     data = header.data
 
     header2 = Header.new_from_data(data);
@@ -79,9 +79,9 @@ class TestHeader < Minitest::Test
 
     header = Header.new;
 
-    #
-    # Check that the aliases work properly.
-    #
+    # 
+    #  Check that the aliases work properly.
+    # 
     header.zocount=(0);
     header.prcount=(1);
     header.upcount=(2);

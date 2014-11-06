@@ -1,64 +1,64 @@
 module Dnsruby
 
 # The header portion of a DNS packet
-#
+# 
 # RFC 1035 Section 4.1.1
 class Header
   MAX_ID = 65535
 
-  # The header ID
+  #  The header ID
   attr_accessor :id
 
-  # The query response flag
+  #  The query response flag
   attr_accessor :qr
 
-  # Authoritative answer flag
+  #  Authoritative answer flag
   attr_accessor :aa
 
-  # Truncated flag
+  #  Truncated flag
   attr_accessor :tc
 
-  # Recursion Desired flag
+  #  Recursion Desired flag
   attr_accessor :rd
 
-  # The Checking Disabled flag
+  #  The Checking Disabled flag
   attr_accessor :cd
 
-  # The Authenticated Data flag
-  # Relevant in DNSSEC context.
-  # (The AD bit is only set on answers where signatures have been
-  # cryptographically verified or the server is authoritative for the data
-  # and is allowed to set the bit by policy.)
+  #  The Authenticated Data flag
+  #  Relevant in DNSSEC context.
+  #  (The AD bit is only set on answers where signatures have been
+  #  cryptographically verified or the server is authoritative for the data
+  #  and is allowed to set the bit by policy.)
   attr_accessor :ad
 
-  # The query response flag
+  #  The query response flag
   attr_accessor :qr
 
-  # Recursion available flag
+  #  Recursion available flag
   attr_accessor :ra
 
-  # Query response code
-  # deprecated - use Message#rcode
-  #    attr_reader :rcode
+  #  Query response code
+  #  deprecated - use Message#rcode
+  #     attr_reader :rcode
 
-  # This new get_header_rcode method is intended for use only by the Message class.
-  # This is because the Message OPT section may contain an extended rcode (see
-  # RFC 2671 section 4.6). Using the header rcode only ignores this extension, and
-  # is not recommended.
+  #  This new get_header_rcode method is intended for use only by the Message class.
+  #  This is because the Message OPT section may contain an extended rcode (see
+  #  RFC 2671 section 4.6). Using the header rcode only ignores this extension, and
+  #  is not recommended.
   def get_header_rcode
     @rcode
   end
 
-  # The header opcode
+  #  The header opcode
   attr_reader :opcode
 
-  # The number of records in the question section of the message
+  #  The number of records in the question section of the message
   attr_accessor :qdcount
-  # The number of records in the authoriy section of the message
+  #  The number of records in the authoriy section of the message
   attr_accessor :nscount
-  # The number of records in the answer section of the message
+  #  The number of records in the answer section of the message
   attr_accessor :ancount
-  # The number of records in the additional record section og the message
+  #  The number of records in the additional record section og the message
   attr_accessor :arcount
 
   def initialize(*args)

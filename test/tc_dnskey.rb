@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -31,14 +31,14 @@ class DnskeyTest < Minitest::Test
     "Mv1LyBUgia7za6ZEzOJBOztyvhjL" +
     "742iU/TpPSEDhm2SNKLijfUppn1U" +
     "aNvv4w==  )"
-  #  def test_bad_flag
-  #    dnskey = Dnsruby::RR.create(BADINPUT)
-  #    assert_equal(384, dnskey.flags)
-  #    assert(dnskey.bad_flags?)
-  #  end
+  #   def test_bad_flag
+  #     dnskey = Dnsruby::RR.create(BADINPUT)
+  #     assert_equal(384, dnskey.flags)
+  #     assert(dnskey.bad_flags?)
+  #   end
   def test_dnskey_from_string
     dnskey = Dnsruby::RR.create(INPUT)
-    #    assert(!dnskey.bad_flags?)
+    #     assert(!dnskey.bad_flags?)
     assert_equal(3, dnskey.protocol)
     assert_equal(256, dnskey.flags)
     assert_equal(Dnsruby::Algorithms::RSASHA1, dnskey.algorithm)

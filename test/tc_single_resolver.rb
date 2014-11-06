@@ -1,25 +1,25 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
 include Dnsruby
 class TestSingleResolver < Minitest::Test
   Thread::abort_on_exception = true
-  #  Dnsruby.log.level=Logger::DEBUG
+  #   Dnsruby.log.level=Logger::DEBUG
 
   def setup
     Dnsruby::Config.reset
@@ -55,8 +55,8 @@ class TestSingleResolver < Minitest::Test
   end
 
   def test_timeout
-    #    if ((RUBY_PLATFORM=~/darwin/) == nil)
-    # Run a query which will not respond, and check that the timeout works
+    #     if ((RUBY_PLATFORM=~/darwin/) == nil)
+    #  Run a query which will not respond, and check that the timeout works
     start_time = 0
     begin
    udps = UDPSocket.new
@@ -88,7 +88,7 @@ class TestSingleResolver < Minitest::Test
       m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
       fail "TCP timeouts"
     rescue ResolvTimeout
-      #        print "Got Timeout for TCP\n"
+      #         print "Got Timeout for TCP\n"
       stop_time = Time.now.to_i
       assert((stop_time - start_time) <= (res.packet_timeout * 2),
         "TCP timeout too long : #{stop_time - start_time}, should be #{res.packet_timeout}")
@@ -165,21 +165,21 @@ class TestSingleResolver < Minitest::Test
     end # do
   end # test_queries
 
-  # @TODO@ Although the test_thread_stopped test runs in isolation, it won't run as part
-  # of the whole test suite (ts_dnsruby.rb). Commented out until I can figure out how to
-  # get Test::Unit to run this one sequentially...
-  #  def test_thread_stopped
-  #    res=SingleResolver.new
-  #    # Send a query, and check select_thread running.
-  #    m = res.query("example.com")
-  #    assert(Dnsruby::SelectThread.instance.select_thread_alive?)
-  #    # Wait a second, and check select_thread stopped.
-  #    sleep(2)
-  #    assert(!Dnsruby::SelectThread.instance.select_thread_alive?)
-  #    # Send another query, and check select_thread running.
-  #    m = res.query("example.com")
-  #    assert(Dnsruby::SelectThread.instance.select_thread_alive?)
-  #  end
+  #  @TODO@ Although the test_thread_stopped test runs in isolation, it won't run as part
+  #  of the whole test suite (ts_dnsruby.rb). Commented out until I can figure out how to
+  #  get Test::Unit to run this one sequentially...
+  #   def test_thread_stopped
+  #     res=SingleResolver.new
+  #     # Send a query, and check select_thread running.
+  #     m = res.query("example.com")
+  #     assert(Dnsruby::SelectThread.instance.select_thread_alive?)
+  #     # Wait a second, and check select_thread stopped.
+  #     sleep(2)
+  #     assert(!Dnsruby::SelectThread.instance.select_thread_alive?)
+  #     # Send another query, and check select_thread running.
+  #     m = res.query("example.com")
+  #     assert(Dnsruby::SelectThread.instance.select_thread_alive?)
+  #   end
 
   def test_res_config
     res = Dnsruby::SingleResolver.new
@@ -195,7 +195,7 @@ class TestSingleResolver < Minitest::Test
 
   def test_truncated_response
     res = SingleResolver.new
-    #    print "Dnssec = #{res.dnssec}\n"
+    #     print "Dnssec = #{res.dnssec}\n"
     res.server=('ns0.validation-test-servers.nominet.org.uk')
     res.packet_timeout = 15
     m = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", 'txt')
@@ -204,7 +204,7 @@ class TestSingleResolver < Minitest::Test
   end
 
   def test_illegal_src_port
-    # Try to set src_port to an illegal value - make sure error raised, and port OK
+    #  Try to set src_port to an illegal value - make sure error raised, and port OK
     res = SingleResolver.new
     tests = [53, 387, 1265, 3210, 48619]
     tests.each do |bad_port|
@@ -217,7 +217,7 @@ class TestSingleResolver < Minitest::Test
   end
 
   def test_add_src_port
-    # Try setting and adding port ranges, and invalid ports, and 0.
+    #  Try setting and adding port ranges, and invalid ports, and 0.
     res = SingleResolver.new
     res.src_port = [56789,56790, 56793]
     assert(res.src_port == [56789,56790, 56793])
@@ -229,7 +229,7 @@ class TestSingleResolver < Minitest::Test
     assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005])
     res.add_src_port(60006)
     assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])
-    # Now test invalid src_ports
+    #  Now test invalid src_ports
     tests = [0, 53, [60007, 53], [60008, 0], 55..100]
     tests.each do |x|
       begin
@@ -242,11 +242,11 @@ class TestSingleResolver < Minitest::Test
   end
 
   def test_options_preserved_on_tcp_resend
-    # Send a very small EDNS message to trigger tcp resend.
-    # Can we do that without using send_raw and avoiding the case we want to test?
-    # Sure - just knock up a little server here, which simply returns the response with the
-    # TC bit set, and records both packets sent to it
-    # Need to listen once on UDP and once on TCP
+    #  Send a very small EDNS message to trigger tcp resend.
+    #  Can we do that without using send_raw and avoiding the case we want to test?
+    #  Sure - just knock up a little server here, which simply returns the response with the
+    #  TC bit set, and records both packets sent to it
+    #  Need to listen once on UDP and once on TCP
     udpPacket = nil
     tcpPacket = nil
     port = 59821

@@ -1,27 +1,27 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either tmexpress or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either tmexpress or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 require_relative 'spec_helper'
 
 require 'socket'
 
 include Dnsruby
-#@TODO@ We also need a test server so we can control behaviour of server to test
-#different aspects of retry strategy.
-#Of course, with Ruby's limit of 256 open sockets per process, we'd need to run
-#the server in a different Ruby process.
+# @TODO@ We also need a test server so we can control behaviour of server to test
+# different aspects of retry strategy.
+# Of course, with Ruby's limit of 256 open sockets per process, we'd need to run
+# the server in a different Ruby process.
 
 class TestResolver < Minitest::Test
 
@@ -123,10 +123,10 @@ class TestResolver < Minitest::Test
     assert_nil_error(error)
   end
 
-  # @TODO@ Implement!!  But then, why would anyone want to do this?
-  #  def test_many_threaded_clients
-  #    assert(false, "IMPLEMENT!")
-  #  end
+  #  @TODO@ Implement!!  But then, why would anyone want to do this?
+  #   def test_many_threaded_clients
+  #     assert(false, "IMPLEMENT!")
+  #   end
 
   def test_reverse_lookup
     m = Message.new("8.8.8.8", Types.PTR)
@@ -157,7 +157,7 @@ class TestResolver < Minitest::Test
 #    assert(m == nil)
 #    assert(err.kind_of?(OtherResolvError) || err.kind_of?(IOError), "OtherResolvError or IOError expected : got #{err.class}")
 #  end
-#
+# 
   def test_nxdomain
     resolver = Resolver.new
     q = Queue.new
@@ -169,19 +169,19 @@ class TestResolver < Minitest::Test
   end
 
   def test_timeouts
-    #test timeout behaviour for different retry, retrans, total timeout etc.
-    #Problem here is that many sockets will be created for queries which time out.
-    # Run a query which will not respond, and check that the timeout works
+    # test timeout behaviour for different retry, retrans, total timeout etc.
+    # Problem here is that many sockets will be created for queries which time out.
+    #  Run a query which will not respond, and check that the timeout works
     if (!RUBY_PLATFORM=~/darwin/)
       start=stop=0
       retry_times = 3
       retry_delay=1
       packet_timeout=2
-      # Work out what time should be, then time it to check
+      #  Work out what time should be, then time it to check
       expected = ((2**(retry_times-1))*retry_delay) + packet_timeout
       begin
         res = Resolver.new({:nameserver => "10.0.1.128"})
-        #      res = Resolver.new({:nameserver => "213.248.199.17"})
+        #       res = Resolver.new({:nameserver => "213.248.199.17"})
         res.packet_timeout=packet_timeout
         res.retry_times=retry_times
         res.retry_delay=retry_delay
@@ -207,7 +207,7 @@ class TestResolver < Minitest::Test
         res.retry_times=retry_times
         res.retry_delay=retry_delay
         res.query_timeout=query_timeout
-        # Work out what time should be, then time it to check
+        #  Work out what time should be, then time it to check
         expected = query_timeout
         start=Time.now
         m = res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
@@ -240,8 +240,8 @@ class TestResolver < Minitest::Test
   end
 
   def test_illegal_src_port
-    # Also test all singleresolver ports ok
-    # Try to set src_port to an illegal value - make sure error raised, and port OK
+    #  Also test all singleresolver ports ok
+    #  Try to set src_port to an illegal value - make sure error raised, and port OK
     res = Resolver.new
     res.port = 56789
     tests = [53, 387, 1265, 3210, 48619]
@@ -256,8 +256,8 @@ class TestResolver < Minitest::Test
   end
 
   def test_add_src_port
-    # Try setting and adding port ranges, and invalid ports, and 0.
-    # Also test all singleresolver ports ok
+    #  Try setting and adding port ranges, and invalid ports, and 0.
+    #  Also test all singleresolver ports ok
     res = Resolver.new
     res.src_port = [56789,56790, 56793]
     assert(res.src_port == [56789,56790, 56793])
@@ -269,7 +269,7 @@ class TestResolver < Minitest::Test
     assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005])
     res.add_src_port(60006)
     assert(res.src_port == [56889,56890,56891,60000,60001,60002,60004,60005,60006])
-    # Now test invalid src_ports
+    #  Now test invalid src_ports
     tests = [0, 53, [60007, 53], [60008, 0], 55..100]
     tests.each do |x|
       begin
@@ -283,6 +283,6 @@ class TestResolver < Minitest::Test
   end
 
   def test_eventtype_api
-    # @TODO@ TEST THE Resolver::EventType interface!
+    #  @TODO@ TEST THE Resolver::EventType interface!
   end
 end

@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -25,9 +25,9 @@ class TestUpdate < Minitest::Test
   end
 
   def test_update
-    #------------------------------------------------------------------------------
-    # Canned data.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Canned data.
+    # ------------------------------------------------------------------------------
 
     zone	= "example.com";
     name	= "foo.example.com";
@@ -38,9 +38,9 @@ class TestUpdate < Minitest::Test
     rdata	= "10.1.2.3";
     rr      = nil;
 
-    #------------------------------------------------------------------------------
-    # Packet creation.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Packet creation.
+    # ------------------------------------------------------------------------------
 
     update = Dnsruby::Update.new(zone, klass);
     z = (update.zone)[0];
@@ -51,9 +51,9 @@ class TestUpdate < Minitest::Test
     assert_equal(z.zclass.to_s, klass.to_s,                     'zclass correct');         #5
     assert_equal(z.ztype,  Types.SOA,                      'ztype correct');          #6
 
-    #------------------------------------------------------------------------------
-    # RRset exists (value-independent).
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  RRset exists (value-independent).
+    # ------------------------------------------------------------------------------
 
     rr = update.present(name, type);
 
@@ -66,9 +66,9 @@ class TestUpdate < Minitest::Test
 
     rr = nil
 
-    #------------------------------------------------------------------------------
-    # RRset exists (value-dependent).
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  RRset exists (value-dependent).
+    # ------------------------------------------------------------------------------
 
     rr = update.present(name, type, rdata, klass);
 
@@ -81,9 +81,9 @@ class TestUpdate < Minitest::Test
 
     rr=nil
 
-    #------------------------------------------------------------------------------
-    # RRset does not exist.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  RRset does not exist.
+    # ------------------------------------------------------------------------------
 
     rr = update.absent(name, type);
 
@@ -96,9 +96,9 @@ class TestUpdate < Minitest::Test
 
     rr = nil
 
-    #------------------------------------------------------------------------------
-    # Name is in use.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Name is in use.
+    # ------------------------------------------------------------------------------
 
     rr = update.present(name);
 
@@ -111,9 +111,9 @@ class TestUpdate < Minitest::Test
 
     rr = nil
 
-    #------------------------------------------------------------------------------
-    # Name is not in use. (No Class)
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Name is not in use. (No Class)
+    # ------------------------------------------------------------------------------
 
     rr = update.absent(name);
 
@@ -128,9 +128,9 @@ class TestUpdate < Minitest::Test
 
 
 
-    #------------------------------------------------------------------------------
-    # Add to an RRset.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Add to an RRset.
+    # ------------------------------------------------------------------------------
 
     rr = update.add(name, type, ttl, rdata);
 
@@ -143,9 +143,9 @@ class TestUpdate < Minitest::Test
 
     rr = nil
 
-    #------------------------------------------------------------------------------
-    # Delete an RRset.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Delete an RRset.
+    # ------------------------------------------------------------------------------
 
     rr = update.delete(name, type);
 
@@ -158,9 +158,9 @@ class TestUpdate < Minitest::Test
 
     rr = nil
 
-    #------------------------------------------------------------------------------
-    # Delete All RRsets From A Name.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Delete All RRsets From A Name.
+    # ------------------------------------------------------------------------------
 
     rr = update.delete(name);
 
@@ -173,9 +173,9 @@ class TestUpdate < Minitest::Test
 
     rr = nil
 
-    #------------------------------------------------------------------------------
-    # Delete An RR From An RRset.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Delete An RR From An RRset.
+    # ------------------------------------------------------------------------------
 
     rr = update.delete(name, type, rdata);
 
@@ -194,10 +194,10 @@ class TestUpdate < Minitest::Test
     new_update = Message.decode(data)
     assert(new_update.header.opcode == OpCode.Update)
 
-    #------------------------------------------------------------------------------
-    # Make sure RRs in an update packet have the same class as the zone, unless
-    # the class is NONE or ANY.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Make sure RRs in an update packet have the same class as the zone, unless
+    #  the class is NONE or ANY.
+    # ------------------------------------------------------------------------------
 
     update = Dnsruby::Update.new(zone, klass);
     assert(update,                               'packet created');          #61

@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 Dnsruby.log.level = Logger::FATAL
@@ -34,36 +34,36 @@ rescue Exception => exception
   puts "----------------------------------------"
 end
 if (online)
-  #   OK - online and ready to go
+  #    OK - online and ready to go
   print "Running online tests. These tests send UDP packets - some may be lost.\n"
   print "If you get the odd timeout error with these tests, try running them again.\n"
   print "It may just be that some UDP packets got lost the first time...\n"
   require_relative "tc_resolver.rb"
   require_relative "tc_dnsruby.rb"
-  #  require_relative "tc_inet6.rb"
-  #  require_relative "tc_recurse.rb"
+  #   require_relative "tc_inet6.rb"
+  #   require_relative "tc_recurse.rb"
   require_relative "tc_tcp.rb"
 #  require_relative "tc_queue.rb"
   require_relative "tc_recur.rb"
-  #  require_relative "tc_soak.rb"
+  #   require_relative "tc_soak.rb"
 
-  # Check if we can contact the server - if we can't, then abort the test
-  # (but tell user that test has not been run due to connectivity problems)
+  #  Check if we can contact the server - if we can't, then abort the test
+  #  (but tell user that test has not been run due to connectivity problems)
   server_up = false
 
-  # Disabling the attempt to connect to Nominet servers...
-  # begin
-  #   sock = UDPSocket.new
-  #   sock.connect('ns0.validation-test-servers.nominet.org.uk',
-  #     25)
-  #   sock.close
-  #   server_up = true
-  # rescue Exception
-  #   puts "----------------------------------------"
-  #   puts "Cannot connect to test server\n\t"+$!.to_s+"\n"
-  #   puts "\n\nNo tests targetting this server will be run!!\n\n"
-  #   puts "----------------------------------------"
-  # end
+  #  Disabling the attempt to connect to Nominet servers...
+  #  begin
+  #    sock = UDPSocket.new
+  #    sock.connect('ns0.validation-test-servers.nominet.org.uk',
+  #      25)
+  #    sock.close
+  #    server_up = true
+  #  rescue Exception
+  #    puts "----------------------------------------"
+  #    puts "Cannot connect to test server\n\t"+$!.to_s+"\n"
+  #    puts "\n\nNo tests targetting this server will be run!!\n\n"
+  #    puts "----------------------------------------"
+  #  end
 
   if (server_up)
 

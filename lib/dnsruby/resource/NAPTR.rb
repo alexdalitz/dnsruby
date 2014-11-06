@@ -1,37 +1,37 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 module Dnsruby
   class RR
-    #Class for DNS Naming Authority Pointer (NAPTR) resource records.
-    #RFC 2168
+    # Class for DNS Naming Authority Pointer (NAPTR) resource records.
+    # RFC 2168
     class NAPTR < RR
       ClassValue = nil #:nodoc: all
       TypeValue= Types::NAPTR #:nodoc: all
 
-      # The NAPTR RR order field
+      #  The NAPTR RR order field
       attr_accessor :order
-      # The NAPTR RR preference field
+      #  The NAPTR RR preference field
       attr_accessor :preference
-      # The NAPTR RR flags field
+      #  The NAPTR RR flags field
       attr_accessor :flags
-      # The NAPTR RR service field
+      #  The NAPTR RR service field
       attr_accessor :service
-      # The NAPTR RR regexp field
+      #  The NAPTR RR regexp field
       attr_accessor :regexp
-      # The NAPTR RR replacement field
+      #  The NAPTR RR replacement field
       attr_accessor :replacement
 
       def from_hash(hash) #:nodoc: all

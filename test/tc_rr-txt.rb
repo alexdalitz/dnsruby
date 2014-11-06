@@ -1,24 +1,24 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
 include Dnsruby
 class TestRrTest < Minitest::Test
-  #Stimulus, expected response, and test name:
+  # Stimulus, expected response, and test name:
 
   TESTLIST =	[
   {	# 2-5
@@ -57,25 +57,25 @@ class TestRrTest < Minitest::Test
     :char_str_list_r	=>	[ %q|two|, %q|tokens|, ],
     :descr		=>	'Two unquoted strings',
   },
-  # @TODO@ Why don't escaped quotes work?
-  #    {	# 22-25
-  #			:stim		=>	%<"escaped \" quote">,
-  #			:rdatastr	=>	%<"escaped \" quote">,
-  #			:char_str_list_r	=>	[ %<escaped " quote>, ],
-  #			:descr		=>	'Quoted, escaped double-quote',
-  #    },
-  #    { # 30-33
-  #			:stim		=> %<"missing quote>,
-  #			:rdatastr    => %<>,
-  #			:char_str_list_r	=>	[],
-  #			:descr    	=> 'Unbalanced quotes work',
-  #    }
+  #  @TODO@ Why don't escaped quotes work?
+  #     {	# 22-25
+  # 			:stim		=>	%<"escaped \" quote">,
+  # 			:rdatastr	=>	%<"escaped \" quote">,
+  # 			:char_str_list_r	=>	[ %<escaped " quote>, ],
+  # 			:descr		=>	'Quoted, escaped double-quote',
+  #     },
+  #     { # 30-33
+  # 			:stim		=> %<"missing quote>,
+  # 			:rdatastr    => %<>,
+  # 			:char_str_list_r	=>	[],
+  # 			:descr    	=> 'Unbalanced quotes work',
+  #     }
   ]
 
   def test_RrTest
-    #------------------------------------------------------------------------------
-    # Canned data.
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Canned data.
+    # ------------------------------------------------------------------------------
 
     name			= 'foo.example.com';
     klass			= 'IN';
@@ -85,9 +85,9 @@ class TestRrTest < Minitest::Test
     rr_base	= [name, ttl, klass, type, "    " ].join(' ')
 
 
-    #------------------------------------------------------------------------------
-    # Run the tests
-    #------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+    #  Run the tests
+    # ------------------------------------------------------------------------------
 
     TESTLIST.each do |test_hr|
       assert( uut = RR.create(rr_base + test_hr[:stim]),
@@ -116,8 +116,8 @@ class TestRrTest < Minitest::Test
     }
 
 
-    # Don't break RR.new_from_hash (e.i. "See the manual pages for each RR
-    # type to see what fields the type requires.").
+    #  Don't break RR.new_from_hash (e.i. "See the manual pages for each RR
+    #  type to see what fields the type requires.").
 
     work_hash[:strings] = %<no quotes>
 

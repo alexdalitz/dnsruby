@@ -1,72 +1,72 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
-#= NAME
-#
-#axfr - Perform a DNS zone transfer
-#
-#= SYNOPSIS
-#
-#axfr [ -fqs ] [ -D directory ] [ @nameserver ] zone
-#
-#= DESCRIPTION
-#
-#axfr performs a DNS zone transfer, prints each record to the standard
-#output, and stores the zone to a file.  If the zone has already been
-#stored in a file, axfr will read the file instead of performing a
-#zone transfer.
-#
-#Zones will be stored in a directory hierarchy.  For example, the
-#zone transfer for foo.bar.com will be stored in the file
+# = NAME
+# 
+# axfr - Perform a DNS zone transfer
+# 
+# = SYNOPSIS
+# 
+# axfr [ -fqs ] [ -D directory ] [ @nameserver ] zone
+# 
+# = DESCRIPTION
+# 
+# axfr performs a DNS zone transfer, prints each record to the standard
+# output, and stores the zone to a file.  If the zone has already been
+# stored in a file, axfr will read the file instead of performing a
+# zone transfer.
+# 
+# Zones will be stored in a directory hierarchy.  For example, the
+# zone transfer for foo.bar.com will be stored in the file
 #  HOME/.dns-zones/com/bar/foo/axfr.  The directory can be changed
 #  with the B<-D> option.
-#
+# 
 #  This programs requires that the Storable module be installed.
-#
-#= OPTIONS
-#
+# 
+# = OPTIONS
+# 
 #    * -f     Force a zone transfer, even if the zone has already been stored
 #    in a file.
-#
+# 
 #    * -q    Be quiet -- don't print the records from the zone.
-#
+# 
 #    * -s    Perform a zone transfer if the SOA serial number on the nameserver
 #    is different than the serial number in the zone file.
-#
+# 
 #    * -D directory   Store zone files under I<directory> instead of the default directory (see "FILES")
-#
+# 
 #    * nameserver    Query nameserver instead of the default nameserver.
-#
-#= FILES
-#
+# 
+# = FILES
+# 
 #  * ${HOME}/.dns-zones   Default directory for storing zone files.
-#
-#= AUTHOR
-#
+# 
+# = AUTHOR
+# 
 #      Michael Fuhr <mike@fuhr.org>
-#
+# 
 
 require 'getoptLong'
 require 'dnsruby'
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Read any command-line options and check syntax.
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
-#getopts("fqsD:");
+# getopts("fqsD:");
 opts = GetoptLong.new(["-f", GetoptLong::NO_ARGUMENT],
   ["-q", GetoptLong::NO_ARGUMENT],
   ["-D", GetoptLong::REQUIRED_ARGUMENT],
@@ -92,10 +92,10 @@ end
 if (ARGV.length < 1) || (ARGV.length > 2)
   print "Usage: #{$0} [ -fqs ] [ -D directory ] [ @nameserver ] zone\n"
 else
-  #------------------------------------------------------------------------------
-  # Get the nameserver (if specified) and set up the zone transfer directory
-  # hierarchy.
-  #------------------------------------------------------------------------------
+  # ------------------------------------------------------------------------------
+  #  Get the nameserver (if specified) and set up the zone transfer directory
+  #  hierarchy.
+  # ------------------------------------------------------------------------------
 
   nameserver = (ARGV[0] =~ /^@/) ? ARGV.shift : ""
   nameserver = nameserver.sub(/^@/, "")
@@ -111,8 +111,8 @@ else
   zonedir = zone.split(/\./).reverse.join("/")
   zonefile = basedir + "/" + zonedir + "/axfr"
 
-  # Don't worry about the 0777 permissions here - the current umask setting
-  # will be applied.
+  #  Don't worry about the 0777 permissions here - the current umask setting
+  #  will be applied.
   if !(FileTest.directory?basedir)
     Dir.mkdir(basedir, 0777) or raise RuntimeError, "can't mkdir #{basedir}: #{$!}\n"
   end
@@ -125,9 +125,9 @@ else
     end
   end
 
-  #------------------------------------------------------------------------------
-  # Get the zone.
-  #------------------------------------------------------------------------------
+  # ------------------------------------------------------------------------------
+  #  Get the zone.
+  # ------------------------------------------------------------------------------
 
   zonearray = nil
 
@@ -137,9 +137,9 @@ else
       raise RuntimeError, "couldn't retrieve zone from #{zonefile}: #{$!}\n"
     end
 
-    #----------------------------------------------------------------------
-    # Check the SOA serial number if desired.
-    #----------------------------------------------------------------------
+    # ----------------------------------------------------------------------
+    #  Check the SOA serial number if desired.
+    # ----------------------------------------------------------------------
 
     if (opt_s)
       serial_file, serial_zone = nil
@@ -186,9 +186,9 @@ else
     Marshal.dump(zoneref, File.open(zonefile, File::CREAT|File::RDWR))
   end
 
-  #------------------------------------------------------------------------------
-  # Print the records in the zone.
-  #------------------------------------------------------------------------------
+  # ------------------------------------------------------------------------------
+  #  Print the records in the zone.
+  # ------------------------------------------------------------------------------
 
   if (!opt_q)
     zoneref.each do |z|

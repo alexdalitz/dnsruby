@@ -1,18 +1,18 @@
-#--
-#Copyright 2007 Nominet UK
-#
-#Licensed under the Apache License, Version 2.0 (the "License");
-#you may not use this file except in compliance with the License.
-#You may obtain a copy of the License at
-#
+# --
+# Copyright 2007 Nominet UK
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
-#Unless required by applicable law or agreed to in writing, software
-#distributed under the License is distributed on an "AS IS" BASIS,
-#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#See the License for the specific language governing permissions and
-#limitations under the License.
-#++
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ++
 
 require_relative 'spec_helper'
 
@@ -89,7 +89,7 @@ class Nsec3Test < Minitest::Test
       c = Dnsruby::RR::NSEC3.calculate_hash(name, 12, Dnsruby::RR::NSEC3.decode_salt("aabbccdd"), 1)
       assert_equal(c, hash, "Expected #{hash} but got #{c} for #{name}")
     }
-    #
+    # 
   end
 
   def test_nsec_other_stuff
@@ -104,7 +104,7 @@ class Nsec3Test < Minitest::Test
 #      fail
 #    rescue DecodeError
 #    end
-    # Be liberal in what you accept...
+    #  Be liberal in what you accept...
 #    begin
 #      nsec.hash_alg = 8
 #      fail
@@ -118,8 +118,8 @@ class Nsec3Test < Minitest::Test
   end
 
   def test_nsec_types
-    # Test types in last section to 65536.
-    #Test no zeros
+    #  Test types in last section to 65536.
+    # Test no zeros
     nsec = Dnsruby::RR.create(INPUT)
     nsec.add_type(Types.TYPE65534)
     assert(nsec.types.include?(Types.TYPE65534))
