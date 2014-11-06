@@ -14,8 +14,10 @@
 # limitations under the License.
 # ++
 # require "Dnsruby/resolver_register.rb"
+
 require "dnsruby/packet_sender"
 require "dnsruby/recursor"
+
 module Dnsruby
   # == Description
   # Dnsruby::Resolver is a DNS stub resolver.
@@ -253,7 +255,7 @@ module Dnsruby
       #      print "Reply = #{reply}\n"
       #      return reply
 
-      id, result, error = q.pop
+      _id, result, error = q.pop
 
       if error != nil
         raise error
@@ -437,7 +439,7 @@ module Dnsruby
                 send(key.to_s + "=", args[0][key])
               end
             rescue Exception => e
-              Dnsruby.log.error{"Argument # {key} not valid : #{e}\n"}
+              Dnsruby.log.error{"Argument #{key} not valid : #{e}\n"}
             end
           end
         elsif args[0].class == String
