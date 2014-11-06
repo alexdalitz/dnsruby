@@ -26,9 +26,9 @@ begin
     25)
   online = true
   sock.close
-rescue Exception
+rescue Exception => exception
   puts "----------------------------------------"
-  puts "Cannot bind to socket:\n\t"+$!+"\n"
+  puts "Cannot bind to socket:\n\t#{exception}\n"
   puts "This is an indication you have network problems\n"
   puts "\n\nNo online tests will be run!!\n\n"
   puts "----------------------------------------"

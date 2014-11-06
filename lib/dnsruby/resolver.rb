@@ -551,7 +551,7 @@ module Dnsruby
     def add_server(server)# :nodoc:
       @configured = true
       res = PacketSender.new(server)
-      raise ArgumentError.new("Can't create server # {server}") unless res
+      log_and_raise("Can't create server #{server}", ArgumentError) unless res
       update_internal_res(res)
       @single_res_mutex.synchronize {
         @single_resolvers.push(res)
@@ -633,7 +633,8 @@ module Dnsruby
         a = Resolver.get_ports_from(p)
         a.each do |x|
           if (@src_port.length > 0) && (x == 0)
-            raise ArgumentError.new("src_port of 0 only allowed as only src_port value (currently # {@src_port.length} values")
+            log_and_raise("src_port of 0 only allowed as only src_port value (currently #{@src_port.length} values",
+                ArgumentError)
           end
           @src_port.push(x)
         end
@@ -659,7 +660,7 @@ module Dnsruby
         return true
       else
         Dnsruby.log.error("Illegal port (# {p})")
-        raise ArgumentError.new("Illegal port # {p}")
+        log_and_raise("Illegal port #{p}", ArgumentError)
       end
     end
 
@@ -708,7 +709,9 @@ module Dnsruby
     end
 
     def create_tsig_options(args)
-      raise "Illegal number of arguments (#{args.size}; must be 1, 2, or 3." if args.size > 3
+      if args.size > 3
+        log_and_raise("Illegal number of arguments (#{args.size}; must be 1, 2, or 3.")
+      end
 
       options = { type: Types.TSIG, klass: Classes.ANY }
       if args.length >= 2
@@ -824,8 +827,7 @@ module Dnsruby
             timeouts[base + offset]=[res, retry_count]
           else
             if timeouts.has_key?(base + retry_delay + offset)
-              Dnsruby.log.error{"Duplicate timeout key!"}
-              raise RuntimeError.new("Duplicate timeout key!")
+              log_and_raise('Duplicate timeout key!')
             end
             timeouts[base + retry_delay + offset]=[res, retry_count]
           end
@@ -1047,15 +1049,13 @@ module Dnsruby
       # @TODO@ Also, should have option to speak only to configured resolvers (not follow authoritative chain)
       # 
       if queue.empty?
-        Dnsruby.log.fatal{"Queue empty in handle_queue_event!"}
-        raise RuntimeError.new("Severe internal error - Queue empty in handle_queue_event")
+        log_and_raise('Severe internal error - Queue empty in handle_queue_event')
       end
       event_id, event_type, response, error = queue.pop
       # We should remove this packet from the list of outstanding packets for this query
       _resolver, _msg, client_query_id, _retry_count = id
       if id != event_id
-        Dnsruby.log.error{"Serious internal error!! # {id} expected, #{event_id} received"}
-        raise RuntimeError.new("Serious internal error!! # {id} expected, #{event_id} received")
+        log_and_raise("Serious internal error!! # {id} expected, #{event_id} received")
       end
       #      @mutex.synchronize{
       @parent.single_res_mutex.synchronize {
@@ -1068,8 +1068,7 @@ module Dnsruby
         if event_type == Resolver::EventType::RECEIVED ||
               event_type == Resolver::EventType::ERROR
           unless outstanding.include?(id)
-            Dnsruby.log.error{"Query id not on outstanding list! # {outstanding.length} items. #{id} not on #{outstanding}"}
-#            raise RuntimeError.new("Query id not on outstanding!")
+            log_and_raise("Query id not on outstanding list! #{outstanding.length} items. #{id} not on #{outstanding}")
           end
           outstanding.delete(id)
         end
@@ -1196,8 +1195,7 @@ module Dnsruby
       #      @mutex.synchronize{
       query, client_queue, s_queue, outstanding = @query_list[client_query_id]
       if s_queue != select_queue
-        Dnsruby.log.error{"Serious internal error : expected select queue # {s_queue}, got #{select_queue}"}
-        raise RuntimeError.new("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
+        log_and_raise("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
       end
       stop_querying(client_query_id)
       # @TODO@ Does the client want notified at this point?
@@ -1210,8 +1208,7 @@ module Dnsruby
       #      @mutex.synchronize {
       _query, client_queue, s_queue, _outstanding = @query_list[client_query_id]
       if s_queue != select_queue
-        Dnsruby.log.error{"Serious internal error : expected select queue # {s_queue}, got #{select_queue}"}
-        raise RuntimeError.new("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
+        log_and_raise("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
       end
       if response.rcode == RCode.NXDOMAIN
         send_result(client_queue, client_query_id, select_queue, response, NXDomain.new)
@@ -1227,8 +1224,7 @@ module Dnsruby
       _resolver, _msg, client_query_id, _retry_count = query_id
       _query, client_queue, s_queue, _outstanding = @query_list[client_query_id]
       if s_queue != select_queue
-        Dnsruby.log.error{"Serious internal error : expected select queue # {s_queue}, got #{select_queue}"}
-        raise RuntimeError.new("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
+        log_and_raise("Serious internal error : expected select queue # {s_queue}, got #{select_queue}")
       end
       #      For some errors, we immediately send result. For others, should we retry?
       #      Either :
