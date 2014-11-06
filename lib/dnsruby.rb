@@ -142,6 +142,19 @@ module Dnsruby
   end
 
 
+  # Logs (error level) and raises an error.
+  def log_and_raise(object, error_class = RuntimeError)
+    if object.is_a?(Exception)
+      error = object
+      Dnsruby.log.error(error.inspect)
+      raise error
+    else
+      message = object.to_s
+      Dnsruby.log.error(message)
+      raise error_class.new(message)
+    end
+  end; module_function :log_and_raise
+
   #An error raised while querying for a resource
   class ResolvError < StandardError
   end
