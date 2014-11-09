@@ -130,7 +130,7 @@ module Dnsruby
           bitmap.each_byte do |char|
             if char.to_i != 0
               #  decode these RR types
-              8.times do |i|
+              0..8.times do |i|
                 if ((1 << (7-i)) & char) == (1 << (7-i))
                   type = Types.new((256 * window_number) + (8 * index) + i)
                   # Bits representing pseudo-types MUST be clear, as they do not appear
