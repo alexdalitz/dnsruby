@@ -114,7 +114,7 @@ module Dnsruby
         @code = arg.code
         @string = array.values[@code]
       else
-        raise ArgumentError.new("Unknown argument #{arg} for #{self.class}")
+        raise ArgumentError.new("Unknown argument of type #{arg.class}: #{arg} for #{self.class}")
       end
     end
 
