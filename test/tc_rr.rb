@@ -310,4 +310,13 @@ class TestRR < Minitest::Test
     assert rr.to_s.index('"Shuttle-ST61G4 Intel PIV3000"')
     assert rr.to_s.index('"FreeBSD 7.0-STABLE"')
   end
+
+  def test_private_method_really_private
+    begin
+      RR._get_subclass(nil, nil, nil, nil, nil)
+      raise "This should not have gotten here; the method should have been private"
+    rescue NoMethodError
+      # We should be here because the method should not have been found.
+    end
+  end
 end
