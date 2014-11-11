@@ -1,18 +1,5 @@
-#--
-#Copyright 2014 Verisign Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#++
+# encoding: ASCII-8BIT
+
 module Dnsruby
   class RR
     # Class for Geographic Position (GPOS) resource records.
@@ -53,7 +40,7 @@ module Dnsruby
         @longitude  = init_data[:longitude].to_s
         @altitude   = init_data[:altitude].to_s
         @owner      = init_data[:owner]
-        @ttl        = init_data[:ttl]
+        @ttl        = init_data[:ttl] || DEFAULT_TTL
         @inet_class = init_data[:inet_class] || Classes::IN
 
         self
@@ -67,10 +54,33 @@ module Dnsruby
       end
 
 
-      def to_binary
-        "%-16.16s%-16.16s%-16.16s" % [latitude, longitude, altitude]
+      def encode_rdata(msg, _canonical=false) #:nodoc: all
+        msg.put_bytes(to_binary)
       end
 
+
+      def to_binary
+        s = '%-16.16s%-16.16s%-16.16s' % [latitude, longitude, altitude]
+        # s.force_encoding('ASCII-8BIT')
+        # puts s.encoding
+        # puts s
+        s
+      end
+
+      def self.from_binary(binary_string)
+        latitude  = binary_string[0...16].strip
+        longitude = binary_string[16...32].strip
+        altitude  = binary_string[32...48].strip
+
+        validate_latitude(latitude)
+        validate_longitude(longitude)
+
+        new(latitude, longitude, altitude)
+      end
+
+      def self.decode_rdata(message)
+        return from_binary(message.get_bytes(48))
+      end
 
       def inspect
         "#{self.class}: latitude: #{latitude}, longitude: #{longitude}, altitude: #{altitude}," +
@@ -97,6 +107,15 @@ module Dnsruby
       end
 
 
+      def self.validate_latitude(value)
+        validate_float_in_range('latitude',  value, 90)
+      end
+
+      def self.validate_longitude(value)
+        validate_float_in_range('longitude', value, 180)
+      end
+
+
       def self.validate_floats(init_data)
         bad_float_keys = REQUIRED_KEYS.reject { |key| valid_float?(init_data[key]) }
         unless bad_float_keys.empty?
@@ -107,8 +126,8 @@ module Dnsruby
           raise message
         end
 
-        validate_float_in_range('latitude',  init_data[:latitude], 90)
-        validate_float_in_range('longitude', init_data[:longitude], 180)
+        validate_latitude(init_data[:latitude])
+        validate_longitude(init_data[:longitude])
       end
     end
   end
