@@ -233,8 +233,7 @@ class RR
       rdata =~ regex
       matches = regex.match(rdata)
       rdlength = matches[1].to_i
-      hexdump  = matches[2]
-      hexdump.gsub!(/\s*/, '')
+      hexdump  = matches[2].gsub(/\s*/, '')
 
       test_length.(hexdump, rdlength)
       packed_rdata = [hexdump].pack('H*')
@@ -268,7 +267,6 @@ class RR
     record.ttl = ttl
     record.type = rrtype
     record.klass = rrclass
-
     record
   end
 
