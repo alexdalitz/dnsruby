@@ -275,17 +275,18 @@ class RR
     @@implemented_rr_map ||= ClassHash.keys.map { |key| Dnsruby::Types.to_string(key[0]) }
   end
 
-  private
-  def RR._get_subclass(name, rrtype, rrclass, ttl, rdata) #:nodoc: all
-    return nil unless rrtype
-    record = get_class(rrtype, rrclass).new(rdata)
-    record.name = Name.create(name)
-    record.ttl = ttl
-    record.type = rrtype
-    record.klass = rrclass
-    record
+  class << self
+    private
+    def _get_subclass(name, rrtype, rrclass, ttl, rdata) #:nodoc: all
+      return unless (rrtype!=nil)
+      record = get_class(rrtype, rrclass).new(rdata)
+      record.name = Name.create(name)
+      record.ttl = ttl
+      record.type = rrtype
+      record.klass = rrclass
+      return record
+    end
   end
-  public
 
   # Returns a string representation of the RR in zone file format
   def to_s
