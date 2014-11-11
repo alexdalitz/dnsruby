@@ -359,9 +359,9 @@ class RR
   end
 
   def self.find_class(type_value, class_value) # :nodoc: all
-    if (ret = ClassHash[[type_value, class_value]])
+    if !! (ret = ClassHash[[type_value, class_value]])
       return ret
-    elsif (val = ClassInsensitiveTypes[type_value])
+    elsif !! (val = ClassInsensitiveTypes[type_value])
       klass = Class.new(val)
       klass.const_set(:TypeValue, type_value)
       klass.const_set(:ClassValue, class_value)
