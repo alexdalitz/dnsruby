@@ -183,17 +183,16 @@ class RR
     #  (the backslash is escaped)
     rrstring = rrstring.gsub(/(\?<!\\);.*/o, '')
 
-    unless rrstring =~/#{@@RR_REGEX}/xo
+    matches = (/#{@@RR_REGEX}/xo).match(rrstring)
+    unless matches
       raise "#{rrstring} did not match RR pattern. Please report this to the author!"
     end
 
-    name    = $1
-    ttl     = $2.to_i || 0
-    rrclass = $3 || ''
-
-
-    rrtype  = $4 || ''
-    rdata   = $5 || ''
+    name    = matches[1]
+    ttl     = matches[2].to_i || 0
+    rrclass = matches[3] || ''
+    rrtype  = matches[4] || ''
+    rdata   = matches[5] || ''
 
     rdata.gsub!(/\s+$/o, '') if rdata
 
@@ -232,8 +231,9 @@ class RR
 
     pack_rdata = ->(regex) do
       rdata =~ regex
-      rdlength = $1.to_i
-      hexdump  = $2
+      matches = regex.match(rdata)
+      rdlength = matches[1].to_i
+      hexdump  = matches[2]
       hexdump.gsub!(/\s*/, '')
 
       test_length.(hexdump, rdlength)
