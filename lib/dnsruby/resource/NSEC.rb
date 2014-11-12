@@ -44,62 +44,46 @@ module Dnsruby
 
       def check_name_in_range(n)
         #  Check if the name is covered by this record
-        if (@name.wild?)
-          return check_name_in_wildcard_range(n)
-        end
-        if (name.canonically_before(n) && (n.canonically_before(next_domain)))
-          return true
-        end
-        return false
+        @name.wild? \
+            ? check_name_in_wildcard_range(n) \
+            : name.canonically_before(n) && n.canonically_before(next_domain)
       end
 
       def check_name_in_wildcard_range(n)
         #   Check if the name is covered by this record
-        return false if !@name.wild?
+        return false unless @name.wild?
         return false if @next_domain.canonically_before(n)
         #  Now just check that the wildcard is *before* the name
         #  Strip the first label ("*") and then compare
         n2 = Name.create(@name)
         n2.labels.delete_at(0)
-        return false if n.canonically_before(n2)
-        return true
+        ! n.canonically_before(n2)
       end
 
       def types=(t)
-        if (t && t.length > 0)
-        @types = NSEC.get_types(t)
-        else
-          @types = []
-        end
+        @types = (t && t.length > 0) ? NSEC.get_types(t) : []
       end
 
       def self.get_types(t)
-        types = nil
-        if (t.instance_of?Array)
+        if t.instance_of?(Array)
           #  from the wire, already decoded
-          types =t
-        elsif (t.instance_of?String)
-          if (index = t.index";")
-            t = t[0, index]
-          end
-          if (index = t.index")")
+          types = t
+        elsif t.instance_of?(String)
+          if (index = t.index(/[;)]/)) # check for ; or )
             t = t[0, index]
           end
           #  List of mnemonics
-          types=[]
-          mnemonics = t.split(" ")
-          mnemonics.each do |m|
-            type = Types.new(m)
-            types.push(type)
-          end
+          types = []
+          mnemonics = t.split(' ')
+          mnemonics.each { |m| types << Types.new(m) }
         else
-          raise DecodeError.new("Unknown format of types for Dnsruby::RR::NSEC")
+          raise DecodeError.new('Unknown format of types for Dnsruby::RR::NSEC')
         end
-        return types
+        types
       end
 
       def add_type(t)
-        self.types=(@types + [t])
+        self.types = (@types + [t])
       end
 
       def self.decode_types(bytes)
@@ -120,14 +104,14 @@ module Dnsruby
         #   where "|" denotes concatenation.
 
         pos = 0
-        while (pos < bytes.length)
+        while pos < bytes.length
           # So, read the first two octets
-          if (bytes.length-pos < 2)
+          if bytes.length - pos < 2
             raise DecodeError.new("NSEC : Expected window number and bitmap length octets")
           end
           window_number = bytes[pos]
           bitmap_length = bytes[pos+1]
-          if (window_number.class == String) # Ruby 1.9
+          if window_number.class == String # Ruby 1.9
             window_number = window_number.getbyte(0)
             bitmap_length = bitmap_length.getbyte(0)
           end
@@ -146,13 +130,13 @@ module Dnsruby
           bitmap.each_byte do |char|
             if char.to_i != 0
               #  decode these RR types
-              0..8.times do |i|
-                if (((1 << (7-i)) & char) == (1 << (7-i)))
+              8.times do |i|
+                if ((1 << (7-i)) & char) == (1 << (7-i))
                   type = Types.new((256 * window_number) + (8 * index) + i)
                   # Bits representing pseudo-types MUST be clear, as they do not appear
                   # in zone data.  If encountered, they MUST be ignored upon being read.
-                  if (!([Types::OPT, Types::TSIG].include?(type)))
-                    types.push(type)
+                  unless [Types::OPT, Types::TSIG].include?(type)
+                    types << type
                   end
                 end
               end
@@ -168,28 +152,26 @@ module Dnsruby
       end
 
       def self.encode_types(nsec)
-        output=""
+        output = ''
         # types represents all 65536 possible RR types.
         # Split up types into sets of 256 different types.
         type_codes = []
-        nsec.types.each do |type|
-          type_codes.push(type.code)
-        end
+        nsec.types.each { |type| type_codes << type.code }
         type_codes.sort!
         window = -1
         0.step(65536,256) { |step|
           #  Gather up the RR types for this set of 256
           types_to_go = []
           while (!type_codes.empty? && type_codes[0] < step)
-            types_to_go.push(type_codes[0])
+            types_to_go << type_codes[0]
             #  And delete them from type_codes
-            type_codes=type_codes.last(type_codes.length-1)
-            break if (type_codes.empty?)
+            type_codes = type_codes.last(type_codes.length - 1)
+            break if type_codes.empty?
           end
 
-          if (!types_to_go.empty?)
+          unless types_to_go.empty?
             #  Then create the bitmap for them
-            bitmap=""
+            bitmap = ''
             #  keep on adding them until there's none left
             pos = 0
             bitmap_pos = 0
@@ -198,85 +180,81 @@ module Dnsruby
               #  Check the next eight
               byte = 0
               pos += 8
-              while (types_to_go[0] < pos + step-256)
-                byte = byte | (1 << (pos-1-(types_to_go[0] - (step-256) )))
+              while types_to_go[0] < (pos + step - 256)
+                byte = byte | (1 << (pos - 1 - (types_to_go[0] - (step - 256))))
                 #  Add it to the list
                 #  And remove it from the to_go queue
-                types_to_go =types_to_go.last(types_to_go.length-1)
-                break if (types_to_go.empty?)
+                types_to_go = types_to_go.last(types_to_go.length - 1)
+                break if types_to_go.empty?
               end
-              bitmap += " "
-              if (bitmap[bitmap_pos].class == String)
+              bitmap << ' '
+              if bitmap[bitmap_pos].class == String
                 bitmap.setbyte(bitmap_pos, byte) # Ruby 1.9
               else
-                bitmap[bitmap_pos]=byte
+                bitmap[bitmap_pos] = byte
               end
-              bitmap_pos+=1
+              bitmap_pos += 1
             end
 
             #  Now add data to output bytes
             start = output.length
-            (2+bitmap.length).times do
-              output += " "
-            end
+            output << (' ' * (2 + bitmap.length))
 
-            if (output[start].class == String)
+            if output[start].class == String
               output.setbyte(start, window)
-              output.setbyte(start+1, bitmap.length)
+              output.setbyte(start + 1, bitmap.length)
               bitmap.length.times do |i|
-                output.setbyte(start+2+i, bitmap[i].getbyte(0))
+                output.setbyte(start + 2 + i, bitmap[i].getbyte(0))
               end
             else
               output[start] = window
-              output[start+1] = bitmap.length
+              output[start + 1] = bitmap.length
               bitmap.length.times do |i|
-                output[start+2+i] = bitmap[i]
+                output[start + 2 + i] = bitmap[i]
               end
             end
           end
           window += 1
 
           #  Are there any more types after this?
-          if (type_codes.empty?)
+          if type_codes.empty?
             #  If not, then break (so we don't add more zeros)
             break
           end
         }
-        if (output[0].class == String)
+        if output[0].class == String
           output = output.force_encoding("ascii-8bit")
         end
-        return output
+        output
       end
 
       def from_data(data) #:nodoc: all
         next_domain, types = data
-        self.next_domain=(next_domain)
-        self.types=(types)
+        self.next_domain = next_domain
+        self.types = types
       end
 
       def from_string(input)
-        if (input.length > 0)
-          data = input.split(" ")
-          self.next_domain=(data[0])
+        if input.length > 0
+          data = input.split(' ')
+          self.next_domain = data[0]
           len = data[0].length+ 1
-          if (data[1] == "(")
-            len = len + data[1].length
+          if data[1] == '('
+            len += data[1].length
           end
-          self.types=(input[len, input.length-len])
+          self.types = input[len, input.length-len]
           @types = NSEC.get_types(input[len, input.length-len])
         end
       end
 
       def rdata_to_string #:nodoc: all
-        if (@next_domain!=nil)
+        if @next_domain
           type_strings = []
-          @types.each do |t|
-            type_strings.push(t.string)
-          end
-          types = type_strings.join(" ")
-          return "#{@next_domain.to_s(true)} ( #{types} )"
+          @types.each { |t| type_strings << t.string }
+          types = type_strings.join(' ')
+          "#{@next_domain.to_s(true)} ( #{types} )"
         else
-          return ""
+          ''
         end
       end
 
@@ -290,8 +268,7 @@ module Dnsruby
       def self.decode_rdata(msg) #:nodoc: all
         next_domain = msg.get_name
         types = decode_types(msg.get_bytes)
-        return self.new(
-          [next_domain, types])
+        return self.new([next_domain, types])
       end
     end
   end
