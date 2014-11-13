@@ -5,7 +5,7 @@ class MessageDecoder #:nodoc: all
     @data = data
     @index = 0
     @limit = data.length
-    yield self
+    yield self if block_given?
   end
 
   def has_remaining
