@@ -78,6 +78,16 @@ If this server is not available then some of the online tests will
 not be run.
 
 
+Usage Help
+----------
+
+There are a couple of blog articles that might be helpful
+in understanding how to use Dnsruby:
+
+* http://blog.nominet.org.uk/tech/2009/05/19/some-examples-of-dnsruby-in-action/
+* http://blog.nominet.org.uk/tech/2009/05/21/examples-of-using-dnsruby-with-dnssec/
+
+
 Contact
 -------
 
