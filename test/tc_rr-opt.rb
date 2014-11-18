@@ -33,10 +33,15 @@ class TestRrOpt < Minitest::Test
     optrr.dnssec_ok=true
     assert_equal(optrr.flags,0x9e22,"Clearing do, leaving the other bits ");
 
-
     assert_equal(optrr.payloadsize,2048,"Size read")
     assert_equal(optrr.payloadsize=(1498),1498,"Size set")
 
+    optrr.set_client_subnet("0.0.0.0/0")
+    assert_equal(optrr.edns_client_subnet,"0.0.0.0/0/0","Wildcard Address")
+    optrr.set_client_subnet("216.253.14.2/24")
+    assert_equal(optrr.edns_client_subnet,"216.253.14.0/24/0","IPv4 subnet")
+    optrr.set_client_subnet("2600:3c00:0:91fd:ab77:157e::/64")
+    assert_equal(optrr.edns_client_subnet,"2600:3c00:0:91fd::/64/0","IPv6 subnet")
   end
 
   def test_resolver_opt_application
