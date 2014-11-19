@@ -27,6 +27,8 @@ module Dnsruby
       ADDRESS_FAMILIES = [1, 2]
       IPV4_ADDRESS_FAMILY, IPV6_ADDRESS_FAMILY = ADDRESS_FAMILIES
 
+      EDNS_SUBNET_OPTION = 8
+
       #  @TODO@ Add BADVERS to an XRCode CodeMapper object
 
       # Can be called with up to 3 arguments, none of which must be present
@@ -203,13 +205,14 @@ module Dnsruby
         ip, source_netmask = subnet.split('/')
         source_netmask = source_netmask.to_i
         if subnet == "0.0.0.0/0"
-          edns_client_subnet = RR::OPT::Option.new(8, [family, source_netmask, scope_netmask].pack("xcc*"))
+          edns_client_subnet = RR::OPT::Option.new(
+              EDNS_SUBNET_OPTION, [family, source_netmask, scope_netmask].pack("xcc*"))
         else
           ip_address = IPAddr.new(ip)
           family = IPV6_ADDRESS_FAMILY if ip_address.ipv6?
           num_addr_bytes = source_netmask / 8
           num_addr_bytes = num_addr_bytes + 1 if source_netmask % 8 > 0
-          edns_client_subnet = RR::OPT::Option.new(8, [family, source_netmask, scope_netmask].pack("xcc*") +
+          edns_client_subnet = RR::OPT::Option.new(EDNS_SUBNET_OPTION, [family, source_netmask, scope_netmask].pack("xcc*") +
             ip_address.hton.slice(0, num_addr_bytes))
         end
         self.options = [edns_client_subnet]
@@ -217,7 +220,7 @@ module Dnsruby
 
       def edns_client_subnet
         return nil if @options.nil?
-        subnet_option = @options.detect { |option| option.code == 8 }
+        subnet_option = @options.detect { |option| option.code == EDNS_SUBNET_OPTION }
         subnet_option ? get_client_subnet(subnet_option) : nil
       end
 
@@ -225,7 +228,7 @@ module Dnsruby
         ret = "OPT pseudo-record : payloadsize #{payloadsize}, xrcode #{xrcode.code}, version #{version}, flags #{flags}\n"
         if @options
           @options.each do |opt|
-            if opt.code == 8
+            if opt.code == EDNS_SUBNET_OPTION
               ret = ret + "CLIENT-SUBNET: #{get_client_subnet(opt)}"
             else
               ret = ret + " " + opt.to_s
