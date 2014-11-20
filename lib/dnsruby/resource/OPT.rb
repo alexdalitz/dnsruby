@@ -172,14 +172,12 @@ module Dnsruby
         raise NotImplementedError
       end
 
-      def get_ip_addr(opt, family)
+      def get_ip_addr(opt, family, source_netmask)
         pad_format_string = family == IPV4_ADDRESS_FAMILY ? 'x3C' : 'x15C'
         ip_addr = [0].pack(pad_format_string)
 
-        num_to_copy = opt.data.size - 5
-        if num_to_copy > 0
-          ip_addr[0..num_to_copy] = opt.data[4..(num_to_copy + 4)]
-        end
+        num_to_copy = (source_netmask + 7) / 8
+        num_to_copy.times { |index| ip_addr[index] = opt.data[index+4] }
         ip_addr
       end
 
@@ -192,15 +190,15 @@ module Dnsruby
 
         case family
         when IPV4_ADDRESS_FAMILY
-          return "#{IPAddr::ntop(get_ip_addr(opt,family))}/#{source_netmask}/#{scope_netmask}"
+          return "#{IPAddr::ntop(get_ip_addr(opt,family,source_netmask))}/#{source_netmask}/#{scope_netmask}"
         when IPV6_ADDRESS_FAMILY
-          new_ipv6 = IPAddr.new(IPAddr::ntop(get_ip_addr(opt,family)), Socket::AF_INET6)
+          new_ipv6 = IPAddr.new(IPAddr::ntop(get_ip_addr(opt,family,source_netmask)), Socket::AF_INET6)
           return "#{new_ipv6}/#{source_netmask}/#{scope_netmask}"
         end
       end
 
       def set_client_subnet(subnet)
-        family = IPV6_ADDRESS_FAMILY
+        family = IPV4_ADDRESS_FAMILY
         scope_netmask = 0
         ip, source_netmask = subnet.split('/')
         source_netmask = source_netmask.to_i
