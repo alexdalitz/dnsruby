@@ -40,8 +40,12 @@ class TestRrOpt < Minitest::Test
     assert_equal(optrr.edns_client_subnet,"0.0.0.0/0/0","Wildcard Address")
     optrr.set_client_subnet("216.253.14.2/24")
     assert_equal(optrr.edns_client_subnet,"216.253.14.0/24/0","IPv4 subnet")
+    optrr.set_client_subnet("216.253.14.2/1")
+    assert_equal(optrr.edns_client_subnet,"216.0.0.0/1/0","IPv4 subnet <8 bits")
     optrr.set_client_subnet("2600:3c00:0:91fd:ab77:157e::/64")
     assert_equal(optrr.edns_client_subnet,"2600:3c00:0:91fd::/64/0","IPv6 subnet")
+    optrr.set_client_subnet("2600:3c00:0:91fd:ab77:157e::/7")
+    assert_equal(optrr.edns_client_subnet,"2600::/7/0","IPv6 subnet <8 bits")
   end
 
   def test_resolver_opt_application
