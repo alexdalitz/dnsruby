@@ -27,13 +27,13 @@ module Dnsruby
       #  ONLY cache the response if it is not an update response
       question = query.question()[0]
       if (query.do_caching && (query.class != Update) &&
-            (question.qtype != Types::AXFR) && (question.qtype != Types::IXFR) &&
-            (response.rcode == RCode::NOERROR) &&(!response.tsig) &&
-            (query.class != Update) &&
-            (response.header.ancount > 0))
+          (question.qtype != Types::AXFR) && (question.qtype != Types::IXFR) &&
+          (response.rcode == RCode::NOERROR) &&(!response.tsig) &&
+          (query.class != Update) &&
+          (response.header.ancount > 0))
         # # @TODO@ What about TSIG-signed responses?
         #  Don't cache any packets with "*" in the query name! (RFC1034 sec 4.3.3)
-        if (!question.qname.to_s.include?"*")
+        if (!question.qname.to_s.include? "*")
           #  Now cache response RRSets
           if (query.header.rd)
             PacketSender.cache_recursive(response);
@@ -43,17 +43,21 @@ module Dnsruby
         end
       end
     end
+
     def PacketSender.cache_authoritative(answer)
       return if !answer.header.aa
       @@authoritative_cache.add(answer)
     end
+
     def PacketSender.cache_recursive(answer)
       @@recursive_cache.add(answer)
     end
+
     def PacketSender.clear_caches
       @@recursive_cache.clear
       @@authoritative_cache.clear
     end
+
     attr_accessor :packet_timeout
 
     #  The port on the resolver to send queries to.
@@ -144,7 +148,7 @@ module Dnsruby
     end
 
     def server=(server)
-      Dnsruby.log.debug{"InternalResolver setting server to #{server}"}
+      Dnsruby.log.debug { "InternalResolver setting server to #{server}" }
       @server=Config.resolve_server(server)
       check_ipv6
     end
@@ -174,29 +178,29 @@ module Dnsruby
       @no_tcp = false
       @tsig = nil
       @ignore_truncation = false
-      @src_address        = '0.0.0.0'
-      @src_address6        = '::'
-      @src_port        = [0]
+      @src_address = '0.0.0.0'
+      @src_address6 = '::'
+      @src_port = [0]
       @recurse = true
 
       if (arg==nil)
         #  Get default config
         config = Config.new
         #         @server = config.nameserver[0]
-      elsif (arg.kind_of?String)
+      elsif (arg.kind_of? String)
         @server=arg
-      elsif (arg.kind_of?Name)
+      elsif (arg.kind_of? Name)
         @server=arg
-      elsif (arg.kind_of?Hash)
+      elsif (arg.kind_of? Hash)
         arg.keys.each do |attr|
           begin
             if (((attr.to_s == "src_address")||(attr.to_s == "src_address6")) &&
-                  ((arg[attr] == nil) || (arg[attr] == "")))
+                ((arg[attr] == nil) || (arg[attr] == "")))
             else
               send(attr.to_s+"=", arg[attr])
             end
           rescue Exception => e
-            Dnsruby.log.error{"PacketSender : Argument #{attr}, #{arg[attr]} not valid : #{e}\n"}
+            Dnsruby.log.error { "PacketSender : Argument #{attr}, #{arg[attr]} not valid : #{e}\n" }
           end
           #         end
         end
@@ -219,7 +223,7 @@ module Dnsruby
           #           @src_address6 = '::'
           @ipv6=true
         rescue Exception
-          Dnsruby.log.error{"Server is neither IPv4 or IPv6!\n"}
+          Dnsruby.log.error { "Server is neither IPv4 or IPv6!\n" }
         end
       end
     end
@@ -275,7 +279,7 @@ module Dnsruby
       client_query_id = nil
       client_queue = nil
       use_tcp = @use_tcp
-      if (msg.kind_of?String)
+      if (msg.kind_of? String)
         msg = Message.new(msg)
         if (@dnssec)
           msg.header.cd = @dnssec # we'll do our own validation by default
@@ -332,11 +336,11 @@ module Dnsruby
         if (@no_tcp)
           #  Can't send the message - abort!
           err=IOError.new("Can't send message - too big for UDP and no_tcp=true")
-          Dnsruby.log.error{"#{err}"}
+          Dnsruby.log.error { "#{err}" }
           st.push_exception_to_select(client_query_id, client_queue, err, nil)
           return
         end
-        Dnsruby.log.debug{"Query packet length exceeds max UDP packet size - using TCP"}
+        Dnsruby.log.debug { "Query packet length exceeds max UDP packet size - using TCP" }
         use_tcp = true
       end
       send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
@@ -357,7 +361,7 @@ module Dnsruby
       if (@ipv6)
         src_address = @src_address6
       end
-      while (runnextportloop)do
+      while (runnextportloop) do
         begin
           numtries += 1
           src_port = get_next_src_port
@@ -367,14 +371,14 @@ module Dnsruby
             rescue Errno::EBADF, Errno::ENETUNREACH => e
               #  Can't create a connection
               err=IOError.new("TCP connection error to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
-              Dnsruby.log.error{"#{err}"}
+              Dnsruby.log.error { "#{err}" }
               st.push_exception_to_select(client_query_id, client_queue, err, nil)
               return
             end
           else
             socket = nil
             #  JRuby UDPSocket only takes 0 parameters - no IPv6 support in JRuby...
-            if (/java/ =~ RUBY_PLATFORM )
+            if (/java/ =~ RUBY_PLATFORM)
               socket = UDPSocket.new()
             else
               #               ipv6 = @src_address =~ /:/
@@ -394,9 +398,9 @@ module Dnsruby
           #  Try again if the error was EADDRINUSE and a random source port is used
           #  Maybe try a max number of times?
           if ((e.class != Errno::EADDRINUSE) || (numtries > 50) ||
-                ((e.class == Errno::EADDRINUSE) && (src_port == @src_port[0])))
+              ((e.class == Errno::EADDRINUSE) && (src_port == @src_port[0])))
             err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
-            Dnsruby.log.error{"#{err}"}
+            Dnsruby.log.error { "#{err}" }
             st.push_exception_to_select(client_query_id, client_queue, err, nil)
             return
           end
@@ -404,11 +408,11 @@ module Dnsruby
       end
       if (socket==nil)
         err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}")
-        Dnsruby.log.error{"#{err}"}
+        Dnsruby.log.error { "#{err}" }
         st.push_exception_to_select(client_query_id, client_queue, err, nil)
         return
       end
-      Dnsruby.log.debug{"Sending packet to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
+      Dnsruby.log.debug { "Sending packet to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}" }
       #             print "#{Time.now} : Sending packet to #{@server} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
       #  Listen for the response before we send the packet (to avoid any race conditions)
       query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
@@ -423,7 +427,7 @@ module Dnsruby
         st.add_to_select(query_settings)
       rescue Exception => e
         err=IOError.new("Send failed to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
-        Dnsruby.log.error{"#{err}"}
+        Dnsruby.log.error { "#{err}" }
         st.push_exception_to_select(client_query_id, client_queue, err, nil)
         begin
           socket.close
@@ -432,7 +436,7 @@ module Dnsruby
         return
       end
 
-      Dnsruby.log.debug{"Packet sent to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}"}
+      Dnsruby.log.debug { "Packet sent to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}" }
       #       print "Packet sent to #{@server}:#{@port} from #{@src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
     end
 
@@ -521,36 +525,37 @@ module Dnsruby
           #  @TODO@!!
         else
           if ((response.question.size == 0) ||
-                (response.question[0].qname.labels != query.question[0].qname.labels) ||
-                (response.question[0].qtype != query.question[0].qtype) ||
-                (response.question[0].qclass != query.question[0].qclass) ||
-                (response.question.length != query.question.length) ||
-                (response.header.id != query.header.id))
+              (response.question[0].qname.labels != query.question[0].qname.labels) ||
+              (response.question[0].qtype != query.question[0].qtype) ||
+              (response.question[0].qclass != query.question[0].qclass) ||
+              (response.question.length != query.question.length) ||
+              (response.header.id != query.header.id))
             TheLog.info("Incorrect packet returned : #{response.to_s}")
             return false
           end
         end
-      end
-      #  IF WE GET FORMERR BACK HERE (and we have EDNS0 on) THEN
-      #  TRY AGAIN WITH NO OPT RECORDS! (rfc2671 section 5.3)
-      if ((response.header.get_header_rcode == RCode.FORMERR) &&
+        # end
+        #  IF WE GET FORMERR BACK HERE (and we have EDNS0 on) THEN
+        #  TRY AGAIN WITH NO OPT RECORDS! (rfc2671 section 5.3)
+        if ((response.header.get_header_rcode == RCode.FORMERR) &&
             (query.header.arcount > 0))
-        #  try resending the message with no OPT record
-        query.remove_additional
-        query.send_raw = true
-        send_async(query, client_queue, client_query_id, false)
-        return false
-      end
-      if (response.header.tc && !tcp && !@ignore_truncation)
-        if (@no_tcp)
-          Dnsruby.log.debug{"Truncated response - not resending over TCP as no_tcp==true"}
-        else
-          #  Try to resend over tcp
-          Dnsruby.log.debug{"Truncated - resending over TCP"}
-          #  @TODO@ Are the query options used correctly here? DNSSEC in particular...
-          #         query.send_raw = true # Make sure that the packet is not messed with.
-          send_async(query, client_queue, client_query_id, true)
+          #  try resending the message with no OPT record
+          query.remove_additional
+          query.send_raw = true
+          send_async(query, client_queue, client_query_id, false)
           return false
+        end
+        if (response.header.tc && !tcp && !@ignore_truncation)
+          if (@no_tcp)
+            Dnsruby.log.debug { "Truncated response - not resending over TCP as no_tcp==true" }
+          else
+            #  Try to resend over tcp
+            Dnsruby.log.debug { "Truncated - resending over TCP" }
+            #  @TODO@ Are the query options used correctly here? DNSSEC in particular...
+            #         query.send_raw = true # Make sure that the packet is not messed with.
+            send_async(query, client_queue, client_query_id, true)
+            return false
+          end
         end
       end
       return true
@@ -561,19 +566,19 @@ module Dnsruby
         if (response.tsig)
           if !query.tsig.verify(query, response, response_bytes)
             #  Discard packet and wait for correctly signed response
-            Dnsruby.log.error{"TSIG authentication failed!"}
+            Dnsruby.log.error { "TSIG authentication failed!" }
             return TsigError.new
           end
         else
           #  Treated as having format error and discarded (RFC2845, 4.6)
           #  but return a different error code, because some servers fail at
           #  this
-          Dnsruby.log.error{"Expecting TSIG signed response, but got unsigned response - discarding"}
+          Dnsruby.log.error { "Expecting TSIG signed response, but got unsigned response - discarding" }
           return TsigNotSignedResponseError.new
         end
       elsif (response.tsig)
         #  Error - signed response to unsigned query
-        Dnsruby.log.error{"Signed response to unsigned query"}
+        Dnsruby.log.error { "Signed response to unsigned query" }
         return TsigError.new
       end
       return :okay
@@ -613,7 +618,7 @@ module Dnsruby
     end
 
     def add_opt_rr(packet)
-      Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}.\n"}
+      Dnsruby.log.debug { ";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}.\n" }
       #  RFC 3225
       optrr = RR::OPT.new(udp_packet_size)
 
@@ -625,8 +630,8 @@ module Dnsruby
 
     def prepare_for_dnssec(packet)
       #  RFC 4035
-      Dnsruby.log.debug{";; Adding EDNS extension with UDP packetsize #{udp_packet_size} and DNS OK bit set\n"}
-      optrr = RR::OPT.new(udp_packet_size)   # Decimal UDPpayload
+      Dnsruby.log.debug { ";; Adding EDNS extension with UDP packetsize #{udp_packet_size} and DNS OK bit set\n" }
+      optrr = RR::OPT.new(udp_packet_size) # Decimal UDPpayload
       optrr.dnssec_ok=true
 
       if (packet.additional.rrset(packet.question()[0].qname, Types::OPT).rrs.length == 0)
