@@ -15,13 +15,7 @@ SPEC = Gem::Specification.new do |s|
 stub resolver. It aims to comply with all DNS RFCs, including
 DNSSEC NSEC3 support.'
   s.license = "Apache License, Version 2.0"
-  candidatestest = Dir.glob("test/**/*")
-  candidateslib = Dir.glob("lib/**/*")
-  candidatesdoc = Dir.glob("html**/*")
-  candidatesdemo = Dir.glob("demo/**/*")
-  rakefile = ['Rakefile']
-  candidates = rakefile + candidatestest + candidateslib + candidatesdoc + candidatesdemo
-  s.files = candidates.delete_if { |item| /rdoc$/.match(item) }
+  s.files = `git ls-files -z`.split("\x0")
   s.test_file = "test/ts_offline.rb"
   s.has_rdoc = true
   s.extra_rdoc_files = ["DNSSEC", "EXAMPLES", "README.md", "EVENTMACHINE"]
