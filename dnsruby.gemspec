@@ -16,6 +16,12 @@ stub resolver. It aims to comply with all DNS RFCs, including
 DNSSEC NSEC3 support.'
   s.license = "Apache License, Version 2.0"
   s.files = `git ls-files -z`.split("\x0")
+
+  s.post_install_message = \
+"Installing dnsruby...
+  For issues and source code: https://github.com/alexdalitz/dnsruby
+  For general discussion (please tell us how you use dnsruby): https://groups.google.com/forum/#!forum/dnsruby"
+
   s.test_file = "test/ts_offline.rb"
   s.has_rdoc = true
   s.extra_rdoc_files = ["DNSSEC", "EXAMPLES", "README.md", "EVENTMACHINE"]
