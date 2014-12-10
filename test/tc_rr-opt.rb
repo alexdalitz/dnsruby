@@ -20,6 +20,38 @@ require 'socket'
 
 include Dnsruby
 class TestRrOpt < Minitest::Test
+
+
+
+  # This test illustrates that when an OPT record specifying a maximum
+  # UDP size is added to a query, the server will respect that setting
+  # and limit the response's size to <= that maximum.
+  # This works only with send_plain_message, not send_message, query, etc.
+  def test_plain_respects_bufsize
+
+    resolver = Resolver.new('a.gtld-servers.net')
+
+    run_test = ->(bufsize) do
+
+      create_test_query = ->(bufsize) do
+        message = Message.new('com', Types.ANY, Classes.IN)
+        message.add_additional(RR::OPT.new(bufsize))
+        message
+      end
+
+      query = create_test_query.(bufsize)
+      response, _error = resolver.send_plain_message(query)
+      # puts "\nBufsize is #{bufsize}, binary message size is #{response.encode.size}"
+      assert_equal(true, response.header.tc)
+      assert(response.encode.size <= bufsize)
+    end
+
+    run_test.(512)
+    run_test.(612)
+    run_test.(4096)
+  end
+
+
   def test_rropt
     size=2048;
     ednsflags=0x9e22;

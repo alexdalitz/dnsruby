@@ -12,5 +12,6 @@ if ENV['RUN_EXTRA_TASK'] == 'TRUE'
   end
 end
 
+require 'minitest'
 require 'minitest/autorun'
 require 'dnsruby'
