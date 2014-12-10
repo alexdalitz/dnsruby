@@ -40,6 +40,7 @@ if (online)
   print "It may just be that some UDP packets got lost the first time...\n"
   require_relative "tc_resolver.rb"
   require_relative "tc_dnsruby.rb"
+  require_relative "tc_hs.rb"
   #   require_relative "tc_inet6.rb"
   #   require_relative "tc_recurse.rb"
   require_relative "tc_tcp.rb"
