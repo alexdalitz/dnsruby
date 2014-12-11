@@ -3,7 +3,7 @@ class MessageEncoder #:nodoc: all
   def initialize
     @data = ''
     @names = {}
-    yield self
+    yield self if block_given?
   end
 
   def to_s

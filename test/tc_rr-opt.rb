@@ -20,6 +20,38 @@ require 'socket'
 
 include Dnsruby
 class TestRrOpt < Minitest::Test
+
+
+
+  # This test illustrates that when an OPT record specifying a maximum
+  # UDP size is added to a query, the server will respect that setting
+  # and limit the response's size to <= that maximum.
+  # This works only with send_plain_message, not send_message, query, etc.
+  def test_plain_respects_bufsize
+
+    resolver = Resolver.new('a.gtld-servers.net')
+
+    run_test = ->(bufsize) do
+
+      create_test_query = ->(bufsize) do
+        message = Message.new('com', Types.ANY, Classes.IN)
+        message.add_additional(RR::OPT.new(bufsize))
+        message
+      end
+
+      query = create_test_query.(bufsize)
+      response, _error = resolver.send_plain_message(query)
+      # puts "\nBufsize is #{bufsize}, binary message size is #{response.encode.size}"
+      assert_equal(true, response.header.tc)
+      assert(response.encode.size <= bufsize)
+    end
+
+    run_test.(512)
+    run_test.(612)
+    run_test.(4096)
+  end
+
+
   def test_rropt
     size=2048;
     ednsflags=0x9e22;
@@ -33,10 +65,19 @@ class TestRrOpt < Minitest::Test
     optrr.dnssec_ok=true
     assert_equal(optrr.flags,0x9e22,"Clearing do, leaving the other bits ");
 
-
     assert_equal(optrr.payloadsize,2048,"Size read")
     assert_equal(optrr.payloadsize=(1498),1498,"Size set")
 
+    optrr.set_client_subnet("0.0.0.0/0")
+    assert_equal(optrr.edns_client_subnet,"0.0.0.0/0/0","Wildcard Address")
+    optrr.set_client_subnet("216.253.14.2/24")
+    assert_equal(optrr.edns_client_subnet,"216.253.14.0/24/0","IPv4 subnet")
+    optrr.set_client_subnet("216.253.14.2/1")
+    assert_equal(optrr.edns_client_subnet,"216.0.0.0/1/0","IPv4 subnet <8 bits")
+    optrr.set_client_subnet("2600:3c00:0:91fd:ab77:157e::/64")
+    assert_equal(optrr.edns_client_subnet,"2600:3c00:0:91fd::/64/0","IPv6 subnet")
+    optrr.set_client_subnet("2600:3c00:0:91fd:ab77:157e::/7")
+    assert_equal(optrr.edns_client_subnet,"2600::/7/0","IPv6 subnet <8 bits")
   end
 
   def test_resolver_opt_application

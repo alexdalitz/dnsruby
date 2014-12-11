@@ -24,6 +24,11 @@ module Dnsruby
       TypeValue = Types::OPT #:nodoc: all
       DO_BIT = 0x8000
 
+      ADDRESS_FAMILIES = [1, 2]
+      IPV4_ADDRESS_FAMILY, IPV6_ADDRESS_FAMILY = ADDRESS_FAMILIES
+
+      EDNS_SUBNET_OPTION = 8
+
       #  @TODO@ Add BADVERS to an XRCode CodeMapper object
 
       # Can be called with up to 3 arguments, none of which must be present
@@ -167,11 +172,65 @@ module Dnsruby
         raise NotImplementedError
       end
 
+      def get_ip_addr(opt, family, source_netmask)
+        pad_format_string = family == IPV4_ADDRESS_FAMILY ? 'x3C' : 'x15C'
+        ip_addr = [0].pack(pad_format_string)
+
+        num_to_copy = (source_netmask + 7) / 8
+        num_to_copy.times { |index| ip_addr[index] = opt.data[index+4] }
+        ip_addr
+      end
+
+      def get_client_subnet(opt)
+        family = opt.data[1].unpack('C')[0]
+        return "Unsupported(family=#{family})" unless ADDRESS_FAMILIES.include?(family)
+
+        source_netmask = opt.data[2].unpack('C')[0]
+        scope_netmask = opt.data[3].unpack('C')[0]
+
+        case family
+        when IPV4_ADDRESS_FAMILY
+          return "#{IPAddr::ntop(get_ip_addr(opt,family,source_netmask))}/#{source_netmask}/#{scope_netmask}"
+        when IPV6_ADDRESS_FAMILY
+          new_ipv6 = IPAddr.new(IPAddr::ntop(get_ip_addr(opt,family,source_netmask)), Socket::AF_INET6)
+          return "#{new_ipv6}/#{source_netmask}/#{scope_netmask}"
+        end
+      end
+
+      def set_client_subnet(subnet)
+        family = IPV4_ADDRESS_FAMILY
+        scope_netmask = 0
+        ip, source_netmask = subnet.split('/')
+        source_netmask = source_netmask.to_i
+        if subnet == "0.0.0.0/0"
+          edns_client_subnet = RR::OPT::Option.new(
+              EDNS_SUBNET_OPTION, [family, source_netmask, scope_netmask].pack("xcc*"))
+        else
+          ip_address = IPAddr.new(ip)
+          family = IPV6_ADDRESS_FAMILY if ip_address.ipv6?
+          num_addr_bytes = source_netmask / 8
+          num_addr_bytes = num_addr_bytes + 1 if source_netmask % 8 > 0
+          edns_client_subnet = RR::OPT::Option.new(EDNS_SUBNET_OPTION, [family, source_netmask, scope_netmask].pack("xcc*") +
+            ip_address.hton.slice(0, num_addr_bytes))
+        end
+        self.options = [edns_client_subnet]
+      end
+
+      def edns_client_subnet
+        return nil if @options.nil?
+        subnet_option = @options.detect { |option| option.code == EDNS_SUBNET_OPTION }
+        subnet_option ? get_client_subnet(subnet_option) : nil
+      end
+
       def to_s
-        ret = "OPT pseudo-record : payloadsize #{payloadsize}, xrcode #{xrcode.code}, version #{version}, flags #{flags}"
+        ret = "OPT pseudo-record : payloadsize #{payloadsize}, xrcode #{xrcode.code}, version #{version}, flags #{flags}\n"
         if @options
           @options.each do |opt|
-            ret = ret + " " + opt.to_s
+            if opt.code == EDNS_SUBNET_OPTION
+              ret = ret + "CLIENT-SUBNET: #{get_client_subnet(opt)}"
+            else
+              ret = ret + " " + opt.to_s
+            end
           end
         end
         ret = ret + "\n"
@@ -198,7 +257,7 @@ module Dnsruby
             options.push(Option.new(code, data))
           end
         end
-        return self.new([options])
+        return self.new(0, 0, options)
       end
 
       class Option

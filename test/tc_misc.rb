@@ -38,8 +38,7 @@ class TestMisc < Minitest::Test
     # 
     srv = Dnsruby::RR.create('_rvp._tcp.t.dnsruby.validation-test-servers.nominet.org.uk. 60 IN SRV 0 0 80 im.bastardsinc.biz')
 
-    assert(!$@,  'No errors')
-    assert(srv, 'SRV got made')
+    assert(srv, 'SRV not created successfully')
 
 
     # ~ # Test that the 5.005 Use of uninitialized value at
