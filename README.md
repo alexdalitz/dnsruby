@@ -73,11 +73,6 @@ at runtime:
 bundle exec rake test
 ```
 
-Nominet operates a test server which the Dnsruby test code queries.
-If this server is not available then some of the online tests will
-not be run.
-
-
 Usage Help
 ----------
 
