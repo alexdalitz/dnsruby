@@ -36,7 +36,7 @@ Dependencies
 Dnsruby can run with no dependencies. However, if you wish to
 use TSIG or DNSSEC then the OpenSSL library must be available.
 This is a part of the Ruby standard library, but appears not to
-be present on all Ruby platforms. If it is not available, then 
+be present on all Ruby platforms. If it is not available, then
 the test code will not run the tests which require it. Code which
 attempts to use the library (if it is not present) will raise an
 exception.
@@ -74,7 +74,7 @@ bundle exec rake test
 ```
 
 Nominet operates a test server which the Dnsruby test code queries.
-If this server is not available then some of the online tests will 
+If this server is not available then some of the online tests will
 not be run.
 
 
@@ -88,9 +88,12 @@ in understanding how to use Dnsruby:
 * http://blog.nominet.org.uk/tech/2009/05/21/examples-of-using-dnsruby-with-dnssec/
 
 
-Contact
+Contact/Links
 -------
 
-alex@caerkettontech.com
-https://github.com/alexdalitz/dnsruby
-
+| Link Type | Link/Text |
+|-----|-----
+| Author Email | alex@caerkettontech.com |
+| Github | https://github.com/alexdalitz/dnsruby |
+| Google Group | https://groups.google.com/forum/#!forum/dnsruby |
+| Rubygems | http://rubygems.org/gems/dnsruby/ |
