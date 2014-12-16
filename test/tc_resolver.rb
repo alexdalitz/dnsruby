@@ -310,6 +310,12 @@ class TestRawQuery < Minitest::Test
     assert_raises(Dnsruby::OtherResolvError) { bad_resolver.query_raw(sample_message, :raise) }
   end
 
+  def test_return_error_is_default
+    response, error = bad_resolver.query_raw(sample_message)
+    assert error.is_a?(Exception)
+    assert response.nil?
+  end
+
   def test_raise_no_error
     response = good_resolver.query_raw(sample_message, :raise)
     assert response.is_a?(Message)
