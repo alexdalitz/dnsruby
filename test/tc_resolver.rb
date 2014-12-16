@@ -286,3 +286,45 @@ class TestResolver < Minitest::Test
     #  @TODO@ TEST THE Resolver::EventType interface!
   end
 end
+
+
+class TestRawQuery < Minitest::Test
+
+  def sample_message
+    Message.new('cnn.com')
+  end
+
+  def good_resolver
+    Resolver.new
+  end
+
+  def bad_resolver
+    Resolver.new('bad-host-9317399505001284552053582690499581029621784165911201558503876818')
+  end
+
+  def test_bad_strategy
+    assert_raises(RuntimeError) { good_resolver.query_raw(sample_message, :invalid_strategy) }
+  end
+
+  def test_raise_error
+    assert_raises(Dnsruby::OtherResolvError) { bad_resolver.query_raw(sample_message, :raise) }
+  end
+
+  def test_raise_no_error
+    response = good_resolver.query_raw(sample_message, :raise)
+    assert response.is_a?(Message)
+  end
+
+  def test_return_error
+    response, error = bad_resolver.query_raw(sample_message, :return)
+    assert error.is_a?(Exception)
+    assert response.nil?
+  end
+
+  def test_return_no_error
+    response, error = good_resolver.query_raw(sample_message, :return)
+    assert error.nil?
+    assert response.is_a?(Message)
+  end
+end
+
