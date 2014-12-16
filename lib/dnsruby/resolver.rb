@@ -275,7 +275,7 @@ module Dnsruby
     def query_raw(message, error_strategy = :return)
 
       unless [:return, :raise].include?(error_strategy)
-        raise 'error_strategy should be one of [:return, :raise].'
+        raise ArgumentError.new('error_strategy should be one of [:return, :raise].')
       end
 
       response, error = send_plain_message(message)

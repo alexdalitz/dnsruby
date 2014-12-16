@@ -299,11 +299,11 @@ class TestRawQuery < Minitest::Test
   end
 
   def bad_resolver
-    Resolver.new('bad-host-9317399505001284552053582690499581029621784165911201558503876818')
+    Resolver.new('bad-host-9317399505001284552053582690499581029621784165911201')
   end
 
   def test_bad_strategy
-    assert_raises(RuntimeError) { good_resolver.query_raw(sample_message, :invalid_strategy) }
+    assert_raises(ArgumentError) { good_resolver.query_raw(sample_message, :invalid_strategy) }
   end
 
   def test_raise_error
