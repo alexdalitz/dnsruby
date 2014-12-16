@@ -270,7 +270,7 @@ module Dnsruby
     # or returned if it occurs.
     #
     # @param message the message to send to the DNS server
-    # @param error_strategy :return to return [response, error],
+    # @param error_strategy :return to return [response, error] (default),
     #                       :raise to return response only, or raise an error if one occurs
     def query_raw(message, error_strategy = :return)
 
