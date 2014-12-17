@@ -291,12 +291,14 @@ end
 # Tests to see that query_raw handles send_plain_message's return values correctly.
 class TestRawQuery < Minitest::Test
 
+  class CustomError < RuntimeError; end
+
   # Returns a new resolver whose send_plain_message method always returns
   # nil for the response, and a RuntimeError for the error.
   def resolver_returning_error
     resolver = Resolver.new
     def resolver.send_plain_message(_message)
-      [nil, RuntimeError.new]
+      [nil, CustomError.new]
     end
     resolver
   end
@@ -323,7 +325,7 @@ class TestRawQuery < Minitest::Test
   # Test that when send_plain_message returns an error,
   # and the error strategy is :raise, query_raw raises an error.
   def test_raise_error
-    assert_raises(RuntimeError) do
+    assert_raises(CustomError) do
       resolver_returning_error.query_raw(Message.new, :raise)
     end
   end
@@ -332,7 +334,7 @@ class TestRawQuery < Minitest::Test
   # returned rather than raised (i.e. strategy defaults to :return).
   def test_return_error_is_default
     _response, error = resolver_returning_error.query_raw(Message.new)
-    assert error.is_a?(Exception)
+    assert error.is_a?(CustomError)
   end
 
   # Tests that when no error is returned, no error is raised.
@@ -345,7 +347,7 @@ class TestRawQuery < Minitest::Test
   # is set to :return, then an error is returned.
   def test_return_error
     _response, error = resolver_returning_error.query_raw(Message.new, :return)
-    assert error.is_a?(Exception)
+    assert error.is_a?(CustomError)
   end
 
   # Test that when send_plain_message returns a valid and response
