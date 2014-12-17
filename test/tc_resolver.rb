@@ -290,46 +290,44 @@ end
 
 class TestRawQuery < Minitest::Test
 
-  def sample_message
+  def good_message
     Message.new('cnn.com')
   end
 
-  def good_resolver
-    Resolver.new
+  def bad_message
+    Message.new('cnn.com', 'A', 'HS') # the server we'll use doesn't support HS
   end
 
-  def bad_resolver
-    Resolver.new('bad-host-9317399505001284552053582690499581029621784165911201')
+  def resolver
+    Resolver.new('a.gtld-servers.net')
   end
 
   def test_bad_strategy
-    assert_raises(ArgumentError) { good_resolver.query_raw(sample_message, :invalid_strategy) }
+    assert_raises(ArgumentError) { resolver.query_raw(good_message, :invalid_strategy) }
   end
 
   def test_raise_error
-    assert_raises(Dnsruby::OtherResolvError) { bad_resolver.query_raw(sample_message, :raise) }
+    assert_raises(Dnsruby::NotImp) { resolver.query_raw(bad_message, :raise) }
   end
 
   def test_return_error_is_default
-    response, error = bad_resolver.query_raw(sample_message)
-    assert error.is_a?(Exception)
-    assert response.nil?
+    _response, error = resolver.query_raw(bad_message)
+    assert error.is_a?(Dnsruby::NotImp)
   end
 
   def test_raise_no_error
-    response = good_resolver.query_raw(sample_message, :raise)
+    response = resolver.query_raw(good_message, :raise)
     assert response.is_a?(Message)
   end
 
   def test_return_error
-    response, error = bad_resolver.query_raw(sample_message, :return)
+    _response, error = resolver.query_raw(bad_message, :return)
     assert error.is_a?(Exception)
-    assert response.nil?
   end
 
   def test_return_no_error
-    response, error = good_resolver.query_raw(sample_message, :return)
-    assert error.nil?
+    response, error = resolver.query_raw(good_message, :return)
+    assert_nil error
     assert response.is_a?(Message)
   end
 end
