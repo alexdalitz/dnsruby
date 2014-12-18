@@ -286,3 +286,76 @@ class TestResolver < Minitest::Test
     #  @TODO@ TEST THE Resolver::EventType interface!
   end
 end
+
+
+# Tests to see that query_raw handles send_plain_message's return values correctly.
+class TestRawQuery < Minitest::Test
+
+  class CustomError < RuntimeError; end
+
+  # Returns a new resolver whose send_plain_message method always returns
+  # nil for the response, and a RuntimeError for the error.
+  def resolver_returning_error
+    resolver = Resolver.new
+    def resolver.send_plain_message(_message)
+      [nil, CustomError.new]
+    end
+    resolver
+  end
+
+  # Returns a new resolver whose send_plain_message is overridden to return
+  # :response_from_send_plain_message instead of a real Dnsruby::Message,
+  # for easy comparison in the tests.
+  def resolver_returning_response
+    resolver = Resolver.new
+    def resolver.send_plain_message(_message)
+      [:response_from_send_plain_message, nil]
+    end
+    resolver
+  end
+
+  # Test that when a strategy other than :raise or :return is passed,
+  # an ArgumentError is raised.
+  def test_bad_strategy
+    assert_raises(ArgumentError) do
+      resolver_returning_error.query_raw(Message.new, :invalid_strategy)
+    end
+  end
+
+  # Test that when send_plain_message returns an error,
+  # and the error strategy is :raise, query_raw raises an error.
+  def test_raise_error
+    assert_raises(CustomError) do
+      resolver_returning_error.query_raw(Message.new, :raise)
+    end
+  end
+
+  # Tests that if you don't specify an error strategy, an error will be
+  # returned rather than raised (i.e. strategy defaults to :return).
+  def test_return_error_is_default
+    _response, error = resolver_returning_error.query_raw(Message.new)
+    assert error.is_a?(CustomError)
+  end
+
+  # Tests that when no error is returned, no error is raised.
+  def test_raise_no_error
+    response, _error = resolver_returning_response.query_raw(Message.new, :raise)
+    assert_equal :response_from_send_plain_message, response
+  end
+
+  # Test that when send_plain_message returns an error, and the error strategy
+  # is set to :return, then an error is returned.
+  def test_return_error
+    _response, error = resolver_returning_error.query_raw(Message.new, :return)
+    assert error.is_a?(CustomError)
+  end
+
+  # Test that when send_plain_message returns a valid and response
+  # and nil error, the same are returned by query_raw.
+  def test_return_no_error
+    response, error = resolver_returning_response.query_raw(Message.new, :return)
+    assert_nil error
+    assert_equal :response_from_send_plain_message, response
+  end
+end
+

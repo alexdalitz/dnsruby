@@ -264,6 +264,30 @@ module Dnsruby
       [response, error]
     end
 
+    # Sends a message with send_plain_message.
+    # Effectively a wrapper around send_plain_message, but adds
+    # the ability to configure whether an error will be raised
+    # or returned if it occurs.
+    #
+    # @param message the message to send to the DNS server
+    # @param error_strategy :return to return [response, error] (default),
+    #                       :raise to return response only, or raise an error if one occurs
+    def query_raw(message, error_strategy = :return)
+
+      unless [:return, :raise].include?(error_strategy)
+        raise ArgumentError.new('error_strategy should be one of [:return, :raise].')
+      end
+
+      response, error = send_plain_message(message)
+
+      if error_strategy == :return
+        [response, error]
+      else
+        raise error if error
+        response
+      end
+    end
+
     #  This method takes a Message (supplied by the client), and sends it to
     #  the configured nameservers. No changes are made to the Message before it
     #  is sent (TSIG signatures will be applied if configured on the Resolver).
