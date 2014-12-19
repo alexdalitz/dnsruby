@@ -60,17 +60,39 @@ module Dnsruby
 
 
       def to_binary
-        s = '%-16.16s%-16.16s%-16.16s' % [latitude, longitude, altitude]
+        binary_string = ''
+        binary_string << latitude.length.chr
+        binary_string << latitude
+        binary_string << longitude.length.chr
+        binary_string << longitude
+        binary_string << altitude.length.chr
+        binary_string << altitude
         # s.force_encoding('ASCII-8BIT')
         # puts s.encoding
         # puts s
-        s
+        binary_string
       end
 
       def self.from_binary(binary_string)
-        latitude  = binary_string[0...16].strip
-        longitude = binary_string[16...32].strip
-        altitude  = binary_string[32...48].strip
+
+        s = binary_string.clone
+
+        lat_len = s[0].ord;           s = s[1..-1]
+        latitude = s[0...lat_len];    s = s[lat_len..-1]
+
+        long_len = s[0].ord;          s = s[1..-1]
+        longitude = s[0...long_len];  s = s[long_len..-1]
+
+        alt_len = s[0].ord;           s = s[1..-1]
+        altitude = s[0...alt_len];    s = s[alt_len..-1]
+
+        # puts [latitude, longitude, altitude].join(', ')
+
+        # puts "Remaining binary string contains #{s.length} chars:\n"
+        # s.each_byte { |ch| puts ch.ord }
+
+        # require 'ripl'
+        # Ripl.start :binding => binding
 
         validate_latitude(latitude)
         validate_longitude(longitude)

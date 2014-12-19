@@ -28,3 +28,10 @@ end
 # puts "Response:\n#{RESPONSE}\n\n"
 
 
+describe RR::GPOS do
+
+  it 'should' do
+    puts RESPONSE
+
+  end
+end
