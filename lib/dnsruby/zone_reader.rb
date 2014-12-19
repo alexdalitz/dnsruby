@@ -65,6 +65,29 @@ module Dnsruby
       return zone
     end
 
+    #  Takes a zone file as a string, and attempts to load it. Returns a list
+    #  of RRs if successful, nil otherwise.
+    def process_string(string)
+      line_num = 0
+      zone = nil
+      string.each_line do |line|
+        begin
+          line_num += 1
+          ret = process_line(line)
+          if (ret)
+            rr = RR.create(ret)
+            if (!zone)
+              zone = []
+            end
+            zone.push(rr)
+          end
+        rescue Exception => e
+          raise ParseException.new("Error reading line #{line_num} of input string : [#{line}]")
+        end
+      end
+      return zone
+    end
+
     #  Process the next line of the file
     #  Returns a string representing the normalised line.
     def process_line(line, do_prefix_hack = false)
