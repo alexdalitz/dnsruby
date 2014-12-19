@@ -69,11 +69,10 @@ module Dnsruby
     #  Returns a string representing the normalised line.
     def process_line(line, do_prefix_hack = false)
       return nil if (line[0,1] == ";")
+      line = strip_comments(line)
       return nil if (line.strip.length == 0)
       return nil if (!line || (line.length == 0))
       @in_quoted_section = false if !@continued_line
-
-      line = strip_comments(line)
 
       if (line.index("$ORIGIN") == 0)
         @origin = line.split()[1].strip #  $ORIGIN <domain-name> [<comment>]
