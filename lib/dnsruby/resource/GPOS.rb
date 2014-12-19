@@ -12,7 +12,7 @@ module Dnsruby
       ClassHash[[TypeValue, ClassValue]] = self  #:nodoc: all
 
       attr_accessor :latitude, :longitude, :altitude,  # NOTE: these are strings, not numbers
-                    :owner,    :ttl
+                    :owner,    :ttl,       :inet_class
 
 
       DEFAULT_TTL = 60 * 60  # ?
@@ -101,7 +101,7 @@ module Dnsruby
       end
 
       def self.decode_rdata(message)
-        return from_binary(message.get_bytes(48))
+        return from_binary(message.get_bytes)
       end
 
       def inspect

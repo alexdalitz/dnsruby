@@ -1,14 +1,15 @@
 require_relative 'spec_helper'
 
-require 'dnsruby'
+require_relative '../lib/dnsruby/resource/GPOS.rb'
+
 include Dnsruby
 
 # ";nil" added temporarily for ease of use when pasting into irb/pry.
 
-GPOS_QUERY_BYTES = "\xE7\u0001\u0001 \u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0001\u0001g\adnsruby\u0003com" +
-    "\u0000\u0000\e\u0000\u0001\u0000\u0000)\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000"; nil
-
-GPOS_QUERY = Message.decode(GPOS_QUERY_BYTES); nil
+# GPOS_QUERY_BYTES = "\xE7\u0001\u0001 \u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0001\u0001g\adnsruby\u0003com" +
+#     "\u0000\u0000\e\u0000\u0001\u0000\u0000)\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000"; nil
+#
+# GPOS_QUERY = Message.decode(GPOS_QUERY_BYTES); nil
 
 # RESPONSE = Resolver.new('127.0.0.1').send_message(GPOS_QUERY); nil
 

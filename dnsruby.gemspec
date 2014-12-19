@@ -27,9 +27,11 @@ DNSSEC NSEC3 support.'
   s.extra_rdoc_files = ["DNSSEC", "EXAMPLES", "README.md", "EVENTMACHINE"]
 
   s.add_development_dependency 'pry'
-  s.add_development_dependency 'ripl'
+  s.add_development_dependency 'pry-byebug' if RUBY_VERSION >= '2'
+
   s.add_development_dependency 'rake', '~> 10', '>= 10.3.2'
   s.add_development_dependency 'minitest', '~> 5.4'
+
   if RUBY_VERSION >= "1.9.3"
     s.add_development_dependency 'coveralls', '~> 0.7'
   end
