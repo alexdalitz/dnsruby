@@ -20,19 +20,27 @@ RESPONSE_BINARY = "\xE7\x01\x85\x90\x00\x01\x00\x01\x00\x01\x00\x01\x01g\adnsrub
 
 RESPONSE = Message.decode(RESPONSE_BINARY); nil
 
-def test_answer_is_a_gpos
-  answer = RESPONSE.answer[0]
-  assert answer.is_a?(RR::GPOS)
-end
 
-# puts "Query:\n#{GPOS_QUERY}\n\n"
-# puts "Response:\n#{RESPONSE}\n\n"
+class TestGPOS < Minitest::Test
 
 
-describe RR::GPOS do
-
-  it 'should' do
-    puts RESPONSE
-
+  def test_answer_is_a_gpos
+    answer = RESPONSE.answer[0]
+    assert answer.is_a?(RR::GPOS)
+    puts; puts answer.inspect; puts
+    puts answer; puts
   end
+
+  # def test_gpos_setup
+  #   gpos = RR::GPOS.new('10.0', '20.0', '30.0', 1234, 'owner', 'HS')
+  #   assert_equal('10.0', gpos.latitude,  )
+  #   assert_equal('20.0', gpos.longitude)
+  #   assert_equal('30.0', gpos.altitude)
+  #   assert_equal(1234, gpos.ttl)
+  #   assert_equal('owner', gpos.owner)
+  #   assert_equal('HS', gpos.inet_class)
+  # end
+
+
 end
+

@@ -11,8 +11,8 @@ module Dnsruby
       ClassValue = Classes::IN
       ClassHash[[TypeValue, ClassValue]] = self  #:nodoc: all
 
-      attr_accessor :latitude, :longitude, :altitude,  # NOTE: these are strings, not numbers
-                    :owner,    :ttl,       :inet_class
+      attr_accessor :latitude, :longitude, :altitude  # NOTE: these are strings, not numbers
+                    # :owner,    :ttl,       :inet_class  # already in superclass
 
 
       DEFAULT_TTL = 60 * 60  # ?
@@ -20,16 +20,17 @@ module Dnsruby
       REQUIRED_KEYS = [:latitude, :longitude, :altitude]
 
 
-      def initialize(latitude, longitude, altitude, ttl = DEFAULT_TTL, owner = nil, inet_class = Classes::IN)
-        from_hash(
-            latitude:   latitude,
-            longitude:  longitude,
-            altitude:   altitude,
-            ttl:        ttl,
-            owner:      owner,
-            inet_class: inet_class
-        )
-      end
+      # initialize must not be defined or be private; remove it.
+      # def initialize(latitude, longitude, altitude, ttl = DEFAULT_TTL, owner = nil, inet_class = Classes::IN)
+      #   from_hash(
+      #       latitude:   latitude,
+      #       longitude:  longitude,
+      #       altitude:   altitude,
+      #       ttl:        ttl,
+      #       owner:      owner,
+      #       inet_class: inet_class
+      #   )
+      # end
 
 
       def from_hash(init_data)
@@ -39,12 +40,29 @@ module Dnsruby
         @latitude   = init_data[:latitude].to_s
         @longitude  = init_data[:longitude].to_s
         @altitude   = init_data[:altitude].to_s
-        @owner      = init_data[:owner]
-        @ttl        = init_data[:ttl] || DEFAULT_TTL
-        @inet_class = init_data[:inet_class] || Classes::IN
-
         self
       end
+
+
+      def from_data(array)
+        unless array.size == 3
+          raise "Array size for creating GPOS record must be 3 (lat, long, alt). Array was:\n#{array.inspect}"
+        end
+
+        from_hash({
+            latitude:  array[0],
+            longitude: array[1],
+            altitude:  array[2]
+        })
+      end
+
+
+      def from_string(string)
+        # Convert commas to spaces, then split by spaces:
+        from_data(string.gsub(',', ' ').split(' '))
+      end
+
+
 
       # From the RFC:
       #    GPOS has the following format:
@@ -57,6 +75,7 @@ module Dnsruby
       def encode_rdata(msg, _canonical=false) #:nodoc: all
         msg.put_bytes(to_binary)
       end
+
 
 
       def to_binary
