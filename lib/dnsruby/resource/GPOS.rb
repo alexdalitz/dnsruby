@@ -14,35 +14,18 @@ module Dnsruby
       attr_accessor :latitude, :longitude, :altitude  # NOTE: these are strings, not numbers
                     # :owner,    :ttl,       :inet_class  # already in superclass
 
-
       DEFAULT_TTL = 60 * 60  # ?
 
       REQUIRED_KEYS = [:latitude, :longitude, :altitude]
 
 
-      # initialize must not be defined or be private; remove it.
-      # def initialize(latitude, longitude, altitude, ttl = DEFAULT_TTL, owner = nil, inet_class = Classes::IN)
-      #   from_hash(
-      #       latitude:   latitude,
-      #       longitude:  longitude,
-      #       altitude:   altitude,
-      #       ttl:        ttl,
-      #       owner:      owner,
-      #       inet_class: inet_class
-      #   )
-      # end
-
-
       def from_hash(init_data)
-
         self.class.validate_floats(init_data)
-
-        @latitude   = init_data[:latitude].to_s
-        @longitude  = init_data[:longitude].to_s
-        @altitude   = init_data[:altitude].to_s
+        @latitude  = init_data[:latitude].to_s
+        @longitude = init_data[:longitude].to_s
+        @altitude  = init_data[:altitude].to_s
         self
       end
-
 
       def from_data(array)
         unless array.size == 3
@@ -56,27 +39,23 @@ module Dnsruby
         })
       end
 
-
       def from_string(string)
         # Convert commas to spaces, then split by spaces:
         from_data(string.gsub(',', ' ').split(' '))
       end
 
-
-
       # From the RFC:
       #    GPOS has the following format:
       # <owner> <ttl> <class> GPOS <longitude> <latitude> <altitude>
-      def to_s
-        [owner, ttl, inet_class, 'GPOS', longitude, latitude, altitude].join(' ')
+      #
+      # We handle the rdata, the RR superclass does the rest.
+      def rdata_to_string
+        [longitude, latitude, altitude].join(' ')
       end
-
 
       def encode_rdata(msg, _canonical=false) #:nodoc: all
         msg.put_bytes(to_binary)
       end
-
-
 
       def to_binary
         binary_string = ''
@@ -92,42 +71,35 @@ module Dnsruby
         binary_string
       end
 
-      def self.from_binary(binary_string)
+      def self.decode_rdata(message)
+        rdata_s = message.get_bytes.clone
 
-        s = binary_string.clone
+        lat_len = rdata_s[0].ord;           rdata_s = rdata_s[1..-1]
+        latitude = rdata_s[0...lat_len];    rdata_s = rdata_s[lat_len..-1]
 
-        lat_len = s[0].ord;           s = s[1..-1]
-        latitude = s[0...lat_len];    s = s[lat_len..-1]
+        long_len = rdata_s[0].ord;          rdata_s = rdata_s[1..-1]
+        longitude = rdata_s[0...long_len];  rdata_s = rdata_s[long_len..-1]
 
-        long_len = s[0].ord;          s = s[1..-1]
-        longitude = s[0...long_len];  s = s[long_len..-1]
-
-        alt_len = s[0].ord;           s = s[1..-1]
-        altitude = s[0...alt_len];    s = s[alt_len..-1]
-
-        # puts [latitude, longitude, altitude].join(', ')
-
-        # puts "Remaining binary string contains #{s.length} chars:\n"
-        # s.each_byte { |ch| puts ch.ord }
-
-        # require 'ripl'
-        # Ripl.start :binding => binding
+        alt_len = rdata_s[0].ord;           rdata_s = rdata_s[1..-1]
+        altitude = rdata_s[0...alt_len];    rdata_s = rdata_s[alt_len..-1]
 
         validate_latitude(latitude)
         validate_longitude(longitude)
 
-        new(latitude, longitude, altitude)
+        new([latitude, longitude, altitude].join(' '))  # e.g. "10.0 20.0 30.0"
       end
 
-      def self.decode_rdata(message)
-        return from_binary(message.get_bytes)
+      # 'name' is used in the RR superclass, but 'owner' is the term referred to
+      # in the RFC, so we'll make owner an alias for name.
+      def owner
+        name
       end
 
-      def inspect
-        "#{self.class}: latitude: #{latitude}, longitude: #{longitude}, altitude: #{altitude}," +
-            " owner: #{owner}, ttl: #{ttl}, class: #{@inet_class}"
+      # 'name' is used in the RR superclass, but 'owner' is the term referred to
+      # in the RFC, so we'll make owner an alias for name.
+      def owner=(owner_string)
+        self.name = owner_string
       end
-
 
       def self.valid_float?(object)
         begin
@@ -138,7 +110,6 @@ module Dnsruby
         end
       end
 
-
       def self.validate_float_in_range(label, object, bound)
         number = Float(object)
         valid_range = (-Float(bound)..Float(bound))
@@ -147,7 +118,6 @@ module Dnsruby
         end
       end
 
-
       def self.validate_latitude(value)
         validate_float_in_range('latitude',  value, 90)
       end
@@ -155,7 +125,6 @@ module Dnsruby
       def self.validate_longitude(value)
         validate_float_in_range('longitude', value, 180)
       end
-
 
       def self.validate_floats(init_data)
         bad_float_keys = REQUIRED_KEYS.reject { |key| valid_float?(init_data[key]) }

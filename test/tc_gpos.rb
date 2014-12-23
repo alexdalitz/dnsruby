@@ -27,8 +27,6 @@ class TestGPOS < Minitest::Test
   def test_answer_is_a_gpos
     answer = RESPONSE.answer[0]
     assert answer.is_a?(RR::GPOS)
-    puts; puts answer.inspect; puts
-    puts answer; puts
   end
 
   # def test_gpos_setup
