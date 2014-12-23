@@ -11,18 +11,15 @@ module Dnsruby
       ClassValue = Classes::IN
       ClassHash[[TypeValue, ClassValue]] = self  #:nodoc: all
 
-      attr_accessor :latitude, :longitude, :altitude  # NOTE: these are strings, not numbers
-                    # :owner,    :ttl,       :inet_class  # already in superclass
+      attr_accessor :longitude, :latitude, :altitude  # NOTE: these are strings, not numbers
 
-      DEFAULT_TTL = 60 * 60  # ?
-
-      REQUIRED_KEYS = [:latitude, :longitude, :altitude]
+      REQUIRED_KEYS = [:longitude, :latitude, :altitude]
 
 
       def from_hash(init_data)
         self.class.validate_floats(init_data)
-        @latitude  = init_data[:latitude].to_s
         @longitude = init_data[:longitude].to_s
+        @latitude  = init_data[:latitude].to_s
         @altitude  = init_data[:altitude].to_s
         self
       end
@@ -33,8 +30,8 @@ module Dnsruby
         end
 
         from_hash({
-            latitude:  array[0],
-            longitude: array[1],
+            longitude: array[0],
+            latitude:  array[1],
             altitude:  array[2]
         })
       end
@@ -59,10 +56,10 @@ module Dnsruby
 
       def to_binary
         binary_string = ''
-        binary_string << latitude.length.chr
-        binary_string << latitude
         binary_string << longitude.length.chr
         binary_string << longitude
+        binary_string << latitude.length.chr
+        binary_string << latitude
         binary_string << altitude.length.chr
         binary_string << altitude
         # s.force_encoding('ASCII-8BIT')
@@ -74,11 +71,11 @@ module Dnsruby
       def self.decode_rdata(message)
         rdata_s = message.get_bytes.clone
 
-        lat_len = rdata_s[0].ord;           rdata_s = rdata_s[1..-1]
-        latitude = rdata_s[0...lat_len];    rdata_s = rdata_s[lat_len..-1]
-
         long_len = rdata_s[0].ord;          rdata_s = rdata_s[1..-1]
         longitude = rdata_s[0...long_len];  rdata_s = rdata_s[long_len..-1]
+
+        lat_len = rdata_s[0].ord;           rdata_s = rdata_s[1..-1]
+        latitude = rdata_s[0...lat_len];    rdata_s = rdata_s[lat_len..-1]
 
         alt_len = rdata_s[0].ord;           rdata_s = rdata_s[1..-1]
         altitude = rdata_s[0...alt_len];    rdata_s = rdata_s[alt_len..-1]
@@ -86,7 +83,7 @@ module Dnsruby
         validate_latitude(latitude)
         validate_longitude(longitude)
 
-        new([latitude, longitude, altitude].join(' '))  # e.g. "10.0 20.0 30.0"
+        new([longitude, latitude, altitude].join(' '))  # e.g. "10.0 20.0 30.0"
       end
 
       # 'name' is used in the RR superclass, but 'owner' is the term referred to
@@ -118,12 +115,12 @@ module Dnsruby
         end
       end
 
-      def self.validate_latitude(value)
-        validate_float_in_range('latitude',  value, 90)
-      end
-
       def self.validate_longitude(value)
         validate_float_in_range('longitude', value, 180)
+      end
+
+      def self.validate_latitude(value)
+        validate_float_in_range('latitude',  value, 90)
       end
 
       def self.validate_floats(init_data)
@@ -136,8 +133,8 @@ module Dnsruby
           raise message
         end
 
-        validate_latitude(init_data[:latitude])
         validate_longitude(init_data[:longitude])
+        validate_latitude(init_data[:latitude])
       end
     end
   end
