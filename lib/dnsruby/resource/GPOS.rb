@@ -50,35 +50,35 @@ module Dnsruby
         [longitude, latitude, altitude].join(' ')
       end
 
-      def encode_rdata(msg, _canonical=false) #:nodoc: all
+      def encode_rdata(msg, _canonical)
         msg.put_bytes(to_binary)
       end
 
       def to_binary
-        binary_string = ''
+        binary_string = ''.force_encoding('ASCII-8BIT')
+
         binary_string << longitude.length.chr
         binary_string << longitude
         binary_string << latitude.length.chr
         binary_string << latitude
         binary_string << altitude.length.chr
         binary_string << altitude
-        # s.force_encoding('ASCII-8BIT')
-        # puts s.encoding
-        # puts s
         binary_string
       end
 
       def self.decode_rdata(message)
         rdata_s = message.get_bytes.clone
 
-        long_len = rdata_s[0].ord;          rdata_s = rdata_s[1..-1]
-        longitude = rdata_s[0...long_len];  rdata_s = rdata_s[long_len..-1]
+        index = 0
 
-        lat_len = rdata_s[0].ord;           rdata_s = rdata_s[1..-1]
-        latitude = rdata_s[0...lat_len];    rdata_s = rdata_s[lat_len..-1]
+        long_len = rdata_s[index].ord;         index += 1
+        longitude = rdata_s[index, long_len];  index += long_len
 
-        alt_len = rdata_s[0].ord;           rdata_s = rdata_s[1..-1]
-        altitude = rdata_s[0...alt_len];    rdata_s = rdata_s[alt_len..-1]
+        lat_len = rdata_s[index].ord;          index += 1
+        latitude = rdata_s[index, lat_len];    index += lat_len
+
+        alt_len = rdata_s[index].ord;          index += 1
+        altitude = rdata_s[index, alt_len];    index += alt_len
 
         validate_latitude(latitude)
         validate_longitude(longitude)

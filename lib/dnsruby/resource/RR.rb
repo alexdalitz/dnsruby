@@ -320,7 +320,6 @@ class RR
   end
 
   def ==(other)
-
     return false unless self.class == other.class
 
     ivars_to_compare = ->(object) do
@@ -351,7 +350,8 @@ class RR
   end
 
   def hash # :nodoc:
-    vars = self.instance_variables - ['@ttl']
+    vars = (self.instance_variables - ['@ttl']).sort
+    # puts vars.each { |v| }
     vars.inject(0) do |hash_value, var_name|
       hash_value ^ self.instance_variable_get(var_name).hash
     end
