@@ -319,4 +319,13 @@ class TestRR < Minitest::Test
       # We should be here because the method should not have been found.
     end
   end
+
+  # TTL should be ignored when calculating the hash of an RR.
+  def test_hash_ignores_ttl
+    a1 = RR.new_from_string 'techhumans.com. 1111 IN A 69.89.31.97'
+    a2 = RR.new_from_string 'techhumans.com. 1111 IN A 69.89.31.97'
+    a3 = RR.new_from_string 'techhumans.com. 2222 IN A 69.89.31.97'
+    assert_equal a1.hash, a2.hash
+    assert_equal a1.hash, a3.hash
+  end
 end
