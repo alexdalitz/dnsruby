@@ -33,6 +33,7 @@ module Dnsruby
         @longitude = init_data[:longitude].to_s
         @latitude  = init_data[:latitude].to_s
         @altitude  = init_data[:altitude].to_s
+        self.rdata = build_rdata
         self
       end
 
@@ -54,7 +55,11 @@ module Dnsruby
         msg.put_bytes(to_rdata)
       end
 
-      def to_rdata
+      def build_rdata
+        self.class.build_rdata(longitude, latitude, altitude)
+      end
+
+      def self.build_rdata(longitude, latitude, altitude)
         binary_string = ''.force_encoding('ASCII-8BIT')
 
         binary_string << longitude.length.chr
