@@ -49,18 +49,6 @@ class TestGPOS < Minitest::Test
   end
 
 
-  def gpos_from_hash
-    RR.new_from_hash(EXAMPLE_GPOS_HASH)
-  end
-
-  def gpos_from_string
-    RR.new_from_string(EXAMPLE_GPOS_STRING)
-  end
-
-  def gpos_from_data
-    RR.new_from_data(*EXAMPLE_GPOS_DATA)
-  end
-
   def test_answer
     answer = gpos_from_response
     assert answer.is_a?(RR::GPOS), "Expected RR::GPOS but got a #{answer.class}: #{answer}"
@@ -80,9 +68,9 @@ class TestGPOS < Minitest::Test
 
   def test_creation_approaches
 
-    ans_from_data   = gpos_from_data
-    ans_from_string = gpos_from_string
-    ans_from_hash   = gpos_from_hash
+    ans_from_data   = RR::GPOS.from_data(*EXAMPLE_GPOS_DATA)
+    ans_from_string = RR::GPOS.from_string(EXAMPLE_GPOS_STRING)
+    ans_from_hash   = RR::GPOS.from_hash(EXAMPLE_GPOS_HASH)
 
     fails_to_populate_rdata = []
     fails_to_populate_rdata << 'data'   if ans_from_data.rdata.nil?
@@ -90,7 +78,7 @@ class TestGPOS < Minitest::Test
     fails_to_populate_rdata << 'hash'   if ans_from_hash.rdata.nil?
 
     assert_equal([], fails_to_populate_rdata,
-                 "Populate modes failing to populate rdata: #{fails_to_populate_rdata.join(', ')}")
+        "Populate modes failing to populate rdata: #{fails_to_populate_rdata.join(', ')}")
 
     assert_equal(ans_from_data.rdata, ans_from_hash.rdata)
     assert_equal(ans_from_data.rdata, ans_from_string.rdata)

@@ -16,6 +16,44 @@ module Dnsruby
       REQUIRED_KEYS = [:longitude, :latitude, :altitude]
 
 
+      # As with all resource record subclasses of RR, this class cannot be
+      # directly instantiated, but instead must be instantiated via use of
+      # one of the RR class methods.  These GPOS class methods are wrappers
+      # around those RR methods, so that there is an interface on the GPOS
+      # class for creating GPOS instances.
+
+      # Create an instance from a hash of parameters, e.g.:
+      #  {
+      #     name:       'techhumans.com',
+      #     type:       Types::GPOS,
+      #     ttl:        1234,
+      #     longitude:  '10.0',
+      #     latitude:   '20.0',
+      #     altitude:   '30.0',
+      #  }
+      def self.from_hash(gpos_params_hash)
+        RR.new_from_hash(gpos_params_hash)
+      end
+
+
+      # Create an instance from a string containing parameters, e.g.:
+      # 'a.dnsruby.com.  10800  IN  GPOS  10.0  20.0  30.0'
+      def self.from_string(gpos_params_string)
+        RR.new_from_string(gpos_params_string)
+      end
+
+
+      # Create an instance from an ordered parameter list, e.g.:
+      # EXAMPLE_GPOS_DATA = begin
+      #   rdata = RR::GPOS.build_rdata(EXAMPLE_LONGITUDE, EXAMPLE_LATITUDE, EXAMPLE_ALTITUDE)
+      #   [EXAMPLE_HOSTNAME, Types::GPOS, Classes::IN, EXAMPLE_TTL, rdata.length, rdata, 0]
+      # end
+      # self.from_data(*EXAMPLE_GPOS_DATA)
+      def self.from_data(*gpos_params_data)
+        RR.new_from_data(*gpos_params_data)
+      end
+
+
       def from_data(array)
         unless array.size == 3
           raise "Array size for creating GPOS record must be 3 (lat, long, alt). Array was:\n#{array.inspect}"
