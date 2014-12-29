@@ -350,8 +350,7 @@ class RR
   end
 
   def hash # :nodoc:
-    vars = (self.instance_variables - ['@ttl']).sort
-    # puts vars.each { |v| }
+    vars = (self.instance_variables - [:@ttl]).sort
     vars.inject(0) do |hash_value, var_name|
       hash_value ^ self.instance_variable_get(var_name).hash
     end
