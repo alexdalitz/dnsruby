@@ -18,9 +18,11 @@ class MessageDecoder #:nodoc: all
     @limit = @index + len
     d = yield(len)
     if @index < @limit
-      raise DecodeError.new('junk exists')
+      message = "Junk exists; limit = #{@limit}, index = #{@index}"
+      raise DecodeError.new(message)
     elsif @limit < @index
-      raise DecodeError.new('limit exceeded')
+      message = "Limit exceeded; limit = #{@limit}, index = #{@index}"
+      raise DecodeError.new(message)
     end
     @limit = save_limit
     d
