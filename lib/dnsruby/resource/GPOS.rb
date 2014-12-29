@@ -16,24 +16,24 @@ module Dnsruby
       REQUIRED_KEYS = [:longitude, :latitude, :altitude]
 
 
-      def from_hash(init_data)
-        self.class.validate_floats(init_data)
-        @longitude = init_data[:longitude].to_s
-        @latitude  = init_data[:latitude].to_s
-        @altitude  = init_data[:altitude].to_s
-        self
-      end
-
       def from_data(array)
         unless array.size == 3
           raise "Array size for creating GPOS record must be 3 (lat, long, alt). Array was:\n#{array.inspect}"
         end
 
         from_hash({
-            longitude: array[0],
-            latitude:  array[1],
-            altitude:  array[2]
-        })
+                      longitude: array[0],
+                      latitude:  array[1],
+                      altitude:  array[2]
+                  })
+      end
+
+      def from_hash(init_data)
+        self.class.validate_floats(init_data)
+        @longitude = init_data[:longitude].to_s
+        @latitude  = init_data[:latitude].to_s
+        @altitude  = init_data[:altitude].to_s
+        self
       end
 
       def from_string(string)
@@ -51,10 +51,10 @@ module Dnsruby
       end
 
       def encode_rdata(msg, _canonical)
-        msg.put_bytes(to_binary)
+        msg.put_bytes(to_rdata)
       end
 
-      def to_binary
+      def to_rdata
         binary_string = ''.force_encoding('ASCII-8BIT')
 
         binary_string << longitude.length.chr
