@@ -56,7 +56,7 @@ module Dnsruby
 
       def from_data(array)
         unless array.size == 3
-          raise "Array size for creating GPOS record must be 3 (lat, long, alt). Array was:\n#{array.inspect}"
+          raise "Array size for creating GPOS record must be 3 (long, lat, alt). Array was:\n#{array.inspect}"
         end
 
         from_hash({
