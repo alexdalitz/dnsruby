@@ -7,6 +7,8 @@ require_relative 'spec_helper'
 module Dnsruby
   module TestUtils
 
+    module_function
+
     # Asserts that all exceptions whose type are the specified exception class
     # or one of its subclasses are *not* raised.
     #

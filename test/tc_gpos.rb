@@ -70,9 +70,9 @@ class TestGPOS < Minitest::Test
 
   def test_creation_approaches
 
-    ans_from_data   = RR::GPOS.from_data(*EXAMPLE_GPOS_DATA)
-    ans_from_string = RR::GPOS.from_string(EXAMPLE_GPOS_STRING)
-    ans_from_hash   = RR::GPOS.from_hash(EXAMPLE_GPOS_HASH)
+    ans_from_data   = RR::GPOS.new_from_data(*EXAMPLE_GPOS_DATA)
+    ans_from_string = RR::GPOS.new_from_string(EXAMPLE_GPOS_STRING)
+    ans_from_hash   = RR::GPOS.new_from_hash(EXAMPLE_GPOS_HASH)
 
     fails_to_populate_rdata = []
     fails_to_populate_rdata << 'data'   if ans_from_data.rdata.nil?

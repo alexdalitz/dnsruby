@@ -15,3 +15,4 @@ end
 require 'minitest'
 require 'minitest/autorun'
 require 'dnsruby'
+require_relative 'test_utils'

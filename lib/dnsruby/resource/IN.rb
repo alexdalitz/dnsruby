@@ -52,7 +52,9 @@ module Dnsruby
       Types::SSHFP => SSHFP,
       Types::IPSECKEY => IPSECKEY,
       Types::HIP => HIP,
-      Types::DHCID => DHCID
+      Types::DHCID => DHCID,
+      # Types::GPOS => GPOS,
+      # Types::NXT => NXT
     } #:nodoc: all
 
     #  module IN contains ARPA Internet specific RRs

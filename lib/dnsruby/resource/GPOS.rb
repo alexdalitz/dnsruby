@@ -31,14 +31,20 @@ module Dnsruby
       #     latitude:   '20.0',
       #     altitude:   '30.0',
       #  }
-      def self.from_hash(gpos_params_hash)
+      #
+      # Since the type is assumed to be GPOS, it will be assigned
+      # automatially, and any other value will be overwritten.
+      # Therefore, having it present in the hash is not necessary.
+
+      def self.new_from_hash(gpos_params_hash)
+        gpos_params_hash[:type] = Types::GPOS
         RR.new_from_hash(gpos_params_hash)
       end
 
 
       # Create an instance from a string containing parameters, e.g.:
       # 'a.dnsruby.com.  10800  IN  GPOS  10.0  20.0  30.0'
-      def self.from_string(gpos_params_string)
+      def self.new_from_string(gpos_params_string)
         RR.new_from_string(gpos_params_string)
       end
 
@@ -49,7 +55,7 @@ module Dnsruby
       #   [EXAMPLE_HOSTNAME, Types::GPOS, Classes::IN, EXAMPLE_TTL, rdata.length, rdata, 0]
       # end
       # self.from_data(*EXAMPLE_GPOS_DATA)
-      def self.from_data(*gpos_params_data)
+      def self.new_from_data(*gpos_params_data)
         RR.new_from_data(*gpos_params_data)
       end
 
