@@ -29,8 +29,10 @@ class TestGPOS < Minitest::Test
     [EXAMPLE_HOSTNAME, Types::GPOS, Classes::IN, EXAMPLE_TTL, rdata.length, rdata, 0]
   end
 
+  # Returns a GPOS record returned by a BIND server configured with the zone file
+  # shown at the bottom of this file.  I (keithrbennett) was unable to find a GPOS
+  # record on the public Internet to use for live testing.
   def gpos_from_response
-
     # query = Message.new(EXAMPLE_HOSTNAME, 'GPOS')
     # query_binary = "E0\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0001a\adnsruby\u0003com\u0000\u0000\e\u0000\u0001"
     # response, _error = Resolver.new('127.0.0.1').query_raw(query)
