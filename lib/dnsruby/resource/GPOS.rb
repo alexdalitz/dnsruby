@@ -90,7 +90,7 @@ module Dnsruby
       end
 
       def encode_rdata(msg, _canonical)
-        msg.put_bytes(to_rdata)
+        msg.put_bytes(build_rdata)
       end
 
       def build_rdata
