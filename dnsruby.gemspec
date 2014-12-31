@@ -27,8 +27,8 @@ DNSSEC NSEC3 support.'
   s.extra_rdoc_files = ["DNSSEC", "EXAMPLES", "README.md", "EVENTMACHINE"]
 
   unless /java/ === RUBY_PLATFORM
-    s.add_development_dependency 'pry'
-    s.add_development_dependency 'pry-byebug' if RUBY_VERSION >= '2'
+    s.add_development_dependency 'pry', '~> 0.10'
+    s.add_development_dependency 'pry-byebug', '~> 2.0' if RUBY_VERSION >= '2'
   end
 
   s.add_development_dependency 'rake', '~> 10', '>= 10.3.2'

@@ -134,9 +134,4 @@ class Nsec3Test < Minitest::Test
      rr = RR.create("929p027vb26s89h6fv5j7hmsis4tcr1p.tjeb.nl.		 3600		 IN		 NSEC3		 1 0 5 beef  9rs4nbe7128ap5i6v196ge2iag5b7rcq A AAAA RRSIG
        ")
   end
-
-  def test_rfc_examples
-    print "IMPLEMENT NSEC3 validation!\n"
-    return
-  end
 end
