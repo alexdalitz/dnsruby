@@ -5,8 +5,7 @@ Dnsruby
 =======
 
 Dnsruby is a pure Ruby DNS client library which implements a
-stub resolver. It aims to comply with all DNS RFCs, including
-DNSSEC NSEC3 support.
+stub resolver. It aims to comply with all DNS RFCs.
 
 Dnsruby presents an enhanced API for DNS. It is based on Ruby's core
 resolv.rb Resolv API, but has been much extended to provide a

@@ -1,5 +1,18 @@
 # Release Notes
 
+## v1.57.0
+
+* Add query_raw method as alias for send_plain_message, with option to raise or return error.
+* Fixed a bug in RR hash calculation where TTL should have been ignored but wasn't.
+* Add support for (obsolete) GPOS resource record type.
+* Tweak Travis CI configuration.
+* Fix zone reader for case where a line contains whitespace preceding a comment.
+* Add post install message.
+* Improve README.
+* Moved content of NEWS to RELEASE_NOTES.md.
+* Use git ls-files now to determine files for inclusion in gem.
+
+
 ## v1.56.0
 
 * Drop support for Ruby 1.8, using lambda -> and hash 'key: value' notations.
