@@ -18,6 +18,7 @@ require_relative 'spec_helper'
 
 Dnsruby.log.level = Logger::FATAL
 
+require_relative 'tc_gpos.rb'
 require_relative 'tc_header.rb'
 require_relative "tc_name.rb"
 require_relative 'tc_message.rb'
