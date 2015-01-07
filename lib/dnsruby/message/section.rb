@@ -65,11 +65,11 @@ class Section < Array
   end
 
   def ==(other)
-    return false unless (other.instance_of?(Message::Section))
+    return false unless self.class == other.class
     return false if other.rrsets(nil, true).length != self.rrsets(nil, true).length
 
-    otherrrsets = other.rrsets(nil, true)
-    self.rrsets(nil, true).each {|rrset|
+    otherrrsets = other.rrsets(nil)
+    self.rrsets(nil).each {|rrset|
       return false unless otherrrsets.include?(rrset)
     }
 
