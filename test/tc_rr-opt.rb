@@ -113,14 +113,15 @@ class TestRrOpt < Minitest::Test
     assert(p.additional()[0].klass.code == 4096)
   end
 
-  def test_large_packet
-    #  Query TXT for overflow.dnsruby.validation-test-servers.nominet.org.uk
-    #  with a large udp_size
-    res = SingleResolver.new
-    res.udp_size = 4096
-    ret = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
-    assert(ret.rcode == RCode.NoError)
-  end
+  # Sadly Nominet no longer host these servers :-(
+  # def test_large_packet
+  #   #  Query TXT for overflow.dnsruby.validation-test-servers.nominet.org.uk
+  #   #  with a large udp_size
+  #   res = SingleResolver.new
+  #   res.udp_size = 4096
+  #   ret = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
+  #   assert(ret.rcode == RCode.NoError)
+  # end
 
   def test_decode_opt
     #  Create an OPT RR
