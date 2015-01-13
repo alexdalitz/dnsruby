@@ -44,10 +44,16 @@ module Dnsruby
 
     #  Takes a filename string and attempts to load a zone. Returns a list
     #  of RRs if successful, nil otherwise.
-    def process_file(filename)
-      file = File.new(filename)
-      zone = process_io(file)
-      file.close
+    def process_file(source)
+      zone = nil
+      if source.is_a?(String)
+        File.open(source) do |file|
+          zone = process_io(file)
+        end
+      else
+        zone = process_io(source)
+        source.close
+      end
       return zone
     end
 
