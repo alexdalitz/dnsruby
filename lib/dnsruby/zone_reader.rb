@@ -47,6 +47,7 @@ module Dnsruby
     def process_file(filename)
       file = File.new(filename)
       zone = process_io(file)
+      file.close
       return zone
     end
 
