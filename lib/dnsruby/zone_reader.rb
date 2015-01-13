@@ -45,15 +45,13 @@ module Dnsruby
     #  Takes a filename string and attempts to load a zone. Returns a list
     #  of RRs if successful, nil otherwise.
     def process_file(source)
-      zone = nil
       if source.is_a?(String)
         File.open(source) do |file|
-          zone = process_io(file)
+          process_io(file)
         end
       else
-        zone = process_io(source)
+        process_io(source)
       end
-      return zone
     end
 
     #  Takes a zone file IO object, and attempts to load it. Returns a list
