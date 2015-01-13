@@ -5,48 +5,74 @@ include Dnsruby
 
 class ZoneReaderTest < Minitest::Test
 
+  def setup
+    @zone_data = <<ZONEDATA
+$TTL 3600
+; Comment
+ ; Comment with whitespace in front
+@                   IN SOA    ns1.example.com. hostmaster.example.com. (
+                                1993112101
+                                10800
+                                3600
+                                604800
+                                7200
+                              )
+                    IN NS     ns1.example.com.
+                    IN NS     ns2.example.com.
+                    IN MX     10 mx.example.com.
+                    IN TXT    "v=spf1 mx ~all"
+www                 IN A      192.0.2.10
+                    IN AAAA   2001:DB8::10
+ftp.example.com.    IN CNAME  www
+db                  IN CNAME  www.example.com.
+ZONEDATA
+
+    @zone_file = Tempfile.new('zonefile')
+    @zone_file << @zone_data
+    @zone_file.flush
+    @zone_file.rewind
+    @reader = Dnsruby::ZoneReader.new("example.com.")
+  end
+
+  def teardown
+    @zone_file.close
+    @zone_file.unlink
+  end
+
   def check_zone_data_is_valid(zone)
-    assert(zone[0].serial == 1993112101)
-    assert(zone[1].rdata == "ns1.example.com.")
-    assert(zone[2].rdata == "ns2.example.com.")
-    assert(zone[3].rdata == "10 mx.example.com.")
-    assert(zone[4].rdata == "\"v=spf1 mx ~all\"")
-    assert(zone[5].rdata == "192.0.2.10")
-    assert(zone[6].rdata == "2001:DB8::10")
-    #assert(zone[7].rdata == "www.example.com.")
-    assert(zone[8].rdata == "www.example.com.")
+    assert_equal(1993112101, zone[0].serial)
+    assert_equal("ns1.example.com.", zone[1].rdata)
+    assert_equal("ns2.example.com.", zone[2].rdata)
+    assert_equal("10 mx.example.com.", zone[3].rdata)
+    assert_equal("\"v=spf1 mx ~all\"", zone[4].rdata)
+    assert_equal("192.0.2.10", zone[5].rdata)
+    assert_equal("2001:DB8::10", zone[6].rdata)
+    #assert_equal("www.example.com.", zone[7].rdata)
+    assert_equal("www.example.com.", zone[8].rdata)
   end
 
   def test_process_file_with_filename
-    reader = Dnsruby::ZoneReader.new("example.com.")
-    zone = reader.process_file("#{File.dirname(__FILE__)}/zone_file.txt")
+    zone = @reader.process_file(@zone_file.path)
     check_zone_data_is_valid(zone)
   end
 
   def test_process_file_with_file_object
-    reader = Dnsruby::ZoneReader.new("example.com.")
-    file = File.new("#{File.dirname(__FILE__)}/zone_file.txt")
-    zone = reader.process_file(file)
+    zone = @reader.process_file(@zone_file)
     check_zone_data_is_valid(zone)
-    assert(file.closed? == true)
+    assert_equal(true, @zone_file.closed?)
   end
 
   def test_process_io_with_file_object
-    reader = Dnsruby::ZoneReader.new("example.com.")
-    file = File.new("#{File.dirname(__FILE__)}/zone_file.txt")
-    zone = reader.process_io(file)
+    zone = @reader.process_io(@zone_file)
     check_zone_data_is_valid(zone)
-    assert(file.closed? == false)
-    file.close
+    assert_equal(false, @zone_file.closed?)
   end
 
   def test_process_io_with_stringio_object
-    reader = Dnsruby::ZoneReader.new("example.com.")
-    string = File.read("#{File.dirname(__FILE__)}/zone_file.txt")
-    stringio = StringIO.new(string)
-    zone = reader.process_io(stringio)
+    stringio = StringIO.new(@zone_data)
+    zone = @reader.process_io(stringio)
     check_zone_data_is_valid(zone)
-    assert(stringio.closed? == false)
+    assert_equal(false, stringio.closed?)
     stringio.close
   end
 end
