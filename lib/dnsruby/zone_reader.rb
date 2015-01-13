@@ -44,35 +44,19 @@ module Dnsruby
 
     #  Takes a filename string and attempts to load a zone. Returns a list
     #  of RRs if successful, nil otherwise.
-    def process_file(file)
-      line_num = 0
-      zone = nil
-      IO.foreach(file) { |line|
-        begin
-
-          ret = process_line(line)
-          if (ret)
-            rr = RR.create(ret)
-            if (!zone)
-              zone = []
-            end
-            zone.push(rr)
-          end
-        rescue Exception => e
-          raise ParseException.new("Error reading line #{line_num} of #{file} : [#{line}]")
-        end
-      }
+    def process_file(filename)
+      io = File.new(filename)
+      zone = process_io(io, filename)
       return zone
     end
 
-    #  Takes a zone file as a string, and attempts to load it. Returns a list
+    #  Takes a zone file IO object, and attempts to load it. Returns a list
     #  of RRs if successful, nil otherwise.
-    def process_string(string)
-      line_num = 0
+    #  Pass a StringIO object to read a zone file from a string.
+    def process_io(io, filename='string')
       zone = nil
-      string.each_line do |line|
+      io.each do |line|
         begin
-          line_num += 1
           ret = process_line(line)
           if (ret)
             rr = RR.create(ret)
@@ -82,7 +66,7 @@ module Dnsruby
             zone.push(rr)
           end
         rescue Exception => e
-          raise ParseException.new("Error reading line #{line_num} of input string : [#{line}]")
+          raise ParseException.new("Error reading line #{io.lineno} of #{filename} : [#{line}]")
         end
       end
       return zone
