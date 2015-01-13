@@ -59,7 +59,7 @@ ZONEDATA
   def test_process_file_with_file_object
     zone = @reader.process_file(@zone_file)
     check_zone_data_is_valid(zone)
-    assert_equal(true, @zone_file.closed?)
+    assert_equal(false, @zone_file.closed?)
   end
 
   def test_process_io_with_file_object

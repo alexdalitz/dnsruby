@@ -52,7 +52,6 @@ module Dnsruby
         end
       else
         zone = process_io(source)
-        source.close
       end
       return zone
     end
