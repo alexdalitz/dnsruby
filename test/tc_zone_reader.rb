@@ -62,15 +62,9 @@ ZONEDATA
     assert_equal(false, @zone_file.closed?)
   end
 
-  def test_process_io_with_file_object
-    zone = @reader.process_io(@zone_file)
-    check_zone_data_is_valid(zone)
-    assert_equal(false, @zone_file.closed?)
-  end
-
-  def test_process_io_with_stringio_object
+  def test_process_file_with_stringio_object
     stringio = StringIO.new(@zone_data)
-    zone = @reader.process_io(stringio)
+    zone = @reader.process_file(stringio)
     check_zone_data_is_valid(zone)
     assert_equal(false, stringio.closed?)
     stringio.close
