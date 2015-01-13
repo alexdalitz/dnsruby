@@ -42,8 +42,8 @@ module Dnsruby
       @in_quoted_section = false
     end
 
-    #  Takes a filename string and attempts to load a zone. Returns a list
-    #  of RRs if successful, nil otherwise.
+    #  Takes a filename string, or any type of IO object, and attempts to load a zone.
+    #  Returns a list of RRs if successful, nil otherwise.
     def process_file(source)
       if source.is_a?(String)
         File.open(source) do |file|
@@ -54,9 +54,8 @@ module Dnsruby
       end
     end
 
-    #  Takes a zone file IO object, and attempts to load it. Returns a list
-    #  of RRs if successful, nil otherwise.
-    #  Pass a StringIO object to read a zone file from a string.
+    #  Iterate over each line in a IO object, and process it.
+    #  Returns a list of RRs if successful, nil otherwise.
     def process_io(io)
       zone = nil
       io.each do |line|
