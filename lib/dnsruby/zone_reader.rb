@@ -355,7 +355,7 @@ module Dnsruby
             Types::PTR, Types::DNAME].include?type_was)
         #         if (line[line.length-1, 1] != ".")
         if (!(/\.\z/ =~ line))
-          line = line + "." + @origin.to_s + "."
+          line = line + "." + @origin.to_s
         end
       end
       #  Other RRs have several names. These should be parsed by Dnsruby,
