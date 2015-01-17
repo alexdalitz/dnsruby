@@ -45,6 +45,7 @@ require_relative "tc_nsec3.rb"
 require_relative "tc_nsec3param.rb"
 require_relative "tc_ipseckey.rb"
 require_relative "tc_naptr.rb"
+require_relative "tc_zone_reader.rb"
 
 begin
   require "openssl"
