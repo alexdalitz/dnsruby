@@ -47,7 +47,7 @@ ZONEDATA
     assert_equal("\"v=spf1 mx ~all\"", zone[4].rdata)
     assert_equal("192.0.2.10", zone[5].rdata)
     assert_equal("2001:DB8::10", zone[6].rdata)
-    #assert_equal("www.example.com.", zone[7].rdata)
+    assert_equal("www.example.com.", zone[7].rdata)
     assert_equal("www.example.com.", zone[8].rdata)
   end
 
