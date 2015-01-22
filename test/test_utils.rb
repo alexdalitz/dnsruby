@@ -1,8 +1,11 @@
 require_relative 'spec_helper'
 
+# Use this in tests in the tests directory with:
+# require_relative 'test_utils'
+# include TestUtils
+
 module Dnsruby
   module TestUtils
-
 
     # Asserts that all exceptions whose type are the specified exception class
     # or one of its subclasses are *not* raised.
@@ -36,7 +39,7 @@ module Dnsruby
 
   # This should result in a passed test:
   def test_no_exception
-    assert_not_raised(ArgumentError, 'No Error') { askfd.asdf }
+    assert_not_raised(ArgumentError, 'No Error') { }
   end
 =end
   end
