@@ -1,6 +1,6 @@
 module Dnsruby
 class MessageDecoder #:nodoc: all
-  attr_reader :index
+  attr_reader :data, :index
   def initialize(data)
     @data = data
     @index = 0
