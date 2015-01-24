@@ -1,6 +1,18 @@
 module Dnsruby
+
+# This class decodes a binary string containing the raw bytes of the message
+# as in coming over the wire from a nameserver, and parses it into a
+# Dnsruby::Message.
 class MessageDecoder #:nodoc: all
+
+  # Keeps a running @index containing the current position (like a cursor)
+  # into the binary string.  In general 'get_' methods will position @index
+  # to follow the data they have read.
+
   attr_reader :data, :index
+
+  # Creates an instance of the decoder, optionally with code block
+  # to be executed with the instance as its parameter.
   def initialize(data)
     @data = data
     @index = 0
@@ -8,159 +20,157 @@ class MessageDecoder #:nodoc: all
     yield self if block_given?
   end
 
-  def has_remaining
-    @limit - @index > 0
+  # Has bytes remaining in the binary string to be parsed?
+  def has_remaining?
+    @limit > @index
   end
 
+  # Asserts that the specified position is a valid position in the buffer.
+  # If not, raises a DecodeError.  If so, does nothing.
+  def assert_buffer_position_valid(end_position)
+    unless (0..@limit).include?(end_position)
+      raise DecodeError.new("requested position of #{end_position} must be between 0 and buffer size (#{@limit}).")
+    end
+  end
+
+  # Gets the byte value at the specified position
+  def get_byte_at(position)
+    assert_buffer_position_valid(position)
+    return nil if @data[position].nil?
+    @data[position].getbyte(0)
+  end
+
+  # Gets a 16-bit length field from the binary string and yields to the block.
+  # This will be the length of the next item to parse in the binary string.
+  # Returns the object returned from that block.
+  #
+  # When this method returns, @index will point to the byte after the
+  # 16-bit length field.
   def get_length16
     len, = self.get_unpack('n')
     save_limit = @limit
     @limit = @index + len
-    d = yield(len)
+    parsed_data = yield(len)
     if @index < @limit
       message = "Junk exists; limit = #{@limit}, index = #{@index}"
       raise DecodeError.new(message)
-    elsif @limit < @index
-      message = "Limit exceeded; limit = #{@limit}, index = #{@index}"
-      raise DecodeError.new(message)
     end
+    assert_buffer_position_valid(@index)
     @limit = save_limit
-    d
+    parsed_data
   end
 
+  # Returns the specified number of bytes from the binary string.
+  # Length defaults to the remaining (not yet processed) size of the string.
   def get_bytes(len = @limit - @index)
-    d = @data[@index, len]
+    bytes = @data[@index, len]
     @index += len
-    d
+    bytes
   end
 
+  # Calls String.unpack to get numbers as specified in the template string.
   def get_unpack(template)
     len = 0
-    littlec = ?c
-    bigc = ?C
-    littleh = ?h
-    bigh = ?H
-    littlen = ?n
-    bign = ?N
-    star = ?*
 
-    if (littlec.class != Fixnum)
-      #  We're using Ruby 1.9 - convert the codes
-      littlec = littlec.getbyte(0)
-      bigc = bigc.getbyte(0)
-      littleh = littleh.getbyte(0)
-      bigh = bigh.getbyte(0)
-      littlen = littlen.getbyte(0)
-      bign = bign.getbyte(0)
-      star = star.getbyte(0)
-    end
-
-    template.each_byte {|byte|
-      case byte
-        when littlec, bigc
+    template.bytes.each do |byte|
+      case byte.chr
+        when 'c', 'C', 'h', 'H'
           len += 1
-        when littleh, bigh
-          len += 1
-        when littlen
+        when 'n'
           len += 2
-        when bign
+        when 'N'
           len += 4
-        when star
+        when '*'
           len = @limit - @index
         else
           raise StandardError.new("unsupported template: '#{byte.chr}' in '#{template}'")
       end
-    }
-    raise DecodeError.new('limit exceeded') if @limit < @index + len
-    arr = @data.unpack("@#{@index}#{template}")
-    @index += len
-    arr
-  end
-
-  def get_string
-    len = @data[@index]
-    if len.class == String
-      len = len.getbyte(0)
     end
-    raise DecodeError.new("limit exceeded\nlimit = #{@limit}, index = #{@index}, len = #{len}\n") if @limit < @index + 1 + (len ? len : 0)
-    d = @data[@index + 1, len]
-    @index += 1 + len
-    d
+
+    assert_buffer_position_valid(@index + len)
+    number_array = @data.unpack("@#{@index}#{template}")
+    @index += len
+    number_array
   end
 
+  # Gets a string whose 1-byte length is at @index, and the string starting at @index + 1.
+  def get_string
+    len = get_byte_at(@index) || 0
+    assert_buffer_position_valid(@index + 1 + len)
+    data_item = @data[@index + 1, len]
+    @index += 1 + len
+    data_item
+  end
+
+  # Gets all strings from @index to the end of the binary string.
   def get_string_list
     strings = []
-    while @index < @limit
-      strings << self.get_string
-    end
+    strings << get_string while has_remaining?
     strings
   end
 
+  # Gets a Name from the current @index position.
   def get_name
-    Name.new(self.get_labels)
+    Name.new(get_labels)
   end
 
-  def get_labels(limit=nil)
-    limit = @index if !limit || @index < limit
-    d = []
+  # Returns labels starting at @index.
+  def get_labels(limit = nil)
+    limit = @index if limit.nil? || (@index < limit)
+    labels = []
     while true
-      temp = @data[@index]
-      if temp.class == String
-        temp = temp.getbyte(0)
-      end
-      case temp # @data[@index]
+      temp = get_byte_at(@index)
+      case temp
         when 0
           @index += 1
-          return d
+          return labels
         when 192..255
-          idx = self.get_unpack('n')[0] & 0x3fff
+          idx = get_unpack('n')[0] & 0x3fff
           if limit <= idx
             raise DecodeError.new('non-backward name pointer')
           end
           save_index = @index
           @index = idx
-          d += self.get_labels(limit)
+          labels += self.get_labels(limit)
           @index = save_index
-          return d
+          return labels
         else
-          d << self.get_label
+          labels << self.get_label
       end
     end
-    d
+    labels
   end
 
+  # Gets a single label.
   def get_label
     begin
-      #         label = Name::Label.new(Name::decode(self.get_string))
-      label = Name::Label.new(self.get_string)
-      return label
-        #          return Name::Label::Str.new(self.get_string)
+      Name::Label.new(get_string)
     rescue ResolvError => e
       raise DecodeError.new(e) # Turn it into something more suitable
     end
   end
 
+  # Gets a question record.
   def get_question
     name = self.get_name
     type, klass = self.get_unpack('nn')
-    q = Question.new(name, type, klass)
-    q
+    Question.new(name, type, klass)
   end
 
+  # Gets a resource record.
   def get_rr
-    name = self.get_name
-    type, klass, ttl = self.get_unpack('nnN')
+    name = get_name
+    type, klass, ttl = get_unpack('nnN')
     klass = Classes.new(klass)
     typeclass = RR.get_class(type, klass)
     #  @TODO@ Trap decode errors here, and somehow mark the record as bad.
     #  Need some way to represent raw data only
-    rec = self.get_length16 { typeclass.decode_rdata(self) }
-    rec.name = name
-    rec.ttl = ttl
-    rec.type = type
-    rec.klass = klass
-    rec
+    record = get_length16 { typeclass.decode_rdata(self) }
+    record.name = name
+    record.ttl = ttl
+    record.type = type
+    record.klass = klass
+    record
   end
 end
-
 end

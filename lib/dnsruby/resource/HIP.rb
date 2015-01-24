@@ -126,7 +126,7 @@ module Dnsruby
         public_key = msg.get_bytes(pk_length)
         rsvs = []
         #  Load in the RSV names, if there are any
-        while (msg.has_remaining)
+        while (msg.has_remaining?)
           name = msg.get_name
           rsvs.push(name)
         end

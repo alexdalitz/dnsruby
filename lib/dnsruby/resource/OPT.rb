@@ -248,9 +248,9 @@ module Dnsruby
       end
 
       def self.decode_rdata(msg)#:nodoc: all
-        if (msg.has_remaining)
+        if (msg.has_remaining?)
           options = []
-          while (msg.has_remaining) do
+          while (msg.has_remaining?) do
             code  = msg.get_unpack('n')[0]
             len = msg.get_unpack('n')[0]
             data = msg.get_bytes(len)
