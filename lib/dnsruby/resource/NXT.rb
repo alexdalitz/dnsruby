@@ -1,6 +1,9 @@
-require_relative '../bitmap'
-require_relative '../bit_mapping'
-require_relative 'rr'
+require_relative = ->(*args) do
+  this_file_dir = File.expand_path(File.dirname(__FILE__))
+  args.each { |arg| require(File.join(this_file_dir, arg)) }
+end
+
+require_relative.('../bitmap', '../bit_mapping', 'rr')
 
 module Dnsruby
 class RR

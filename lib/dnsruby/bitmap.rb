@@ -2,8 +2,13 @@
 # It is copied a) to avoid adding a new dependency and b) because that gem is in
 # version 0 and is unstable.
 
+require_relative = ->(*args) do
+  this_file_dir = File.expand_path(File.dirname(__FILE__))
+  args.each { |arg| require(File.join(this_file_dir, arg)) }
+end
+
 require 'forwardable'
-require_relative 'bit_mapping'
+require_relative.('bit_mapping')
 
 
 module Dnsruby
