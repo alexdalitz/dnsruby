@@ -16,8 +16,8 @@ queries. It is therefore suitable for high volume DNS applications.
 
 The following is a (non-exhaustive) list of features :
 
-- Implemented RRs :  A, AAAA, AFSDB, ANY, CERT, CNAME, DNAME,
-     HINFO, ISDN, LOC, MB, MG, MINFO, MR, MX, NAPTR, NS, NSAP,
+- Implemented RRs :  A, AAAA, AFSDB, ANY, CERT, CNAME, DNAME, GPOS,
+     HINFO, ISDN, LOC, MB, MG, MINFO, MR, MX, NAPTR, NS, NSAP, NXT,
      OPT, PTR, PX, RP, RT, SOA, SPF, SRV, TKEY, TSIG, TXT, WKS,
      X25, DNSKEY, RRSIG, NSEC, NSEC3, NSEC3PARAM, DS, DLV
 
