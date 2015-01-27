@@ -7,7 +7,6 @@ require_relative.('../bitmap', '../bit_mapping', 'RR')
 
 module Dnsruby
 class RR
-module IN
 
 # Class for NXT resource records.
 #
@@ -58,7 +57,7 @@ class NXT < RR
 
   # Create an instance from a hash of parameters, e.g.:
   #
-  # rr = RR::IN::NXT.new_from_hash(
+  # rr = RR::NXT.new_from_hash(
   #     name: 'b.dnsruby.com.',
   #     ttl: 10800,
   #     klass: Classes::IN,
@@ -80,9 +79,9 @@ class NXT < RR
   end
 
   # Create an instance from an ordered parameter list, e.g.:
-  # rdata = RR::IN::NXT.build_rdata('a.dnsruby.com.', [Types::SOA, Types::NXT])
+  # rdata = RR::NXT.build_rdata('a.dnsruby.com.', [Types::SOA, Types::NXT])
   #
-  # rr = RR::IN::NXT.new_from_data('b.dnsruby.com.', Types::NXT,
+  # rr = RR::NXT.new_from_data('b.dnsruby.com.', Types::NXT,
   #     Classes::IN, 10800, rdata.size, rdata, 0)
   def self.new_from_data(*params_data)
     RR.new_from_data(*params_data)
@@ -298,7 +297,6 @@ class NXT < RR
       NxtTypes.codes_to_string(type_codes)
     end
   end
-end
 end
 end
 end

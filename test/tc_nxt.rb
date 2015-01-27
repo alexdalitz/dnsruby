@@ -25,36 +25,36 @@ class TestNXT < Minitest::Test
       "\x01\x00\x00*0\x00\x04\x7F\x00\x00\x01"
 
   def test_type_val_to_string
-    assert_equal 'SOA', RR::IN::NXT::NxtTypes.code_to_name(6)
-    assert_equal 'AXFR', RR::IN::NXT::NxtTypes.code_to_name(252)
-    assert_equal 'TYPE9999', RR::IN::NXT::NxtTypes.code_to_name(9999)
+    assert_equal 'SOA', RR::NXT::NxtTypes.code_to_name(6)
+    assert_equal 'AXFR', RR::NXT::NxtTypes.code_to_name(252)
+    assert_equal 'TYPE9999', RR::NXT::NxtTypes.code_to_name(9999)
   end
 
   def test_type_name_to_code
-    assert_equal 6, RR::IN::NXT::NxtTypes.name_to_code('SOA')
-    assert_equal 252, RR::IN::NXT::NxtTypes.name_to_code('AXFR')
-    assert_equal 9999, RR::IN::NXT::NxtTypes.name_to_code('TYPE9999')
+    assert_equal 6, RR::NXT::NxtTypes.name_to_code('SOA')
+    assert_equal 252, RR::NXT::NxtTypes.name_to_code('AXFR')
+    assert_equal 9999, RR::NXT::NxtTypes.name_to_code('TYPE9999')
   end
 
   def test_type_names_to_codes
     strings = %w(TYPE9999  SOA  AXFR)
-    assert_equal [9999, 6, 252], RR::IN::NXT::NxtTypes.names_to_codes(strings)
+    assert_equal [9999, 6, 252], RR::NXT::NxtTypes.names_to_codes(strings)
   end
 
   def test_type_name_to_codes
-    assert_equal [9999, 6, 252], RR::IN::NXT::NxtTypes.names_string_to_codes("TYPE9999  SOA  AXFR")
+    assert_equal [9999, 6, 252], RR::NXT::NxtTypes.names_string_to_codes("TYPE9999  SOA  AXFR")
   end
 
   def test_codes_to_names
-    assert_equal %w(TYPE9999  SOA  AXFR), RR::IN::NXT::NxtTypes.codes_to_names([9999, 6, 252])
+    assert_equal %w(TYPE9999  SOA  AXFR), RR::NXT::NxtTypes.codes_to_names([9999, 6, 252])
   end
 
   def test_codes_to_string
-    assert_equal 'SOA AXFR TYPE9999', RR::IN::NXT::NxtTypes.codes_to_string([6, 252, 9999])
+    assert_equal 'SOA AXFR TYPE9999', RR::NXT::NxtTypes.codes_to_string([6, 252, 9999])
   end
 
   def test_codes_to_name_sorts_by_code
-    assert_equal 'SOA AXFR TYPE9999', RR::IN::NXT::NxtTypes.codes_to_string([9999, 6, 252])
+    assert_equal 'SOA AXFR TYPE9999', RR::NXT::NxtTypes.codes_to_string([9999, 6, 252])
   end
 
   def test_binary_string_to_codes
@@ -62,33 +62,33 @@ class TestNXT < Minitest::Test
     test_type_codes_as_name_array = %w(A  SOA  AAAA  UINFO)
     test_type_codes_as_number = 1267650600228229401496971640898  # (2 ** 1) + (2 ** 6) + (2 ** 28) + (2 ** 100)
     test_type_codes_as_binary_string = "\x10\x0\x0\x0\x0\x0\x0\x0\x0\x10\x0\x0\x42"
-    assert_equal(test_type_codes_as_code_array, RR::IN::NXT::NxtTypes.binary_string_to_codes(test_type_codes_as_binary_string))
-    assert_equal(test_type_codes_as_name_array, RR::IN::NXT::NxtTypes.binary_string_to_names(test_type_codes_as_binary_string))
-    assert_equal(test_type_codes_as_binary_string, RR::IN::NXT::NxtTypes.codes_to_binary_string(test_type_codes_as_code_array))
+    assert_equal(test_type_codes_as_code_array, RR::NXT::NxtTypes.binary_string_to_codes(test_type_codes_as_binary_string))
+    assert_equal(test_type_codes_as_name_array, RR::NXT::NxtTypes.binary_string_to_names(test_type_codes_as_binary_string))
+    assert_equal(test_type_codes_as_binary_string, RR::NXT::NxtTypes.codes_to_binary_string(test_type_codes_as_code_array))
   end
 
   def test_that_codes_are_in_range_1_to_127
-    TestUtils.assert_not_raised(ArgumentError) { RR::IN::NXT::NxtTypes.codes_to_binary_string([1]) }
-    TestUtils.assert_not_raised(ArgumentError) { RR::IN::NXT::NxtTypes.codes_to_binary_string([127]) }
-    assert_raises(ArgumentError) { RR::IN::NXT::NxtTypes.codes_to_binary_string([0]) }
-    assert_raises(ArgumentError) { RR::IN::NXT::NxtTypes.codes_to_binary_string([128]) }
+    TestUtils.assert_not_raised(ArgumentError) { RR::NXT::NxtTypes.codes_to_binary_string([1]) }
+    TestUtils.assert_not_raised(ArgumentError) { RR::NXT::NxtTypes.codes_to_binary_string([127]) }
+    assert_raises(ArgumentError) { RR::NXT::NxtTypes.codes_to_binary_string([0]) }
+    assert_raises(ArgumentError) { RR::NXT::NxtTypes.codes_to_binary_string([128]) }
   end
 
   def test_that_zero_bit_set_raises_error
-    assert_raises(ArgumentError) { RR::IN::NXT::NxtTypes.codes_to_binary_string([]) }
+    assert_raises(ArgumentError) { RR::NXT::NxtTypes.codes_to_binary_string([]) }
   end
 
   def test_A_AAAA_NXT
-    assert_equal([1, 28, 30], RR::IN::NXT::NxtTypes.names_string_to_codes('A AAAA NXT'))
-    assert_equal("P\x00\x00\x02", RR::IN::NXT::NxtTypes.codes_to_binary_string([1, 28, 30]))
+    assert_equal([1, 28, 30], RR::NXT::NxtTypes.names_string_to_codes('A AAAA NXT'))
+    assert_equal("P\x00\x00\x02", RR::NXT::NxtTypes.codes_to_binary_string([1, 28, 30]))
   end
 
   def test_type_bitmap_ctor_is_private
-    assert_raises(NoMethodError) { RR::IN::NXT::TypeBitmap.new('') }
+    assert_raises(NoMethodError) { RR::NXT::TypeBitmap.new('') }
   end
 
   def test_type_bitmap_to_s
-    type_bitmap = RR::IN::NXT::TypeBitmap.from_type_codes([1, 16, 30])
+    type_bitmap = RR::NXT::TypeBitmap.from_type_codes([1, 16, 30])
     assert_equal('A TXT NXT', type_bitmap.to_s)
   end
 
@@ -96,6 +96,12 @@ class TestNXT < Minitest::Test
     response = Message.decode(EXAMPLE_NXT_RESPONSE_AS_BINARY)
     answer = response.answer
     nxt_record = answer[0]
+
+    # Note: Although the NXT class is defined as Dnsruby::RR::NXT and not
+    # Dnsruby::RR::IN::NXT, the IN module (in IN.rb) creates new classes
+    # in the IN module for all class-insensitive resource record classes.
+    # When the binary record is parsed, it is a Dnsruby::RR::IN::NXT
+    # that is created.
     assert_equal(Dnsruby::RR::IN::NXT, nxt_record.class)
     actual_tokens = nxt_record.to_s.split
     expected_tokens = 'a.dnsruby.com. 10800	IN	NXT	b.dnsruby.com A AAAA NXT'.split
@@ -111,7 +117,7 @@ class TestNXT < Minitest::Test
   end
 
   def test_new_from_string
-    rr = RR::IN::NXT.new_from_string('b.dnsruby.com.		10800	IN	NXT	a.dnsruby.com. SOA NXT')
+    rr = RR::NXT.new_from_string('b.dnsruby.com.		10800	IN	NXT	a.dnsruby.com. SOA NXT')
     assert_rr_content(rr)
   end
 
@@ -120,9 +126,9 @@ class TestNXT < Minitest::Test
   end
 
   def test_new_from_data
-    rdata = RR::IN::NXT.build_rdata('a.dnsruby.com.', [Types::SOA, Types::NXT])
+    rdata = RR::NXT.build_rdata('a.dnsruby.com.', [Types::SOA, Types::NXT])
 
-    rr = RR::IN::NXT.new_from_data('b.dnsruby.com.', Types::NXT, Classes::IN, 10800,
+    rr = RR::NXT.new_from_data('b.dnsruby.com.', Types::NXT, Classes::IN, 10800,
         rdata.size, rdata, 0)
     assert_rr_content(rr)
   end
@@ -149,7 +155,7 @@ class TestNXT < Minitest::Test
   end
 
   def sample_nxt_rr
-    RR::IN::NXT.new_from_hash(
+    RR::NXT.new_from_hash(
         name: 'b.dnsruby.com.',
         ttl: 10800,
         klass: Classes::IN,

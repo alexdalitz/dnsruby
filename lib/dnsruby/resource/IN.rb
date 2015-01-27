@@ -53,8 +53,8 @@ module Dnsruby
       Types::IPSECKEY => IPSECKEY,
       Types::HIP => HIP,
       Types::DHCID => DHCID,
-      # Types::GPOS => GPOS,
-      # Types::NXT => NXT
+      Types::GPOS => GPOS,
+      Types::NXT => NXT
     } #:nodoc: all
 
     #  module IN contains ARPA Internet specific RRs
@@ -103,4 +103,3 @@ require 'dnsruby/resource/AAAA'
 require 'dnsruby/resource/AFSDB'
 require 'dnsruby/resource/PX'
 require 'dnsruby/resource/SRV'
-require 'dnsruby/resource/NXT'
