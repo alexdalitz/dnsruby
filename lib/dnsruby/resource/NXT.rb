@@ -3,7 +3,7 @@ require_relative = ->(*args) do
   args.each { |arg| require(File.join(this_file_dir, arg)) }
 end
 
-require_relative.('../bitmap', '../bit_mapping', 'rr')
+require_relative.('../bitmap', '../bit_mapping', 'RR')
 
 module Dnsruby
 class RR
