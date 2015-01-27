@@ -364,28 +364,37 @@ module Dnsruby
       while (runnextportloop) do
         begin
           numtries += 1
-          src_port = get_next_src_port
-          if (use_tcp)
-            begin
-              socket = TCPSocket.new(@server, @port, src_address, src_port)
-            rescue Errno::EBADF, Errno::ENETUNREACH => e
-              #  Can't create a connection
-              err=IOError.new("TCP connection error to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
-              Dnsruby.log.error { "#{err}" }
-              st.push_exception_to_select(client_query_id, client_queue, err, nil)
-              return
-            end
-          else
-            socket = nil
-            #  JRuby UDPSocket only takes 0 parameters - no IPv6 support in JRuby...
-            if (/java/ =~ RUBY_PLATFORM)
-              socket = UDPSocket.new()
+          loop do
+            src_port = get_next_src_port
+            if (use_tcp)
+              begin
+                socket = TCPSocket.new(@server, @port, src_address, src_port)
+              rescue Errno::EADDRINUSE => e
+                socket = nil  # if we can't bind to this address, try again
+              rescue Errno::EBADF, Errno::ENETUNREACH => e
+                #  Can't create a connection
+                err=IOError.new("TCP connection error to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
+                Dnsruby.log.error { "#{err}" }
+                st.push_exception_to_select(client_query_id, client_queue, err, nil)
+                return
+              end
             else
-              #               ipv6 = @src_address =~ /:/
-              socket = UDPSocket.new(@ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
+              socket = nil
+              #  JRuby UDPSocket only takes 0 parameters - no IPv6 support in JRuby...
+              if (/java/ =~ RUBY_PLATFORM)
+                socket = UDPSocket.new()
+              else
+                #               ipv6 = @src_address =~ /:/
+                socket = UDPSocket.new(@ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
+              end
+              begin
+                socket.bind(src_address, src_port)
+                socket.connect(@server, @port)
+              rescue Errno::EADDRINUSE => e
+                socket = nil  # if we can't bind to this address, try again
+              end
             end
-            socket.bind(src_address, src_port)
-            socket.connect(@server, @port)
+            break if socket != nil
           end
           runnextportloop = false
         rescue Exception => e
