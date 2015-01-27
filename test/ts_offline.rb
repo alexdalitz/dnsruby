@@ -24,6 +24,7 @@ require_relative "tc_name.rb"
 require_relative 'tc_message.rb'
 require_relative "tc_misc.rb"
 require_relative "tc_hash.rb"
+require_relative "tc_nxt.rb"
 require_relative "tc_packet.rb"
 require_relative "tc_packet_unique_push.rb"
 require_relative "tc_question.rb"
