@@ -329,7 +329,7 @@ module Dnsruby
           if (presentation.index(/\G(\d\d\d)/o, pos))
             wire=wire+[$1.to_i].pack("C")
             i=i+3
-          elsif(presentation.index(/\Gx([0..9a..fA..F][0..9a..fA..F])/o, pos))
+          elsif(presentation.index(/\Gx([0..9a..fA..F]{2})/o, pos))
             wire=wire+[$1].pack("H*")
             i=i+3
           elsif(presentation.index(/\G\./o, pos))
