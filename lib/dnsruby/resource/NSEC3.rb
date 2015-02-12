@@ -242,7 +242,7 @@ module Dnsruby
 
       def decode_next_hashed(input)
         @next_hashed = NSEC3.decode_next_hashed(input)
-        end
+      end
 
       def NSEC3.decode_next_hashed(input)
         return Base32.decode32hex(input)

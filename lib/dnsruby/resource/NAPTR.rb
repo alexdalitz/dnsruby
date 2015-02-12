@@ -30,7 +30,7 @@ module Dnsruby
       #  The NAPTR RR service field
       attr_accessor :service
       #  The NAPTR RR regexp field
-      attr_accessor :regexp
+      attr_reader :regexp
       #  The NAPTR RR replacement field
       attr_accessor :replacement
 

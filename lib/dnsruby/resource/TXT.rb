@@ -15,7 +15,7 @@
 # ++
 begin
   require 'jcode'
-rescue LoadError => e
+rescue LoadError => _e
 end
 module Dnsruby
   class RR
