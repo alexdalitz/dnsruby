@@ -682,12 +682,9 @@ module Dnsruby
     end
 
     #  Sets the TSIG to sign outgoing messages with.
-    #  Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
     #  Pass in nil to stop tsig signing.
-    #  * res.tsig=(tsig_rr)
-    #  * res.tsig=(key_name, key) # defaults to hmac-md5
-    #  * res.tsig=(key_name, key, alg) # e.g. alg = 'hmac-sha1'
-    #  * res.tsig=nil # Stop the resolver from signing
+    #  * res.tsig = tsig_rr
+    #  * res.tsig = nil # Stop the resolver from signing
     def tsig=(t)
       @tsig = t
       update
