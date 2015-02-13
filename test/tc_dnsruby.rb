@@ -15,6 +15,7 @@
 # ++
 
 require_relative 'spec_helper'
+require 'resolv'
 
 include Dnsruby
 class TestDnsruby < Minitest::Test

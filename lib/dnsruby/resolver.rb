@@ -707,7 +707,7 @@ module Dnsruby
       end
 
       options
-    end; private :create_tsig_options
+    end
 
 
     def Resolver.get_tsig(args)
