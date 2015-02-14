@@ -722,7 +722,7 @@ module Dnsruby
           if args[0].instance_of?(RR::TSIG)
             tsig = args[0]
           elsif args[0].instance_of?(Array)
-            tsig = RR.new_from_hash(create_tsig_options(args))
+            tsig = RR.new_from_hash(create_tsig_options(args[0]))
           end
         else
           #           Dnsruby.log.debug{'TSIG signing switched off'}
