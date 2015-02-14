@@ -46,6 +46,7 @@ if (online)
   require_relative "tc_tcp.rb"
 #  require_relative "tc_queue.rb"
   require_relative "tc_recur.rb"
+  require_relative "tc_axfr.rb"
   #   require_relative "tc_soak.rb"
 
   #  Check if we can contact the server - if we can't, then abort the test
@@ -68,8 +69,7 @@ if (online)
 
   if (server_up)
 
-    require_relative "tc_single_resolver.rb"
-    require_relative "tc_axfr.rb"
+    require_relative "tc_single_resolver.rb"    
     require_relative "tc_cache.rb"
     require_relative "tc_dns.rb"
     require_relative "tc_rr-opt.rb"

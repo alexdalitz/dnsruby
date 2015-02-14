@@ -20,8 +20,10 @@ class TestAxfr < Minitest::Test
   def test_axfr
     zt = Dnsruby::ZoneTransfer.new
     zt.transfer_type = Dnsruby::Types.AXFR
-    zt.server = "ns0.validation-test-servers.nominet.org.uk"
-    zone = zt.transfer("validation-test-servers.nominet.org.uk")
+    # zt.server = "ns0.validation-test-servers.nominet.org.uk"
+    # zone = zt.transfer("validation-test-servers.nominet.org.uk")
+    zt.server = "nsztm1.digi.ninja"
+    zone = zt.transfer("zonetransfer.me")
     assert(zone.length > 0)
     assert(zt.last_tsigstate==nil)
   end
