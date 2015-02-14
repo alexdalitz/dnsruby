@@ -39,7 +39,7 @@ module Dnsruby
     # * res.tsig=(key_name, key)
     # * res.tsig=nil # Don't sign the transfer
     def tsig=(*args)
-      @tsig = SingleResolver.get_tsig(args)
+      @tsig = Resolver.get_tsig(args)
     end
 
 
