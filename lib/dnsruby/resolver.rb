@@ -693,7 +693,9 @@ module Dnsruby
       update
     end
 
-    def create_tsig_options(args)
+
+    protected
+    def Resolver.create_tsig_options(args)
       if args.size > 3
         log_and_raise("Illegal number of arguments (#{args.size}; must be 1, 2, or 3.")
       end
@@ -707,9 +709,10 @@ module Dnsruby
       end
 
       options
-    end; private :create_tsig_options
+    end;
 
 
+    public
     def Resolver.get_tsig(args)
 
       tsig = nil
