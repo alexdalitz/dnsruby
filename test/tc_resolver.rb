@@ -1,12 +1,12 @@
 # --
 # Copyright 2007 Nominet UK
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either tmexpress or implied.
@@ -157,7 +157,7 @@ class TestResolver < Minitest::Test
 #    assert(m == nil)
 #    assert(err.kind_of?(OtherResolvError) || err.kind_of?(IOError), "OtherResolvError or IOError expected : got #{err.class}")
 #  end
-# 
+#
   def test_nxdomain
     resolver = Resolver.new
     q = Queue.new
@@ -356,6 +356,27 @@ class TestRawQuery < Minitest::Test
     response, error = resolver_returning_response.query_raw(Message.new, :return)
     assert_nil error
     assert_equal :response_from_send_plain_message, response
+  end
+
+  def test_create_tsig_options
+    name = 'key-name'
+    key  = '0123456789'
+    algo = 'hmac-md5'
+    assert_raises(ArgumentError) do
+      Resolver.create_tsig_options(name)
+      Resolver.create_tsig_options(name,key,algo,'WHATEVER')
+    end
+    # two args call
+    response = Resolver.create_tsig_options(name,key)
+    assert_equal name, response[:name]
+    assert_equal key, response[:key]
+    assert_nil response[:algorithm]
+
+    # three args call
+    response = Resolver.create_tsig_options(name,key,algo)
+    assert_equal name, response[:name]
+    assert_equal key, response[:key]
+    assert_equal algo, response[:algorithm]
   end
 end
 
