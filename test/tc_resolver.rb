@@ -35,10 +35,6 @@ class TestResolver < Minitest::Test
   PORT = 42138
   @@port = PORT
 
-  NAME = 'key-name'
-  KEY  = '0123456789'
-  ALGO = 'hmac-md5'
-
   def setup
     Dnsruby::Config.reset
   end
@@ -295,6 +291,10 @@ end
 # Tests to see that query_raw handles send_plain_message's return values correctly.
 class TestRawQuery < Minitest::Test
 
+  KEY_NAME = 'key-name'
+  KEY  = '0123456789'
+  ALGO = 'hmac-md5'
+
   class CustomError < RuntimeError; end
 
   # Returns a new resolver whose send_plain_message method always returns
@@ -363,15 +363,15 @@ class TestRawQuery < Minitest::Test
   end
 
   def test_2_args_init
-    options = Resolver.create_tsig_options(NAME, KEY)
-    assert_equal NAME, options[:name]
+    options = Resolver.create_tsig_options(KEY_NAME, KEY)
+    assert_equal KEY_NAME, options[:name]
     assert_equal KEY, options[:key]
     assert_nil options[:algorithm]
   end
 
   def test_3_args_init
-    options = Resolver.create_tsig_options(NAME,KEY,ALGO)
-    assert_equal NAME, options[:name]
+    options = Resolver.create_tsig_options(KEY_NAME,KEY,ALGO)
+    assert_equal KEY_NAME, options[:name]
     assert_equal KEY, options[:key]
     assert_equal ALGO, options[:algorithm]
   end
