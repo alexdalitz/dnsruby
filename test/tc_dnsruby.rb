@@ -32,7 +32,7 @@ class TestDnsruby < Minitest::Test
       assert(a.any? {|s| s.to_s == ("8.8.8.8")})
       assert(a.any? {|s| s.to_s == ("2001:4860:4860::8888")})
       Resolv.each_address("google-public-dns-a.google.com.") {|address|
-        assert((address == "8.8.8.8") || (address = "2001:4860:4860::8888")) }
+        assert((address == "8.8.8.8") || (address == "2001:4860:4860::8888")) }
     end
 
     n = Resolv.getname("8.8.8.8")
