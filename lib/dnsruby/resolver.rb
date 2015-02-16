@@ -696,13 +696,15 @@ module Dnsruby
 
     protected
     def Resolver.create_tsig_options(name, key, algorithm = nil)
-      options = { type: Types.TSIG, klass: Classes.ANY }
-      options.merge!({ name: name, key: key })
-      unless algorithm.nil?
-        options[:algorithm] = algorithm
-      end
+        options = {
+          type:  Types.TSIG,
+          klass: Classes.ANY,
+          name:  name,
+          key:   key
+      }
+      options[:algorithm] = algorithm if algorithm
       options
-    end;
+    end
 
 
     public

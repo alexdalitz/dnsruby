@@ -35,6 +35,10 @@ class TestResolver < Minitest::Test
   PORT = 42138
   @@port = PORT
 
+  NAME = 'key-name'
+  KEY  = '0123456789'
+  ALGO = 'hmac-md5'
+
   def setup
     Dnsruby::Config.reset
   end
@@ -358,25 +362,18 @@ class TestRawQuery < Minitest::Test
     assert_equal :response_from_send_plain_message, response
   end
 
-  def test_create_tsig_options
-    name = 'key-name'
-    key  = '0123456789'
-    algo = 'hmac-md5'
-    assert_raises(ArgumentError) do
-      Resolver.create_tsig_options(name)
-      Resolver.create_tsig_options(name,key,algo,'WHATEVER')
-    end
-    # two args call
-    response = Resolver.create_tsig_options(name,key)
-    assert_equal name, response[:name]
-    assert_equal key, response[:key]
-    assert_nil response[:algorithm]
+  def test_2_args_init
+    options = Resolver.create_tsig_options(NAME, KEY)
+    assert_equal NAME, options[:name]
+    assert_equal KEY, options[:key]
+    assert_nil options[:algorithm]
+  end
 
-    # three args call
-    response = Resolver.create_tsig_options(name,key,algo)
-    assert_equal name, response[:name]
-    assert_equal key, response[:key]
-    assert_equal algo, response[:algorithm]
+  def test_3_args_init
+    options = Resolver.create_tsig_options(NAME,KEY,ALGO)
+    assert_equal NAME, options[:name]
+    assert_equal KEY, options[:key]
+    assert_equal ALGO, options[:algorithm]
   end
 end
 
