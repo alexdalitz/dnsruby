@@ -1,12 +1,12 @@
 # --
 # Copyright 2007 Nominet UK
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,18 +23,18 @@ module Dnsruby
   #  Dnsruby::Resolver is a DNS stub resolver.
   #  This class performs queries with retries across multiple nameservers.
   #  The system configured resolvers are used by default.
-  #  
+  #
   #  The retry policy is a combination of the Net::DNS and dnsjava approach, and has the option of :
   #  * A total timeout for the query (defaults to 0, meaning "no total timeout")
   #  * A retransmission system that targets the namervers concurrently once the first query round is
   #   complete, but in which the total time per query round is split between the number of nameservers
   #   targetted for the first round. and total time for query round is doubled for each query round
-  #  
+  #
   #  Note that, if a total timeout is specified, then that will apply regardless of the retry policy
   #  (i.e. it may cut retries short).
-  #  
+  #
   #  Note also that these timeouts are distinct from the SingleResolver's packet_timeout
-  #  
+  #
   #  Timeouts apply to the initial query and response. If DNSSEC validation is to
   #  be performed, then additional queries may be required (these are performed automatically
   #  by Dnsruby). Each additional query will be performed with its own timeouts.
@@ -42,31 +42,31 @@ module Dnsruby
   #  validation may take several times that long.
   #  (Future versions of Dnsruby may expose finer-grained events for client tracking of
   #  responses and validation)
-  #  
+  #
   #  == Methods
-  #  
+  #
   #  === Synchronous
   #  These methods raise an exception or return a response message with rcode==NOERROR
-  #  
+  #
   #  *  Dnsruby::Resolver#send_message(msg)
   #  *  Dnsruby::Resolver#query(name [, type [, klass]])
-  #  
+  #
   #    There are "!" versions of these two methods that return an array [response, error]
   #    instead of raising an error on failure.  They can be called as follows:
-  #  
+  #
   #    response, error = resolver.send_message!(...)
   #    response, error = resolver.query!(...)
-  #  
+  #
   #    If the request succeeds, response will contain the Dnsruby::Message response
   #    and error will be nil.
-  #  
+  #
   #    If the request fails, response will be nil and error will contain the error raised.
-  #  
+  #
   #  === Asynchronous
   #  These methods use a response queue to return the response and the error
-  #  
+  #
   #  *  Dnsruby::Resolver#send_async(msg, response_queue, query_id)
-  #  
+  #
   #  == Event Loop
   #  Dnsruby runs a pure Ruby event loop to handle I/O in a single thread.
   #  Support for EventMachine has been deprecated.
@@ -171,12 +171,12 @@ module Dnsruby
     #  --
     #  @TODO@ add load_balance? i.e. Target nameservers in a random, rather than pre-determined, order?
     #  This is best done when configuring the Resolver, as it will re-order servers based on their response times.
-    #  
+    #
     #  ++
 
     #  Query for a name. If a valid Message is received, then it is returned
     #  to the caller. Otherwise an exception (a Dnsruby::ResolvError or Dnsruby::ResolvTimeout) is raised.
-    #  
+    #
     #    require 'dnsruby'
     #    res = Dnsruby::Resolver.new
     #    response = res.query('example.com') # defaults to Types.A, Classes.IN
@@ -222,11 +222,11 @@ module Dnsruby
 
     #  Send a message, and wait for the response. If a valid Message is received, then it is returned
     #  to the caller. Otherwise an exception (a Dnsruby::ResolvError or Dnsruby::ResolvTimeout) is raised.
-    #  
+    #
     #  send_async is called internally.
-    #  
+    #
     #  example :
-    #  
+    #
     #    require 'dnsruby'
     #    include Dnsruby
     #    res = Dnsruby::Resolver.new
@@ -302,9 +302,9 @@ module Dnsruby
     #  Dnsruby::PacketSender#add_opt_rr(msg)
     #  The return value from this method is the [response, error] tuple. Either of
     #  these values may be nil - it is up to the client to check.
-    #  
+    #
     #  example :
-    #  
+    #
     #    require 'dnsruby'
     #    include Dnsruby
     #    res = Dnsruby::Resolver.new
@@ -328,40 +328,40 @@ module Dnsruby
 
     #  Asynchronously send a Message to the server. The send can be done using just
     #  Dnsruby. Support for EventMachine has been deprecated.
-    #  
+    #
     #  == Dnsruby pure Ruby event loop :
-    #  
+    #
     #  A client_queue is supplied by the client,
     #  along with an optional client_query_id to identify the response. The client_query_id
     #  is generated, if not supplied, and returned to the client.
     #  When the response is known,
     #  a tuple of (query_id, response_message, exception) will be added to the client_queue.
-    #  
+    #
     #  The query is sent synchronously in the caller's thread. The select thread is then used to
     #  listen for and process the response (up to pushing it to the client_queue). The client thread
     #  is then used to retrieve the response and deal with it.
-    #  
+    #
     #  Takes :
-    #  
+    #
     #  * msg - the message to send
     #  * client_queue - a Queue to push the response to, when it arrives
     #  * client_query_id - an optional ID to identify the query to the client
     #  * use_tcp - whether to use only TCP (defaults to SingleResolver.use_tcp)
-    #  
+    #
     #  Returns :
-    #  
+    #
     #  * client_query_id - to identify the query response to the client. This ID is
     #  generated if it is not passed in by the client
-    #  
+    #
     #  === Example invocations :
-    #  
+    #
     #     id = res.send_async(msg, queue)
     #     NOT SUPPORTED : id = res.send_async(msg, queue, use_tcp)
     #     id = res.send_async(msg, queue, id)
     #     id = res.send_async(msg, queue, id, use_tcp)
-    #  
+    #
     #  === Example code :
-    #  
+    #
     #    require 'dnsruby'
     #    res = Dnsruby::Resolver.newsend
     #    query_id = 10 # can be any object you like
@@ -378,7 +378,7 @@ module Dnsruby
     #          # deal with problem
     #      end
     #    end
-    #  
+    #
     def send_async(msg, client_queue, client_query_id = nil)
       unless @configured
         add_config_nameservers
@@ -406,8 +406,8 @@ module Dnsruby
     #  Create a new Resolver object. If no parameters are passed in, then the default
     #  system configuration will be used. Otherwise, a Hash may be passed in with the
     #  following optional elements :
-    #  
-    #  
+    #
+    #
     #  * :port
     #  * :use_tcp
     #  * :tsig
@@ -589,7 +589,7 @@ module Dnsruby
     #  The source port to send queries from
     #  Returns either a single Fixnum or an Array
     #  e.g. '0', or '[60001, 60002, 60007]'
-    #  
+    #
     #  Defaults to 0 - random port
     def src_port
       @src_port.length == 1 ? @src_port[0] : @src_port
@@ -598,11 +598,11 @@ module Dnsruby
     #  Can be a single Fixnum or a Range or an Array
     #  If an invalid port is selected (one reserved by
     #  IANA), then an ArgumentError will be raised.
-    #  
+    #
     #         res.src_port=0
     #         res.src_port=[60001,60005,60010]
     #         res.src_port=60015..60115
-    #  
+    #
     def src_port=(p)
       if Resolver.check_port(p)
         @src_port = Resolver.get_ports_from(p)
@@ -617,11 +617,11 @@ module Dnsruby
     #  option if it is the only port in the list.
     #  An ArgumentError will be raised if "0" is added to
     #  an existing set of source ports.
-    #  
+    #
     #         res.add_src_port(60000)
     #         res.add_src_port([60001,60005,60010])
     #         res.add_src_port(60015..60115)
-    #  
+    #
     def add_src_port(p)
       if Resolver.check_port(p, @src_port)
         a = Resolver.get_ports_from(p)
@@ -695,21 +695,16 @@ module Dnsruby
 
 
     protected
-    def Resolver.create_tsig_options(args)
-      if args.size > 3
-        log_and_raise("Illegal number of arguments (#{args.size}; must be 1, 2, or 3.")
-      end
-
-      options = { type: Types.TSIG, klass: Classes.ANY }
-      if args.length >= 2
-        options.merge!({ name: args[0], key: args[1] })
-      end
-      if args.length == 3
-        options[:algorithm] == args[2]
-      end
-
+    def Resolver.create_tsig_options(name, key, algorithm = nil)
+        options = {
+          type:  Types.TSIG,
+          klass: Classes.ANY,
+          name:  name,
+          key:   key
+      }
+      options[:algorithm] = algorithm if algorithm
       options
-    end;
+    end
 
 
     public
@@ -722,7 +717,7 @@ module Dnsruby
           if args[0].instance_of?(RR::TSIG)
             tsig = args[0]
           elsif args[0].instance_of?(Array)
-            tsig = RR.new_from_hash(create_tsig_options(args[0]))
+            tsig = RR.new_from_hash(create_tsig_options(*args[0]))
           end
         else
           #           Dnsruby.log.debug{'TSIG signing switched off'}
@@ -901,7 +896,7 @@ module Dnsruby
     def generate_timeouts # :nodoc: all
       #  Create the timeouts for the query from the retry_times and retry_delay attributes.
       #  These are created at the same time in case the parameters change during the life of the query.
-      #  
+      #
       #  These should be absolute, rather than relative
       #  The first value should be Time.now[
       @parent.generate_timeouts(Time.now)
@@ -920,7 +915,7 @@ module Dnsruby
     end
 
     #  MUST BE CALLED IN A SYNCHRONIZED BLOCK!
-    #  
+    #
     #  Send the result back to the client, and close the socket for that query by removing
     #  the query from the select thread.
     def send_result_and_stop_querying(client_queue, client_query_id, select_queue, msg, error) # :nodoc: all
@@ -929,14 +924,14 @@ module Dnsruby
     end
 
     #  MUST BE CALLED IN A SYNCHRONIZED BLOCK!
-    #  
+    #
     #  Stops send any more packets for a client-level query
     def stop_querying(client_query_id) # :nodoc: all
       @timeouts.delete(client_query_id)
     end
 
     #  MUST BE CALLED IN A SYNCHRONIZED BLOCK!
-    #  
+    #
     #  Sends the result to the client's queue, and removes the queue observer from the select thread
     def send_result(client_queue, client_query_id, select_queue, msg, error) # :nodoc: all
       stop_querying(client_query_id)  # @TODO@ !
@@ -999,35 +994,35 @@ module Dnsruby
     #  The queue interface is used to separate producer/consumer threads, but we're using it here in one thread.
     #  It's probably a good idea to create a new "worker thread" to take items from the select thread queue and
     #  call this method in the worker thread.
-    #  
+    #
     def handle_queue_event(queue, id) # :nodoc: all
       #  Time to process a new queue event.
       #  If we get a callback for an ID we don't know about, don't worry -
       #  just ignore it. It may be for a query we've already completed.
-      #  
+      #
       #  So, get the next response from the queue (presuming there is one!)
-      #  
+      #
       #  @TODO@ Tick could poll the queue and then call this method if needed - no need for observer interface.
       #  @TODO@ Currently, tick and handle_queue_event called from select_thread - could have thread chuck events in to tick_queue. But then, clients would have to call in on other thread!
-      #  
+      #
       #  So - two types of response :
       #  1) we've got a coherent response (or error) - stop sending more packets for that query!
       #  2) we've validated the response - it's ready to be sent to the client
-      #  
+      #
       #  so need two more methods :
       #   handleValidationResponse : basically calls send_result_and_stop_querying and
       #   handleValidationError : does the same as handleValidationResponse, but for errors
       #  can leave handleError alone
       #  but need to change handleResponse to stop sending, rather than send_result_and_stop_querying.
-      #  
+      #
       #  @TODO@ Also, we could really do with a MaxValidationTimeout - if validation not OK within
       #  this time, then raise Timeout (and stop validation)?
-      #  
+      #
       #  @TODO@ Also, should there be some facility to stop validator following same chain
       #  concurrently?
-      #  
+      #
       #  @TODO@ Also, should have option to speak only to configured resolvers (not follow authoritative chain)
-      #  
+      #
       if queue.empty?
         log_and_raise('Severe internal error - Queue empty in handle_queue_event')
       end
@@ -1211,8 +1206,8 @@ module Dnsruby
       #                 handle_error_response(queue, event_id, error, response)
       #                 Or:
       send_result(client_queue, client_query_id, select_queue, response, error)
-      #  
-      #  
+      #
+      #
     end
   end
 end

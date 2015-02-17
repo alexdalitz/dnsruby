@@ -1,12 +1,12 @@
 # --
 # Copyright 2007 Nominet UK
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either tmexpress or implied.
@@ -157,7 +157,7 @@ class TestResolver < Minitest::Test
 #    assert(m == nil)
 #    assert(err.kind_of?(OtherResolvError) || err.kind_of?(IOError), "OtherResolvError or IOError expected : got #{err.class}")
 #  end
-# 
+#
   def test_nxdomain
     resolver = Resolver.new
     q = Queue.new
@@ -291,6 +291,10 @@ end
 # Tests to see that query_raw handles send_plain_message's return values correctly.
 class TestRawQuery < Minitest::Test
 
+  KEY_NAME = 'key-name'
+  KEY  = '0123456789'
+  ALGO = 'hmac-md5'
+
   class CustomError < RuntimeError; end
 
   # Returns a new resolver whose send_plain_message method always returns
@@ -356,6 +360,20 @@ class TestRawQuery < Minitest::Test
     response, error = resolver_returning_response.query_raw(Message.new, :return)
     assert_nil error
     assert_equal :response_from_send_plain_message, response
+  end
+
+  def test_2_args_init
+    options = Resolver.create_tsig_options(KEY_NAME, KEY)
+    assert_equal KEY_NAME, options[:name]
+    assert_equal KEY, options[:key]
+    assert_nil options[:algorithm]
+  end
+
+  def test_3_args_init
+    options = Resolver.create_tsig_options(KEY_NAME,KEY,ALGO)
+    assert_equal KEY_NAME, options[:name]
+    assert_equal KEY, options[:key]
+    assert_equal ALGO, options[:algorithm]
   end
 end
 
