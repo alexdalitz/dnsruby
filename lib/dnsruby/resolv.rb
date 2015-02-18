@@ -3,6 +3,12 @@
 # The DNS class may be used to perform more queries. If greater control over the sending
 # of packets is required, then the Resolver or SingleResolver classes may be used.
 module Dnsruby
+
+
+# NOTE!  Beware, there is a Ruby library class named Resolv, and you may need to
+# explicitly specify Dnsruby::Resolv to use the Dnsruby Resolv class,
+# even if you have include'd Dnsruby.
+
 class Resolv
 
   # Address RegExp to use for matching IP addresses
