@@ -18,7 +18,7 @@ require 'dnsruby'
 require_relative 'test_utils'
 
 
-if RUBY_VERSION >= '2'
+if RUBY_VERSION >= '2' && RUBY_PLATFORM != 'java'
   require 'pretty_backtrace'
   PrettyBacktrace.enable
 end

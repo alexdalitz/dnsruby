@@ -39,7 +39,7 @@ DNSSEC NSEC3 support.'
     s.add_development_dependency 'coveralls', '~> 0.7'
   end
 
-  if RUBY_VERSION >= "2"
+  if RUBY_VERSION >= "2" && RUBY_PLATFORM != 'java'
     s.add_development_dependency 'pretty_backtrace'
   end
 

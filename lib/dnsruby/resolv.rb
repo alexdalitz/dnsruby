@@ -64,19 +64,23 @@ class Resolv
 
   # Looks up the first IP address for +name+
   def getaddress(name)
-    each_address(name) {|address| return address}
-    raise ResolvError.new("no address for #{name}")
+    addresses = getaddresses(name)
+    if addresses.empty?
+      raise ResolvError.new("no address for #{name}")
+    else
+      addresses.first
+    end
   end
 
   # Looks up all IP addresses for +name+
   def getaddresses(name)
     return name if ADDRESS_REGEX.match(name)
-    addresses = []
     @resolvers.each do |resolver|
+      addresses = []
       resolver.each_address(name) { |address| addresses << address }
       return addresses unless addresses.empty?
     end
-    addresses  # empty array
+    []
   end
 
   # Iterates over all IP addresses for +name+
@@ -96,12 +100,12 @@ class Resolv
 
   # Looks up all hostnames of +address+
   def getnames(address)
-    names = []
     @resolvers.each do |resolver|
+      names = []
       resolver.each_name(address) { |name| names << name }
       return names unless names.empty?
     end
-    names  # empty array
+    []
   end
 
   # Iterates over all hostnames of +address+
