@@ -38,5 +38,10 @@ DNSSEC NSEC3 support.'
   if RUBY_VERSION >= "1.9.3"
     s.add_development_dependency 'coveralls', '~> 0.7'
   end
-end
+
+  if RUBY_VERSION >= "2"
+    s.add_development_dependency 'pretty_backtrace'
+  end
+
+  end
 

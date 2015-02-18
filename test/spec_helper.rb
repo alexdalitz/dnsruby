@@ -17,5 +17,8 @@ require 'minitest/autorun'
 require 'dnsruby'
 require_relative 'test_utils'
 
-require 'pretty_backtrace'
-PrettyBacktrace.enable
+
+if RUBY_VERSION >= '2'
+  require 'pretty_backtrace'
+  PrettyBacktrace.enable
+end
