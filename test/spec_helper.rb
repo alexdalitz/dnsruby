@@ -16,3 +16,6 @@ require 'minitest'
 require 'minitest/autorun'
 require 'dnsruby'
 require_relative 'test_utils'
+
+require 'pretty_backtrace'
+PrettyBacktrace.enable
