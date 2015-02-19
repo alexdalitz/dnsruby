@@ -23,7 +23,8 @@ class TestRecur < Minitest::Test
 #    Dnsruby::TheLog.level = Logger::DEBUG
     ret = r.query("uk", Dnsruby::Types.DNSKEY)
 #    print ret
-    assert(ret && ret.answer.length > 0)
+    assert ret, "Query result was nil."
+    assert ret.answer.length > 0, "Answer length should > 0, but was #{ret.answer.length}."
 #    ret = r.query_dorecursion("aaa.bigzone.uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
 #    ret = r.query_dorecursion("uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
   end
