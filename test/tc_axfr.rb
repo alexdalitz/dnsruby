@@ -22,12 +22,27 @@ class TestAxfr < Minitest::Test
     zt.transfer_type = Dnsruby::Types.AXFR
     # zt.server = "ns0.validation-test-servers.nominet.org.uk"
     # zone = zt.transfer("validation-test-servers.nominet.org.uk")
+
     zt.server = "nsztm1.digi.ninja"
-    zone = zt.transfer("zonetransfer.me")
-    assert(zone.length > 0)
-    assert(zt.last_tsigstate==nil)
+    if (contactable(zt.server))
+      zone = zt.transfer("zonetransfer.me")
+      assert(zone.length > 0)
+      assert(zt.last_tsigstate==nil)
+    end
   end
 
+    def contactable(server)
+       begin
+       sock = UDPSocket.new
+         sock.connect(server,
+           25)
+         sock.close
+         return true
+       rescue Exception
+         return false
+      end
+
+    end
 
   #  NB - test_ixfr is in tc_tsig.rg - this is becuase it requires
   #  TSIG to make an update (which we can then test for with ixfr)
