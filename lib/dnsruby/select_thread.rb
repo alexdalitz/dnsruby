@@ -346,7 +346,7 @@ module Dnsruby
             res = @@query_hash[id].single_resolver
             query = @@query_hash[id].query
           }
-          tcp = (socket.class == TCPSocket)
+          tcp = tcp?(socket)
           #  At this point, we should check if the response is OK
           if (ret = res.check_response(msg, bytes, query, client_queue, id, tcp))
             remove_id(id)
