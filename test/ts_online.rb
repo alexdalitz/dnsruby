@@ -44,6 +44,7 @@ if (online)
   #   require_relative "tc_inet6.rb"
   #   require_relative "tc_recurse.rb"
   require_relative "tc_tcp.rb"
+  require_relative "tc_tcp_pipelining.rb"
 #  require_relative "tc_queue.rb"
   require_relative "tc_recur.rb"
   require_relative "tc_axfr.rb"

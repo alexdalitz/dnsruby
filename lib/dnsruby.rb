@@ -208,6 +208,10 @@ module Dnsruby
   class OtherResolvError < ResolvError
   end
 
+  # Socket was closed by server before request was processed
+  class SocketEofResolvError < ResolvError
+  end
+
   # An error occurred processing the TSIG
   class TsigError < OtherResolvError
   end

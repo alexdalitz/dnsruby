@@ -94,6 +94,9 @@ module Dnsruby
     #  If use_tcp==true, then ONLY TCP will be used as a transport.
     attr_reader :use_tcp
 
+    #  If tcp_pipelining==true, then we reuse the TCP connection
+    attr_reader :tcp_pipelining
+
     #  If no_tcp==true, then ONLY UDP will be used as a transport.
     #  This should not generally be used, but is provided as a debugging aid.
     attr_reader :no_tcp
@@ -478,6 +481,7 @@ module Dnsruby
               dnssec:             @dnssec,
               use_tcp:            @use_tcp,
               no_tcp:             @no_tcp,
+              tcp_pipelining:     @tcp_pipelining,
               packet_timeout:     @packet_timeout,
               tsig:               @tsig,
               ignore_truncation:  @ignore_truncation,
@@ -520,6 +524,7 @@ module Dnsruby
       @do_caching= true
       @use_tcp = false
       @no_tcp = false
+      @tcp_pipelining = false
       @tsig = nil
       @ignore_truncation = false
       @config = Config.new()
@@ -557,7 +562,7 @@ module Dnsruby
     end
 
     def update_internal_res(res)
-      [:port, :use_tcp, :no_tcp, :tsig, :ignore_truncation, :packet_timeout,
+      [:port, :use_tcp, :no_tcp, :tcp_pipelining, :tsig, :ignore_truncation, :packet_timeout,
         :src_address, :src_address6, :src_port, :recurse,
         :udp_size, :dnssec].each do |param|
 
@@ -669,6 +674,11 @@ module Dnsruby
         end
       end
       a
+    end
+
+    def tcp_pipelining=(on)
+      @tcp_pipelining = on
+      update
     end
 
     def use_tcp=(on)

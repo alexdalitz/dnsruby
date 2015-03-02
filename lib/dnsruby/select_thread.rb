@@ -20,6 +20,7 @@ begin
 rescue LoadError
   require 'thread'
 end
+require 'set'
 require 'singleton'
 require 'dnsruby/validator_thread.rb'
 module Dnsruby
@@ -46,11 +47,12 @@ module Dnsruby
       @@mutex.synchronize {
         @@in_select=false
         #         @@notifier,@@notified=IO.pipe
-        @@sockets = [] # @@notified]
+        @@sockets = Set.new
         @@timeouts = Hash.new
         #     @@mutex.synchronize do
         @@query_hash = Hash.new
         @@socket_hash = Hash.new
+        @@socket_is_persistent = Hash.new
         @@observers = Hash.new
         @@tcp_buffers=Hash.new
         @@tick_observers = []
@@ -93,7 +95,7 @@ module Dnsruby
     class QuerySettings
       attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue,
         :client_query_id, :socket, :dest_server, :dest_port, :endtime, :udp_packet_size,
-        :single_resolver
+        :single_resolver, :is_persistent_socket
       #  new(query_bytes, query, ignore_truncation, client_queue, client_query_id,
       #      socket, dest_server, dest_port, endtime, , udp_packet_size, single_resolver)
       def initialize(*args)
@@ -108,7 +110,18 @@ module Dnsruby
         @endtime = args[8]
         @udp_packet_size = args[9]
         @single_resolver = args[10]
+        @is_persistent_socket = false
       end
+    end
+
+    def tcp?(socket)
+      type = socket.getsockopt(Socket::SOL_SOCKET, Socket::SO_TYPE)
+      [Socket::SOCK_STREAM].pack("i") == type.data
+    end
+
+    def udp?(socket)
+      type = socket.getsockopt(Socket::SOL_SOCKET, Socket::SO_TYPE)
+      [Socket::SOCK_DGRAM].pack("i") == type.data
     end
 
     def add_to_select(query_settings)
@@ -118,9 +131,11 @@ module Dnsruby
         #  @TODO@ This assumes that all client_query_ids are unique!
         #  Would be a good idea at least to check this...
         @@query_hash[query_settings.client_query_id]=query_settings
-        @@socket_hash[query_settings.socket]=[query_settings.client_query_id] # @todo@ If we use persistent sockets then we need to update this array
+        @@socket_hash[query_settings.socket] ||= []
+        @@socket_hash[query_settings.socket] << query_settings.client_query_id
         @@timeouts[query_settings.client_query_id]=query_settings.endtime
-        @@sockets.push(query_settings.socket)
+        @@sockets << query_settings.socket
+        @@socket_is_persistent[query_settings.socket] = query_settings.is_persistent_socket
       }
       begin
         @@wakeup_sockets[0].send("wakeup!", 0)
@@ -161,11 +176,7 @@ module Dnsruby
         sockets=[]
         timeouts=[]
         has_observer = false
-        @@mutex.synchronize {
-          sockets = @@sockets
-          timeouts = @@timeouts.values
-          has_observer = !@@observers.empty?
-        }
+        sockets, timeouts, has_observer = @@mutex.synchronize { [@@sockets.to_a, @@timeouts.values, !@@observers.empty?] }
         if (timeouts.length > 0)
           timeouts.sort!
           timeout = timeouts[0] - Time.now
@@ -185,8 +196,14 @@ module Dnsruby
         rescue SelectWakeup
           #  If SelectWakeup, then just restart this loop - the select call will be made with the new data
           next
-        rescue IOError => e# Don't worry if the socket was closed already
+        rescue IOError => e
           #           print "IO Error  =: #{e}\n"
+          exceptions = clean_up_closed_sockets
+
+          exceptions.each do |exception|
+            send_exception_to_client(*exception)
+          end
+
           next
         end
         if ready && ready.include?(@@wakeup_sockets[1])
@@ -209,13 +226,39 @@ module Dnsruby
           unused_loop_count=0
           #                   process_error(errors)
         end
-        @@mutex.synchronize{
+        @@mutex.synchronize do
           if (unused_loop_count > 10 && @@query_hash.empty? && @@observers.empty?)
-            Dnsruby.log.debug{"Stopping select loop"}
-            return
+            Dnsruby.log.debug("Try stop select loop")
+
+            non_persistent_sockets = @@sockets.select { |s| ! @@socket_is_persistent[s] }
+            non_persistent_sockets.each do |socket|
+              socket.close rescue nil
+              @@sockets.delete(socket)
+            end
+
+            Dnsruby.log.debug("Deleted #{non_persistent_sockets.size} non-persistent sockets," +
+                              " #{@@sockets.count} persistent sockets remain.")
+            @@socket_hash.clear
+
+            if @@sockets.empty?
+              Dnsruby.log.debug("Stopping select loop")
+              return
+            end
           end
-        }
+        end
         #               }
+      end
+    end
+
+    def clean_up_closed_sockets
+      exceptions = @@mutex.synchronize do
+        closed_sockets_in_hash = @@sockets.select(&:closed?).select { |s| @@socket_hash[s] }
+        @@sockets.delete_if { | socket | socket.closed? }
+        closed_sockets_in_hash.each_with_object([]) do |socket, exceptions|
+          @@socket_hash[socket].each do | client_id |
+            exceptions << [SocketEofResolvError.new("TCP socket closed before all answers received"), socket, client_id]
+          end
+        end
       end
     end
 
@@ -224,40 +267,59 @@ module Dnsruby
       #  @todo@ Process errors [can we do this in single socket environment?]
     end
 
+    def get_active_ids(queries, id)
+      queries.keys.select { |client_query_id| client_query_id[1].header.id == id }
+    end
+
     #         @@query_hash[query_settings.client_query_id]=query_settings
-    #         @@socket_hash[query_settings.socket]=[query_settings.client_query_id] # @todo@ If we use persistent sockets then we need to update this array
     def process_ready(ready)
-      ready.each do |socket|
-        query_settings = nil
-        @@mutex.synchronize{
-          #  Can do this if we have a query per socket, but not otherwise...
-          c_q_id = @@socket_hash[socket][0] # @todo@ If we use persistent sockets then this won't work
-          query_settings = @@query_hash[c_q_id]
-        }
+      persistent_sockets, nonpersistent_sockets = @@mutex.synchronize { ready.partition { |socket| persistent?(socket) } }
+
+      nonpersistent_sockets.each do |socket|
+        query_settings =  @@mutex.synchronize { @@query_hash[@@socket_hash[socket][0]] }
         next if !query_settings
+
         udp_packet_size = query_settings.udp_packet_size
         msg, bytes = get_incoming_data(socket, udp_packet_size)
-        if (msg!=nil)
-          #  Check that the IP we received from was the IP we sent to!
-          answerip = msg.answerip.downcase
-          answerfrom = msg.answerfrom.downcase
-          dest_server = query_settings.dest_server
-          answeripaddr = IPAddr.new(answerip)
-          dest_server = IPAddr.new("0.0.0.0")
-          begin
-            destserveripaddr = IPAddr.new(dest_server)
-          rescue ArgumentError
-            #  Host name not IP address
-          end
-          if (dest_server && (dest_server != '0.0.0.0') &&
-                (answeripaddr != destserveripaddr) &&
-                (answerfrom != dest_server))
-            Dnsruby.log.warn("Unsolicited response received from #{answerip} instead of #{query_settings.dest_server}")
-          else
-            send_response_to_client(msg, bytes, socket)
-          end
-        end
+
+        process_message(msg, bytes, socket) if msg
+
         ready.delete(socket)
+      end
+
+      persistent_sockets.each do |socket|
+        msg, bytes = get_incoming_data(socket, 0)
+
+        process_message(msg, bytes, socket) if msg
+
+        ready.delete(socket)
+      end
+    end
+
+    def process_message(msg, bytes, socket)
+      @@mutex.synchronize do
+        ids = get_active_ids(@@query_hash, msg.header.id)
+        return if ids.empty? #should be only one
+        query_settings = @@query_hash[ids[0]].clone
+      end
+
+      answerip = msg.answerip.downcase
+      answerfrom = msg.answerfrom.downcase
+      answeripaddr = IPAddr.new(answerip)
+      dest_server = IPAddr.new("0.0.0.0")
+
+      begin
+        destserveripaddr = IPAddr.new(dest_server)
+      rescue ArgumentError
+        #  Host name not IP address
+      end
+
+      if (dest_server && (dest_server != '0.0.0.0') &&
+          (answeripaddr != destserveripaddr) &&
+          (answerfrom != dest_server))
+        Dnsruby.log.warn("Unsolicited response received from #{answerip} instead of #{query_settings.dest_server}")
+      else
+        send_response_to_client(msg, bytes, socket)
       end
     end
 
@@ -266,7 +328,7 @@ module Dnsruby
       #  @TODO@ Can get rid of this, as we only have one query per socket.
       client_ids=[]
       @@mutex.synchronize{
-        client_ids = @@socket_hash[socket]
+        client_ids = @@socket_hash[socket].clone
       }
       #  get the queries associated with them
       client_ids.each do |id|
@@ -307,19 +369,25 @@ module Dnsruby
       print("Stray packet - " + msg.question()[0].qname.to_s + " from " + msg.answerip.to_s + ", #{client_ids.length} client_ids\n")
     end
 
+    def persistent?(socket)
+      @@socket_is_persistent[socket]
+    end
+
     def remove_id(id)
       socket=nil
-      @@mutex.synchronize{
+      close_socket = true
+      @@mutex.synchronize do
         socket = @@query_hash[id].socket
         @@timeouts.delete(id)
         @@query_hash.delete(id)
-        @@socket_hash.delete(socket)
-        @@sockets.delete(socket) # @TODO@ Not if persistent!
-      }
-      Dnsruby.log.debug{"Closing socket #{socket}"}
-      begin
-        socket.close # @TODO@ Not if persistent!
-      rescue IOError # Don't worry if the socket was closed already
+        @@socket_hash[socket].delete(id)
+
+        unless persistent?(socket)
+          @@sockets.delete(socket)
+          @@socket_hash.delete(socket)
+          Dnsruby.log.debug("Closing socket #{socket}")
+          socket.close rescue nil
+        end
       end
     end
 
@@ -327,7 +395,7 @@ module Dnsruby
       time_now = Time.now
       timeouts={}
       @@mutex.synchronize {
-        timeouts = @@timeouts
+        timeouts = @@timeouts.clone
       }
       timeouts.each do |client_id, timeout|
         if (timeout < time_now)
@@ -354,8 +422,21 @@ module Dnsruby
         begin
           input, = socket.recv_nonblock(expected_length-buf.length)
           if (input=="")
-            TheLog.info("Bad response from server - no bytes read - ignoring")
-            #  @TODO@ Should we do anything about this?
+            Dnsruby.log.debug("EOF from server - no bytes read - closing socket")
+            socket.close #EOF closed by server, if we were interrupted we need to resend
+            exceptions = []
+            @@mutex.synchronize {
+              @@sockets.delete(socket) #remove ourselves from select, app will have to retry
+              #maybe fire an event
+              @@socket_hash[socket].each do | client_id |
+                exception = [SocketEofResolvError.new("TCP socket closed before all answers received"), socket, client_id]
+                exceptions << exception
+              end
+            }
+            exceptions.each do |exception|
+              send_exception_to_client(*exception)
+            end
+
             return false
           end
           buf += input
@@ -391,21 +472,10 @@ module Dnsruby
     def get_incoming_data(socket, packet_size)
       answerfrom,answerip,answerport,answersize=nil
       ans,buf = nil
-      begin
-        if (socket.class == TCPSocket)
-          #  @todo@ Ruby Bug #9061 stops this working right
-          #  We'd like to do a socket.recvfrom, but that raises an Exception
-          #  on Windows for TCPSocket for Ruby 1.8.5 (and 1.8.6).
-          #  So, we need to do something different for TCP than UDP. *sigh*
-          #  @TODO@ This workaround will only work if there is exactly one socket per query
-          #     - *not* ideal TCP use!
-          @@mutex.synchronize{
-            client_id = @@socket_hash[socket][0]
-            answerfrom = @@query_hash[client_id].dest_server
-            answerip = answerfrom
-            answerport = @@query_hash[client_id].dest_port
-          }
+      is_tcp = tcp?(socket)
 
+      begin
+        if is_tcp
           #  Call TCP read here - that will take care of reading the 2 byte length,
           #  and then the full packet - without blocking select.
           buf = tcp_read(socket)
@@ -438,8 +508,23 @@ module Dnsruby
 
       begin
         ans = Message.decode(buf)
+
+        if is_tcp
+          @@mutex.synchronize do
+            ids = get_active_ids(@@query_hash, ans.header.id)
+            if ids.empty?
+              Dnsruby.log.error("Decode error from #{answerip} but can't determine packet id")
+              #todo add error event? The problem is we don't have a valid id so we don't
+              #know which client queue to send the exception to
+            end
+            answerfrom = @@query_hash[ids[0]].dest_server
+            answerip = answerfrom
+            answerport = @@query_hash[ids[0]].dest_port
+          end
+        end
+
       rescue Exception => e
-        Dnsruby.log.error{"Decode error! #{e.class}, #{e}\nfor msg (length=#{buf.length}) : #{buf}"}
+        Dnsruby.log.error("Decode error! #{e.class}, #{e}\nfor msg (length=#{buf.length}) : #{buf}")
         client_id=get_client_id_from_answerfrom(socket, answerip, answerport)
         if (client_id == nil)
           Dnsruby.log.error{"Decode error from #{answerip} but can't determine packet id"}
