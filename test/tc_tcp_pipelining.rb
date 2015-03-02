@@ -30,7 +30,6 @@ class TCPPipeliningHandler < RubyDNS::GenericHandler
     @max_request_per_connection = max_request
     @socket = TCPServer.new(host, port)
 
-
     async.run
   end
 
@@ -107,27 +106,15 @@ class Stats
   def increment_connection; @mutex.synchronize { @accept_count  += 1 } end
 
   def accept_count
-    a = 0
-    @mutex.synchronize {
-      a = @accept_count
-    }
-    a
+    @mutex.synchronize { @accept_count  }
   end
 
   def timeout_count
-    a = 0
-    @mutex.synchronize {
-      a = @timeout_count
-    }
-    a
+    @mutex.synchronize { @timeout_count }
   end
 
   def max_count
-    a = 0
-    @mutex.synchronize {
-      a = @max_count
-    }
-    a
+    @mutex.synchronize { @max_count }
   end
 
 end

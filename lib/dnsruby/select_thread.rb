@@ -173,9 +173,6 @@ module Dnsruby
         send_queued_responses
         send_queued_validation_responses
         timeout = tick_time = 0.1 # We provide a timer service to various Dnsruby classes
-        sockets=[]
-        timeouts=[]
-        has_observer = false
         sockets, timeouts, has_observer = @@mutex.synchronize { [@@sockets.to_a, @@timeouts.values, !@@observers.empty?] }
         if (timeouts.length > 0)
           timeouts.sort!
