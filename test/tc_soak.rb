@@ -15,18 +15,11 @@
 # ++
 
 require_relative 'spec_helper'
+require_relative 'tc_single_resolver'
+require_relative 'tc_soak_base'
 
-begin
-require 'test/tc_single_resolver'
-rescue LoadError
-  require 'tc_single_resolver'
-end
-begin
-require 'test/tc_soak_base'
-rescue LoadError
-  require 'tc_soak_base'
-end
 include Dnsruby
+
 # This class tries to soak test the Dnsruby library.
 # It can't do this very well, owing to the small number of sockets allowed to be open simultaneously.
 # @TODO@ Future versions of dnsruby will allow random streaming over a fixed number of (cycling) random sockets,
