@@ -15,7 +15,7 @@
 # ++
 
 require_relative 'spec_helper'
-require_relative 'tc_single_resolver'
+# require_relative 'tc_single_resolver'
 require_relative 'tc_soak_base'
 
 include Dnsruby
