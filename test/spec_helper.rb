@@ -23,8 +23,3 @@ require 'minitest/autorun'
   require_relative '../lib/dnsruby'
   require_relative 'test_utils'
 end.()
-
-if RUBY_VERSION >= '2' && RUBY_PLATFORM != 'java'
-  require 'pretty_backtrace'
-  PrettyBacktrace.enable
-end
