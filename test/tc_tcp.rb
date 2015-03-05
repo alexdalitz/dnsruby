@@ -80,7 +80,7 @@ class TestTcp < Minitest::Test
 
   class HackMessage < Dnsruby::Message
     def wipe_additional
-      @additional = Dnsruby::Message::Section.new(self)
+      @additional = Dnsruby::Section.new(self)
     end
 
     # Decode the encoded message
