@@ -45,12 +45,12 @@ end
 
 if online?
   online_tests = %w(
-      resolver
-      resolv
-      hs
-      tcp
-      recur
       axfr
+      hs
+      recur
+      resolv
+      resolver
+      tcp
   )
 
   # Excluded are:

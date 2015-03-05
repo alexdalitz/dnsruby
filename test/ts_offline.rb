@@ -59,21 +59,23 @@ TESTS.each { |test| require_relative "tc_#{test}.rb" }
 
 
 def have_open_ssl?
-  have_open_ssl = false
+  have_open_ssl = true
   begin
     require "openssl"
     OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
     key = OpenSSL::PKey::RSA.new
     key.e = 111
-    have_open_ssl = true
-  rescue Exception => e
-    puts "-----------------------------------------------------------------------"
-    puts "OpenSSL not present (with full functionality) - skipping DS digest test"
-    puts "-----------------------------------------------------------------------"
+  rescue
+    have_open_ssl = false
   end
   have_open_ssl
 end
 
-
-require_relative 'tc_ds.rb' if have_open_ssl?
+if have_open_ssl?
+  require_relative 'tc_ds.rb'
+else
+  puts "-----------------------------------------------------------------------"
+  puts "OpenSSL not present (with full functionality) - skipping DS digest test"
+  puts "-----------------------------------------------------------------------"
+end
 
