@@ -17,41 +17,68 @@
 require_relative 'spec_helper'
 Dnsruby.log.level = Logger::FATAL
 
-# Disable these tests if we're not online
 require 'socket'
-sock = UDPSocket.new()
-online = false
-begin
-  sock.connect('193.0.14.129', # k.root-servers.net.
-    25)
-  online = true
-  sock.close
-rescue Exception => exception
-  puts "----------------------------------------"
-  puts "Cannot bind to socket:\n\t#{exception}\n"
-  puts "This is an indication you have network problems\n"
-  puts "\n\nNo online tests will be run!!\n\n"
-  puts "----------------------------------------"
-end
-if (online)
-  #    OK - online and ready to go
-  print "Running online tests. These tests send UDP packets - some may be lost.\n"
-  print "If you get the odd timeout error with these tests, try running them again.\n"
-  print "It may just be that some UDP packets got lost the first time...\n"
-  require_relative "tc_resolver.rb"
-  require_relative "tc_resolv.rb"
-  require_relative "tc_hs.rb"
-  #   require_relative "tc_inet6.rb"
-  #   require_relative "tc_recurse.rb"
-  require_relative "tc_tcp.rb"
-#  require_relative "tc_queue.rb"
-  require_relative "tc_recur.rb"
-  require_relative "tc_axfr.rb"
-  #   require_relative "tc_soak.rb"
 
-  #  Check if we can contact the server - if we can't, then abort the test
+
+# Tells whether or not we can connect to the Internet.
+def online?
+  sock = UDPSocket.new()
+  online = false
+  begin
+    sock.connect('193.0.14.129', 25) # that address is k.root-servers.net
+    online = true
+    sock.close
+  rescue Exception => exception
+    puts "
+------------------------------------------------------------
+Cannot bind to socket:
+        #{exception}
+
+This is an indication you have network problems.
+No online tests will be run!!
+------------------------------------------------------------
+"
+  end
+  online
+end
+
+
+if online?
+  online_tests = %w(
+      resolver
+      resolv
+      hs
+      tcp
+      recur
+      axfr
+  )
+
+  # Excluded are:
+  #
+  # inet6
+  # recurse
+  # queue
+  # soak
+
+  #    OK - online and ready to go
+  puts '
+Running online tests. These tests send UDP packets - some may be lost.
+If you get the odd timeout error with these tests, try running them again.
+It may just be that some UDP packets got lost the first time...
+'
+
+  online_tests.each { |test| require_relative("tc_#{test}.rb") }
+end
+
+
+# We have set server_up to unconditionally return false.
+# Therefore, to avoid any misconception that this code could run,
+# I'm commenting it out.
+=begin
+def server_up?
+  false
+#  Check if we can contact the server - if we can't, then abort the test
   #  (but tell user that test has not been run due to connectivity problems)
-  server_up = false
 
   #  Disabling the attempt to connect to Nominet servers...
   #  begin
@@ -66,37 +93,40 @@ if (online)
   #    puts "\n\nNo tests targetting this server will be run!!\n\n"
   #    puts "----------------------------------------"
   #  end
+end
 
-  if (server_up)
 
-    require_relative "tc_single_resolver.rb"    
-    require_relative "tc_cache.rb"
-    require_relative "tc_dns.rb"
-    require_relative "tc_rr-opt.rb"
-    require_relative "tc_res_config.rb"
+if (server_up)
 
-    have_openssl = false
-    begin
-      require "openssl"
-      OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
-      key = OpenSSL::PKey::RSA.new
-      key.e = 111
+  require_relative "tc_single_resolver.rb"
+  require_relative "tc_cache.rb"
+  require_relative "tc_dns.rb"
+  require_relative "tc_rr-opt.rb"
+  require_relative "tc_res_config.rb"
 
-      have_openssl=true
-    rescue Exception => e
-      puts "-------------------------------------------------------------------------"
-      puts "OpenSSL not present (with full functionality) - skipping TSIG/DNSSEC test"
-      puts "-------------------------------------------------------------------------"
-    end
-    if (have_openssl)
-      require_relative "tc_tsig.rb"
-      puts "------------------------------------------------------"
-      puts "Running DNSSEC test - may fail if OpenSSL not complete"
-      puts "------------------------------------------------------"
-      require_relative "tc_verifier.rb"
-      require_relative "tc_dlv.rb"
-      require_relative "tc_validator.rb"
-    end
+  have_openssl = false
+  begin
+    require "openssl"
+    OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
+    key = OpenSSL::PKey::RSA.new
+    key.e = 111
+
+    have_openssl=true
+  rescue Exception => e
+    puts "-------------------------------------------------------------------------"
+    puts "OpenSSL not present (with full functionality) - skipping TSIG/DNSSEC test"
+    puts "-------------------------------------------------------------------------"
+  end
+  if (have_openssl)
+    require_relative "tc_tsig.rb"
+    puts "------------------------------------------------------"
+    puts "Running DNSSEC test - may fail if OpenSSL not complete"
+    puts "------------------------------------------------------"
+    require_relative "tc_verifier.rb"
+    require_relative "tc_dlv.rb"
+    require_relative "tc_validator.rb"
+  end
+=end
 
 #    have_em = false
 #    begin
@@ -112,5 +142,3 @@ if (online)
 #      require 'test/tc_event_machine_res.rb'
 #      require 'test/tc_event_machine_deferrable.rb'
 #    end
-  end
-end

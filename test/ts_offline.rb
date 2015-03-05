@@ -18,48 +18,62 @@ require_relative 'spec_helper'
 
 Dnsruby.log.level = Logger::FATAL
 
-require_relative 'tc_gpos.rb'
-require_relative 'tc_header.rb'
-require_relative "tc_name.rb"
-require_relative 'tc_message.rb'
-require_relative "tc_misc.rb"
-require_relative "tc_hash.rb"
-require_relative "tc_nxt.rb"
-require_relative "tc_packet.rb"
-require_relative "tc_packet_unique_push.rb"
-require_relative "tc_question.rb"
-require_relative "tc_res_file.rb"
-require_relative "tc_res_opt.rb"
-require_relative "tc_res_config.rb"
-# require_relative "tc_res_env.rb"
-require_relative "tc_rr-txt.rb"
-require_relative "tc_rr-unknown.rb"
-require_relative "tc_rr.rb"
-require_relative "tc_rrset.rb"
-require_relative "tc_tkey.rb"
-require_relative "tc_update.rb"
-require_relative "tc_escapedchars.rb"
-require_relative "tc_dnskey.rb"
-require_relative "tc_rrsig.rb"
-require_relative "tc_nsec.rb"
-require_relative "tc_nsec3.rb"
-require_relative "tc_nsec3param.rb"
-require_relative "tc_ipseckey.rb"
-require_relative "tc_naptr.rb"
-require_relative "tc_zone_reader.rb"
+# We'll prepend 'tc_' and append '.rb' to these:
+TESTS = %w(
+    dnskey
+    escapedchars
+    gpos
+    hash
+    header
+    ipseckey
+    message
+    misc
+    name
+    naptr
+    nsec
+    nsec3
+    nsec3param
+    nxt
+    packet
+    packet_unique_push
+    question
+    res_config
+    res_file
+    res_opt
+    rr
+    rr-txt
+    rr-unknown
+    rrset
+    rrsig
+    tkey
+    update
+    zone_reader
+)
 
-begin
-  require "openssl"
-  OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
-  key = OpenSSL::PKey::RSA.new
-  key.e = 111
+# Omitted:
+#
+# tc_res_env
 
-  have_openssl=true
-rescue Exception => e
+
+TESTS.each { |test| require_relative "tc_#{test}.rb" }
+
+
+def have_open_ssl?
+  have_open_ssl = false
+  begin
+    require "openssl"
+    OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
+    key = OpenSSL::PKey::RSA.new
+    key.e = 111
+    have_open_ssl = true
+  rescue Exception => e
     puts "-----------------------------------------------------------------------"
     puts "OpenSSL not present (with full functionality) - skipping DS digest test"
     puts "-----------------------------------------------------------------------"
+  end
+  have_open_ssl
 end
-if (have_openssl)
-    require_relative "tc_ds.rb"
-end
+
+
+require_relative 'tc_ds.rb' if have_open_ssl?
+
