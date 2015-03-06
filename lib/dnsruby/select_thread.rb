@@ -55,6 +55,7 @@ module Dnsruby
         @@socket_is_persistent = Hash.new
         @@observers = Hash.new
         @@tcp_buffers=Hash.new
+        @@socket_remaining_queries = Hash.new
         @@tick_observers = []
         @@queued_exceptions=[]
         @@queued_responses=[]
@@ -95,7 +96,7 @@ module Dnsruby
     class QuerySettings
       attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue,
         :client_query_id, :socket, :dest_server, :dest_port, :endtime, :udp_packet_size,
-        :single_resolver, :is_persistent_socket
+        :single_resolver, :is_persistent_socket, :tcp_pipelining_max_queries
       #  new(query_bytes, query, ignore_truncation, client_queue, client_query_id,
       #      socket, dest_server, dest_port, endtime, , udp_packet_size, single_resolver)
       def initialize(*args)
@@ -111,6 +112,7 @@ module Dnsruby
         @udp_packet_size = args[9]
         @single_resolver = args[10]
         @is_persistent_socket = false
+        @tcp_pipelining_max_queries = nil
       end
     end
 
@@ -133,6 +135,7 @@ module Dnsruby
         @@query_hash[query_settings.client_query_id]=query_settings
         @@socket_hash[query_settings.socket] ||= []
         @@socket_hash[query_settings.socket] << query_settings.client_query_id
+        @@socket_remaining_queries[query_settings.socket] ||= query_settings.tcp_pipelining_max_queries
         @@timeouts[query_settings.client_query_id]=query_settings.endtime
         @@sockets << query_settings.socket
         @@socket_is_persistent[query_settings.socket] = query_settings.is_persistent_socket
@@ -379,12 +382,30 @@ module Dnsruby
         @@query_hash.delete(id)
         @@socket_hash[socket].delete(id)
 
-        unless persistent?(socket)
+        decrement_remaining_queries(socket) if persistent?(socket)
+
+        if !persistent?(socket) || max_attained?(socket)
           @@sockets.delete(socket)
           @@socket_hash.delete(socket)
           Dnsruby.log.debug("Closing socket #{socket}")
           socket.close rescue nil
         end
+      end
+    end
+
+    def decrement_remaining_queries(socket)
+      if @@socket_remaining_queries[socket]
+        @@socket_remaining_queries[socket] -= 1
+      end
+    end
+
+    def max_attained?(socket)
+      remaining = @@socket_remaining_queries[socket]
+      if persistent?(socket) && remaining && remaining <= 0
+        Dnsruby.log.debug("Max queries per conn attained")
+        true
+      else
+        false
       end
     end
 

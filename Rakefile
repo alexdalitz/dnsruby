@@ -28,3 +28,5 @@ end
 create_task(:test,         'test/ts_dnsruby.rb')
 create_task(:test_offline, 'test/ts_offline.rb')
 create_task(:test_online,  'test/ts_online.rb')
+#This test is very cpu/memory intensive
+create_task(:soak,         'test/ts_soak.rb')

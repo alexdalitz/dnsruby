@@ -76,6 +76,9 @@ module Dnsruby
     # Defaults to false
     attr_accessor :tcp_pipelining
 
+    # Limit the number of queries per pipeline
+    attr_accessor :tcp_pipelining_max_queries
+
     #  Use UDP only - don't use TCP
     #  For test/debug purposes only
     #  Defaults to false
@@ -165,6 +168,7 @@ module Dnsruby
     #  * :port
     #  * :use_tcp
     #  * :tcp_pipelining
+    #  * :tcp_pipelining_max_queries
     #  * :no_tcp
     #  * :ignore_truncation
     #  * :src_address
@@ -190,6 +194,8 @@ module Dnsruby
       @src_port = [0]
       @recurse = true
       @tcp_pipelining = false
+      @tcp_pipelining_max_queries = nil #infinite
+      @use_count = {}
 
       if (arg==nil)
         #  Get default config
@@ -365,12 +371,21 @@ module Dnsruby
     #  In general, every subsequent call the function will either return the current tcp
     #  pipeline socket or a new connected socket if the current one was closed by the server
     def tcp_pipeline_socket(src_port)
-
+      Dnsruby.log.debug("Using tcp_pipeline_socket")
       sockaddr = Socket.sockaddr_in(@port, @server)
 
       reuse_pipeline_socket = -> do
         begin
-          @pipeline_socket.connect(sockaddr)
+          max = @tcp_pipelining_max_queries
+          use = @use_count[@pipeline_socket]
+          if use && max && use >= max
+             #we can't reuse the socket since max is reached
+            @use_count.delete(@pipeline_socket)
+            @pipeline_socket = nil
+            Dnsruby.log.debug("Max queries per connection attained - creating new socket")
+          else
+            @pipeline_socket.connect(sockaddr)
+          end
         rescue Errno::EISCONN
           #already connected, do nothing and reuse!
         rescue IOError #close by remote host, reconnect
@@ -394,6 +409,9 @@ module Dnsruby
 
       reuse_pipeline_socket.() if @pipeline_socket
       create_pipeline_socket.() unless @pipeline_socket
+
+      @use_count[@pipeline_socket] ||= 0
+      @use_count[@pipeline_socket]  += 1
 
       @pipeline_socket
     end
@@ -471,7 +489,7 @@ module Dnsruby
       #  Listen for the response before we send the packet (to avoid any race conditions)
       query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
       query_settings.is_persistent_socket = @tcp_pipelining if use_tcp
-
+      query_settings.tcp_pipelining_max_queries = @tcp_pipelining_max_queries if @tcp_pipelining
       begin
         if (use_tcp)
           lenmsg = [query_bytes.length].pack('n')

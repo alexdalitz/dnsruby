@@ -75,6 +75,7 @@ module Dnsruby
     DefaultPacketTimeout = 5
     DefaultRetryTimes = 1
     DefaultRetryDelay = 5
+    DefaultPipeLiningMaxQueries = 5
     DefaultPort = 53
     DefaultDnssec = true
     AbsoluteMinDnssecUdpSize = 1220
@@ -96,6 +97,10 @@ module Dnsruby
 
     #  If tcp_pipelining==true, then we reuse the TCP connection
     attr_reader :tcp_pipelining
+
+    # How many times (number of messages) to reuse the pipelining connection
+    # before closing
+    attr_reader :tcp_pipelining_max_queries
 
     #  If no_tcp==true, then ONLY UDP will be used as a transport.
     #  This should not generally be used, but is provided as a debugging aid.
@@ -482,6 +487,7 @@ module Dnsruby
               use_tcp:            @use_tcp,
               no_tcp:             @no_tcp,
               tcp_pipelining:     @tcp_pipelining,
+              tcp_pipelining_max_queries: @tcp_pipelining_max_queries,
               packet_timeout:     @packet_timeout,
               tsig:               @tsig,
               ignore_truncation:  @ignore_truncation,
@@ -525,6 +531,7 @@ module Dnsruby
       @use_tcp = false
       @no_tcp = false
       @tcp_pipelining = false
+      @tcp_pipelining_max_queries = DefaultPipeLiningMaxQueries
       @tsig = nil
       @ignore_truncation = false
       @config = Config.new()
@@ -562,7 +569,7 @@ module Dnsruby
     end
 
     def update_internal_res(res)
-      [:port, :use_tcp, :no_tcp, :tcp_pipelining, :tsig, :ignore_truncation, :packet_timeout,
+      [:port, :use_tcp, :no_tcp, :tcp_pipelining, :tcp_pipelining_max_queries, :tsig, :ignore_truncation, :packet_timeout,
         :src_address, :src_address6, :src_port, :recurse,
         :udp_size, :dnssec].each do |param|
 
@@ -678,6 +685,11 @@ module Dnsruby
 
     def tcp_pipelining=(on)
       @tcp_pipelining = on
+      update
+    end
+
+    def tcp_pipelining_max_queries=(max)
+      @tcp_pipelining_max_queries = max
       update
     end
 
