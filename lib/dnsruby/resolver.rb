@@ -99,7 +99,7 @@ module Dnsruby
     attr_reader :tcp_pipelining
 
     # How many times (number of messages) to reuse the pipelining connection
-    # before closing
+    # before closing, :infinite for infinite number of requests per connection
     attr_reader :tcp_pipelining_max_queries
 
     #  If no_tcp==true, then ONLY UDP will be used as a transport.
@@ -432,6 +432,8 @@ module Dnsruby
     #  * :retry_times
     #  * :retry_delay
     #  * :do_caching
+    #  * :tcp_pipelining
+    #  * :tcp_pipelining_max_queries - can be a number or :infinite symbol
     def initialize(*args)
       #  @TODO@ Should we allow :namesver to be an RRSet of NS records? Would then need to randomly order them?
       @resolver_ruby = nil

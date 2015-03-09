@@ -135,7 +135,7 @@ module Dnsruby
         @@query_hash[query_settings.client_query_id]=query_settings
         @@socket_hash[query_settings.socket] ||= []
         @@socket_hash[query_settings.socket] << query_settings.client_query_id
-        @@socket_remaining_queries[query_settings.socket] ||= query_settings.tcp_pipelining_max_queries
+        @@socket_remaining_queries[query_settings.socket] ||= query_settings.tcp_pipelining_max_queries if query_settings.tcp_pipelining_max_queries != :infinite
         @@timeouts[query_settings.client_query_id]=query_settings.endtime
         @@sockets << query_settings.socket
         @@socket_is_persistent[query_settings.socket] = query_settings.is_persistent_socket

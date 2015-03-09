@@ -113,62 +113,61 @@ class TestSingleResolverSoak < Minitest::Test
 
   def run_many_asynch_queries_test_single_res(num_resolvers, tcp = false, pipelining = false)
     q = Queue.new
-    resolvers = []
-    timed_out = 0
-    num_resolvers.times do |n|
-      resolvers.push(SingleResolver.new(:server  => IP,
-                                        :port    => PORT,
-                                        :do_caching => false,
-                                        :do_validation => false,
-                                        :tcp_pipelining => pipelining,
-                                        :packet_timeout => 10,
-                                        :tcp_pipelining_max_queries => 5,
-                                        :use_tcp => tcp))
-      resolvers[n].packet_timeout=10
+    timeout_count = 0
+    resolvers = Array.new(num_resolvers) do
+      res = SingleResolver.new(:server  => IP,
+                               :port    => PORT,
+                               :do_caching => false,
+                               :do_validation => false,
+                               :tcp_pipelining => pipelining,
+                               :packet_timeout => 10,
+                               :tcp_pipelining_max_queries => 5,
+                               :use_tcp => tcp)
+      res.packet_timeout=10
+      res
     end
     res_pos = 0
     start = Time.now
     #  @todo@ On windows, MAX_FILES is 256. This means that we have to limit
     #  this test while we're not using single sockets.
     #  We run four queries per iteration, so we're limited to 64 runs.
-    messages = []
-    TestSoakBase::Rrs.each do |data|
+    messages = TestSoakBase::Rrs.map do |data|
       message = Message.new(data[:name], data[:type])
       message.do_validation = false
       message.do_caching    = false
-      messages << message
+      message
     end
 
     query_count = SINGLE_RESOLVER_QUERY_TIMES * messages.count
 
     thr = Thread.new do
       query_count.times do |i|
-        id,ret, error = q.pop
-        if (error.class == ResolvTimeout)
-          timed_out+=1
-        elsif (ret.class != Message)
+        _id, ret, error = q.pop
+        if error.is_a?(ResolvTimeout)
+          timeout_count+=1
+        elsif ret.class != Message
           p "ERROR RETURNED : #{error}"
         end
       end
     end
 
+    cycler = resolvers.cycle
+
     SINGLE_RESOLVER_QUERY_TIMES.times do |i|
       rr_count = 0
       messages.each do | message |
         rr_count+=1
-        res = resolvers[res_pos]
-        res_pos= (res_pos+1) % num_resolvers
-
+        res = cycler.next
         res.send_async(message, q, rr_count + i * messages.count)
         #         p "Sent #{i}, #{rr_count}, Queue #{q}"
       end
     end
 
     thr.join
-    stop=Time.now
-    time_taken=stop-start
-    p "Query count : #{query_count}, #{timed_out} timed out. #{time_taken} time taken"
-    assert(timed_out < query_count * 0.1, "#{timed_out} of #{query_count} timed out!")
+
+    time_taken = Time.now - start
+    p "Query cosunt : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
+    assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
 
   def test_many_threads_on_one_single_resolver_synchronous
@@ -183,7 +182,7 @@ class TestSingleResolverSoak < Minitest::Test
                              :packet_timeout => 10)
     ids = []
     mutex = Mutex.new
-    timed_out = 0
+    timeout_count = 0
     query_count = 0
     res.packet_timeout=4
     start=Time.now
@@ -205,7 +204,7 @@ class TestSingleResolverSoak < Minitest::Test
               packet = res.query(data[:name], data[:type])
             rescue ResolvTimeout
               mutex.synchronize {
-                timed_out+=1
+                timeout_count+=1
               }
               next
             end
@@ -221,9 +220,9 @@ class TestSingleResolverSoak < Minitest::Test
     end
     stop=Time.now
     time_taken=stop-start
-    p "Query count : #{query_count}, #{timed_out} timed out. #{time_taken} time taken"
+    p "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
     #     check_ids(ids) # only do this if we expect all different IDs - e.g. if we stream over a single socket
-    assert(timed_out < query_count * 0.1, "#{timed_out} of #{query_count} timed out!")
+    assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
 
   def check_ids(ids)
@@ -242,7 +241,7 @@ class TestSingleResolverSoak < Minitest::Test
     #  @todo@ Check the header IDs to make sure they're all different
     threads = Array.new
     mutex = Mutex.new
-    timed_out = 0
+    timeout_count = 0
     query_count = 0
     start=Time.now
     num_times=250
@@ -273,7 +272,7 @@ class TestSingleResolverSoak < Minitest::Test
             id, packet, error = q.pop
             if (error.class == ResolvTimeout)
               mutex.synchronize {
-                timed_out+=1
+                timeout_count+=1
               }
               next
             elsif (packet.class!=Message)
@@ -291,8 +290,8 @@ class TestSingleResolverSoak < Minitest::Test
     end
     stop=Time.now
     time_taken=stop-start
-    p "Query count : #{query_count}, #{timed_out} timed out. #{time_taken} time taken"
-    assert(timed_out < query_count * 0.1, "#{timed_out} of #{query_count} timed out!")
+    p "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
+    assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
 
 

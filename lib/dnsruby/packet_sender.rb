@@ -194,7 +194,7 @@ module Dnsruby
       @src_port = [0]
       @recurse = true
       @tcp_pipelining = false
-      @tcp_pipelining_max_queries = nil #infinite
+      @tcp_pipelining_max_queries = :infinite
       @use_count = {}
 
       if (arg==nil)
@@ -378,7 +378,7 @@ module Dnsruby
         begin
           max = @tcp_pipelining_max_queries
           use = @use_count[@pipeline_socket]
-          if use && max && use >= max
+          if use && max != :infinite && use >= max
              #we can't reuse the socket since max is reached
             @use_count.delete(@pipeline_socket)
             @pipeline_socket = nil
