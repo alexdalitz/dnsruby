@@ -27,6 +27,7 @@ require 'dnsruby/update'
 require 'dnsruby/zone_transfer'
 require 'dnsruby/dnssec'
 require 'dnsruby/zone_reader'
+require 'dnsruby/resolv'
 
 
 # = Dnsruby library
