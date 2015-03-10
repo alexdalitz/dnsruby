@@ -21,23 +21,23 @@ class TestSoakBase # < Minitest::Test
   Rrs = [
   {
     :type   		=> Types.A,
-    :name   		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
+    :name   		=> 'ns1.google.com.',
     :address 	=> '10.0.1.128'
   },
   {
     :type		=> Types::MX,
-    :name		=> 'mx.t.dnsruby.validation-test-servers.nominet.org.uk',
-    :exchange	=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
+    :name		=> 'ns1.google.com.',
+    :exchange	=> 'ns1.google.com.',
     :preference 	=> 10
   },
   {
     :type		=> 'CNAME',
-    :name		=> 'cname.t.dnsruby.validation-test-servers.nominet.org.uk',
+    :name		=> 'ns1.google.com.',
     :domainname		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk'
   },
   {
     :type		=> Types.TXT,
-    :name		=> 'txt.t.dnsruby.validation-test-servers.nominet.org.uk',
+    :name		=> 'ns1.google.com.',
     :strings		=> ['Net-DNS']
   }
   ]
