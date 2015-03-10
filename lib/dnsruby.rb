@@ -27,16 +27,8 @@ require 'dnsruby/update'
 require 'dnsruby/zone_transfer'
 require 'dnsruby/dnssec'
 require 'dnsruby/zone_reader'
+require 'dnsruby/resolv'
 
-# Now, require all other files in the lib/dnsruby directory and below
-# that were not already required by the requires above.
-#
-# This is a self invoking anonymous lambda to confine the scope of its locals.
--> do
-  this_file_dir = File.dirname(__FILE__)
-  files_to_require = Dir[File.join(this_file_dir, 'dnsruby', '**', '*.rb')]
-  files_to_require.each { |file| require file }
-end.()
 
 # = Dnsruby library
 # Dnsruby is a thread-aware DNS stub resolver library written in Ruby.
