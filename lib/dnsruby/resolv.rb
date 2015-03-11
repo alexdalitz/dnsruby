@@ -74,7 +74,7 @@ class Resolv
 
   # Looks up all IP addresses for +name+
   def getaddresses(name)
-    return name if ADDRESS_REGEX.match(name)
+    return [name] if ADDRESS_REGEX.match(name)
     @resolvers.each do |resolver|
       addresses = []
       resolver.each_address(name) { |address| addresses << address }

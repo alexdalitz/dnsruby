@@ -65,4 +65,9 @@ class TestResolv < Minitest::Test
     assert_equal(RELATIVE_NAME, names.first.to_s)
     Dnsruby::Resolv.each_name(IPV4_ADDR) { |name| assert_equal(RELATIVE_NAME, name.to_s)}
   end
+
+  def test_resolv_address_to_address
+    local = '127.0.0.1'
+    assert_equal(local, Dnsruby::Resolv.new.getaddress(local))
+  end
 end
