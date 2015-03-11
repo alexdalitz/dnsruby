@@ -16,6 +16,7 @@
 require 'dnsruby/select_thread'
 require 'ipaddr'
 # require 'dnsruby/iana_ports'
+include Socket::Constants
 module Dnsruby
   class PacketSender # :nodoc: all
     @@authoritative_cache = Cache.new
@@ -69,6 +70,14 @@ module Dnsruby
     # 
     #  Defaults to false
     attr_accessor :use_tcp
+
+    # Reuse tcp connection
+    #
+    # Defaults to false
+    attr_accessor :tcp_pipelining
+
+    # Limit the number of queries per pipeline
+    attr_accessor :tcp_pipelining_max_queries
 
     #  Use UDP only - don't use TCP
     #  For test/debug purposes only
@@ -158,6 +167,8 @@ module Dnsruby
     #  * :server
     #  * :port
     #  * :use_tcp
+    #  * :tcp_pipelining
+    #  * :tcp_pipelining_max_queries
     #  * :no_tcp
     #  * :ignore_truncation
     #  * :src_address
@@ -182,6 +193,9 @@ module Dnsruby
       @src_address6 = '::'
       @src_port = [0]
       @recurse = true
+      @tcp_pipelining = false
+      @tcp_pipelining_max_queries = :infinite
+      @use_count = {}
 
       if (arg==nil)
         #  Get default config
@@ -348,6 +362,59 @@ module Dnsruby
       #       end
     end
 
+    #  This method returns the current tcp socket for pipelining
+    #  If this is the first time the method is called then the socket is bound to
+    #  @src_address:@src_port and connected to the remote dns server @server:@port.
+    #  If the connection has been closed because of an EOF on recv_nonblock (closed by server)
+    #  the function will recreate of the socket (since @pipeline_socket.connect will result in a IOError
+    #  exception)
+    #  In general, every subsequent call the function will either return the current tcp
+    #  pipeline socket or a new connected socket if the current one was closed by the server
+    def tcp_pipeline_socket(src_port)
+      Dnsruby.log.debug("Using tcp_pipeline_socket")
+      sockaddr = Socket.sockaddr_in(@port, @server)
+
+      reuse_pipeline_socket = -> do
+        begin
+          max = @tcp_pipelining_max_queries
+          use = @use_count[@pipeline_socket]
+          if use && max != :infinite && use >= max
+             #we can't reuse the socket since max is reached
+            @use_count.delete(@pipeline_socket)
+            @pipeline_socket = nil
+            Dnsruby.log.debug("Max queries per connection attained - creating new socket")
+          else
+            @pipeline_socket.connect(sockaddr)
+          end
+        rescue Errno::EISCONN
+          #already connected, do nothing and reuse!
+        rescue IOError #close by remote host, reconnect
+          @pipeline_socket = nil
+          Dnsruby.log.debug("Connection closed - recreating socket")
+        end
+      end
+
+      create_pipeline_socket = -> do
+        pipeline = Socket.new( AF_INET, SOCK_STREAM, 0 )
+
+        src_address = @ipv6 ? @src_address6 : @src_address
+
+        pipeline.bind(Addrinfo.tcp(src_address, src_port))
+
+        @tcp_pipeline_local_port = src_port
+        @pipeline_socket = pipeline
+
+        @pipeline_socket.connect(sockaddr)
+      end
+
+      reuse_pipeline_socket.() if @pipeline_socket
+      create_pipeline_socket.() unless @pipeline_socket
+
+      @use_count[@pipeline_socket] ||= 0
+      @use_count[@pipeline_socket]  += 1
+
+      @pipeline_socket
+    end
 
     #  This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
     def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp) #:nodoc: all
@@ -367,7 +434,12 @@ module Dnsruby
           src_port = get_next_src_port
           if (use_tcp)
             begin
-              socket = TCPSocket.new(@server, @port, src_address, src_port)
+              if (@tcp_pipelining)
+                socket = tcp_pipeline_socket(src_port)
+                src_port = @tcp_pipeline_local_port
+              else
+                socket = TCPSocket.new(@server, @port, src_address, src_port)
+              end
             rescue Errno::EBADF, Errno::ENETUNREACH => e
               #  Can't create a connection
               err=IOError.new("TCP connection error to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
@@ -416,6 +488,8 @@ module Dnsruby
       #             print "#{Time.now} : Sending packet to #{@server} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
       #  Listen for the response before we send the packet (to avoid any race conditions)
       query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
+      query_settings.is_persistent_socket = @tcp_pipelining if use_tcp
+      query_settings.tcp_pipelining_max_queries = @tcp_pipelining_max_queries if @tcp_pipelining
       begin
         if (use_tcp)
           lenmsg = [query_bytes.length].pack('n')

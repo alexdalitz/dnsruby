@@ -114,7 +114,7 @@ module Dnsruby
         end
       end
 
-      isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
+      isr = PacketSender.new({:server=>@server, :port=>@port, :dnssec=>@dnssec,
           :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
           :src_address=>@src_address, :src_address6=>@src_address6, :src_port=>@src_port,

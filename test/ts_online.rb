@@ -51,6 +51,7 @@ if online?
       resolv
       resolver
       tcp
+      tcp_pipelining
   )
 
   # Excluded are:
