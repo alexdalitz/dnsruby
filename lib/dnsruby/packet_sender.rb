@@ -195,7 +195,7 @@ module Dnsruby
       @recurse = true
       @tcp_pipelining = false
       @tcp_pipelining_max_queries = :infinite
-      @use_count = {}
+      @use_counts = {}
 
       if (arg==nil)
         #  Get default config
@@ -377,10 +377,10 @@ module Dnsruby
       reuse_pipeline_socket = -> do
         begin
           max = @tcp_pipelining_max_queries
-          use = @use_count[@pipeline_socket]
-          if use && max != :infinite && use >= max
+          use_count = @use_counts[@pipeline_socket]
+          if use_count && max != :infinite && use_count >= max
              #we can't reuse the socket since max is reached
-            @use_count.delete(@pipeline_socket)
+            @use_counts.delete(@pipeline_socket)
             @pipeline_socket = nil
             Dnsruby.log.debug("Max queries per connection attained - creating new socket")
           else
@@ -395,23 +395,22 @@ module Dnsruby
       end
 
       create_pipeline_socket = -> do
-        pipeline = Socket.new( AF_INET, SOCK_STREAM, 0 )
-
+        @tcp_pipeline_local_port = src_port
         src_address = @ipv6 ? @src_address6 : @src_address
 
-        pipeline.bind(Addrinfo.tcp(src_address, src_port))
-
-        @tcp_pipeline_local_port = src_port
-        @pipeline_socket = pipeline
-
+        @pipeline_socket = Socket.new(AF_INET, SOCK_STREAM, 0)
+        @pipeline_socket.bind(Addrinfo.tcp(src_address, src_port))
         @pipeline_socket.connect(sockaddr)
+        # NOTE: Moved this here from ||= 0 a few lines below.
+        @use_counts[@pipeline_socket] = 0
       end
 
+      # Don't combine the following 2 statements; the reuse lambda can set the
+      # socket to nil and if so we'd want to call the create lambda to recreate it.
       reuse_pipeline_socket.() if @pipeline_socket
       create_pipeline_socket.() unless @pipeline_socket
 
-      @use_count[@pipeline_socket] ||= 0
-      @use_count[@pipeline_socket]  += 1
+      @use_counts[@pipeline_socket] += 1
 
       @pipeline_socket
     end

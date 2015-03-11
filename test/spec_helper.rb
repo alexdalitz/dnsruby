@@ -11,6 +11,7 @@ if ENV['RUN_EXTRA_TASK'] == 'TRUE'
     add_filter 'test/'
   end
 end
+
 require 'minitest'
 require 'minitest/autorun'
 

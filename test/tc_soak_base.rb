@@ -20,25 +20,25 @@ class TestSoakBase # < Minitest::Test
   include Dnsruby
   Rrs = [
   {
-    :type   		=> Types.A,
-    :name   		=> 'ns1.google.com.',
-    :address 	=> '10.0.1.128'
+    :type       => Types.A,
+    :name       => 'ns1.google.com.',
+    :address    => '10.0.1.128'
   },
   {
-    :type		=> Types::MX,
-    :name		=> 'ns1.google.com.',
-    :exchange	=> 'ns1.google.com.',
-    :preference 	=> 10
+    :type       => Types::MX,
+    :name       => 'ns1.google.com.',
+    :exchange   => 'ns1.google.com.',
+    :preference => 10
   },
   {
-    :type		=> 'CNAME',
-    :name		=> 'ns1.google.com.',
-    :domainname		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk'
+    :type       => 'CNAME',
+    :name       => 'ns1.google.com.',
+    :domainname => 'a.t.dnsruby.validation-test-servers.nominet.org.uk'
   },
   {
-    :type		=> Types.TXT,
-    :name		=> 'ns1.google.com.',
-    :strings		=> ['Net-DNS']
+    :type       => Types.TXT,
+    :name       => 'ns1.google.com.',
+    :strings    => ['Net-DNS']
   }
   ]
 
@@ -92,7 +92,7 @@ class TestSoakBase # < Minitest::Test
     assert(num_in_progress==0)
     stop=Time.now
     time_taken=stop-start
-    p "Query count : #{num_sent}, #{timed_out} timed out. #{time_taken} time taken"
+    puts "Query count : #{num_sent}, #{timed_out} timed out. #{time_taken} time taken"
     assert(timed_out < num_sent * 0.1, "#{timed_out} of #{num_sent} timed out!")
   end
 
@@ -143,7 +143,7 @@ class TestSoakBase # < Minitest::Test
     assert(num_in_progress==0)
     stop=Time.now
     time_taken=stop-start
-    p "Query count : #{num_sent}, #{timed_out} timed out, #{error_count} other errors. #{time_taken} time taken"
+    puts "Query count : #{num_sent}, #{timed_out} timed out, #{error_count} other errors. #{time_taken} time taken"
     assert(timed_out < num_sent * 0.1, "#{timed_out} of #{num_sent} timed out!")
     assert(error_count == 0)
   end

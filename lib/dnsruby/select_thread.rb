@@ -67,9 +67,8 @@ module Dnsruby
         BasicSocket.do_not_reverse_lookup = true
         #     end
         #  Now start the select thread
-        @@select_thread = Thread.new {
-          do_select
-        }
+        @@select_thread = Thread.new { do_select }
+
         #         # Start the validator thread
         #         @@validator = ValidatorThread.instance
       }
@@ -199,10 +198,7 @@ module Dnsruby
         rescue IOError => e
           #           print "IO Error  =: #{e}\n"
           exceptions = clean_up_closed_sockets
-
-          exceptions.each do |exception|
-            send_exception_to_client(*exception)
-          end
+          exceptions.each { |exception| send_exception_to_client(*exception) }
 
           next
         end
@@ -218,13 +214,13 @@ module Dnsruby
           end
         end
         if (ready == nil)
-          #  proces the timeouts
+          #  process the timeouts
           process_timeouts
           unused_loop_count+=1
         else
           process_ready(ready)
           unused_loop_count=0
-          #                   process_error(errors)
+          # process_error(errors)
         end
         @@mutex.synchronize do
           if (unused_loop_count > 10 && @@query_hash.empty? && @@observers.empty?)
@@ -250,6 +246,8 @@ module Dnsruby
       end
     end
 
+    # Removes closed sockets from @@sockets, and returns an array containing 1
+    # exception for each closed socket contained in @@socket_hash.
     def clean_up_closed_sockets
       exceptions = @@mutex.synchronize do
         closed_sockets_in_hash = @@sockets.select(&:closed?).select { |s| @@socket_hash[s] }
@@ -289,9 +287,7 @@ module Dnsruby
 
       persistent_sockets.each do |socket|
         msg, bytes = get_incoming_data(socket, 0)
-
         process_message(msg, bytes, socket) if msg
-
         ready.delete(socket)
       end
     end
@@ -299,7 +295,7 @@ module Dnsruby
     def process_message(msg, bytes, socket)
       @@mutex.synchronize do
         ids = get_active_ids(@@query_hash, msg.header.id)
-        return if ids.empty? #should be only one
+        return if ids.empty? # should be only one
         query_settings = @@query_hash[ids[0]].clone
       end
 
@@ -374,8 +370,10 @@ module Dnsruby
     end
 
     def remove_id(id)
-      socket=nil
-      close_socket = true
+      # NOTE: I removed the following, which were never used:
+      # socket=nil
+      # close_socket = true
+
       @@mutex.synchronize do
         socket = @@query_hash[id].socket
         @@timeouts.delete(id)
@@ -401,22 +399,17 @@ module Dnsruby
 
     def max_attained?(socket)
       remaining = @@socket_remaining_queries[socket]
-      if persistent?(socket) && remaining && remaining <= 0
-        Dnsruby.log.debug("Max queries per conn attained")
-        true
-      else
-        false
-      end
+      attained = persistent?(socket) && remaining && remaining <= 0
+      Dnsruby.log.debug("Max queries per conn attained") if attained
+      attained
     end
 
     def process_timeouts
+      # NOTE: It's @@timeouts we need to protect; after the clone we're ok
+      timeouts = @@mutex.synchronize { @@timeouts.clone }
       time_now = Time.now
-      timeouts={}
-      @@mutex.synchronize {
-        timeouts = @@timeouts.clone
-      }
       timeouts.each do |client_id, timeout|
-        if (timeout < time_now)
+        if timeout < time_now
           send_exception_to_client(ResolvTimeout.new("Query timed out"), nil, client_id)
         end
       end
@@ -442,18 +435,16 @@ module Dnsruby
           if (input=="")
             Dnsruby.log.debug("EOF from server - no bytes read - closing socket")
             socket.close #EOF closed by server, if we were interrupted we need to resend
-            exceptions = []
-            @@mutex.synchronize {
+
+            exceptions = @@mutex.synchronize do
               @@sockets.delete(socket) #remove ourselves from select, app will have to retry
               #maybe fire an event
-              @@socket_hash[socket].each do | client_id |
-                exception = [SocketEofResolvError.new("TCP socket closed before all answers received"), socket, client_id]
-                exceptions << exception
+              @@socket_hash[socket].map do | client_id |
+                [SocketEofResolvError.new("TCP socket closed before all answers received"), socket, client_id]
               end
-            }
-            exceptions.each do |exception|
-              send_exception_to_client(*exception)
             end
+
+            exceptions.each { |exception| send_exception_to_client(*exception) }
 
             return false
           end

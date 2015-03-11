@@ -19,16 +19,17 @@ require 'nio'
 require 'socket'
 
 # TCPPipeliningHandler accepts new tcp connection and reads data from the sockets until
-# either the client closes the connection, @max_request_per_connection is reached
-# or @timeout is attained
+# either the client closes the connection, @max_requests_per_connection is reached
+# or @timeout is attained.
 
 class NioTcpPipeliningHandler < RubyDNS::GenericHandler
+
   DEFAULT_MAX_REQUESTS = 4
 
   # TODO Add timeout
-  def initialize(server, host, port, max_request = DEFAULT_MAX_REQUESTS)
+  def initialize(server, host, port, max_requests = DEFAULT_MAX_REQUESTS)
     super(server)
-    @max_request_per_connection = max_request
+    @max_requests_per_connection = max_requests
     @socket = TCPServer.new(host, port)
     @count = {}
 
@@ -58,7 +59,7 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
 
   def process_socket(socket)
     @logger.debug "Processing socket"
-    _, remote_port, remote_host = socket.peeraddr
+    _, _remote_port, remote_host = socket.peeraddr
     options = { peer: remote_host }
 
     input_data = RubyDNS::StreamTransport.read_chunk(socket)
@@ -68,20 +69,20 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
     @count[socket] ||= 0
     @count[socket]  += 1
 
-    if @count[socket] >= @max_request_per_connection
+    if @count[socket] >= @max_requests_per_connection
       _, port, host = socket.peeraddr
       @logger.debug("*** max request for #{host}:#{port}")
       remove(socket)
     end
   rescue EOFError
-      _, port, host = socket.peeraddr
+    _, port, host = socket.peeraddr
     @logger.debug("*** #{host}:#{port} disconnected")
 
     remove(socket)
   end
 
   def remove(socket)
-    @logger.debug("Removing soket from selector")
+    @logger.debug("Removing socket from selector")
     socket.close rescue nil
     @selector.deregister(socket)
     @count.delete(socket)
@@ -91,11 +92,13 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
     @rcv_thread = Thread.new do
       loop do
         begin
+          # NOTE: ret value ignored below; did you mean to call 'each'?
           @selector.select { |monitor| monitor.value.call(monitor) }
           if @selector.closed?
             break
           end
         rescue Exception => e
+          # NOTE: Just to be sure, you want to swallow the exception here?  And log on debug level? (Did we talk about this before?)
           @logger.log.debug(e)
         end
       end
@@ -103,9 +106,6 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
   end
 
   def handle_connection(socket)
-    _, remote_port, remote_host = socket.peeraddr
-    options = { peer: remote_host }
-
     @logger.debug "New connection"
     @server.class.stats.increment_connection
 
@@ -119,10 +119,10 @@ class TCPPipeliningHandler < RubyDNS::GenericHandler
   DEFAULT_MAX_REQUESTS = 4
   DEFAULT_TIMEOUT = 3.0
 
-  def initialize(server, host, port, max_request = DEFAULT_MAX_REQUESTS, timeout = DEFAULT_TIMEOUT)
+  def initialize(server, host, port, max_requests = DEFAULT_MAX_REQUESTS, timeout = DEFAULT_TIMEOUT)
     super(server)
     @timeout = timeout
-    @max_request_per_connection = max_request
+    @max_requests_per_connection = max_requests
     @socket = TCPServer.new(host, port)
 
     async.run
@@ -140,7 +140,7 @@ class TCPPipeliningHandler < RubyDNS::GenericHandler
 
 
   def handle_connection(socket)
-    _, remote_port, remote_host = socket.peeraddr
+    _, _remote_port, remote_host = socket.peeraddr
     options = { peer: remote_host }
 
     @logger.debug "New connection"
@@ -172,14 +172,14 @@ class TCPPipeliningHandler < RubyDNS::GenericHandler
         break
       end
 
-      if msg_count >= @max_request_per_connection
-        @logger.debug "Max number of requests attained (#{@max_request_per_connection})"
+      if msg_count >= @max_requests_per_connection
+        @logger.debug "Max number of requests attained (#{@max_requests_per_connection})"
         @server.class.stats.increment_max
         break
       end
 
     end
-  rescue EOFError => error
+  rescue EOFError
     @logger.warn "TCP session ended (closed by client)"
   rescue DecodeError
     @logger.warn "Could not decode incoming TCP data!"
