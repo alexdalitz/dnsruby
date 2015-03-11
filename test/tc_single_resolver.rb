@@ -28,30 +28,30 @@ class TestSingleResolver < Minitest::Test
   Rrs = [
     {
       :type   		=> Types.A,
-      :name   		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
+      :name   		=> 'a.t.net-dns.org',
       :address 	=> '10.0.1.128'
     },
     {
       :type		=> Types::MX,
-      :name		=> 'mx.t.dnsruby.validation-test-servers.nominet.org.uk',
-      :exchange	=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk',
+      :name		=> 'mx.t.net-dns.org',
+      :exchange	=> 'a.t.net-dns.org',
       :preference 	=> 10
     },
     {
       :type		=> 'CNAME',
-      :name		=> 'cname.t.dnsruby.validation-test-servers.nominet.org.uk',
-      :domainname		=> 'a.t.dnsruby.validation-test-servers.nominet.org.uk'
+      :name		=> 'cname.t.net-dns.org',
+      :domainname		=> 'a.t.net-dns.org'
     },
     {
       :type		=> Types.TXT,
-      :name		=> 'txt.t.dnsruby.validation-test-servers.nominet.org.uk',
+      :name		=> 'txt.t.net-dns.org',
       :strings		=> ['Net-DNS']
     }
   ]
 
   def test_simple
     res = SingleResolver.new()
-    m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
+    m = res.query("ns1.google.com.")
   end
 
   def test_timeout
@@ -69,7 +69,7 @@ class TestSingleResolver < Minitest::Test
       res.port = port
       res.packet_timeout=1
       start_time = Time.now.to_i
-      m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
+      m = res.query("a.t.net-dns.org")
       fail "Got response when should have got none"
     rescue ResolvTimeout
       stop_time = Time.now.to_i
@@ -85,7 +85,7 @@ class TestSingleResolver < Minitest::Test
       res.packet_timeout=1
       start_time = Time.now.to_i
 #      TheLog.level = Logger::DEBUG
-      m = res.query("a.t.dnsruby.validation-test-servers.nominet.org.uk")
+      m = res.query("a.t.net-dns.org")
       fail "TCP timeouts"
     rescue ResolvTimeout
       #         print "Got Timeout for TCP\n"
@@ -112,7 +112,7 @@ class TestSingleResolver < Minitest::Test
       res.port = port
       res.packet_timeout=1
       q = Queue.new
-      msg = Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk")
+      msg = Message.new("a.t.net-dns.org")
       res.send_async(msg, q, msg)
       id,ret, error = q.pop
       assert(id==msg)
@@ -141,7 +141,7 @@ class TestSingleResolver < Minitest::Test
 
       assert(packet, "Got an answer for #{data[:name]} IN #{data[:type]}")
       assert_equal(1, packet.header.qdcount, 'Only one question')
-      assert_equal(1, packet.header.ancount, 'Got single answer')
+      assert_equal(1, packet.header.ancount, "Got single answer (for question #{data[:name]}")
 
       question = (packet.question)[0]
       answer   = (packet.answer)[0]
@@ -184,11 +184,11 @@ class TestSingleResolver < Minitest::Test
   def test_res_config
     res = Dnsruby::SingleResolver.new
 
-    res.server=('a.t.dnsruby.validation-test-servers.nominet.org.uk')
+    res.server=('a.t.net-dns.org')
     ip = res.server
     assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up IP.')
 
-    res.server=('cname.t.dnsruby.validation-test-servers.nominet.org.uk')
+    res.server=('cname.t.net-dns.org')
     ip = res.server
     assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up cname.')
   end
@@ -196,9 +196,9 @@ class TestSingleResolver < Minitest::Test
   def test_truncated_response
     res = SingleResolver.new
     #     print "Dnssec = #{res.dnssec}\n"
-    res.server=('ns0.validation-test-servers.nominet.org.uk')
+    # res.server=('ns0.validation-test-servers.nominet.org.uk')
     res.packet_timeout = 15
-    m = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", 'txt')
+    m = res.query("overflow.net-dns.org", 'txt')
     assert(m.header.ancount == 61, "61 answer records expected, got #{m.header.ancount}")
     assert(!m.header.tc, "Message was truncated!")
   end

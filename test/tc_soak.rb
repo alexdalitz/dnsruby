@@ -16,6 +16,8 @@
 
 require_relative 'spec_helper'
 
+# require_relative 'tc_single_resolver'
+
 require_relative 'tc_soak_base'
 
 require_relative 'test_dnsserver'
@@ -166,7 +168,7 @@ class TestSingleResolverSoak < Minitest::Test
     thr.join
 
     time_taken = Time.now - start
-    p "Query cosunt : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
+    p "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
     assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
 
