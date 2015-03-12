@@ -17,9 +17,7 @@
 require_relative 'spec_helper'
 
 # require_relative 'tc_single_resolver'
-
 require_relative 'tc_soak_base'
-
 require_relative 'test_dnsserver'
 
 include Dnsruby
@@ -31,6 +29,7 @@ include Dnsruby
 # @todo@ A test DNS server running on localhost is really needed here
 
 class MyServer < RubyDNS::Server
+
   IP   = "127.0.0.1"
   PORT = 53927
 
@@ -41,10 +40,7 @@ class MyServer < RubyDNS::Server
   end
 
   def process(name, resource_class, transaction)
-    transaction.respond!("93.184.216.34",
-                         {
-                           :resource_class => Resolv::DNS::Resource::IN::A
-                         })
+    transaction.respond!("93.184.216.34", { resource_class: Resolv::DNS::Resource::IN::A })
     Celluloid.logger.debug "got message"
   end
 end
@@ -61,6 +57,7 @@ class PipeliningServer < MyServer
 end
 
 class TestSingleResolverSoak < Minitest::Test
+
   IP   = MyServer::IP
   PORT = MyServer::PORT
 
@@ -72,7 +69,7 @@ class TestSingleResolverSoak < Minitest::Test
   def self.init
     unless @initialized
       Celluloid.boot
-      #default Celluloid log outputs to console. Use Dnsruby.log instead
+      # By default, Celluloid logs output to console. Use Dnsruby.log instead.
       Celluloid.logger = Dnsruby.log
       @initialized = true
     end
@@ -117,19 +114,17 @@ class TestSingleResolverSoak < Minitest::Test
     q = Queue.new
     timeout_count = 0
     resolvers = Array.new(num_resolvers) do
-      res = SingleResolver.new(:server  => IP,
-                               :port    => PORT,
-                               :do_caching => false,
-                               :do_validation => false,
-                               :tcp_pipelining => pipelining,
-                               :packet_timeout => 10,
-                               :tcp_pipelining_max_queries => 5,
-                               :use_tcp => tcp)
-      res.packet_timeout=10
-      res
+      SingleResolver.new(server:                     IP,
+                         port:                       PORT,
+                         do_caching:                 false,
+                         do_validation:              false,
+                         tcp_pipelining:             pipelining,
+                         packet_timeout:             10,
+                         tcp_pipelining_max_queries: 5,
+                         use_tcp:                    tcp)
     end
-    res_pos = 0
     start = Time.now
+
     #  @todo@ On windows, MAX_FILES is 256. This means that we have to limit
     #  this test while we're not using single sockets.
     #  We run four queries per iteration, so we're limited to 64 runs.
@@ -142,8 +137,8 @@ class TestSingleResolverSoak < Minitest::Test
 
     query_count = SINGLE_RESOLVER_QUERY_TIMES * messages.count
 
-    thr = Thread.new do
-      query_count.times do |i|
+    receive_thread = Thread.new do
+      query_count.times do
         _id, ret, error = q.pop
         if error.is_a?(ResolvTimeout)
           timeout_count+=1
@@ -153,22 +148,22 @@ class TestSingleResolverSoak < Minitest::Test
       end
     end
 
-    cycler = resolvers.cycle
+    resolver_cycler = resolvers.cycle
 
     SINGLE_RESOLVER_QUERY_TIMES.times do |i|
       rr_count = 0
       messages.each do | message |
-        rr_count+=1
-        res = cycler.next
-        res.send_async(message, q, rr_count + i * messages.count)
+        rr_count += 1
+        resolver_cycler.next.send_async(message, q, rr_count + i * messages.count)
         #         p "Sent #{i}, #{rr_count}, Queue #{q}"
       end
     end
 
-    thr.join
+    receive_thread.join
 
     time_taken = Time.now - start
-    p "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
+    # NOTE: I changed the 'p' calls to 'puts' because p was printing quote chars, is that ok?
+    puts "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
     assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
 
@@ -177,11 +172,7 @@ class TestSingleResolverSoak < Minitest::Test
     #  Check the header IDs to make sure they're all different
     threads = Array.new
 
-    res = SingleResolver.new(:server  => IP,
-                             :port    => PORT,
-                             :do_caching => false,
-                             :do_validation => false,
-                             :packet_timeout => 10)
+    res = create_default_single_resolver
     ids = []
     mutex = Mutex.new
     timeout_count = 0
@@ -198,16 +189,12 @@ class TestSingleResolverSoak < Minitest::Test
       threads[i] = Thread.new{
         40.times do |j|
           TestSoakBase::Rrs.each do |data|
-            mutex.synchronize do
-              query_count+=1
-            end
+            mutex.synchronize { query_count += 1 }
             packet=nil
             begin
               packet = res.query(data[:name], data[:type])
             rescue ResolvTimeout
-              mutex.synchronize {
-                timeout_count+=1
-              }
+              mutex.synchronize { timeout_count += 1 }
               next
             end
             assert(packet)
@@ -222,7 +209,7 @@ class TestSingleResolverSoak < Minitest::Test
     end
     stop=Time.now
     time_taken=stop-start
-    p "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
+    puts "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
     #     check_ids(ids) # only do this if we expect all different IDs - e.g. if we stream over a single socket
     assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
@@ -253,11 +240,7 @@ class TestSingleResolverSoak < Minitest::Test
     end
     num_times.times do |i|
       threads[i] = Thread.new{
-        res = SingleResolver.new(:server  => IP,
-                                 :port    => PORT,
-                                 :do_caching => false,
-                                 :do_validation => false,
-                                 :packet_timeout => 10)
+        res = create_default_single_resolver
         40.times do |j|
           TestSoakBase::Rrs.each do |data|
             mutex.synchronize do
@@ -278,7 +261,7 @@ class TestSingleResolverSoak < Minitest::Test
               }
               next
             elsif (packet.class!=Message)
-              p "ERROR! #{error}"
+              puts "ERROR! #{error}"
             end
 
             assert(packet)
@@ -287,14 +270,21 @@ class TestSingleResolverSoak < Minitest::Test
         end
       }
     end
-    threads.each do |thread|
-      thread.join
-    end
-    stop=Time.now
-    time_taken=stop-start
-    p "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
+    # NOTE: For methods on the objects taking no params, we can use this shorthand.
+    threads.each(&:join)
+
+    time_taken = Time.now - start
+    puts "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
     assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
 
 
+  def create_default_single_resolver
+    SingleResolver.new(server:         IP,
+                       port:           PORT,
+                       do_caching:     false,
+                       do_validation:  false,
+                       packet_timeout: 10)
+
+  end
 end
