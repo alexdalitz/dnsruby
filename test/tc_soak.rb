@@ -162,7 +162,6 @@ class TestSingleResolverSoak < Minitest::Test
     receive_thread.join
 
     time_taken = Time.now - start
-    # NOTE: I changed the 'p' calls to 'puts' because p was printing quote chars, is that ok?
     puts "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
     assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end

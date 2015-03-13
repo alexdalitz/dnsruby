@@ -370,9 +370,6 @@ module Dnsruby
     end
 
     def remove_id(id)
-      # NOTE: I removed the following, which were never used:
-      # socket=nil
-      # close_socket = true
 
       @@mutex.synchronize do
         socket = @@query_hash[id].socket
