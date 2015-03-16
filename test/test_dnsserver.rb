@@ -45,12 +45,12 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
   def finalize
     @socket.close if @socket
     @selector.close
-    @rcv_thread.join
+    @selector_thread.join
   end
 
   def run
     @logger.debug "Running selector thread"
-    selector_thread
+    @selector_thread = create_selector_thread
   end
 
   def accept
@@ -88,19 +88,11 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
     @count.delete(socket)
   end
 
-  def selector_thread
-    @rcv_thread = Thread.new do
+  def create_selector_thread
+    Thread.new do
       loop do
-        begin
-          # NOTE: ret value ignored below; did you mean to call 'each'?
-          @selector.select { |monitor| monitor.value.call(monitor) }
-          if @selector.closed?
-            break
-          end
-        rescue Exception => e
-          # NOTE: Just to be sure, you want to swallow the exception here?  And log on debug level? (Did we talk about this before?)
-          @logger.log.debug(e)
-        end
+        @selector.select { |monitor| monitor.value.call(monitor) }
+        break if @selector.closed?
       end
     end
   end

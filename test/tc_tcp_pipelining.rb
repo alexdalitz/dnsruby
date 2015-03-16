@@ -93,10 +93,7 @@ class TestTCPPipelining < Minitest::Test
         port:                       TCPPipeliningServer::PORT)
   end
 
-  # Send a x number of queries asynchronously to our resolver
-
-  # NOTE: Since durations can be in different units, this name is clearer.
-
+  # Send x number of queries asynchronously to our resolver
   def send_async_messages(number_of_messages, queue, wait_seconds = 0)
     query_cycler = QUERIES.cycle
     number_of_messages.times do
@@ -114,7 +111,6 @@ class TestTCPPipelining < Minitest::Test
   # Verify x responses with no exception
   def verify_responses(number_of_messages, queue)
     number_of_messages.times do
-      # NOTE: Leading '_' indicates it's unused.
       _response_id, response, exception = queue.pop
       assert_nil(exception)
       assert(response.is_a?(Dnsruby::Message))

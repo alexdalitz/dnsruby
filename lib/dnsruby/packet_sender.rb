@@ -401,7 +401,6 @@ module Dnsruby
         @pipeline_socket = Socket.new(AF_INET, SOCK_STREAM, 0)
         @pipeline_socket.bind(Addrinfo.tcp(src_address, src_port))
         @pipeline_socket.connect(sockaddr)
-        # NOTE: Moved this here from ||= 0 a few lines below.
         @use_counts[@pipeline_socket] = 0
       end
 
