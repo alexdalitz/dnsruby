@@ -1,6 +1,9 @@
+#! /usr/bin/env ruby
+
 # --
 # Copyright 2007 Nominet UK
 # 
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -59,8 +62,15 @@
 #      Michael Fuhr <mike@fuhr.org>
 # 
 
+if (ARGV.length < 1) || (ARGV.length > 2)
+  puts "Usage: #{$0} [ -fqs ] [ -D directory ] [ @nameserver ] zone"
+  exit(-1)
+end
+
+
 require 'getoptLong'
 require 'dnsruby'
+
 
 # ------------------------------------------------------------------------------
 # Read any command-line options and check syntax.
@@ -89,110 +99,99 @@ opts.each do |opt, arg|
   end
 end
 
-if (ARGV.length < 1) || (ARGV.length > 2)
-  print "Usage: #{$0} [ -fqs ] [ -D directory ] [ @nameserver ] zone\n"
+# ------------------------------------------------------------------------------
+#  Get the nameserver (if specified) and set up the zone transfer directory
+#  hierarchy.
+# ------------------------------------------------------------------------------
+
+nameserver = (ARGV[0] =~ /^@/) ? ARGV.shift : ''
+nameserver = nameserver.sub(/^@/, '')
+resolver = nameserver ? Dnsruby::Resolver.new(nameserver) : Dnsruby::Resolver.new
+
+zone = ARGV.shift
+basedir = opt_d || File.join((ENV['HOME'] || ''), '.dns-zones')
+zonedir = zone.split(/\./).reverse.join("/")
+zonefile = File.join(basedir, zonedir, 'axfr')
+
+#  Don't worry about the 0777 permissions here - the current umask setting
+#  will be applied.
+# NOTE: mkdir will raise an error on failure so I don't think 'or' works here.
+unless FileTest.directory?(basedir)
+  Dir.mkdir(basedir, 0777) or raise RuntimeError, "can't mkdir #{basedir}: #{$!}\n"
+end
+
+dir = basedir
+# NOTE: What are we doing here?  Could this be replaced by mkdir_p?
+zonedir.split('/').each do |subdir|
+  dir += '/' + subdir
+  unless FileTest.directory?(dir)
+    Dir.mkdir(dir, 0777) or raise RuntimeError, "can't mkdir #{dir}: #{$!}\n"
+  end
+end
+
+# ------------------------------------------------------------------------------
+#  Get the zone.
+# ------------------------------------------------------------------------------
+
+if FileTest.exist?(zonefile) && !opt_f
+  zoneref = Marshal.load(File.open(zonefile))
+  if zoneref.nil?
+    raise RuntimeError, "couldn't retrieve zone from #{zonefile}: #{$!}\n"
+  end
+
+  # ----------------------------------------------------------------------
+  #  Check the SOA serial number if desired.
+  # ----------------------------------------------------------------------
+
+  if opt_s
+    serial_file = serial_zone = nil
+
+    zoneref.each do |rr|
+      if (rr.type == "SOA")
+        serial_file = rr.serial
+        break
+      end
+    end
+    if serial_file.nil?
+      raise RuntimeError,  "no SOA in #{zonefile}\n"
+    end
+
+    soa = resolver.query(zone, 'SOA')
+    if soa.nil?
+      raise RuntimeError, "couldn't get SOA for #{zone}: " + resolver.errorstring + "\n"
+    end
+
+    soa.answer.each do |rr|
+      if rr.type == 'SOA'
+        serial_zone = rr.serial
+        break
+      end
+    end
+
+    if serial_zone != serial_file
+      opt_f = true
+    end
+  end
 else
-  # ------------------------------------------------------------------------------
-  #  Get the nameserver (if specified) and set up the zone transfer directory
-  #  hierarchy.
-  # ------------------------------------------------------------------------------
+  opt_f = true
+end
 
-  nameserver = (ARGV[0] =~ /^@/) ? ARGV.shift : ""
-  nameserver = nameserver.sub(/^@/, "")
-  res = nil
-  if nameserver
-    res = Dnsruby::Resolver.new(nameserver)
-  else
-    res = Dnsruby::Resolver.new
+if opt_f
+  print "nameserver = #{nameserver}, zone=#{zone}"
+  zt = Dnsruby::ZoneTransfer.new
+  zt.server = nameserver if nameserver != ''
+
+  zoneref = zt.transfer(zone)
+  if zoneref.nil?
+    raise RuntimeError,  "couldn't transfer zone\n"
   end
+  Marshal.dump(zoneref, File.open(zonefile, File::CREAT | File::RDWR))
+end
 
-  zone = ARGV.shift
-  basedir = opt_d!=nil ? opt_d : (ENV["HOME"]!=nil ? ENV["HOME"] : "") + "/.dns-zones"
-  zonedir = zone.split(/\./).reverse.join("/")
-  zonefile = basedir + "/" + zonedir + "/axfr"
+# ------------------------------------------------------------------------------
+#  Print the records in the zone.
+# ------------------------------------------------------------------------------
 
-  #  Don't worry about the 0777 permissions here - the current umask setting
-  #  will be applied.
-  if !(FileTest.directory?basedir)
-    Dir.mkdir(basedir, 0777) or raise RuntimeError, "can't mkdir #{basedir}: #{$!}\n"
-  end
-
-  dir = basedir
-  zonedir.split("/").each do |subdir|
-    dir += "/" + subdir
-    if (!FileTest.directory?dir)
-      Dir.mkdir(dir, 0777) or raise RuntimeError, "can't mkdir #{dir}: #{$!}\n"
-    end
-  end
-
-  # ------------------------------------------------------------------------------
-  #  Get the zone.
-  # ------------------------------------------------------------------------------
-
-  zonearray = nil
-
-  if (FileTest.exist?(zonefile) && !opt_f)
-    zoneref = Marshal.load(File.open(zonefile))
-    if (zoneref==nil)
-      raise RuntimeError, "couldn't retrieve zone from #{zonefile}: #{$!}\n"
-    end
-
-    # ----------------------------------------------------------------------
-    #  Check the SOA serial number if desired.
-    # ----------------------------------------------------------------------
-
-    if (opt_s)
-      serial_file, serial_zone = nil
-
-      zoneref.each do |rr|
-        if (rr.type == "SOA")
-          serial_file = rr.serial
-          break
-        end
-      end
-      if serial_file==nil
-        raise RuntimeError,  "no SOA in #{zonefile}\n"
-      end
-
-      soa = res.query(zone, "SOA")
-      if soa==nil
-        raise RuntimeError, "couldn't get SOA for #{zone}: " + res.errorstring + "\n"
-      end
-
-      soa.answer.each do |rr|
-        if (rr.type == "SOA")
-          serial_zone = rr.serial
-          break
-        end
-      end
-
-      if (serial_zone != serial_file)
-        opt_f = true
-      end
-    end
-  else
-    opt_f = true
-  end
-
-  if (opt_f)
-    print "nameserver = #{nameserver}, zone=#{zone}"
-    zt = Dnsruby::ZoneTransfer.new
-    zt.server=(nameserver) if nameserver!=""
-
-    zoneref = zt.transfer(zone)
-    if zoneref==nil
-      raise RuntimeError,  "couldn't transfer zone\n"
-    end
-    Marshal.dump(zoneref, File.open(zonefile, File::CREAT|File::RDWR))
-  end
-
-  # ------------------------------------------------------------------------------
-  #  Print the records in the zone.
-  # ------------------------------------------------------------------------------
-
-  if (!opt_q)
-    zoneref.each do |z|
-      print z.to_s + "\n"
-    end
-  end
+unless opt_q
+  zoneref.each { |z| puts z }
 end
