@@ -1,3 +1,5 @@
+#! /usr/bin/env ruby
+
 # --
 # Copyright 2007 Nominet UK
 # 
@@ -34,16 +36,24 @@ require 'dnsruby'
 # (Ruby port AlexD, Nominet UK)
 # 
 
-if ARGV.length == 1
-  dname = ARGV[0]
-  res   = Dnsruby::DNS.new
-  begin
-    res.each_resource(dname, 'MX') { |rr|
-      print rr.preference, "\t", rr.exchange, "\n"
-    }
-  rescue Exception => e
-    print "Can't find MX hosts for #{dname}: ", e, "\n"
+def fatal_error(message)
+  puts message
+  exit -1
+end
+
+
+unless ARGV.length == 1
+  fatal_error("Usage: #{$0} name")
+end
+
+
+domain = ARGV[0]
+resolver = Dnsruby::DNS.new
+
+begin
+  resolver.each_resource(domain, 'MX') do |rr|
+    print rr.preference, "\t", rr.exchange, "\n"
   end
-else
-  print "Usage: #{$0} domain\n"
+rescue Exception => e
+  fatal_error("Can't find MX hosts for #{domain}: #{e}")
 end
