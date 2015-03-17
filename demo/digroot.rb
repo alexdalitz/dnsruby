@@ -1,3 +1,5 @@
+#! /usr/bin/env ruby
+
 # --
 # Copyright 2007 Nominet UK
 # 
@@ -35,29 +37,31 @@
 # Michael Fuhr <mike@fuhr.org>
 # Alex D <alexd@nominet.org.uk>
 
-begin
-require 'rubygems'
-rescue LoadError
-end
 require 'dnsruby'
-include Dnsruby
 
-raise RuntimeError, "Usage: #{$0} name [ type [ class ] ]\n" unless (ARGV.length >= 1) && (ARGV.length <= 3)
+def fatal_error(message)
+  puts message
+  exit -1
+end
 
-resolver = Dnsruby::Resolver.new()
-resolver.do_validation = true
-res = Dnsruby::Recursor.new(resolver)
+unless (1..3).include?(ARGV.length)
+  fatal_error("Usage: #{$0}  name [ type [ class ] ]")
+end
+
+
+inner_resolver = Dnsruby::Resolver.new
+inner_resolver.do_validation = true
+resolver = Dnsruby::Recursor.new(inner_resolver)
 
 #    Dnsruby::TheLog.level=Logger::DEBUG
 
 name, type, klass = ARGV
-type  ||= "A"
-klass ||= "IN"
+type  ||= 'A'
+klass ||= 'IN'
 
-  begin
-    answer = nil
-    answer = res.query(name, type, klass)
-    print answer
-  rescue Exception => e
-    print "query failed: #{e}\n"
-  end
+begin
+  answer = resolver.query(name, type, klass)
+  print answer
+rescue Exception => e
+  fatal_error("query failed: #{e}")
+end
