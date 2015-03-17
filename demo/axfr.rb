@@ -62,7 +62,7 @@
 #      Michael Fuhr <mike@fuhr.org>
 # 
 
-if (ARGV.length < 1) || (ARGV.length > 2)
+unless (1..2).include?(ARGV.length)
   puts "Usage: #{$0} [ -fqs ] [ -D directory ] [ @nameserver ] zone"
   exit(-1)
 end
@@ -147,7 +147,7 @@ if FileTest.exist?(zonefile) && !opt_f
     serial_file = serial_zone = nil
 
     zoneref.each do |rr|
-      if (rr.type == "SOA")
+      if (rr.type == 'SOA')
         serial_file = rr.serial
         break
       end

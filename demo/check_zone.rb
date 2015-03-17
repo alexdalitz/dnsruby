@@ -69,7 +69,7 @@ def check_domain(args)
   resolver = Dnsruby::Resolver.new
   resolver.retry_times = 2
   nspack = begin
-    resolver.query(domain, "NS", klass)
+    resolver.query(domain, 'NS', klass)
   rescue Exception => e
     print "Couldn't find nameservers for #{domain}: #{e}\n"
     return
@@ -87,9 +87,8 @@ def check_domain(args)
   zt.server = ns_domain_names
 
   zone = zt.transfer(domain) # , klass)
-  unless (zone)
+  unless zone
     fatal_error("Zone transfer failed: #{resolver.errorstring}")
-    return
   end
 
   puts "checking PTR records"
@@ -106,22 +105,22 @@ def check_domain(args)
   print "\n"
 
   if @recurse
-    puts "checking subdomains\n"
+    puts 'checking subdomains'
     subdomains = Hash.new
-    #           foreach (grep { $_->type eq "NS" and $_->name ne $domain } @zone) {
-    (zone.select {|i| i.type == "NS" && i.name != domain}).each do |z|
+    #           foreach (grep { $_->type eq 'NS' and $_->name ne $domain } @zone) {
+    zone.select { |i| i.type == 'NS' && i.name != domain }.each do |z|
       subdomains[z.name] = 1
     end
     #           foreach (sort keys %subdomains) {
     subdomains.keys.sort.each do |k|
-      check_domain(k, klass)
+      check_domain([k, klass])
     end
   end
 end
 
 def check_ptr(domain, klass, zone)
   resolver = Dnsruby::Resolver.new
-  #   foreach $rr (grep { $_->type eq "A" } @zone) {
+  #   foreach $rr (grep { $_->type eq 'A' } @zone) {
   zone.select { |z| z.type == 'A' }.each do |rr|
     host = rr.name
     addr = rr.address
@@ -139,8 +138,8 @@ def check_ns(domain, klass, zone)
   resolver = Dnsruby::Resolver.new
   #   foreach $rr (grep { $_->type eq "NS" } @zone) {
   zone.select { |z| z.type == 'NS' }.each do |rr|
-    ans = resolver.query(rr.nsdname, "A", klass)
-    puts "\t", rr.nsdname, " has no A record" if (ans.header.ancount < 1)
+    ans = resolver.query(rr.nsdname, 'A', klass)
+    puts "\t", rr.nsdname, ' has no A record' if (ans.header.ancount < 1)
   end
 end
 
@@ -157,13 +156,13 @@ def check_cname(domain, klass, zone)
   resolver = Dnsruby::Resolver.new
   #   foreach $rr (grep { $_->type eq "CNAME" } @zone)
   zone.select { |z| z.type == 'CNAME' }.each do |rr|
-    ans = resolver.query(rr.cname, "A", klass)
+    ans = resolver.query(rr.cname, 'A', klass)
     print "\t", rr.cname, " has no A record\n" if (ans.header.ancount < 1)
   end
 end
 
 def main
-  opts = GetoptLong.new(["-r", GetoptLong::NO_ARGUMENT])
+  opts = GetoptLong.new(['-r', GetoptLong::NO_ARGUMENT])
   @recurse = false
   opts.each do |opt, arg|
     case opt

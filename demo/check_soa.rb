@@ -49,9 +49,14 @@ NO_DOMAIN_SPECIFIED = -1
 NO_NAMESERVERS      = -2
 
 
+def fatal_error(message, exit_code)
+  puts message
+  exit(exit_code)
+end
+
+
 def usage
-  puts "Usage: #{$0} domain"
-  exit NO_DOMAIN_SPECIFIED
+  fatal_error("Usage: #{$0} domain", NO_DOMAIN_SPECIFIED)
 end
 
 
@@ -66,8 +71,7 @@ end
 def get_ns_response(resolver, domain)
   ns_response = resolver.query(domain, 'NS')
   if ns_response.header.ancount == 0
-    puts "No nameservers found for #{domain}."
-    exit NO_NAMESERVERS
+    fatal_error("No nameservers found for #{domain}.", NO_NAMESERVERS)
   end
   ns_response
 end

@@ -60,8 +60,8 @@ Dnsruby::Dnssec.add_dlv_key(dlv_key)
 
 
 name, type, klass = ARGV
-type  ||= "A"
-klass ||= "IN"
+type  ||= 'A'
+klass ||= 'IN'
 
 if type.upcase == 'AXFR'
   rrs = zone_transfer.transfer(name) # , klass)

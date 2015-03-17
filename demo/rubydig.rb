@@ -53,7 +53,7 @@ resolver = Dnsruby::Resolver.new
 zone_transfer = Dnsruby::ZoneTransfer.new
 
 
-if ARGV && ARGV[0] =~ /^@/
+if ARGV[0] =~ /^@/
   nameserver = ARGV.shift
   if nameserver == '@auth'
     resolver = Dnsruby::Recursor.new

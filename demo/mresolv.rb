@@ -41,9 +41,9 @@ require 'dnsruby'
 require 'getoptLong'
 
 opts = GetoptLong.new(
-  ["-d", GetoptLong::NO_ARGUMENT],
-  ["-n", GetoptLong::REQUIRED_ARGUMENT],
-  ["-t", GetoptLong::REQUIRED_ARGUMENT])
+  ['-d', GetoptLong::NO_ARGUMENT],
+  ['-n', GetoptLong::REQUIRED_ARGUMENT],
+  ['-t', GetoptLong::REQUIRED_ARGUMENT])
 
 max_outstanding = 32	# number of requests to have outstanding at any time
 timeout = 15    # timeout (seconds)
@@ -70,7 +70,7 @@ q = Queue.new
 eof = false
 
 until eof
-  #  Have the thread loop round, send queries until max_num are outstanding.
+  # Have the thread loop round, send queries until max_num are outstanding.
   while !eof && in_progress < max_outstanding
     print('DEBUG: reading...') if debug
     unless (name = gets)
@@ -83,7 +83,7 @@ until eof
     in_progress += 1
     print("name = #{name}, outstanding = #{in_progress}\n")   if debug
   end
-  #  Keep receiving while the query pool is full, or the list has been queried
+  # Keep receiving while the query pool is full, or the list has been queried
   while in_progress >= max_outstanding || (eof && in_progress > 0)
     id, result, error = q.pop
     in_progress -= 1
