@@ -328,4 +328,26 @@ class TestRR < Minitest::Test
     assert_equal a1.hash, a2.hash
     assert_equal a1.hash, a3.hash
   end
+
+  def _test_duplicate_answer(method_as_symbol)
+    expected_count = case method_as_symbol
+    when :add_answer
+      1
+    when :add_answer!
+      2
+    end
+
+    rr = RR.new_from_string 'techhumans.com. 1111 IN A 69.89.31.97'
+    message = Message.new
+    2.times { message.send(method_as_symbol, rr) }
+    assert_equal(expected_count, message.header.ancount)
+  end
+
+  def test_add_dup_answer_no_force
+    _test_duplicate_answer(:add_answer)
+  end
+
+  def test_add_dup_answer_force
+    _test_duplicate_answer(:add_answer!)
+  end
 end
