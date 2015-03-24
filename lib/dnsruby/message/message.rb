@@ -290,13 +290,26 @@ module Dnsruby
       @header.nscount = @authority.length
     end
 
-
-    def add_answer(rr) #:nodoc: all
-      unless @answer.include?(rr)
+    def _add_answer(rr, force = false)
+      if force || (! @answer.include?(rr))
         @answer << rr
         update_counts
       end
+    end; private :_add_answer
+
+    # Adds an RR to the answer section unless it already occurs.
+    def add_answer(rr) #:nodoc: all
+      _add_answer(rr)
     end
+
+    # When adding an RR to a Dnsruby::Message, add_answer checks to see if it already occurs,
+    # and, if so, does not add it again. This method adds the record whether or not
+    # it already occurs.  This is needed in order to add
+    # a SOA record twice for an AXFR response.
+    def add_answer!(rr)
+      _add_answer(rr, true)
+    end
+
 
     def each_answer
       @answer.each {|rec|
