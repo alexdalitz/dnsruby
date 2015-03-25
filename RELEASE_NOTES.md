@@ -1,5 +1,21 @@
 # Release Notes
 
+
+## v1.58.0
+
+* Add TCP pipelining (reusing a single TCP connection for multiple requests).
+* Enhance zone reading, including reading data from a string.
+* Add add_answer! method for adding duplicate answers, as needed for an AXFR response.
+* Add support for GPOS and NXT resource records.
+* Test cleanup, including removal of use of Nominet servers, soak_test cleanup.
+* Refactorings: MessageDecoder, Resolv, Resolver (part).
+* Fix zone reader adding unwanted dot to relative hostnames being converted to absolute.
+* Fix default access for tsig options in Resolver.
+* Fix ZoneTransfer not to use deprecated SingleResolver.
+* Fix Resolver bug in parameter to create_tsig_options.
+* Fix tests to always use working copy and not gem.
+
+
 ## v1.57.0
 
 * Add query_raw method as alias for send_plain_message, with option to raise or return error.
