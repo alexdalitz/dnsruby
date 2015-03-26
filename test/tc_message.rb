@@ -27,7 +27,7 @@ class TestMessage < Minitest::Test
   #  ;; Security Level : UNCHECKED
   #  ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 7195
   #  ;; flags: ; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
-  def   sample_message
+  def sample_message
     Message.new('cnn.com', 'A')
   end
 

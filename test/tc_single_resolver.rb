@@ -59,55 +59,55 @@ class TestSingleResolver < Minitest::Test
     #  Run a query which will not respond, and check that the timeout works
     start_time = 0
     begin
-   udps = UDPSocket.new
-  udps.bind("127.0.0.1", 0)
-  port = *udps.addr.values_at(3,1)
+      udps = UDPSocket.new
+      udps.bind("127.0.0.1", 0)
+      port = *udps.addr.values_at(3,1)
 
-    begin
-      Dnsruby::PacketSender.clear_caches
-      res = SingleResolver.new("127.0.0.1")
-      res.port = port
-      res.packet_timeout=1
-      start_time = Time.now.to_i
-      m = res.query("a.t.net-dns.org")
-      fail "Got response when should have got none"
-    rescue ResolvTimeout
-      stop_time = Time.now.to_i
-      assert((stop_time - start_time) <= (res.packet_timeout * 2),
-      "UDP timeout too long : #{stop_time - start_time}" +
-      ", should be #{res.packet_timeout}")
-    end
-    begin
-      Dnsruby::PacketSender.clear_caches
-      res = SingleResolver.new("127.0.0.1")
-      res.port = port
-      res.use_tcp = true
-      res.packet_timeout=1
-      start_time = Time.now.to_i
+      begin
+        Dnsruby::PacketSender.clear_caches
+        res = SingleResolver.new("127.0.0.1")
+        res.port = port
+        res.packet_timeout=1
+        start_time = Time.now.to_i
+        m = res.query("a.t.net-dns.org")
+        fail "Got response when should have got none"
+      rescue ResolvTimeout
+        stop_time = Time.now.to_i
+        assert((stop_time - start_time) <= (res.packet_timeout * 2),
+               "UDP timeout too long : #{stop_time - start_time}" +
+                   ", should be #{res.packet_timeout}")
+      end
+      begin
+        Dnsruby::PacketSender.clear_caches
+        res = SingleResolver.new("127.0.0.1")
+        res.port = port
+        res.use_tcp = true
+        res.packet_timeout=1
+        start_time = Time.now.to_i
 #      TheLog.level = Logger::DEBUG
-      m = res.query("a.t.net-dns.org")
-      fail "TCP timeouts"
-    rescue ResolvTimeout
-      #         print "Got Timeout for TCP\n"
-      stop_time = Time.now.to_i
-      assert((stop_time - start_time) <= (res.packet_timeout * 2),
-        "TCP timeout too long : #{stop_time - start_time}, should be #{res.packet_timeout}")
-    rescue Exception => e
-      fail(e)
-    end
+        m = res.query("a.t.net-dns.org")
+        fail "TCP timeouts"
+      rescue ResolvTimeout
+        #         print "Got Timeout for TCP\n"
+        stop_time = Time.now.to_i
+        assert((stop_time - start_time) <= (res.packet_timeout * 2),
+               "TCP timeout too long : #{stop_time - start_time}, should be #{res.packet_timeout}")
+      rescue Exception => e
+        fail(e)
+      end
       TheLog.level = Logger::ERROR
     rescue
       udps.close
-        end
+    end
   end
 
   def test_queue_timeout
     port = 46129
 #    if (!RUBY_PLATFORM=~/darwin/)
     begin
-   udps = UDPSocket.new
-  udps.bind("127.0.0.1", 0)
-  port = *udps.addr.values_at(3,1)
+      udps = UDPSocket.new
+      udps.bind("127.0.0.1", 0)
+      port = *udps.addr.values_at(3,1)
       res = SingleResolver.new("127.0.0.1")
       res.port = port
       res.packet_timeout=1
