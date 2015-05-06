@@ -982,8 +982,7 @@ module Dnsruby
     end
 
     def get_anchor_for(child, parent, current_anchor, parent_res = nil) # :nodoc:
-      #       print "Trying to discover anchor for #{child} from #{parent}\n"
-      TheLog.debug("Trying to discover anchor for #{child} from #{parent} using #{current_anchor}, #{parent_res}")
+      TheLog.info("Trying to discover anchor for ]#{child}[ from ]#{parent}[ using #{current_anchor}, #{parent_res}")
       #  We wish to return a DNSKEY which the caller can use to verify name
       #  We are either given a key or a ds record from the parent zone
       #  If given a DNSKEY, then find a DS record signed by that key for the child zone
@@ -1071,8 +1070,7 @@ module Dnsruby
         end
         #  Query for DNSKEY record, and verify against DS in parent.
         #  Need to get resolver NOT to verify this message - we verify it afterwards
-        #         print "Trying to find DNSKEY records for #{child} from servers for #{child}\n"
-        TheLog.info("Trying to find DNSKEY records for #{child} from servers for #{child}")
+        TheLog.info("Trying to find DNSKEY records for ]#{child}[ from servers for ]#{child}[")
         #         query = Message.new(child, Types.DNSKEY)
         #         query.do_validation = false
         key_ret = nil
@@ -1272,7 +1270,7 @@ module Dnsruby
       msg.security_level = Message::SecurityLevel.INDETERMINATE
       qname = msg.question()[0].qname
       closest_anchor = find_closest_anchor_for(qname)
-      TheLog.debug("Closest anchor for #{qname} is #{closest_anchor} - trying to follow down")
+      TheLog.info("Closest anchor for ]#{qname}[ is ]#{closest_anchor}[ - trying to follow down")
       error = try_to_follow_from_anchor(closest_anchor, msg, qname)
 
       if ((msg.security_level.code < Message::SecurityLevel::SECURE) &&
@@ -1283,11 +1281,11 @@ module Dnsruby
         dlv_anchor = find_closest_dlv_anchor_for(qname)
         if (dlv_anchor)
           #           print "Trying to follow DLV anchor from #{dlv_anchor.name} to #{qname}\n"
-          TheLog.debug("Trying to follow DLV anchor from #{dlv_anchor.name} to #{qname}")
+          TheLog.debug("Trying to follow DLV anchor from ]#{dlv_anchor.name}[ to ]#{qname}[")
           error = try_to_follow_from_anchor(dlv_anchor, msg, qname)
         else
           #           print "Couldn't find DLV anchor for #{qname}\n"
-          TheLog.debug("Couldn't find DLV anchor for #{qname}")
+          TheLog.debug("Could not find DLV anchor for ]#{qname}[")
         end
       end
       if (msg.security_level.code != Message::SecurityLevel::SECURE)
