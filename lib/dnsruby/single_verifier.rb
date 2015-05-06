@@ -1,12 +1,13 @@
+# coding: utf-8
 # --
 # Copyright 2007 Nominet UK
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -233,14 +234,14 @@ module Dnsruby
     #  If keys is a DNSKEY, or an Array or RRSet of DNSKEYs, then keys
     #  is added to the set of trusted keys before the message (or RRSet) is
     #  verified.
-    # 
+    #
     #  If msg is a Dnsruby::Message, then any signed DNSKEY or DS RRSets are
     #  processed first, and any new keys are added to the trusted key set
     #  before the other RRSets are checked.
-    # 
+    #
     #  msg can be a Dnsruby::Message or Dnsruby::RRSet.
     #  keys may be nil, or a KeyCache or an RRSet of Dnsruby::RR::DNSKEY
-    # 
+    #
     #  Returns true if the message verifies OK, and false otherwise.
     def verify(msg, keys = nil)
       if (msg.kind_of?RRSet)
@@ -381,7 +382,7 @@ module Dnsruby
       #          ii) NSEC proving no RRSets in zone that would have been closer match for <SNAME, SCLASS>
       #      - this may be proved by one or more NSECs (and associated RRSIGs)
       #      - NOERROR returned
-      # 
+      #
       #  Otherwise no NSECs should be returned.
 
       #  So, check for NSEC records in response, and work out what type of answer we have.
@@ -692,7 +693,7 @@ module Dnsruby
 
     #  Verify the signature of an rrset encoded with the specified KeyCache
     #  or RRSet. If no signature is included, false is returned.
-    # 
+    #
     #  Returns true if the RRSet verified, false otherwise.
     def verify_rrset(rrset, keys = nil)
       #       print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
@@ -941,7 +942,7 @@ module Dnsruby
     def follow_chain(anchor, name) # :nodoc:
       #  Follow the chain from the anchor to name, returning the appropriate
       #  key at the end, or false.
-      # 
+      #
       #  i.e. anchor = se, name = foo.example.se
       #    get anchor for example.se with se anchor
       #    get anchor for foo.example.se with example.se anchor
@@ -1264,8 +1265,8 @@ module Dnsruby
       #  If we don't, then see if we can get to it from the closest
       #  trust anchor
       #  Otherwise, try DLV (if configured)
-      # 
-      # 
+      #
+      #
       #  So - find closest existing trust anchor
       error = nil
       msg.security_level = Message::SecurityLevel.INDETERMINATE
