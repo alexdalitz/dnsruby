@@ -318,7 +318,11 @@ module Dnsruby
         @@hints = Hash.new
         @@hints[0] = temp
       end
-      @@nameservers = @@hints.values
+      # @@nameservers = @@hints.values
+      @@nameservers=[]
+      @@hints.each {|key, value|
+        @@nameservers.push(key)
+      }
       return @@nameservers
     end
 
