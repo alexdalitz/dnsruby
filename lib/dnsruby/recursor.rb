@@ -608,7 +608,8 @@ module Dnsruby
           nameservers.push(n.to_s)
         }
       end
-      resolver = Resolver.new({:nameserver=>nameservers})
+      TheLog.debug("creating {3} ns: #{nameservers.inspect}")
+      resolver = Resolver.new({:nameservers=>nameservers})
       servers = []
       resolver.single_resolvers.each {|s|
         servers.push(s.server)
