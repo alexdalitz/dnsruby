@@ -1,3 +1,5 @@
+#! /usr/bin/env ruby
+
 # --
 # Copyright 2007 Nominet UK
 # 
@@ -35,7 +37,7 @@
 # The original Bourne Shell and C versions were printed in
 # "DNS and BIND" by Paul Albitz & Cricket Liu.
 # 
-# This Perl version was written by Michael Fuhr <mike@fuhr.org>.
+# The Perl version was written by Michael Fuhr <mike@fuhr.org>.
 # 
 # = SEE ALSO
 # 
@@ -43,116 +45,133 @@
 
 require 'dnsruby'
 
-# ------------------------------------------------------------------------------
-# Get the domain from the command line.
-# ------------------------------------------------------------------------------
+NO_DOMAIN_SPECIFIED = -1
+NO_NAMESERVERS      = -2
 
-if ARGV.length ==1
-  domain = ARGV[0]
 
-  # ------------------------------------------------------------------------------
-  #  Find all the nameservers for the domain.
-  # ------------------------------------------------------------------------------
+def fatal_error(message, exit_code)
+  puts message
+  exit(exit_code)
+end
 
-  res = Dnsruby::Resolver.new
 
-  #   res.defnames=(0)
-  res.retry_times=(2)
-  ns_req = nil
-  begin
-    ns_req = res.query(domain, "NS")
+def usage
+  fatal_error("Usage: #{$0} domain", NO_DOMAIN_SPECIFIED)
+end
+
+
+def create_resolver
+  resolver = Dnsruby::Resolver.new
+  resolver.retry_times = 2
+  resolver.recurse = 0  # Send out non-recursive queries
+  resolver
+end
+
+
+def get_ns_response(resolver, domain)
+  ns_response = resolver.query(domain, 'NS')
+  if ns_response.header.ancount == 0
+    fatal_error("No nameservers found for #{domain}.", NO_NAMESERVERS)
+  end
+  ns_response
+end
+
+
+# Finds all the nameserver domains for the domain.
+def get_ns_domains(resolver, domain)
+  ns_response = get_ns_response(resolver, domain)
+  ns_answers = ns_response.answer.select { |r| r.type == 'NS'}
+  ns_answers.map(&:domainname)
+end
+
+
+def process_ns_domain(resolver, domain, ns_domain)
+
+  a_response = begin
+    #  In order to lookup the IP(s) of the nameserver, we need a Resolver
+    #  object that is set to our local, recursive nameserver.  So we create
+    #  a new object just to do that.
+    local_resolver = Dnsruby::Resolver.new
+
+    local_resolver.query(ns_domain, 'A')
   rescue Exception => e
-    print "Error : #{e}"
-    return
-  end
-  if (ns_req.header.ancount == 0)
-    print "No nameservers found for #{domain}\n"
+    puts "Cannot find address for #{ns_domain}: #{e}"
     return
   end
 
-  #  Send out non-recursive queries
-  res.recurse=(0)
+  a_answers = a_response.answer.select {|r| r.type == 'A'}
+  a_answers.each do |a_answer|
 
+    # ----------------------------------------------------------------------
+    #  Ask this IP.
+    # ----------------------------------------------------------------------
+    ip_address = a_answer.address
+    resolver.nameserver = ip_address.to_s
+    print "#{ns_domain} (#{ip_address}): "
+
+    # ----------------------------------------------------------------------
+    #  Get the SOA record.
+    # ----------------------------------------------------------------------
+    soa_response = begin
+      resolver.query(domain, 'SOA', 'IN')
+    rescue Exception => e
+      puts "Error : #{e}"
+      return
+    end
+
+    # ----------------------------------------------------------------------
+    #  Is this nameserver authoritative for the domain?
+    # ----------------------------------------------------------------------
+
+    unless soa_response.header.aa
+      print "isn't authoritative for #{domain}\n"
+      return
+    end
+
+    # ----------------------------------------------------------------------
+    #  We should have received exactly one answer.
+    # ----------------------------------------------------------------------
+
+    unless soa_response.header.ancount == 1
+      puts "expected 1 answer, got #{soa_response.header.ancount}."
+      return
+    end
+
+    # ----------------------------------------------------------------------
+    #  Did we receive an SOA record?
+    # ----------------------------------------------------------------------
+
+    answer_type = soa_response.answer[0].type
+    unless answer_type == 'SOA'
+      puts "expected SOA, got #{answer_type}"
+      return
+    end
+
+    # ----------------------------------------------------------------------
+    #  Print the serial number.
+    # ----------------------------------------------------------------------
+
+    puts "has serial number #{soa_response.answer[0].serial}"
+  end
+end
+
+
+def main
+
+  # Get domain from command line, printing usage and exiting if none provided:
+  domain = ARGV.fetch(0) { usage }
+
+  resolver = create_resolver
+
+  ns_domains = get_ns_domains(resolver, domain)
 
   # ------------------------------------------------------------------------------
   #  Check the SOA record on each nameserver.
   # ------------------------------------------------------------------------------
-
-   (ns_req.answer.select {|r| r.type == "NS"}).each do |nsrr|
-
-    # ----------------------------------------------------------------------
-    #  Set the resolver to query this nameserver.
-    # ----------------------------------------------------------------------
-    ns = nsrr.domainname
-
-    #  In order to lookup the IP(s) of the nameserver, we need a Resolver
-    #  object that is set to our local, recursive nameserver.  So we create
-    #  a new object just to do that.
-
-    local_res = Dnsruby::Resolver.new
-    a_req=nil
-    begin
-      a_req = local_res.query(ns, 'A')
-    rescue Exception => e
-      print "Can not find address for #{ns}: #{e}\n"
-      next
-    end
-
-     (a_req.answer.select {|r| r.type == 'A'}).each do |r|
-      ip = r.address
-      # ----------------------------------------------------------------------
-      #  Ask this IP.
-      # ----------------------------------------------------------------------
-
-      res.nameserver=(ip.to_s)
-
-      print "#{ns} (#{ip}): "
-
-      # ----------------------------------------------------------------------
-      #  Get the SOA record.
-      # ----------------------------------------------------------------------
-      soa_req=nil
-      begin
-        soa_req = res.query(domain, 'SOA', 'IN')
-      rescue Exception => e
-        print "Error : #{e}\n"
-        next
-      end
-
-      # ----------------------------------------------------------------------
-      #  Is this nameserver authoritative for the domain?
-      # ----------------------------------------------------------------------
-
-      unless (soa_req.header.aa)
-        print "isn't authoritative for #{domain}\n"
-        next
-      end
-
-      # ----------------------------------------------------------------------
-      #  We should have received exactly one answer.
-      # ----------------------------------------------------------------------
-
-      unless (soa_req.header.ancount == 1)
-        print "expected 1 answer, got ", soa_req.header.ancount, "\n"
-        next
-      end
-
-      # ----------------------------------------------------------------------
-      #  Did we receive an SOA record?
-      # ----------------------------------------------------------------------
-
-      unless ((soa_req.answer)[0].type == "SOA")
-        print "expected SOA, got ", (soa_req.answer)[0].type, "\n"
-        next
-      end
-
-      # ----------------------------------------------------------------------
-      #  Print the serial number.
-      # ----------------------------------------------------------------------
-
-      print "has serial number ", (soa_req.answer)[0].serial, "\n"
-    end
+  ns_domains.each do |ns_domain_name|
+    process_ns_domain(resolver, domain, ns_domain_name)
   end
-else
-  print "Usage: #{$0} domain\n"
 end
+
+
+main

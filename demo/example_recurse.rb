@@ -1,3 +1,5 @@
+#! /usr/bin/env ruby
+
 # --
 # Copyright 2007 Nominet UK
 # 
@@ -19,11 +21,23 @@
 
 require 'dnsruby'
 
-res = Dnsruby::Recursor.new
+unless (1..3).include?(ARGV.length)
+  puts "Usage: #{$0} domain [type [ class ]]"
+  exit(-1)
+end
+
+
+resolver = Dnsruby::Recursor.new
+resolver.hints = '198.41.0.4' # A.ROOT-SERVER.NET.
+
+
 Dnsruby::TheLog.level = Logger::DEBUG
+
+
 name, type, klass = ARGV
-type  ||= "A"
-klass ||= "IN"
-res.hints=("198.41.0.4") # A.ROOT-SERVER.NET.
-packet = res.query(name, type, klass)
-print packet.to_s
+type  ||= 'A'
+klass ||= 'IN'
+
+
+packet = resolver.query(name, type, klass)
+puts packet

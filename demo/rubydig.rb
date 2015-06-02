@@ -1,3 +1,5 @@
+#! /usr/bin/env ruby
+
 # --
 # Copyright 2007 Nominet UK
 # 
@@ -33,49 +35,56 @@
 # Michael Fuhr <mike@fuhr.org>
 # 
 
+def fatal_error(message)
+  puts message
+  exit(-1)
+end
+
+
+unless (1..3).include?(ARGV.length)
+  fatal_error("Usage: #{$0} [ @nameserver ] name [ type [ class ] ]")
+end
+
+
 require 'dnsruby'
-include Dnsruby
 
-res = Dnsruby::Resolver.new
-zt=Dnsruby::ZoneTransfer.new
 
-if (ARGV && (ARGV[0] =~ /^@/))
+resolver = Dnsruby::Resolver.new
+zone_transfer = Dnsruby::ZoneTransfer.new
+
+
+if ARGV[0] =~ /^@/
   nameserver = ARGV.shift
-  if (nameserver == "@auth")
-    res = Dnsruby::Recursor.new
+  if nameserver == '@auth'
+    resolver = Dnsruby::Recursor.new
   else
-  print "Setting nameserver : #{nameserver}\n"
-  res.nameserver=(nameserver.sub(/^@/, ""))
-  print "nameservers = #{res.config.nameserver}\n"
-  zt.server=(nameserver.sub(/^@/, ""))
+    puts "Setting nameserver : #{nameserver}"
+    resolver.nameserver = (nameserver.sub(/^@/, ''))
+    puts "nameservers = #{resolver.config.nameserver}"
+    zone_transfer.server = (nameserver.sub(/^@/, ''))
   end
 end
 
-raise RuntimeError, "Usage: #{$0} [ \@nameserver ] name [ type [ class ] ]\n" unless (ARGV.length >= 1) && (ARGV.length <= 3)
-
 name, type, klass = ARGV
-type  ||= "A"
-klass ||= "IN"
+type  ||= 'A'
+klass ||= 'IN'
 
-if (type.upcase == "AXFR")
-  rrs = zt.transfer(name) # , klass)
+if type.upcase == 'AXFR'
+  rrs = zone_transfer.transfer(name) # , klass)
 
-  if (rrs)
-    rrs.each do |rr|
-      print rr.to_s + "\n"
-    end
+  if rrs
+    rrs.each { |rr| puts rr }
   else
-    raise RuntimeError, "zone transfer failed: ", res.errorstring, "\n"
+    fatal_error("Zone transfer failed: #{resolver.errorstring}")
   end
 
 else
 
 #    Dnsruby::TheLog.level=Logger::DEBUG
   begin
-    answer = nil
-    answer = res.query(name, type, klass)
-    print answer
+    answer = resolver.query(name, type, klass)
+    puts answer
   rescue Exception => e
-    print "query failed: #{e}\n"
+    fatal_error("Query failed: #{e}")
   end
 end

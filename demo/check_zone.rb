@@ -1,3 +1,5 @@
+#! /usr/bin/env ruby
+
 # --
 # Copyright 2007 Nominet UK
 # 
@@ -28,6 +30,7 @@
 # 
 # * Checks that all A records have corresponding PTR records.
 # 
+
 # * Checks that hosts listed in NS, MX, and CNAME records have
 # A records.
 # 
@@ -42,132 +45,134 @@
 # 
 
 
+def fatal_error(message)
+  puts message
+  exit(-1)
+end
+
+unless (1..2).include?(ARGV.length)
+  fatal_error("Usage: #{$0}  domain [ class ]")
+end
+
+
 require 'dnsruby'
 require 'getoptLong'
 
+
 def check_domain(args)
   domain = args[0]
-  klass = "IN"
-  if (args.length > 1)
-    klass = args[1]
-  end
-  print "----------------------------------------------------------------------\n"
-  print "#{domain} (class #{klass}\n"
-  print "\n"
+  klass = args[1] || 'IN'
+  puts "----------------------------------------------------------------------"
+  puts "#{domain} (class #{klass}\n"
+  puts "----------------------------------------------------------------------"
 
-  res = Dnsruby::Resolver.new
-  res.retry_times=(2)
-  nspack = nil
-  begin
-    nspack = res.query(domain, "NS", klass)
+  resolver = Dnsruby::Resolver.new
+  resolver.retry_times = 2
+  nspack = begin
+    resolver.query(domain, 'NS', klass)
   rescue Exception => e
     print "Couldn't find nameservers for #{domain}: #{e}\n"
     return
   end
 
   print "nameservers (will request zone from first available):\n"
-  ns=""
-  (nspack.answer.select {|r| r.type == "NS"}).each do |ns|
-    print "\t", ns.domainname, "\n"
-  end
-  print "\n"
+  ns_answers = nspack.answer.select {|r| r.type == 'NS' }
+  ns_domain_names = ns_answers.map(&:domainname)
+  ns_domain_names.each { |name| puts "\t#{name}" }
+  puts ''
 
-  res.nameserver= (nspack.answer.select {|i| i.type == "NS"}).collect {|i| i.domainname.to_s}
+  resolver.nameserver = ns_domain_names
 
   zt = Dnsruby::ZoneTransfer.new
-  zt.server=(nspack.answer.select {|i| i.type == "NS"}).collect {|i| i.domainname.to_s}
+  zt.server = ns_domain_names
+
   zone = zt.transfer(domain) # , klass)
-  unless (zone)
-    print "Zone transfer failed: ", res.errorstring, "\n"
-    return
+  unless zone
+    fatal_error("Zone transfer failed: #{resolver.errorstring}")
   end
 
-  print "checking PTR records\n"
+  puts "checking PTR records"
   check_ptr(domain, klass, zone)
-  print "\n"
 
-  print "checking NS records\n"
+  puts "\nchecking NS records"
   check_ns(domain, klass, zone)
-  print "\n"
 
-  print "checking MX records\n"
+  puts "\nchecking MX records"
   check_mx(domain, klass, zone)
-  print "\n"
 
-  print "checking CNAME records\n"
+  puts "\nchecking CNAME records"
   check_cname(domain, klass, zone)
   print "\n"
 
-  if (@recurse)
-    print "checking subdomains\n\n"
+  if @recurse
+    puts 'checking subdomains'
     subdomains = Hash.new
-    #           foreach (grep { $_->type eq "NS" and $_->name ne $domain } @zone) {
-    (zone.select {|i| i.type == "NS" && i.name != domain}).each do |z|
+    #           foreach (grep { $_->type eq 'NS' and $_->name ne $domain } @zone) {
+    zone.select { |i| i.type == 'NS' && i.name != domain }.each do |z|
       subdomains[z.name] = 1
     end
     #           foreach (sort keys %subdomains) {
     subdomains.keys.sort.each do |k|
-      check_domain(k, klass)
+      check_domain([k, klass])
     end
   end
 end
 
 def check_ptr(domain, klass, zone)
-  res = Dnsruby::Resolver.new
-  #   foreach $rr (grep { $_->type eq "A" } @zone) {
-  (zone.select {|z| z.type == "A"}).each do |rr|
+  resolver = Dnsruby::Resolver.new
+  #   foreach $rr (grep { $_->type eq 'A' } @zone) {
+  zone.select { |z| z.type == 'A' }.each do |rr|
     host = rr.name
     addr = rr.address
-    ans= nil
+    ans = nil
     begin
-    ans = res.query(addr.to_s, "A") #, klass)
-    print "\t#{host} (#{addr}) has no PTR record\n" if (ans.header.ancount < 1)
+      ans = resolver.query(addr.to_s, 'A') #, klass)
+      puts "\t#{host} (#{addr}) has no PTR record" if ans.header.ancount < 1
     rescue Dnsruby::NXDomain
-      print "\t#{host} (#{addr}) returns NXDomain\n"
+      puts "\t#{host} (#{addr}) returns NXDomain"
     end
   end
 end
 
 def check_ns(domain, klass, zone)
-  res = Dnsruby::Resolver.new
+  resolver = Dnsruby::Resolver.new
   #   foreach $rr (grep { $_->type eq "NS" } @zone) {
-  (zone.select { |z| z.type == "NS" }).each do |rr|
-    ans = res.query(rr.nsdname, "A", klass)
-    print "\t", rr.nsdname, " has no A record\n" if (ans.header.ancount < 1)
+  zone.select { |z| z.type == 'NS' }.each do |rr|
+    ans = resolver.query(rr.nsdname, 'A', klass)
+    puts "\t", rr.nsdname, ' has no A record' if (ans.header.ancount < 1)
   end
 end
 
 def check_mx(domain, klass, zone)
-  res = Dnsruby::Resolver.new
+  resolver = Dnsruby::Resolver.new
   #   foreach $rr (grep { $_->type eq "MX" } @zone) {
-  zone.select {|z| z.type == "MX"}.each do |rr|
-    ans = res.query(rr.exchange, "A", klass)
+  zone.select { |z| z.type == 'MX' }.each do |rr|
+    ans = resolver.query(rr.exchange, 'A', klass)
     print "\t", rr.exchange, " has no A record\n" if (ans.header.ancount < 1)
   end
 end
 
 def check_cname(domain, klass, zone)
-  res = Dnsruby::Resolver.new
+  resolver = Dnsruby::Resolver.new
   #   foreach $rr (grep { $_->type eq "CNAME" } @zone)
-  zone.select {|z| z.type == "CNAME"}.each do |rr|
-    ans = res.query(rr.cname, "A", klass)
+  zone.select { |z| z.type == 'CNAME' }.each do |rr|
+    ans = resolver.query(rr.cname, 'A', klass)
     print "\t", rr.cname, " has no A record\n" if (ans.header.ancount < 1)
   end
 end
 
-opts = GetoptLong.new(["-r", GetoptLong::NO_ARGUMENT])
-@recurse = false
-opts.each do |opt, arg|
-  case opt
-  when '-r'
-    @recurse=true
+def main
+  opts = GetoptLong.new(['-r', GetoptLong::NO_ARGUMENT])
+  @recurse = false
+  opts.each do |opt, arg|
+    case opt
+    when '-r'
+      @recurse = true
+    end
   end
-end
-
-if (ARGV.length >=1 && ARGV.length <=2)
 
   check_domain(ARGV)
-  exit
-else
-  print "Usage: #{$0} [ -r ] domain [ class ]\n"
 end
+
+
+main
