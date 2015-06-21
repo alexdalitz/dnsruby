@@ -231,7 +231,7 @@ module Dnsruby
               #  Found root authority
               server = rr.nsdname.to_s.downcase
               server.sub!(/\.$/,"")
-              TheLog.debug(";; FOUND HINT: #{server}\n")
+              TheLog.debug(";; FOUND HINT: #{server}")
               hints[server] = AddressCache.new
             end
           end
@@ -285,10 +285,10 @@ module Dnsruby
         @@hints = {}
       end
       if (@@hints.size > 0)
-        TheLog.info(";; USING THE FOLLOWING HINT IPS:\n")
+        TheLog.info(";; USING THE FOLLOWING HINT IPS:")
         @@hints.values.each do |ips|
           ips.each do |server|
-            TheLog.info(";;  #{server}\n")
+            TheLog.info(";;  #{server}")
           end
         end
       else
@@ -333,14 +333,14 @@ module Dnsruby
         if ( rr.type == Types::A)
           # print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
           if (hints[server]!=nil)
-            TheLog.debug(";; STORING IP: #{server} IN A "+rr.address.to_s+"\n")
+            TheLog.info(";; STORING IP: #{server} IN A "+rr.address.to_s)
             hints[server].push([rr.address.to_s, rr.ttl])
           end
         end
         if ( rr.type == Types::AAAA)
           # print ";; ADDITIONAL HELP: $server -> [".$rr->rdatastr."]\n" if $self->{'debug'};
           if (hints[server])
-            TheLog.debug(";; STORING IP6: #{server} IN AAAA "+rr.address.to_s+"\n")
+            TheLog.info(";; STORING IP6: #{server} IN AAAA "+rr.address.to_s)
             hints[server].push([rr.address.to_s, rr.ttl])
           end
         end
@@ -608,7 +608,8 @@ module Dnsruby
           nameservers.push(n.to_s)
         }
       end
-      resolver = Resolver.new({:nameserver=>nameservers})
+      TheLog.debug("creating {3} ns: #{nameservers.inspect}")
+      resolver = Resolver.new({:nameservers=>nameservers})
       servers = []
       resolver.single_resolvers.each {|s|
         servers.push(s.server)

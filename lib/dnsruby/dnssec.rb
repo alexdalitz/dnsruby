@@ -76,6 +76,10 @@ module Dnsruby
     end
 
     @@root_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ROOT)
+    def Dnssec.root_verifier
+      @@root_verifier
+    end
+
 
     #  #NOTE# You may wish to import these via a secure channel yourself, if
     #  using Dnsruby for validation.

@@ -690,7 +690,7 @@ module Dnsruby
     end
 
     def add_opt_rr(packet)
-      Dnsruby.log.debug { ";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}.\n" }
+      Dnsruby.log.debug { ";; Adding EDNS extension with UDP packetsize  #{udp_packet_size}." }
       #  RFC 3225
       optrr = RR::OPT.new(udp_packet_size)
 
@@ -702,7 +702,7 @@ module Dnsruby
 
     def prepare_for_dnssec(packet)
       #  RFC 4035
-      Dnsruby.log.debug { ";; Adding EDNS extension with UDP packetsize #{udp_packet_size} and DNS OK bit set\n" }
+      Dnsruby.log.debug { ";; Adding EDNS extension with UDP packetsize #{udp_packet_size} and DNS OK bit set" }
       optrr = RR::OPT.new(udp_packet_size) # Decimal UDPpayload
       optrr.dnssec_ok=true
 

@@ -1,12 +1,13 @@
+# coding: utf-8
 # --
 # Copyright 2007 Nominet UK
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -50,6 +51,15 @@ module Dnsruby
       #  The configured_ds_store is the set of DS records which have been configured
       #  by the client as trust anchors. Use Dnssec#add_trust_anchor to add these
       @configured_ds_store = []
+
+      @verified_rrsets = []
+    end
+
+    def verified_rrsets
+      @verified_rrsets
+    end
+    def reset_verified_rrset
+      @verified_rrsets = []
     end
 
     def set_hints(hints)
@@ -233,14 +243,14 @@ module Dnsruby
     #  If keys is a DNSKEY, or an Array or RRSet of DNSKEYs, then keys
     #  is added to the set of trusted keys before the message (or RRSet) is
     #  verified.
-    # 
+    #
     #  If msg is a Dnsruby::Message, then any signed DNSKEY or DS RRSets are
     #  processed first, and any new keys are added to the trusted key set
     #  before the other RRSets are checked.
-    # 
+    #
     #  msg can be a Dnsruby::Message or Dnsruby::RRSet.
     #  keys may be nil, or a KeyCache or an RRSet of Dnsruby::RR::DNSKEY
-    # 
+    #
     #  Returns true if the message verifies OK, and false otherwise.
     def verify(msg, keys = nil)
       if (msg.kind_of?RRSet)
@@ -381,7 +391,7 @@ module Dnsruby
       #          ii) NSEC proving no RRSets in zone that would have been closer match for <SNAME, SCLASS>
       #      - this may be proved by one or more NSECs (and associated RRSIGs)
       #      - NOERROR returned
-      # 
+      #
       #  Otherwise no NSECs should be returned.
 
       #  So, check for NSEC records in response, and work out what type of answer we have.
@@ -692,7 +702,7 @@ module Dnsruby
 
     #  Verify the signature of an rrset encoded with the specified KeyCache
     #  or RRSet. If no signature is included, false is returned.
-    # 
+    #
     #  Returns true if the RRSet verified, false otherwise.
     def verify_rrset(rrset, keys = nil)
       #       print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
@@ -807,7 +817,8 @@ module Dnsruby
       expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
       rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl,
           expiration_diff].sort)[0]
-      #             print "VERIFIED OK\n"
+      #print "VERIFIED OK ]#{rrset.name}[, #{rrset.type}\n"
+      @verified_rrsets.push(rrset)
       return true
     end
 
@@ -941,7 +952,7 @@ module Dnsruby
     def follow_chain(anchor, name) # :nodoc:
       #  Follow the chain from the anchor to name, returning the appropriate
       #  key at the end, or false.
-      # 
+      #
       #  i.e. anchor = se, name = foo.example.se
       #    get anchor for example.se with se anchor
       #    get anchor for foo.example.se with example.se anchor
@@ -981,8 +992,7 @@ module Dnsruby
     end
 
     def get_anchor_for(child, parent, current_anchor, parent_res = nil) # :nodoc:
-      #       print "Trying to discover anchor for #{child} from #{parent}\n"
-      TheLog.debug("Trying to discover anchor for #{child} from #{parent} using #{current_anchor}, #{parent_res}")
+      TheLog.info("Trying to discover anchor for ]#{child}[ from ]#{parent}[ using #{current_anchor}, #{parent_res}")
       #  We wish to return a DNSKEY which the caller can use to verify name
       #  We are either given a key or a ds record from the parent zone
       #  If given a DNSKEY, then find a DS record signed by that key for the child zone
@@ -1070,8 +1080,7 @@ module Dnsruby
         end
         #  Query for DNSKEY record, and verify against DS in parent.
         #  Need to get resolver NOT to verify this message - we verify it afterwards
-        #         print "Trying to find DNSKEY records for #{child} from servers for #{child}\n"
-        TheLog.info("Trying to find DNSKEY records for #{child} from servers for #{child}")
+        TheLog.info("Trying to find DNSKEY records for ]#{child}[ from servers for ]#{child}[")
         #         query = Message.new(child, Types.DNSKEY)
         #         query.do_validation = false
         key_ret = nil
@@ -1264,14 +1273,14 @@ module Dnsruby
       #  If we don't, then see if we can get to it from the closest
       #  trust anchor
       #  Otherwise, try DLV (if configured)
-      # 
-      # 
+      #
+      #
       #  So - find closest existing trust anchor
       error = nil
       msg.security_level = Message::SecurityLevel.INDETERMINATE
       qname = msg.question()[0].qname
       closest_anchor = find_closest_anchor_for(qname)
-      TheLog.debug("Closest anchor for #{qname} is #{closest_anchor} - trying to follow down")
+      TheLog.info("Closest anchor for ]#{qname}[ is ]#{closest_anchor}[ - trying to follow down")
       error = try_to_follow_from_anchor(closest_anchor, msg, qname)
 
       if ((msg.security_level.code < Message::SecurityLevel::SECURE) &&
@@ -1282,11 +1291,11 @@ module Dnsruby
         dlv_anchor = find_closest_dlv_anchor_for(qname)
         if (dlv_anchor)
           #           print "Trying to follow DLV anchor from #{dlv_anchor.name} to #{qname}\n"
-          TheLog.debug("Trying to follow DLV anchor from #{dlv_anchor.name} to #{qname}")
+          TheLog.debug("Trying to follow DLV anchor from ]#{dlv_anchor.name}[ to ]#{qname}[")
           error = try_to_follow_from_anchor(dlv_anchor, msg, qname)
         else
           #           print "Couldn't find DLV anchor for #{qname}\n"
-          TheLog.debug("Couldn't find DLV anchor for #{qname}")
+          TheLog.debug("Could not find DLV anchor for ]#{qname}[")
         end
       end
       if (msg.security_level.code != Message::SecurityLevel::SECURE)

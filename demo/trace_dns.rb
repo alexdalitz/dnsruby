@@ -42,7 +42,7 @@ end
 
 
 domain = ARGV[0]
-type = ARGV[1] || Types.A
+type = ARGV[1] || Dnsruby::Types.A
 
 begin
   response = resolver.query(domain, type)
