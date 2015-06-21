@@ -1154,7 +1154,7 @@ module Dnsruby
 
     #  TO BE CALLED IN A SYNCHRONIZED BLOCK
     def increment_resolver_priority(res)
-      TheLog.debug("Incrementing resolver priority for #{res.server}\n")
+      TheLog.debug("Incrementing resolver priority for #{res.server}")
       #       @parent.single_res_mutex.synchronize {
       index = @parent.single_resolvers.index(res)
       if index > 0
@@ -1166,7 +1166,7 @@ module Dnsruby
 
     #  TO BE CALLED IN A SYNCHRONIZED BLOCK
     def decrement_resolver_priority(res)
-      TheLog.debug("Decrementing resolver priority for #{res.server}\n")
+      TheLog.debug("Decrementing resolver priority for #{res.server}")
       #       @parent.single_res_mutex.synchronize {
       index = @parent.single_resolvers.index(res)
       if index < @parent.single_resolvers.length

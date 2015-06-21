@@ -231,7 +231,7 @@ module Dnsruby
               #  Found root authority
               server = rr.nsdname.to_s.downcase
               server.sub!(/\.$/,"")
-              TheLog.debug(";; FOUND HINT: #{server}\n")
+              TheLog.debug(";; FOUND HINT: #{server}")
               hints[server] = AddressCache.new
             end
           end
