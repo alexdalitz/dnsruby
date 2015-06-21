@@ -58,6 +58,9 @@ module Dnsruby
     def verified_rrsets
       @verified_rrsets
     end
+    def reset_verified_rrset
+      @verified_rrsets = []
+    end
 
     def set_hints(hints)
       @@hints = hints
