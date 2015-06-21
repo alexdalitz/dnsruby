@@ -51,6 +51,12 @@ module Dnsruby
       #  The configured_ds_store is the set of DS records which have been configured
       #  by the client as trust anchors. Use Dnssec#add_trust_anchor to add these
       @configured_ds_store = []
+
+      @verified_rrsets = []
+    end
+
+    def verified_rrsets
+      @verified_rrsets
     end
 
     def set_hints(hints)
@@ -808,7 +814,8 @@ module Dnsruby
       expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
       rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl,
           expiration_diff].sort)[0]
-      #             print "VERIFIED OK\n"
+      #print "VERIFIED OK ]#{rrset.name}[, #{rrset.type}\n"
+      @verified_rrsets.push(rrset)
       return true
     end
 
