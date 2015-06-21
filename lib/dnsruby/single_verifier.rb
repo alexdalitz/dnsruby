@@ -1044,7 +1044,9 @@ module Dnsruby
               rescue VerifyError => e
                 #                 print "FAILED TO VERIFY DS RRSET FOR #{child}\n"
                 TheLog.info("FAILED TO VERIFY DS RRSET FOR #{child}")
-                return false, nil
+                # return false, nil
+                # raise ResolvError.new("FAILED TO VERIFY DS RRSET FOR #{child}")
+                raise VerifyError.new("FAILED TO VERIFY DS RRSET FOR #{child}")
               end
             end
           end
@@ -1084,7 +1086,8 @@ module Dnsruby
         rescue ResolvError => e
           #           print "Error getting DNSKEY for #{child} : #{e}\n"
           TheLog.error("Error getting DNSKEY for #{child} : #{e}")
-          return false, nil
+          # return false, nil
+          raise VerifyError.new("Error getting DNSKEY for #{child} : #{e}")
         end
         verified = true
         key_rrset = key_ret.answer.rrset(child, Types.DNSKEY)
@@ -1110,6 +1113,7 @@ module Dnsruby
               verify(key_rrset)
             rescue VerifyError =>e
               verified = false
+              raise VerifyError.new("Couldn't verify DNSKEY and DS records")
             end
           end
         end
@@ -1121,14 +1125,16 @@ module Dnsruby
         end
         if (!verified)
           TheLog.info("Failed to verify DNSKEY for #{child}")
-          return false, nil # new_res
+          # return false, nil # new_res
+          raise VerifyError.new("Failed to verify DNSKEY for #{child}")
         end
         #         Cache.add(key_ret)
         return key_rrset, new_res
       rescue VerifyError => e
         #         print "Verification error : #{e}\n"
         TheLog.info("Verification error : #{e}\n")
-        return false, nil # new_res
+        # return false, nil # new_res
+        raise VerifyError.new("Verification error : #{e}\n")
       end
     end
 
@@ -1271,6 +1277,9 @@ module Dnsruby
       msg.security_level = Message::SecurityLevel.INDETERMINATE
       qname = msg.question()[0].qname
       closest_anchor = find_closest_anchor_for(qname)
+      if (!closest_anchor)
+
+      end
       TheLog.debug("Closest anchor for #{qname} is #{closest_anchor} - trying to follow down")
       error = try_to_follow_from_anchor(closest_anchor, msg, qname)
 
@@ -1304,6 +1313,9 @@ module Dnsruby
       if (error)
         raise error
       end
+      if (msg.security_level == Message::SecurityLevel.BOGUS)
+        raise VerifyError.new("Bogus record")
+      end
       if (msg.security_level.code > Message::SecurityLevel::UNCHECKED)
         return true
       else
@@ -1315,7 +1327,15 @@ module Dnsruby
       error = nil
       if (closest_anchor)
         #  Then try to descend to the level we're interested in
-        actual_anchor = follow_chain(closest_anchor, qname)
+        actual_anchor = false
+        begin
+          actual_anchor = follow_chain(closest_anchor, qname)
+        rescue VerifyError => e
+          TheLog.debug("Broken chain from anchor : #{closest_anchor.name}")
+          msg.security_level = Message::SecurityLevel.BOGUS
+          return e
+        end
+        # @TODO@ We need to de ermine whether there was simply no DS record, or whether there was a failure
         if (!actual_anchor)
           TheLog.debug("Unable to follow chain from anchor : #{closest_anchor.name}")
           msg.security_level = Message::SecurityLevel.INSECURE

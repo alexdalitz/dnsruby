@@ -712,8 +712,8 @@ module Dnsruby
         #  validate it only if it has not been validated already
         #  So, if we need to validate it, send it to the validation thread
         #  Otherwise, send VALIDATED to the requester.
-        if (((msg.security_level == Message::SecurityLevel::UNCHECKED) ||
-                (msg.security_level == Message::SecurityLevel::INDETERMINATE)) &&
+        if (((msg.security_level == Message::SecurityLevel.UNCHECKED) ||
+                (msg.security_level == Message::SecurityLevel.INDETERMINATE)) &&
               (ValidatorThread.requires_validation?(query, msg, err, res)))
           validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
           validator.run

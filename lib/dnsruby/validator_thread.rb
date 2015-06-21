@@ -85,7 +85,7 @@ module Dnsruby
       #  @error will be nil for DNS RCODE errors - it will be true for TsigError. really?!
       if ((!error || (error.instance_of?NXDomain)) && query.do_validation)
         if (res.dnssec)
-          if (response.security_level != Message::SecurityLevel::SECURE)
+          if (response.security_level != Message::SecurityLevel.SECURE)
             return true
           end
         end
@@ -109,6 +109,7 @@ module Dnsruby
           return true
         rescue VerifyError => e
           response.security_error = e
+          response.security_level = BOGUS
           #  Response security_level should already be set
           return false
         end

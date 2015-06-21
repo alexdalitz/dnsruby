@@ -203,6 +203,7 @@ module Dnsruby
           end
         rescue VerifyError => e
           msg.security_error = e
+          msg.security_level = Message::SecurityLevel.BOGUS
         end
       end
 
@@ -240,13 +241,16 @@ module Dnsruby
               Proc.new{|m, q| validate_with_anchors(m, q)}, msg, query)
           end
         end
-        if (last_level != Message::SecurityLevel.SECURE)
+        if (last_level != Message::SecurityLevel.SECURE && last_level != Message::SecurityLevel.BOGUS)
           last_level, last_error, last_error_level = try_validation(last_level, last_error, last_error_level,
             Proc.new{|m, q| validate_with_dlv(m, q)}, msg, query)
         end
         #  Set the message security level!
         msg.security_level = last_level
         msg.security_error = last_error
+        if (last_error && last_error.index("ification error"))
+          msg.security_level = Message::SecurityLevel.BOGUS
+        end
         raise VerifyError.new(last_error) if (last_level < 0)
         return (msg.security_level.code > Message::SecurityLevel::UNCHECKED)
       end
