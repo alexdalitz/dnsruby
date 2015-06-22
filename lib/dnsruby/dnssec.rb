@@ -66,7 +66,7 @@ module Dnsruby
     @@validation_policy = ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT
 
     def Dnssec.validation_policy=(p)
-      if ((p >= ALWAYS_ROOT_ONLY) && (p <= ALWAYS_LOCAL_ANCHORS_ONLY))
+      if ((p >= ValidationPolicy::ALWAYS_ROOT_ONLY) && (p <= ValidationPolicy::ALWAYS_LOCAL_ANCHORS_ONLY))
         @@validation_policy = p
         #  @TODO@ Should we be clearing the trusted keys now?
       end
