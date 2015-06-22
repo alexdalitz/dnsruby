@@ -1125,8 +1125,8 @@ module Dnsruby
         end
         if (!verified)
           TheLog.info("Failed to verify DNSKEY for #{child}")
-          # return false, nil # new_res
-          raise VerifyError.new("Failed to verify DNSKEY for #{child}")
+          return false, nil # new_res
+          # raise VerifyError.new("Failed to verify DNSKEY for #{child}")
         end
         #         Cache.add(key_ret)
         return key_rrset, new_res
