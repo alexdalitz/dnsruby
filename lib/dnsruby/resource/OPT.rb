@@ -142,7 +142,7 @@ module Dnsruby
       end
 
       def payloadsize=(size)
-        self.klass=size
+        self.klass=Classes.new(size)
       end
 
       def options(args)
