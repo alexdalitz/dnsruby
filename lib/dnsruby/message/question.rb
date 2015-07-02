@@ -66,7 +66,7 @@ class Question
     other.is_a?(Question) &&
         self.qname  == other.qname  &&
         self.qtype  == other.qtype  &&
-        self.qclass == other.qclass
+        self.qclass == Classes.new(other.qclass)
   end
 
   #  Returns a string representation of the question record.
