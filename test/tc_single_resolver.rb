@@ -141,7 +141,7 @@ class TestSingleResolver < Minitest::Test
 
       assert(packet, "Got an answer for #{data[:name]} IN #{data[:type]}")
       assert_equal(1, packet.header.qdcount, 'Only one question')
-      assert_equal(1, packet.header.ancount, "Got single answer (for question #{data[:name]}")
+      assert_equal(2, packet.header.ancount, "Got single answer (for question #{data[:name]}")
 
       question = (packet.question)[0]
       answer   = (packet.answer)[0]
@@ -199,7 +199,7 @@ class TestSingleResolver < Minitest::Test
     # res.server=('ns0.validation-test-servers.nominet.org.uk')
     res.packet_timeout = 15
     m = res.query("overflow.net-dns.org", 'txt')
-    assert(m.header.ancount == 61, "61 answer records expected, got #{m.header.ancount}")
+    assert(m.header.ancount == 62, "62 answer records expected, got #{m.header.ancount}")
     assert(!m.header.tc, "Message was truncated!")
   end
 

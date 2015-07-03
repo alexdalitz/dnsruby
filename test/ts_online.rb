@@ -52,6 +52,13 @@ if online?
       resolver
       tcp
       tcp_pipelining
+
+  single_resolver
+  cache
+  dns
+  rr-opt
+  res_config
+
   )
 
   # Excluded are:
