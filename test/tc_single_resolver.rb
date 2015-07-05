@@ -197,6 +197,7 @@ class TestSingleResolver < Minitest::Test
     res = SingleResolver.new
     #     print "Dnssec = #{res.dnssec}\n"
     # res.server=('ns0.validation-test-servers.nominet.org.uk')
+    res.server=('ns.nlnetlabs.nl')
     res.packet_timeout = 15
     m = res.query("overflow.net-dns.org", 'txt')
     assert(m.header.ancount == 62, "62 answer records expected, got #{m.header.ancount}")
@@ -252,7 +253,7 @@ class TestSingleResolver < Minitest::Test
     port = 59821
     thread = Thread.new {
       u = UDPSocket.new()
-      u.bind("127.0.0.1", port)
+      u.bind("localhost", port)
 
       s = u.recvfrom(15000)
       received_query = s[0]
@@ -281,7 +282,7 @@ class TestSingleResolver < Minitest::Test
     }
     ret = nil
     thread2 = Thread.new {
-      r = SingleResolver.new("127.0.0.1")
+      r = SingleResolver.new("localhost")
       r.port = port
       ret = r.query("example.com")
     }
