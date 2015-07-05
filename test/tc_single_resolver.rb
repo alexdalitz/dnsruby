@@ -287,16 +287,22 @@ class TestSingleResolver < Minitest::Test
       ts.close
     }
     ret = nil
+    done = true;
     thread2 = Thread.new {
       r = SingleResolver.new("localhost")
       r.port = port
+      begin
       ret = r.query("example.com")
+      rescue OtherResolvError => e
+        done = false
+      end
     }
     thread.join
     thread2.join
-    assert(tcpPacket && udpPacket)
-    assert(tcpPacket.header == udpPacket.header)
-    assert(tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0].ttl == udpPacket.additional.rrsets('OPT', true)[0].rrs()[0].ttl, "UDP : #{udpPacket.additional.rrsets('OPT', true)[0].rrs()[0]}, TCP #{tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0]}")
-
+    if (done)
+      assert(tcpPacket && udpPacket)
+      assert(tcpPacket.header == udpPacket.header)
+      assert(tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0].ttl == udpPacket.additional.rrsets('OPT', true)[0].rrs()[0].ttl, "UDP : #{udpPacket.additional.rrsets('OPT', true)[0].rrs()[0]}, TCP #{tcpPacket.additional.rrsets('OPT', true)[0].rrs()[0]}")
+    end
   end
 end
