@@ -154,6 +154,7 @@ class MessageDecoder #:nodoc: all
   def get_question
     name = self.get_name
     type, klass = self.get_unpack('nn')
+    klass = Classes.new(klass)
     Question.new(name, type, klass)
   end
 

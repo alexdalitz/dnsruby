@@ -146,7 +146,7 @@ module Dnsruby
           type = args[1]
         end
         if (args.length > 2) # RRSET (RFC2136, Section 2.4.2)
-          klass = zone()[0].zclass
+          klass = Classes.new(zone()[0].zclass)
           rdata=args[2]
         end
         rec = RR.create("#{name} #{ttl} #{klass} #{type} #{rdata}")

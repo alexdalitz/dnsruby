@@ -141,7 +141,7 @@ class RR
   def RR.new_from_hash(inhash)
     hash = inhash.clone
     type = hash[:type] || Types::ANY
-    klass = hash[:klass] || Classes::IN
+    klass = Classes.new(hash[:klass] || Classes::IN)
     ttl = hash[:ttl] || 0
     record_class = get_class(type, klass)
     record = record_class.new
@@ -151,7 +151,7 @@ class RR
     end
     record.ttl = ttl
     record.type = type
-    record.klass = klass
+    record.klass = Classes.new(klass)
     hash.delete(:name)
     hash.delete(:type)
     hash.delete(:ttl)
@@ -266,7 +266,7 @@ class RR
     record.name = Name.create(name)
     record.ttl = ttl
     record.type = rrtype
-    record.klass = rrclass
+    record.klass = Classes.new(rrclass)
     record
   end
 
@@ -283,7 +283,7 @@ class RR
       record.name = Name.create(name)
       record.ttl = ttl
       record.type = rrtype
-      record.klass = rrclass
+      record.klass = Classes.new(rrclass)
       return record
     end
   end
