@@ -242,7 +242,7 @@ module Dnsruby
           @options.each do |opt|
             msg.put_pack('n', opt.code)
             msg.put_pack('n', opt.data.length)
-            msg.put_bytes(opt.data)
+            msg.put_pack('a*', opt.data)
           end
         end
       end
