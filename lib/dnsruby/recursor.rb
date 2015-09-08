@@ -431,6 +431,10 @@ module Dnsruby
       if (Name === n)
         n = n.to_s # @TODO@ This is a bit crap!
       end
+      if (n == nil)
+        TheLog.error("Name is nil")
+        raise  ResolvError.new("Nameserver invalid!")
+      end
       name = n.tr("","")
       if (name[name.length-1] != ".")
         name = name + "."

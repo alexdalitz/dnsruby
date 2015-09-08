@@ -73,8 +73,9 @@ class TestResolverConfig < Minitest::Test
   end
 
   def test_single_resolver
-    [Dnsruby::SingleResolver.new({:nameserver => ["127.0.0.1"]}),
-      Dnsruby::SingleResolver.new({:nameserver => ["::1"]})].each {|res|
+    [Dnsruby::SingleResolver.new()].each {|res|
+    # [Dnsruby::SingleResolver.new({:nameserver => ["127.0.0.1"]}),
+    #   Dnsruby::SingleResolver.new({:nameserver => ["::1"]})].each {|res|
       GoodInput.each do | param, value |
         #       puts("Setting " + param);
         res.send(param+"=", value)
