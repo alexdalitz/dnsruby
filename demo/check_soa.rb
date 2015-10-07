@@ -107,6 +107,8 @@ def process_ns_domain(resolver, domain, ns_domain)
     # ----------------------------------------------------------------------
     ip_address = a_answer.address
     resolver.nameserver = ip_address.to_s
+    # disable caching otherwise SOA is cached from first nameserver queried
+    resolver.do_caching = false
     print "#{ns_domain} (#{ip_address}): "
 
     # ----------------------------------------------------------------------
