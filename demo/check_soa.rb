@@ -64,6 +64,8 @@ def create_resolver
   resolver = Dnsruby::Resolver.new
   resolver.retry_times = 2
   resolver.recurse = 0  # Send out non-recursive queries
+  # disable caching otherwise SOA is cached from first nameserver queried
+  resolver.do_caching = false
   resolver
 end
 
@@ -107,8 +109,6 @@ def process_ns_domain(resolver, domain, ns_domain)
     # ----------------------------------------------------------------------
     ip_address = a_answer.address
     resolver.nameserver = ip_address.to_s
-    # disable caching otherwise SOA is cached from first nameserver queried
-    resolver.do_caching = false
     print "#{ns_domain} (#{ip_address}): "
 
     # ----------------------------------------------------------------------
