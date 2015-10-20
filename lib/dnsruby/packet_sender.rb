@@ -59,6 +59,10 @@ module Dnsruby
       @@authoritative_cache.clear
     end
 
+    def PacketSender.recursive_cache_length
+      @@recursive_cache.length
+    end
+
     attr_accessor :packet_timeout
 
     #  The port on the resolver to send queries to.

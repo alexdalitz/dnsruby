@@ -63,6 +63,33 @@ class TestCache < Minitest::Test
 
   end
 
+  def test_cache_max_size
+    Dnsruby::Cache.max_size=1
+    res = Resolver.new()
+    Dnsruby::PacketSender.clear_caches()
+    assert (Dnsruby::PacketSender.recursive_cache_length == 0)
+    msg = res.query("example.com")
+    assert (!msg.cached)
+    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    msg = res.query("example.com")
+    assert (msg.cached)
+    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    msg = res.query("google.com")
+    assert (!msg.cached)
+    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    msg = res.query("example.com")
+    assert (!msg.cached)
+    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    Dnsruby::Cache.max_size=2
+    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    msg = res.query("example.com")
+    assert (msg.cached)
+    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    msg = res.query("google.com")
+    assert (!msg.cached)
+    assert (Dnsruby::PacketSender.recursive_cache_length == 2)
+  end
+
   def test_resolver_do_caching
     #  Get the records back from the test zone
     Dnsruby::PacketSender.clear_caches

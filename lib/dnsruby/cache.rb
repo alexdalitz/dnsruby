@@ -31,6 +31,7 @@ module Dnsruby
   class Cache # :nodoc: all
     def initialize()
     @cache = Hash.new
+    @@max_size = 16*1024 # Get this right...
     @mutex = Mutex.new
     end
     def cache
@@ -44,6 +45,9 @@ module Dnsruby
     def length
       return @cache.length
     end
+    def Cache.max_size=(length)
+       @@max_size = length
+    end
     def add(message)
       q = message.question[0]
       key = CacheKey.new(q.qname, q.qtype, q.qclass).to_s
@@ -55,6 +59,10 @@ module Dnsruby
           TheLog.debug("CACHE ADD : #{q.qname}, #{q.qtype}\n")
         end
         @cache[key] = data
+
+        while @cache.size > @@max_size # keep the cache size reasonable
+          @cache.shift
+        end
       }
     end
     #  This method "fixes up" the response, so that the header and ttls are OK

@@ -29,4 +29,5 @@ create_task(:test,         'test/ts_dnsruby.rb')
 create_task(:test_offline, 'test/ts_offline.rb')
 create_task(:test_online,  'test/ts_online.rb')
 create_task(:soak,         'test/tc_soak.rb')
-
+create_task(:message,      'test/tc_message.rb')
+create_task(:cache,         'test/tc_cache.rb')
