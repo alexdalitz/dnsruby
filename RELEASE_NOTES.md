@@ -1,5 +1,20 @@
 # Release Notes
 
+## v1.59.0
+
+* Add LICENSE file
+* Add Cache max_size (gihub issue 64)
+* Disable caching for SOA lookups in demo check_soa.rb
+* Fix for invalid nameserver in config
+* Fix encoding for OPT data (thanks Craig Despeaux)
+* Various test system fixes
+* OPT fixes
+* DNSSEC verification failure handling wrt lack of DS chain
+* DNSSEC validation policy name constants
+* Fix for BOGUS DLV chains
+* demo upgrades
+* Resolver hints improvements 
+
 
 ## v1.58.0
 
