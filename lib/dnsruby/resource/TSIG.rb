@@ -54,6 +54,7 @@ module Dnsruby
       HMAC_MD5 = Name.create("HMAC-MD5.SIG-ALG.REG.INT.")
       HMAC_SHA1 = Name.create("hmac-sha1.")
       HMAC_SHA256 = Name.create("hmac-sha256.")
+      HMAC_SHA512 = Name.create("hmac-sha512.")
 
       DEFAULT_FUDGE     = 300
 
@@ -157,6 +158,8 @@ module Dnsruby
           mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA1.new, key, data)
         elsif (algorithm == HMAC_SHA256)
           mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA256.new, key, data)
+        elsif (algorithm == HMAC_SHA512)
+          mac = OpenSSL::HMAC.digest(OpenSSL::Digest::SHA512.new, key, data)
         else
           #  Should we allow client to pass in their own signing function?
           raise VerifyError.new("Algorithm #{algorithm} unsupported by TSIG")
@@ -515,6 +518,7 @@ module Dnsruby
       # * hmac-md5
       # * hmac-sha1
       # * hmac-sha256
+      # * hmac-sha512
       def algorithm=(alg)
         if (alg.class == String)
           if (alg.downcase=="hmac-md5")
@@ -523,11 +527,13 @@ module Dnsruby
             @algorithm = HMAC_SHA1;
           elsif (alg.downcase=="hmac-sha256")
             @algorithm = HMAC_SHA256;
+          elsif (alg.downcase=="hmac-sha512")
+            @algorithm = HMAC_SHA512;
           else
             raise ArgumentError.new("Invalid TSIG algorithm")
           end
         elsif (alg.class == Name)
-          if (alg!=HMAC_MD5 && alg!=HMAC_SHA1 && alg!=HMAC_SHA256)
+          if (alg!=HMAC_MD5 && alg!=HMAC_SHA1 && alg!=HMAC_SHA256 && alg!=HMAC_SHA512)
             raise ArgumentException.new("Invalid TSIG algorithm")
           end
           @algorithm=alg
