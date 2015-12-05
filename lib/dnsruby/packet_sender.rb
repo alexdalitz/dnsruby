@@ -392,7 +392,7 @@ module Dnsruby
           end
         rescue Errno::EISCONN
           #already connected, do nothing and reuse!
-        rescue IOError #close by remote host, reconnect
+        rescue IOError, Errno::ECONNRESET #close by remote host, reconnect
           @pipeline_socket = nil
           Dnsruby.log.debug("Connection closed - recreating socket")
         end
@@ -401,21 +401,27 @@ module Dnsruby
       create_pipeline_socket = -> do
         @tcp_pipeline_local_port = src_port
         src_address = @ipv6 ? @src_address6 : @src_address
-
-        @pipeline_socket = Socket.new(AF_INET, SOCK_STREAM, 0)
-        @pipeline_socket.bind(Addrinfo.tcp(src_address, src_port))
-        @pipeline_socket.connect(sockaddr)
-        @use_counts[@pipeline_socket] = 0
+        begin
+          @pipeline_socket = Socket.new(AF_INET, SOCK_STREAM, 0)
+          @pipeline_socket.bind(Addrinfo.tcp(src_address, src_port))
+          @pipeline_socket.connect(sockaddr)
+          Dnsruby.log.debug("Creating socket #{src_address}:#{src_port}")
+          @use_counts[@pipeline_socket] = 0
+        rescue Exception => e
+          @pipeline_socket = nil
+          raise e
+        end
       end
 
       # Don't combine the following 2 statements; the reuse lambda can set the
       # socket to nil and if so we'd want to call the create lambda to recreate it.
       reuse_pipeline_socket.() if @pipeline_socket
+      new_socket = @pipeline_socket.nil?
       create_pipeline_socket.() unless @pipeline_socket
 
       @use_counts[@pipeline_socket] += 1
 
-      @pipeline_socket
+      [@pipeline_socket, new_socket]
     end
 
     #  This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
@@ -437,10 +443,11 @@ module Dnsruby
           if (use_tcp)
             begin
               if (@tcp_pipelining)
-                socket = tcp_pipeline_socket(src_port)
+                socket, new_socket = tcp_pipeline_socket(src_port)
                 src_port = @tcp_pipeline_local_port
               else
                 socket = TCPSocket.new(@server, @port, src_address, src_port)
+                new_socket = true
               end
             rescue Errno::EBADF, Errno::ENETUNREACH => e
               #  Can't create a connection
@@ -458,6 +465,7 @@ module Dnsruby
               #               ipv6 = @src_address =~ /:/
               socket = UDPSocket.new(@ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
             end
+            new_socket = true
             socket.bind(src_address, src_port)
             socket.connect(@server, @port)
           end
@@ -465,7 +473,8 @@ module Dnsruby
         rescue Exception => e
           if (socket!=nil)
             begin
-              socket.close
+              #let the select thread close the socket if tcp_pipeli
+              socket.close unless @tcp_pipelining && !new_socket
             rescue Exception
             end
           end
@@ -473,9 +482,15 @@ module Dnsruby
           #  Maybe try a max number of times?
           if ((e.class != Errno::EADDRINUSE) || (numtries > 50) ||
               ((e.class == Errno::EADDRINUSE) && (src_port == @src_port[0])))
-            err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
-            Dnsruby.log.error { "#{err}" }
-            st.push_exception_to_select(client_query_id, client_queue, err, nil)
+            err_msg = "dnsruby can't connect to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e} #{e.backtrace}"
+            err=IOError.new(err_msg)
+            Dnsruby.log.error( "#{err}")
+            Dnsruby.log.error(e.backtrace)
+            if @tcp_pipelining
+              st.push_exception_to_select(client_query_id, client_queue, SocketEofResolvError.new(err_msg), nil)
+            else
+              st.push_exception_to_select(client_query_id, client_queue, err, nil)
+            end
             return
           end
         end
@@ -498,15 +513,24 @@ module Dnsruby
           socket.send(lenmsg, 0)
         end
         socket.send(query_bytes, 0)
-        #  The select thread will now wait for the response and send that or a timeout
-        #  back to the client_queue.
+
+        #  The select thread will now wait for the response and send that or a
+        #  timeout back to the client_queue.
         st.add_to_select(query_settings)
       rescue Exception => e
-        err=IOError.new("Send failed to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}")
+        err_msg = "Send failed to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}"
+        err=IOError.new(err_msg)
         Dnsruby.log.error { "#{err}" }
-        st.push_exception_to_select(client_query_id, client_queue, err, nil)
+        Dnsruby.log.error(e.backtrace)
+        if @tcp_pipelining
+          st.push_exception_to_select(client_query_id, client_queue, SocketEofResolvError.new(err_msg), nil) if new_socket
+        else
+          st.push_exception_to_select(client_query_id, client_queue, err, nil)
+        end
         begin
-          socket.close
+          #we let the select_thread close the socket when doing tcp
+          #pipelining
+          socket.close unless @tcp_pipelining && !new_socket
         rescue Exception
         end
         return
