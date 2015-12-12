@@ -14,7 +14,17 @@ end
 
 require 'minitest'
 require 'minitest/autorun'
+require 'minitest/display'
 
+MiniTest::Display.options = {
+  suite_names: true,
+  color: true,
+  print: {
+    success: ".",
+    failure: "F",
+    error: "R"
+  }
+}
 # This is in a self invoking anonymous lambda so local variables do not
 # leak to the outer scope.
 -> do
