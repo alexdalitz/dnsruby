@@ -17,21 +17,61 @@
 require 'rubydns'
 require 'nio'
 require 'socket'
+require 'thread'
 
-# TCPPipeliningHandler accepts new tcp connection and reads data from the sockets until
+class SimpleTimers
+  def initialize
+    @events = {}
+  end
+
+  def empty?
+    @events.empty?
+  end
+
+  def after(seconds, &block)
+    eventTime = Time.now + seconds
+    @events[eventTime] ||= []
+    @events[eventTime] << block
+  end
+
+  def fire
+    now = Time.now
+
+    events = @events.select { |key, value| key <= now }
+
+    (events || []).each do |key, blocks|
+      blocks.each do |block|
+        block.call
+      end
+      @events.delete(key)
+    end
+  end
+
+  def wait_interval
+    next_event = @events.keys.min
+    next_event.nil? ? nil : next_event - Time.now
+  end
+end
+
+# NioTcpPipeliningHandler accepts new tcp connection and reads data from the sockets until
 # either the client closes the connection, @max_requests_per_connection is reached
 # or @timeout is attained.
 
 class NioTcpPipeliningHandler < RubyDNS::GenericHandler
 
   DEFAULT_MAX_REQUESTS = 4
-
+  DEFAULT_TIMEOUT = 3
   # TODO Add timeout
-  def initialize(server, host, port, max_requests = DEFAULT_MAX_REQUESTS)
+  def initialize(server, host, port, max_requests = DEFAULT_MAX_REQUESTS, timeout = DEFAULT_TIMEOUT)
     super(server)
     @max_requests_per_connection = max_requests
+    @timeout = timeout
     @socket = TCPServer.new(host, port)
     @count = {}
+
+    @server.class.stats.connections = @count.keys.count
+
+    @timers = SimpleTimers.new
 
     @selector = NIO::Selector.new
     monitor = @selector.register(@socket, :r)
@@ -62,18 +102,26 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
     _, _remote_port, remote_host = socket.peeraddr
     options = { peer: remote_host }
 
-    input_data = RubyDNS::StreamTransport.read_chunk(socket)
-    response = process_query(input_data, options)
-    RubyDNS::StreamTransport.write_message(socket, response)
-
+    new_connection = @count[socket].nil?
     @count[socket] ||= 0
     @count[socket]  += 1
+    @server.class.stats.connection_accept(new_connection, @count.keys.count)
 
+    #we read all data until timeout
+    input_data = RubyDNS::StreamTransport.read_chunk(socket)
+
+    if @count[socket] <= @max_requests_per_connection
+      response = process_query(input_data, options)
+      RubyDNS::StreamTransport.write_message(socket, response)
+    end
+
+=begin
     if @count[socket] >= @max_requests_per_connection
       _, port, host = socket.peeraddr
       @logger.debug("*** max request for #{host}:#{port}")
       remove(socket)
     end
+=end
   rescue EOFError
     _, port, host = socket.peeraddr
     @logger.debug("*** #{host}:#{port} disconnected")
@@ -81,117 +129,91 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
     remove(socket)
   end
 
-  def remove(socket)
+  def remove(socket, update_connections=true)
     @logger.debug("Removing socket from selector")
     socket.close rescue nil
-    @selector.deregister(socket)
-    @count.delete(socket)
+    @selector.deregister(socket) rescue nil
+    socket_count = @count.delete(socket)
+    @server.class.stats.connections = @count.keys.count if update_connections
+    socket_count
   end
 
   def create_selector_thread
     Thread.new do
       loop do
-        @selector.select { |monitor| monitor.value.call(monitor) }
-        break if @selector.closed?
+        begin
+          @timers.fire
+          intervals = [@timers.wait_interval || 0.1, 0.1]
+
+          @selector.select(intervals.min > 0 ? intervals.min : 0.1) do
+            |monitor| monitor.value.call(monitor)
+          end
+
+          @logger.debug "Woke up"
+          break if @selector.closed?
+        rescue Exception => e
+          @logger.debug "Exception #{e}"
+          @logger.debug "Backtrace #{e.backtrace}"
+        end
       end
     end
   end
 
   def handle_connection(socket)
     @logger.debug "New connection"
-    @server.class.stats.increment_connection
-
     @logger.debug "Add socket to @selector"
+
     monitor = @selector.register(socket, :r)
     monitor.value = proc { process_socket(socket) }
-  end
-end
 
-class TCPPipeliningHandler < RubyDNS::GenericHandler
-  DEFAULT_MAX_REQUESTS = 4
-  DEFAULT_TIMEOUT = 3.0
-
-  def initialize(server, host, port, max_requests = DEFAULT_MAX_REQUESTS, timeout = DEFAULT_TIMEOUT)
-    super(server)
-    @timeout = timeout
-    @max_requests_per_connection = max_requests
-    @socket = TCPServer.new(host, port)
-
-    async.run
-  end
-
-  finalizer :finalize
-
-  def finalize
-    @socket.close if @socket
-  end
-
-  def run
-    loop { async.handle_connection(@socket.accept) }
-  end
-
-
-  def handle_connection(socket)
-    _, _remote_port, remote_host = socket.peeraddr
-    options = { peer: remote_host }
-
-    @logger.debug "New connection"
-    @server.class.stats.increment_connection
-
-    timeout = @timeout
-    msg_count = 0
-
-    loop do
-      start_time = Time.now
-      @logger.debug "Waiting for #{timeout} max"
-      sockets = ::IO.select([socket], nil , nil, timeout)
-      duration = Time.now - start_time
-
-      @logger.debug "Slept for #{duration}"
-
-      timeout -= duration
-
-      if sockets
-        input_data = RubyDNS::StreamTransport.read_chunk(socket)
-        response = process_query(input_data, options)
-        RubyDNS::StreamTransport.write_message(socket, response)
-
-        msg_count += 1
-        @logger.debug "Responded to message #{msg_count}"
-      else
-        @logger.debug "TCP session timeout!"
-        @server.class.stats.increment_timeout
-        break
+    @logger.debug "Add socket timer of #{@timeout}"
+    @timers.after(@timeout) do
+      @logger.debug "Timeout fired for socket #{socket}"
+      count = remove(socket, false)
+      unless count.nil?
+        @logger.debug "Timeout for socket #{socket}"
+        @logger.debug "Increasing timeout count"
+        @server.class.stats.connection_timeout(@count.keys.count)
       end
-
-      if msg_count >= @max_requests_per_connection
-        @logger.debug "Max number of requests attained (#{@max_requests_per_connection})"
-        @server.class.stats.increment_max
-        break
-      end
-
     end
-  rescue EOFError
-    @logger.warn "TCP session ended (closed by client)"
-  rescue DecodeError
-    @logger.warn "Could not decode incoming TCP data!"
-  ensure
-    socket.close
   end
 end
 
 # Stats collects statistics from our tcp handler
 class Stats
   def initialize()
-    @mutex = Mutex.new
-    @accept_count = 0
+    @mutex         = Mutex.new
+    @accept_count  = 0
     @timeout_count = 0
-    @max_count = 0
+    @max_count     = 0
+    @connections   = 0
   end
 
   def increment_max;        @mutex.synchronize { @max_count     += 1 } end
   def increment_timeout;    @mutex.synchronize { @timeout_count += 1 } end
   def increment_connection; @mutex.synchronize { @accept_count  += 1 } end
+
+  def connection_timeout(active_connections)
+    @mutex.synchronize do
+      @timeout_count += 1
+      @connections = active_connections
+    end
+  end
+
+  def connection_accept(new_connection, active_connections)
+    @mutex.synchronize {
+      @connections    = active_connections
+      @accept_count  += 1 if new_connection
+    }
+  end
+
+  def connections=(active_connections)
+    @mutex.synchronize { @connections = active_connections }
+  end
+
+  def connections
+    @mutex.synchronize { @connections }
+  end
 
   def accept_count
     @mutex.synchronize { @accept_count  }
@@ -204,5 +226,4 @@ class Stats
   def max_count
     @mutex.synchronize { @max_count }
   end
-
 end
