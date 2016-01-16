@@ -1,5 +1,11 @@
 # Release Notes
 
+## v1.59.1
+
+* Support for HMAC SHA512 TSIG keys
+* Fix TCP pipelining tests
+* IDN encoding error returned as Dnsruby::OtherResolvError
+
 ## v1.59.0
 
 * Add LICENSE file
