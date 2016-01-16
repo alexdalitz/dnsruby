@@ -15,7 +15,11 @@ class MessageEncoder #:nodoc: all
   end
 
   def put_pack(template, *d)
-    @data << d.pack(template)
+    begin
+      @data << d.pack(template)
+    rescue Encoding::CompatibilityError => e
+      raise Dnsruby::OtherResolvError.new("IDN support currently requires punycode string")
+    end
   end
 
   def put_length16
@@ -28,8 +32,12 @@ class MessageEncoder #:nodoc: all
   end
 
   def put_string(d)
-    self.put_pack("C", d.length)
-    @data << d
+    begin
+      self.put_pack("C", d.length)
+      @data << d
+    rescue Encoding::CompatibilityError => e
+      raise Dnsruby::OtherResolvError.new("IDN support currently requires punycode string")
+    end
   end
 
   def put_string_list(ds)
