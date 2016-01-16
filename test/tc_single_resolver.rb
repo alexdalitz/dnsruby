@@ -195,20 +195,20 @@ class TestSingleResolver < Minitest::Test
     assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up cname.')
   end
 
-  def test_truncated_response
-    res = SingleResolver.new
-    #     print "Dnssec = #{res.dnssec}\n"
-    # res.server=('ns0.validation-test-servers.nominet.org.uk')
-    res.server=('ns.nlnetlabs.nl')
-    res.packet_timeout = 15
-    begin
-      m = res.query("overflow.net-dns.org", 'txt')
-      assert(m.header.ancount == 62, "62 answer records expected, got #{m.header.ancount}")
-      assert(!m.header.tc, "Message was truncated!")
-    rescue ResolvTimeout => e
-    rescue ServFail => e # not sure why, but we get this on Travis...
-    end
-  end
+  # def test_truncated_response
+    # res = SingleResolver.new
+    # #     print "Dnssec = #{res.dnssec}\n"
+    # # res.server=('ns0.validation-test-servers.nominet.org.uk')
+    # res.server=('ns.nlnetlabs.nl')
+    # res.packet_timeout = 15
+    # begin
+      # m = res.query("overflow.net-dns.org", 'txt')
+      # assert(m.header.ancount == 62, "62 answer records expected, got #{m.header.ancount}")
+      # assert(!m.header.tc, "Message was truncated!")
+    # rescue ResolvTimeout => e
+    # rescue ServFail => e # not sure why, but we get this on Travis...
+    # end
+  # end
 
   def test_illegal_src_port
     #  Try to set src_port to an illegal value - make sure error raised, and port OK
