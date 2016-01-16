@@ -67,27 +67,27 @@ class TestCache < Minitest::Test
     Dnsruby::Cache.max_size=1
     res = Resolver.new()
     Dnsruby::PacketSender.clear_caches()
-    assert (Dnsruby::PacketSender.recursive_cache_length == 0)
+    assert(Dnsruby::PacketSender.recursive_cache_length == 0)
     msg = res.query("example.com")
-    assert (!msg.cached)
-    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    assert(!msg.cached)
+    assert(Dnsruby::PacketSender.recursive_cache_length == 1)
     msg = res.query("example.com")
-    assert (msg.cached)
-    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    assert(msg.cached)
+    assert(Dnsruby::PacketSender.recursive_cache_length == 1)
     msg = res.query("google.com")
-    assert (!msg.cached)
-    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    assert(!msg.cached)
+    assert(Dnsruby::PacketSender.recursive_cache_length == 1)
     msg = res.query("example.com")
-    assert (!msg.cached)
-    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    assert(!msg.cached)
+    assert(Dnsruby::PacketSender.recursive_cache_length == 1)
     Dnsruby::Cache.max_size=2
-    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    assert(Dnsruby::PacketSender.recursive_cache_length == 1)
     msg = res.query("example.com")
-    assert (msg.cached)
-    assert (Dnsruby::PacketSender.recursive_cache_length == 1)
+    assert(msg.cached)
+    assert(Dnsruby::PacketSender.recursive_cache_length == 1)
     msg = res.query("google.com")
-    assert (!msg.cached)
-    assert (Dnsruby::PacketSender.recursive_cache_length == 2)
+    assert(!msg.cached)
+    assert(Dnsruby::PacketSender.recursive_cache_length == 2)
   end
 
   def test_resolver_do_caching
@@ -98,7 +98,7 @@ class TestCache < Minitest::Test
     res.do_caching = false
     assert(!res.do_caching)
     res.udp_size = 4096
-    ret = res.query("overflow.net-dns.org", Types.TXT)
+    ret = res.query("net-dns.org", Types.TXT)
     # ret = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
 #    print "#{ret}\n"
     assert(!ret.cached)
@@ -106,12 +106,12 @@ class TestCache < Minitest::Test
     assert(ret.header.aa)
     #  Store the ttls
     first_ttls = ret.answer.rrset(
-      "overflow.net-dns.org", Types.TXT).ttl
+      "net-dns.org", Types.TXT).ttl
       # "overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT).ttl
     #  Wait a while
     sleep(1)
     #  Ask for the same records
-    ret = res.query("overflow.net-dns.org", Types.TXT)
+    ret = res.query("net-dns.org", Types.TXT)
     # ret = res.query("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
 #    print "#{ret}\n"
     assert(ret.rcode == RCode.NoError)
@@ -125,7 +125,7 @@ class TestCache < Minitest::Test
     res = SingleResolver.new("ns.nlnetlabs.nl.")
     # res = SingleResolver.new("ns0.validation-test-servers.nominet.org.uk.")
     res.udp_size = 4096
-    query = Message.new("overflow.net-dns.org", Types.TXT)
+    query = Message.new("net-dns.org", Types.TXT)
     # query = Message.new("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
     ret = res.send_message(query)
 #    print "#{ret}\n"
@@ -134,19 +134,19 @@ class TestCache < Minitest::Test
     assert(ret.header.aa)
     #  Store the ttls
     first_ttls = ret.answer.rrset(
-      "overflow.net-dns.org", Types.TXT).ttl
+      "net-dns.org", Types.TXT).ttl
       # "overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT).ttl
     #  Wait a while
     sleep(1)
     #  Ask for the same records
-    query = Message.new("overflow.net-dns.org", Types.TXT)
+    query = Message.new("net-dns.org", Types.TXT)
     # query = Message.new("overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT)
     ret = res.send_message(query)
 #    print "#{ret}\n"
     assert(ret.rcode == RCode.NoError)
     assert(ret.cached)
     second_ttls = ret.answer.rrset(
-      "overflow.net-dns.org", Types.TXT).ttl
+      "net-dns.org", Types.TXT).ttl
       # "overflow.dnsruby.validation-test-servers.nominet.org.uk", Types.TXT).ttl
     #  make sure the ttl is less the time we waited
     assert((second_ttls == first_ttls - 1) || (second_ttls == first_ttls - 2),
