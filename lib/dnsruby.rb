@@ -76,7 +76,7 @@ require 'dnsruby/resolv'
 # 
 # * ResolvError < StandardError
 # 
-# * ResolvTimeout < TimeoutError
+# * ResolvTimeout < Timeout::Error
 # 
 # * NXDomain < ResolvError
 # 
