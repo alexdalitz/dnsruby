@@ -1,5 +1,9 @@
 # Release Notes
 
+## v1.59.2
+
+* Timeout error fix
+
 ## v1.59.1
 
 * Support for HMAC SHA512 TSIG keys
