@@ -153,7 +153,7 @@ module Dnsruby
         add_pre(rec)
         return rec
       else
-        raise ArgumentError.new("Wrong number of arguments (#{args.length} for 1 or 2) for Update#absent")
+        raise ArgumentError.new("Wrong number of arguments (#{args.length} for 1 or 2) for Update#present")
       end
     end
 

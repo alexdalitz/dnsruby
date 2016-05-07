@@ -59,14 +59,16 @@ class MessageEncoder #:nodoc: all
   end
 
   def put_labels(d, do_canonical)
-    d.each_index do |i|
-      domain = d[i..-1].join('.')
-      if !do_canonical && (idx = @names[domain])
-        self.put_pack('n', 0xc000 | idx)
-        return
-      else
-        @names[domain] = @data.length
-        self.put_label(d[i])
+    if (d.length > 0)
+      d.each_index do |i|
+        domain = d[i..-1].join('.')
+        if !do_canonical && (idx = @names[domain])
+          self.put_pack('n', 0xc000 | idx)
+          return
+        else
+          @names[domain] = @data.length
+          self.put_label(d[i])
+        end
       end
     end
     @data << "\0"
