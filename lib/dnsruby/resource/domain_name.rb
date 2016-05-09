@@ -43,7 +43,9 @@ module Dnsruby
       end
 
       def encode_rdata(msg, canonical=false) #:nodoc: all
-        msg.put_name(@domainname, canonical)
+        if (klass != Classes::NONE)
+          msg.put_name(@domainname, canonical)
+        end
       end
 
       def self.decode_rdata(msg) #:nodoc: all
