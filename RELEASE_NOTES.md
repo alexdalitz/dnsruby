@@ -1,5 +1,11 @@
 # Release Notes
 
+## v1.59.3
+
+* Output TXT record multiple strings correctly
+* NONE class encoding fix
+* only add name labels if there are any
+
 ## v1.59.2
 
 * Timeout error fix
