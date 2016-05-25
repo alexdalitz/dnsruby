@@ -29,7 +29,7 @@ module Dnsruby
       attr_accessor :strings
 
       def data
-        @strings[0]
+        @strings.join
       end
 
       def from_data(data)
