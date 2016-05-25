@@ -219,6 +219,17 @@ class TestUpdate < Minitest::Test
     assert_equal(Classes.NONE,              pre[2].klass, 'forth class right');         #66
   end
 
+  def test_absent_cname
+    update = Update.new()
+    rr = update.absent("target_name", "CNAME")
+    assert(rr,                                    'nxdomain() returned RR');
+    assert_equal(rr.name.to_s,  "target_name",                      'nxdomain - right name');
+    assert_equal(rr.ttl,   0,                          'nxdomain - right ttl');
+    assert_equal(rr.klass.string, 'NONE',                     'nxdomain - right class');
+    assert_equal(rr.type.string,  'CNAME',                      'nxdomain - right type');
+    assert(is_empty(rr.rdata),                'nxdomain - data empty');
+  end
+
   def test_txt
     update = Update.new()
     update.add("target_name", "TXT", 100, "test signed update")
