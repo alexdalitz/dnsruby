@@ -1,12 +1,12 @@
 # --
 # Copyright 2007 Nominet UK
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -228,6 +228,41 @@ class TestUpdate < Minitest::Test
     assert_equal(rr.klass.string, 'NONE',                     'nxdomain - right class');
     assert_equal(rr.type.string,  'CNAME',                      'nxdomain - right type');
     assert(is_empty(rr.rdata),                'nxdomain - data empty');
+
+    encoded_msg = Message.decode(update.encode)
+    rr = encoded_msg.answer.first
+    assert(rr,                                    'nxdomain() returned RR')
+    assert_equal(rr.name.to_s,  "target_name",                      'nxdomain - right name')
+    assert_equal(rr.ttl,   0,                          'nxdomain - right ttl')
+    assert_equal(rr.klass.string, 'NONE',                     'nxdomain - right class')
+    assert_equal(rr.type.string,  'CNAME',                      'nxdomain - right type')
+    assert_equal(rr.rdata, nil,               'nxdomain - data empty')
+  end
+
+  def test_delete_specific_cname
+    update = Update.new 'example.com'
+    update.delete 'test.example.com', 'CNAME', 'target.example.com'
+
+    encoded_msg = Message.decode update.encode
+    rr = encoded_msg.authority.first
+    assert_equal rr.name.to_s, 'test.example.com', 'delete_cname - right name'
+    assert_equal 0, rr.ttl, 'delete_cname - right ttl'
+    assert_equal 'NONE', rr.klass.string, 'delete_cname - right class'
+    assert_equal 'CNAME', rr.type.string, 'delete_cname - right type'
+    assert_equal 'target.example.com', rr.rdata.to_s, 'delete_cname - right target'
+  end
+
+  def test_delete_cname
+    update = Update.new 'example.com'
+    update.delete 'test.example.com', 'CNAME'
+
+    encoded_msg = Message.decode update.encode
+    rr = encoded_msg.authority.first
+    assert_equal rr.name.to_s, 'test.example.com', 'delete_cname - right name'
+    assert_equal 0, rr.ttl, 'delete_cname - right ttl'
+    assert_equal 'ANY', rr.klass.string, 'delete_cname - right class'
+    assert_equal 'CNAME', rr.type.string, 'delete_cname - right type'
+    assert_equal nil, rr.rdata, 'delete_cname - right rdata'
   end
 
   def test_txt

@@ -134,6 +134,8 @@ class MessageDecoder #:nodoc: all
           labels += self.get_labels(limit)
           @index = save_index
           return labels
+        when nil
+          return labels
         else
           labels << self.get_label
       end
