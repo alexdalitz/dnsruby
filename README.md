@@ -76,11 +76,11 @@ Usage Help
 ----------
 
 There are a couple of blog articles that might be helpful
-in understanding how to use Dnsruby:
+in understanding how to use Dnsruby. These used to be hosted by
+Nominet UK, however the original content has been copied to the
+dnsruby github wiki at :
 
-* http://blog.nominet.org.uk/tech/2009/05/19/some-examples-of-dnsruby-in-action/
-* http://blog.nominet.org.uk/tech/2009/05/21/examples-of-using-dnsruby-with-dnssec/
-
+https://github.com/alexdalitz/dnsruby/wiki
 
 Contact/Links
 -------
