@@ -253,6 +253,7 @@ module Dnsruby
       _id, result, error = q.pop
 
       if error
+        error.response = result if error.is_a?(ResolvError)
         raise error
       else
         result
@@ -268,6 +269,7 @@ module Dnsruby
         response = send_message(message)
       rescue => e
         error = e
+        response = error.response if error.is_a?(ResolvError)
       end
       [response, error]
     end

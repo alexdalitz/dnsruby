@@ -158,6 +158,7 @@ module Dnsruby
 
   # An error raised while querying for a resource
   class ResolvError < StandardError
+    attr_accessor :response
   end
 
   # A timeout error raised while querying for a resource
