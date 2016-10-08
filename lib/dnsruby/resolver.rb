@@ -269,7 +269,6 @@ module Dnsruby
         response = send_message(message)
       rescue => e
         error = e
-        response = error.response if error.is_a?(ResolvError)
       end
       [response, error]
     end
@@ -332,6 +331,7 @@ module Dnsruby
       q = Queue.new
       send_async(message, q)
       _id, result, error = q.pop
+      error.response = result if !error.nil? && error.is_a?(ResolvError)
       [result, error]
     end
 
