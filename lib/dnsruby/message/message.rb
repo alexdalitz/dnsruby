@@ -17,7 +17,6 @@
 require 'dnsruby/name'
 require 'dnsruby/resource/resource'
 
-
 module Dnsruby
   #  ===Defines a DNS packet.
   # 
@@ -539,7 +538,7 @@ module Dnsruby
     #  Return the encoded form of the message
     #  If there is a TSIG record present and the record has not been signed
     #  then sign it
-    def encode
+    def encode(canonical=false)
       if @tsigkey && (@tsigstate == :Unsigned) && !@signing
         @signing = true
         sign!
@@ -555,7 +554,7 @@ module Dnsruby
         }
         [@answer, @authority, @additional].each { |rr|
           rr.each { |r|
-            msg.put_rr(r)
+            msg.put_rr(r, canonical)
           }
         }
       }.to_s

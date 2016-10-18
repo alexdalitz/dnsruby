@@ -36,6 +36,7 @@ TESTS = %w(
     nxt
     packet
     packet_unique_push
+    ptrin
     question
     res_config
     res_file
