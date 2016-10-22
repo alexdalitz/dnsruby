@@ -117,7 +117,7 @@ module Dnsruby
       attr_reader :expiration
       def message=(m)
         @expiration = get_expiration(m)
-        @message = Message.decode(m.encode)
+        @message = Message.decode(m.encode(true))
         @message.cached = true
       end
       def message

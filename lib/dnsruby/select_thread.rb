@@ -445,7 +445,7 @@ module Dnsruby
 
             return false
           end
-          buf += input
+          buf << input
         rescue
           #  Oh well - better luck next time!
           return false
