@@ -5,7 +5,7 @@ class TestPtrIn < Minitest::Test
 
   # Tests that message raises no error when decoded, encoded, and decoded again.
   def verify(message_data_as_hex_string, canonical = false)
-    Dnsruby.log.level = Logger::DEBUG
+    # Dnsruby.log.level = Logger::DEBUG
     message = Message.decode([message_data_as_hex_string].pack('H*').force_encoding("ASCII-8BIT"))
     Message.decode(message.encode(canonical))
   end
