@@ -1,5 +1,12 @@
 # Release Notes
 
+## v1.60.0
+
+* TCP multi-packet support fixed
+* Response 'Message' now included with exception.
+* Docs added
+* CNAME dynamic update fix
+
 ## v1.59.3
 
 * Output TXT record multiple strings correctly
