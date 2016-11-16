@@ -100,6 +100,7 @@ class TestRrOpt < Minitest::Test
 
     #  Now send query
     res = Resolver.new("127.0.0.1")
+    res.dnssec = true
     res.port = port
     res.udp_size = 4096
     assert(res.udp_size == 4096)
@@ -177,6 +178,7 @@ class TestRrOpt < Minitest::Test
     }
     #  Now send query
     res = Resolver.new("127.0.0.1")
+    res.dnssec = true
     res.port = port
     res.udp_size = 4096
     assert(res.udp_size == 4096)

@@ -109,6 +109,7 @@ class TestSingleResolver < Minitest::Test
       udps.bind("127.0.0.1", 0)
       port = *udps.addr.values_at(3, 1)
       res = SingleResolver.new("127.0.0.1")
+      res.dnssec = true
       res.port = port
       res.packet_timeout=1
       q = Queue.new
