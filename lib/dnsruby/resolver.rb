@@ -77,7 +77,7 @@ module Dnsruby
     DefaultRetryDelay = 5
     DefaultPipeLiningMaxQueries = 5
     DefaultPort = 53
-    DefaultDnssec = true
+    DefaultDnssec = false
     AbsoluteMinDnssecUdpSize = 1220
     MinDnssecUdpSize = 4096
     DefaultUDPSize = MinDnssecUdpSize
