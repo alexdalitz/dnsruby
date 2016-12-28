@@ -178,6 +178,18 @@ class TestRR < Minitest::Test
       :preference   => 10,
       :exchange     => 'kx-exchange.example.com',
     },
+    {	# [26]
+      :type         => Types.APL,
+      :prefixes     => '1:10.0.0.0/8 !1:172.16.0.0/12 1:192.168.0.0/16 !1:192.168.0.0/24',
+    },
+    {	# [27]
+      :type         => Types.APL,
+      :prefixes     => '!2:fe80::/10 2:2001:db8::/32 2:2001:db8::/64',
+    },
+    {	# [28]
+      :type         => Types.APL,
+      :prefixes     => '1:0.0.0.0/0 1:255.255.255.255/32 2:::/0 2:::1/128',
+    }
     ]
 
 
