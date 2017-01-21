@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestResOpt < Minitest::Test
+
+  include Dnsruby
+
   def test_dns_file
 
     #  .txt because this test will run under windows, unlike the other file

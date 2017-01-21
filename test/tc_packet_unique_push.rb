@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestPacketUniquePush < Minitest::Test
+
+  include Dnsruby
+
   #   def test_packUniquePush
   # 
   # 

@@ -18,10 +18,9 @@ require_relative 'spec_helper'
 
 require 'socket'
 
-include Dnsruby
 class TestRrOpt < Minitest::Test
 
-
+  include Dnsruby
 
   # This test illustrates that when an OPT record specifying a maximum
   # UDP size is added to a query, the server will respect that setting

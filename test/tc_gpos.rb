@@ -2,10 +2,10 @@ require_relative 'spec_helper'
 
 require_relative '../lib/dnsruby/resource/GPOS.rb'
 
-include Dnsruby
-
 # Tests GPOS resource record.  See bottom of file for sample zone file.
 class TestGPOS < Minitest::Test
+
+  include Dnsruby
 
   EXAMPLE_LONGITUDE  = '10.0'
   EXAMPLE_LATITUDE   = '20.0'

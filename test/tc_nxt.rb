@@ -3,10 +3,10 @@ require_relative 'spec_helper'
 require_relative '../lib/dnsruby/resource/NXT'
 require_relative '../lib/dnsruby/code_mappers'
 
-include Dnsruby
-
 # Tests NXT resource record.  See bottom of file for sample zone file.
 class TestNXT < Minitest::Test
+
+  include Dnsruby
 
   # Get this by running the following script:
   # require 'dnsruby'

@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestName < Minitest::Test
+
+  include Dnsruby
+
   def test_label_length
     Name::Label.set_max_length(Name::Label::MaxLabelLength) # Other tests may have changed this
     #  Test max label length = 63

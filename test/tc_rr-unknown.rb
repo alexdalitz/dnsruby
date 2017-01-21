@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestRrUnknown < Minitest::Test
+
+  include Dnsruby
+
   def test_RrUnknown
     assert_equal(10226, Types::typesbyname('TYPE10226'), 'typesbyname(TYPE10226) returns 10226')
     assert_equal('TYPE10226', Types::typesbyval(10226),        'typesbyval(10226) returns TYPE10226')

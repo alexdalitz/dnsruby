@@ -1,9 +1,9 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
-
 class ZoneReaderTest < Minitest::Test
+
+  include Dnsruby
 
   def setup
     @zone_data = <<ZONEDATA

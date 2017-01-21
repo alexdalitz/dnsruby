@@ -17,7 +17,9 @@
 require_relative 'spec_helper'
 
 class TestSoakBase # < Minitest::Test
+
   include Dnsruby
+
   Rrs = [
   {
     :type       => Types.A,

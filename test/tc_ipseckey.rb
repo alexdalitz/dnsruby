@@ -17,8 +17,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestIPSECKEY < Minitest::Test
+
+  include Dnsruby
+
   def test_ipseckey
     [{"38.1.0.192.in-addr.arpa. 7200 IN     IPSECKEY ( 10 3 2
                     mygateway.example.com.

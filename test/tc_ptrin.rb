@@ -1,7 +1,8 @@
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestPtrIn < Minitest::Test
+
+  include Dnsruby
 
   # Tests that message raises no error when decoded, encoded, and decoded again.
   def verify(message_data_as_hex_string, canonical = false)

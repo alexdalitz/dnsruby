@@ -16,8 +16,10 @@
 require 'dnsruby/select_thread'
 require 'ipaddr'
 # require 'dnsruby/iana_ports'
-include Socket::Constants
 module Dnsruby
+
+  include Socket::Constants
+
   class PacketSender # :nodoc: all
     @@authoritative_cache = Cache.new
     @@recursive_cache = Cache.new

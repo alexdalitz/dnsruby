@@ -16,9 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
-
 class TestDlv < Minitest::Test
+
+  include Dnsruby
+
   def test_dlv
     #  Enable DLV (only) for validation.
     #  Try to validate some records which can only be done through dlv

@@ -16,9 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
-
 class TestCache < Minitest::Test
+
+  include Dnsruby
+
   def test_cache
     cache = Cache.new
     m1 = Message.new("example.com.", Types.A, Classes.IN)
