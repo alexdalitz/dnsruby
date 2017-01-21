@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestNAPTR < Minitest::Test
+
+  include Dnsruby
+
   def test_naptr
     txt = "example.com. IN NAPTR 100  50  \"s\"  \"z3950+I2L+I2C\"     \"\"  _z3950._tcp.gatech.edu."
     naptr = RR.create(txt)

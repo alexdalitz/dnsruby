@@ -16,12 +16,12 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
-
 class NsecTest < Minitest::Test
+
+  include Dnsruby
+
   INPUT = "alfa.example.com. 86400 IN NSEC host.example.com. ( " +
     "A MX RRSIG NSEC TYPE1234 )"
-  include Dnsruby
   def test_nsec_from_string
     nsec = Dnsruby::RR.create(INPUT)
     assert_equal("host.example.com", nsec.next_domain.to_s)

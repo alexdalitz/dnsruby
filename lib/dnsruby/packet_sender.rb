@@ -16,9 +16,12 @@
 require 'dnsruby/select_thread'
 require 'ipaddr'
 # require 'dnsruby/iana_ports'
-include Socket::Constants
 module Dnsruby
+
   class PacketSender # :nodoc: all
+
+    include Socket::Constants
+
     @@authoritative_cache = Cache.new
     @@recursive_cache = Cache.new
 
@@ -402,7 +405,7 @@ module Dnsruby
         @tcp_pipeline_local_port = src_port
         src_address = @ipv6 ? @src_address6 : @src_address
         begin
-          @pipeline_socket = Socket.new(AF_INET, SOCK_STREAM, 0)
+          @pipeline_socket = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
           @pipeline_socket.bind(Addrinfo.tcp(src_address, src_port))
           @pipeline_socket.connect(sockaddr)
           Dnsruby.log.debug("Creating socket #{src_address}:#{src_port}")

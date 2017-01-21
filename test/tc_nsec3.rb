@@ -17,11 +17,13 @@
 require_relative 'spec_helper'
 
 class Nsec3Test < Minitest::Test
+
+  include Dnsruby
+
   INPUT = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd ( " +
     "2vptu5timamqttgl4luu9kg21e0aor3s A RRSIG )"
   INPUT2 = "2t7b4g4vsa5smi47k61mv5bv1a22bojr.example. 3600 IN NSEC3 1 1 12 aabbccdd " +
     "2vptu5timamqttgl4luu9kg21e0aor3s"
-  include Dnsruby
   def test_nsec_from_string
     nsec = Dnsruby::RR.create(INPUT)
 #    assert_equal(H("x.y.w.example"), nsec.next_hashed.to_s)

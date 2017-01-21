@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestQuestion < Minitest::Test
+
+  include Dnsruby
+
   def test_question
     domain = "example.com"
     type = Types.MX

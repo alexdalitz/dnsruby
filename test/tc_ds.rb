@@ -20,6 +20,9 @@ require 'openssl'
 require 'digest/sha2'
 
 class DsTest < Minitest::Test
+
+  include Dnsruby
+
   DLVINPUT = "dskey.example.com. 86400 IN DLV 60485 5 1 ( 2BB183AF5F22588179A53B0A" +
     "98631FAD1A292118 )"
   INPUT = "dskey.example.com. 86400 IN DS 60485 5 1 ( 2BB183AF5F22588179A53B0A" +
@@ -37,7 +40,7 @@ class DsTest < Minitest::Test
       DS2 = "dskey.example.com. 86400 IN DS 60485 5 2   ( D4B7D520E7BB5F0F67674A0C"+
                                                 "CEB1E3E0614B93C4F9E99B83"+
                                                 "83F6A1E4469DA50A )"
-  include Dnsruby
+
   def test_ds_from_string
     ds = Dnsruby::RR.create(INPUT)
     assert_equal(60485, ds.key_tag)

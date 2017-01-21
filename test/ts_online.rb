@@ -52,14 +52,17 @@ if online?
       resolver
       tcp
       tcp_pipelining
-
-  single_resolver
-  cache
-  dns
-  rr-opt
-  res_config
-
+      single_resolver
+      cache
+      dns
+      rr-opt
+      res_config
   )
+
+  # online_tests = %w(
+  #     resolv
+  #     tcp_pipelining
+  # )
 
   # Excluded are:
   #

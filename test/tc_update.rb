@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestUpdate < Minitest::Test
+
+  include Dnsruby
+
   def is_empty(string)
     return true if string == nil || string.length == 0
 

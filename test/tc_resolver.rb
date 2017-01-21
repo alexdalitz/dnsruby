@@ -17,7 +17,6 @@ require_relative 'spec_helper'
 
 require 'socket'
 
-include Dnsruby
 # @TODO@ We also need a test server so we can control behaviour of server to test
 # different aspects of retry strategy.
 # Of course, with Ruby's limit of 256 open sockets per process, we'd need to run
@@ -180,7 +179,7 @@ class TestResolver < Minitest::Test
       #  Work out what time should be, then time it to check
       expected = ((2**(retry_times-1))*retry_delay) + packet_timeout
       begin
-        res = Resolver.new({:nameserver => "10.0.1.128"})
+        res = Dnsruby::Resolver.new({:nameserver => "10.0.1.128"})
         #       res = Resolver.new({:nameserver => "213.248.199.17"})
         res.packet_timeout=packet_timeout
         res.retry_times=retry_times
@@ -191,13 +190,13 @@ class TestResolver < Minitest::Test
       rescue ResolvTimeout
         stop=Time.now
         time = stop-start
-        assert(time <= expected *1.3 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")
+        assert(time <= expected * 1.3 && time >= expected * 0.9, "Wrong time take, expected #{expected}, took #{time}")
       end
   end
   end
 
   def test_packet_timeout
-        res = Resolver.new({:nameserver => []})
+        res = Dnsruby::Resolver.new({:nameserver => []})
 #      res = Resolver.new({:nameserver => "10.0.1.128"})
       start=stop=0
       retry_times = retry_delay = packet_timeout= 10
@@ -212,16 +211,16 @@ class TestResolver < Minitest::Test
         start=Time.now
         m = res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
         fail
-      rescue ResolvTimeout
+      rescue Dnsruby::ResolvTimeout
         stop=Time.now
         time = stop-start
-        assert(time <= expected *1.3 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")
+        assert(time <= expected * 1.3 && time >= expected * 0.9, "Wrong time take, expected #{expected}, took #{time}")
       end    #
   end
 
   def test_queue_packet_timeout
 #    if (!RUBY_PLATFORM=~/darwin/)
-      res = Resolver.new({:nameserver => "10.0.1.128"})
+      res = Dnsruby::Resolver.new({:nameserver => "10.0.1.128"})
 #      bad = SingleResolver.new("localhost")
       res.add_server("localhost")
       expected = 2
@@ -235,14 +234,14 @@ class TestResolver < Minitest::Test
       assert(ret==nil)
       assert(err.class == ResolvTimeout, "#{err.class}, #{err}")
       time = stop-start
-      assert(time <= expected *1.3 && time >= expected *0.9, "Wrong time take, expected #{expected}, took #{time}")
+      assert(time <= expected * 1.3 && time >= expected * 0.9, "Wrong time take, expected #{expected}, took #{time}")
 #    end
   end
 
   def test_illegal_src_port
     #  Also test all singleresolver ports ok
     #  Try to set src_port to an illegal value - make sure error raised, and port OK
-    res = Resolver.new
+    res = Dnsruby::Resolver.new
     res.port = 56789
     tests = [53, 387, 1265, 3210, 48619]
     tests.each do |bad_port|
@@ -300,7 +299,7 @@ class TestRawQuery < Minitest::Test
   # Returns a new resolver whose send_plain_message method always returns
   # nil for the response, and a RuntimeError for the error.
   def resolver_returning_error
-    resolver = Resolver.new
+    resolver = Dnsruby::Resolver.new
     def resolver.send_plain_message(_message)
       [nil, CustomError.new]
     end
@@ -311,7 +310,7 @@ class TestRawQuery < Minitest::Test
   # :response_from_send_plain_message instead of a real Dnsruby::Message,
   # for easy comparison in the tests.
   def resolver_returning_response
-    resolver = Resolver.new
+    resolver = Dnsruby::Resolver.new
     def resolver.send_plain_message(_message)
       [:response_from_send_plain_message, nil]
     end

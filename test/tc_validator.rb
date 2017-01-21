@@ -16,9 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
-
 class TestValidator < Minitest::Test
+
+  include Dnsruby
+
   def test_validation
 #    Dnsruby::TheLog.level = Logger::DEBUG
     Dnsruby::Dnssec.clear_trusted_keys

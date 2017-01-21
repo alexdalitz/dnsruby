@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestEscapedChars < Minitest::Test
+
+  include Dnsruby
+
   def test_one
     Name::Label.set_max_length(150)
     # 

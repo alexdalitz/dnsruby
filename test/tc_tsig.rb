@@ -17,8 +17,10 @@
 require_relative 'spec_helper'
 
 require "digest/md5"
-include Dnsruby
 class TestTSig < Minitest::Test
+
+  include Dnsruby
+
   KEY_NAME="rubytsig"
   KEY = "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw=="
   def is_empty(string)

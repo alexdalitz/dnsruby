@@ -20,7 +20,6 @@ require_relative 'spec_helper'
 require_relative 'tc_soak_base'
 require_relative 'test_dnsserver'
 
-include Dnsruby
 
 # This class tries to soak test the Dnsruby library.
 # It can't do this very well, owing to the small number of sockets allowed to be open simultaneously.
@@ -29,6 +28,8 @@ include Dnsruby
 # @todo@ A test DNS server running on localhost is really needed here
 
 class MyServer < RubyDNS::Server
+
+  include Dnsruby
 
   IP   = "127.0.0.1"
   PORT = 53927

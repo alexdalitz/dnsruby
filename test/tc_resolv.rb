@@ -17,7 +17,6 @@
 require_relative 'spec_helper'
 require_relative '../lib/dnsruby/resolv'
 
-include Dnsruby
 class TestResolv < Minitest::Test
 
   RELATIVE_NAME = 'google-public-dns-a.google.com'
@@ -56,7 +55,7 @@ class TestResolv < Minitest::Test
 
     assert_equal(RELATIVE_NAME, Dnsruby::Resolv.getname(IPV4_ADDR).to_s)
 
-    assert_raises(Dnsruby::Resolv::ResolvError) do
+    assert_raises(Dnsruby::ResolvError) do
       Dnsruby::Resolv.getname(RELATIVE_NAME)
     end
 

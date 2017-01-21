@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestSingleResolver < Minitest::Test
+
+  include Dnsruby
+
   Thread::abort_on_exception = true
   #   Dnsruby.log.level=Logger::DEBUG
 

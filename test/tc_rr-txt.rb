@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestRrTest < Minitest::Test
+
+  include Dnsruby
+
   # Stimulus, expected response, and test name:
 
   TESTLIST =	[

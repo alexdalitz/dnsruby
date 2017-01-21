@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestResolverEnv < Minitest::Test
+
+  include Dnsruby
+
 # @todo@ Dnsruby does not provide this functionality
   def test_res_env
     ENV['RES_NAMESERVERS'] = '10.0.1.128 10.0.2.128';

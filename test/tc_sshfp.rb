@@ -17,8 +17,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestSSHFP < Minitest::Test
+
+  include Dnsruby
+
   def test_sshfp
     txt = "apt-blade6.nominet.org.uk. 85826 IN	SSHFP	1 1 6D4CF7C68E3A959990855099E15D6E0D4DEA4FFF"
     sshfp = RR.create(txt)

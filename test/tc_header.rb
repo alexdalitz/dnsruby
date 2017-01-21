@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestHeader < Minitest::Test
+
+  include Dnsruby
+
   def test_header
     header = Header.new();
     assert(header, "new() returned something")

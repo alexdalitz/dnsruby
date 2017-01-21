@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestDNS < Minitest::Test
+
+  include Dnsruby
+
   def setup
     Dnsruby::Config.reset
   end

@@ -16,8 +16,10 @@
 
 require_relative 'spec_helper'
 
-include Dnsruby
 class TestRR < Minitest::Test
+
+  include Dnsruby
+
   def test_rr
     # ------------------------------------------------------------------------------
     #  Canned data.
