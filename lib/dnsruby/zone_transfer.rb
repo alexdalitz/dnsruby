@@ -27,6 +27,8 @@ module Dnsruby
     attr_accessor :port
     #  If using IXFR, this is the SOA serial number to start the incrementals from
     attr_accessor :serial
+    #  The source address to connect to
+    attr_accessor :src_address
     #  The TSIG record used to sign the transfer
     attr_reader :tsig
     #  Returns the tsigstate of the last transfer (nil if no TSIG signed transfer has occurred)
@@ -51,6 +53,7 @@ module Dnsruby
       @serial=0
       @tsig = nil
       @axfr = nil
+      @src_address = nil
     end
 
     #  Perform a zone transfer (RFC1995)
@@ -104,7 +107,7 @@ module Dnsruby
     def do_transfer(zone, server) #:nodoc: all
       @transfer_type = Types.new(@transfer_type)
       @state = :InitialSoa
-      socket = TCPSocket.new(server, @port)
+      socket = TCPSocket.new(server, @port, @src_address)
       begin
         #  Send an initial query
         msg = Message.new(zone, @transfer_type, @klass)
