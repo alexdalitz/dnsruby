@@ -154,7 +154,7 @@ module Dnsruby
     end
 
     def <=>(other)
-      if other.is_a?(Integer
+      if other.is_a?(Integer)
         self.code <=> other
       else
         self.code <=> other.code
