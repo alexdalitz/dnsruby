@@ -103,7 +103,7 @@ module Dnsruby
         else
           unknown_string(arg)
         end
-      elsif (arg.kind_of?Fixnum)
+      elsif arg.kind_of?(Integer)
         if (array.values[arg] != nil)
           @code = arg
           @string = array.values[@code]
@@ -146,7 +146,7 @@ module Dnsruby
     end
 
     def CodeMapper.to_code(arg)
-      if (arg.kind_of?Fixnum)
+      if arg.kind_of?(Integer)
         return arg
       else
         return @@arrays[self].stringsdown[arg.downcase]
@@ -154,7 +154,7 @@ module Dnsruby
     end
 
     def <=>(other)
-      if (other.class == Fixnum)
+      if other.is_a?(Integer
         self.code <=> other
       else
         self.code <=> other.code

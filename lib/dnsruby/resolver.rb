@@ -603,7 +603,7 @@ module Dnsruby
     end
 
     #  The source port to send queries from
-    #  Returns either a single Fixnum or an Array
+    #  Returns either a single Integer or an Array
     #  e.g. '0', or '[60001, 60002, 60007]'
     #
     #  Defaults to 0 - random port
@@ -611,7 +611,7 @@ module Dnsruby
       @src_port.length == 1 ? @src_port[0] : @src_port
     end
 
-    #  Can be a single Fixnum or a Range or an Array
+    #  Can be a single Integer or a Range or an Array
     #  If an invalid port is selected (one reserved by
     #  IANA), then an ArgumentError will be raised.
     #
@@ -626,7 +626,7 @@ module Dnsruby
       end
     end
 
-    #  Can be a single Fixnum or a Range or an Array
+    #  Can be a single Integer or a Range or an Array
     #  If an invalid port is selected (one reserved by
     #  IANA), then an ArgumentError will be raised.
     #  "0" means "any valid port" - this is only a viable
@@ -653,7 +653,7 @@ module Dnsruby
     end
 
     def Resolver.check_port(p, src_port=[])
-      if p.class != Fixnum
+      unless p.is_a?(Integer)
         tmp_src_ports = Array.new(src_port)
         p.each do |x|
           unless Resolver.check_port(x, tmp_src_ports)
@@ -677,7 +677,7 @@ module Dnsruby
 
     def Resolver.get_ports_from(p)
       a = []
-      if p.class == Fixnum
+      if p.is_a?(Integer)
         a = [p]
       else
         p.each do |x|

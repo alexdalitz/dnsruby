@@ -73,7 +73,7 @@ module Dnsruby
     #         nameserver (String)
     #         domain (String)
     #         search (String)
-    #         ndots (Fixnum)
+    #         ndots (Integer)
     # 
     #  This method should not normally be called by client code.
     def set_config_info(config_info)

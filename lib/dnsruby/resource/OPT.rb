@@ -148,7 +148,7 @@ module Dnsruby
       def options(args)
         if (args==nil)
           return @options
-        elsif args.kind_of?Fixnum
+        elsif args.kind_of?(Integer)
           #  return list of options with that code
           ret = []
           @options.each do |option|
