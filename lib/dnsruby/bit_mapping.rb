@@ -120,7 +120,7 @@ module Dnsruby
     def assert_non_negative(number)
       unless number.is_a?(Integer) && number >= 0
         raise ArgumentError.new(
-                  "Parameter must be a nonnegative Integer (Fixnum, Bignum) " +
+                  "Parameter must be a nonnegative Integer " +
                       "but is #{number.inspect} (a #{number.class})")
       end
     end

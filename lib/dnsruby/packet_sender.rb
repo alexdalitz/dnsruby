@@ -544,7 +544,7 @@ module Dnsruby
     end
 
     #  The source port to send queries from
-    #  Returns either a single Fixnum or an Array
+    #  Returns either a single Integer or an Array
     #  e.g. "0", or "[60001, 60002, 60007]"
     # 
     #  Defaults to 0 - random port
@@ -555,7 +555,7 @@ module Dnsruby
       return @src_port
     end
 
-    #  Can be a single Fixnum or a Range or an Array
+    #  Can be a single Integer or a Range or an Array
     #  If an invalid port is selected (one reserved by
     #  IANA), then an ArgumentError will be raised.
     # 
@@ -568,7 +568,7 @@ module Dnsruby
       add_src_port(p)
     end
 
-    #  Can be a single Fixnum or a Range or an Array
+    #  Can be a single Integer or a Range or an Array
     #  If an invalid port is selected (one reserved by
     #  IANA), then an ArgumentError will be raised.
     #  "0" means "any valid port" - this is only a viable

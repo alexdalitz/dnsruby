@@ -181,7 +181,7 @@ module Dnsruby
       end
 
       def RRSIG.get_time(input)
-        if (input.kind_of?Fixnum)
+        if input.kind_of?(Integer)
           return input
         end
         #  RFC 4034, section 3.2
