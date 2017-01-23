@@ -114,14 +114,14 @@ class DnsrubyResolv
   end
 
 
-  # require 'dnsruby/cache'
-  # require 'dnsruby/DNS'
-  # require 'dnsruby/hosts'
-  # require 'dnsruby/message/message'
-  # require 'dnsruby/update'
-  # require 'dnsruby/zone_transfer'
-  # require 'dnsruby/dnssec'
-  # require 'dnsruby/zone_reader'
+  require 'dnsruby/cache'
+  require 'dnsruby/DNS'
+  require 'dnsruby/hosts'
+  require 'dnsruby/message/message'
+  require 'dnsruby/update'
+  require 'dnsruby/zone_transfer'
+  require 'dnsruby/dnssec'
+  require 'dnsruby/zone_reader'
 
 end
 end
