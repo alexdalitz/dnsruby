@@ -41,7 +41,6 @@ class DnsrubyResolv
 
   # Looks up the first hostname of +address+
   def self.getname(address)
-    puts 'in self.getname'
     instance.getname(address)
   end
 
@@ -103,7 +102,7 @@ class DnsrubyResolv
   def getnames(address)
     @resolvers.each do |resolver|
       names = []
-      resolver.each_name(address) { |name| names << name; puts "\nAdded name: #{name}\n"; File.write('name.txt', name) }
+      resolver.each_name(address) { |name| names << name }
       return names unless names.empty?
     end
     []
