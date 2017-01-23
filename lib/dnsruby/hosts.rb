@@ -34,7 +34,7 @@ module Dnsruby
   class Hosts
     if /mswin32|cygwin|mingw|bccwin/ =~ RUBY_PLATFORM
       require 'win32/resolv'
-      DefaultFileName = Win32::DnsrubyResolv.get_hosts_path
+      DefaultFileName = Win32::Resolv.get_hosts_path
     else
       DefaultFileName = '/etc/hosts'
     end

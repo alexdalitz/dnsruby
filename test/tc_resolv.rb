@@ -28,20 +28,20 @@ class TestResolv < Minitest::Test
 
   def test_resolv_name_to_addresses
 
-    assert_equal(IPV4_ADDR, Dnsruby::DnsrubyResolv.getaddress(ABSOLUTE_NAME).to_s)
+    assert_equal(IPV4_ADDR, DnsrubyResolv.getaddress(ABSOLUTE_NAME).to_s)
 
-    addresses = Dnsruby::DnsrubyResolv.getaddresses(ABSOLUTE_NAME)
+    addresses = DnsrubyResolv.getaddresses(ABSOLUTE_NAME)
 
     case addresses.length
       when 1
         assert_equal IPV4_ADDR, addresses.first.to_s
-        Dnsruby::DnsrubyResolv.each_address(ABSOLUTE_NAME) do |address|
+        DnsrubyResolv.each_address(ABSOLUTE_NAME) do |address|
           assert_equal IPV4_ADDR, address.to_s
         end
       when 2
         assert_equal ADDRESSES.sort, addresses.map(&:to_s).sort
         addresses_from_each = []
-        Dnsruby::DnsrubyResolv.each_address(ABSOLUTE_NAME) do |address|
+        DnsrubyResolv.each_address(ABSOLUTE_NAME) do |address|
           addresses_from_each << address.to_s
         end
         assert_equal ADDRESSES.sort, addresses_from_each.sort
@@ -53,31 +53,20 @@ class TestResolv < Minitest::Test
 
   def test_resolv_address_to_name
 
-    puts 'test_resolv_address_to_name'
-    # require 'irb'; binding.irb
-    begin
-      puts 'trying now...'
-      name = Dnsruby::DnsrubyResolv.getname(IPV4_ADDR)
-      puts "name == #{name}"
-    rescue => e
-      puts e; exit!
-    end
-
-
-    assert_equal(RELATIVE_NAME, Dnsruby::DnsrubyResolv.getname(IPV4_ADDR).to_s)
+    assert_equal(RELATIVE_NAME, Dnsruby::Resolv.getname(IPV4_ADDR).to_s)
 
     assert_raises(Dnsruby::ResolvError) do
-      Dnsruby::DnsrubyResolv.getname(RELATIVE_NAME)
+      DnsrubyResolv.getname(RELATIVE_NAME)
     end
 
-    names = Dnsruby::DnsrubyResolv.getnames(IPV4_ADDR)
+    names = DnsrubyResolv.getnames(IPV4_ADDR)
     assert_equal(1, names.size)
     assert_equal(RELATIVE_NAME, names.first.to_s)
-    Dnsruby::DnsrubyResolv.each_name(IPV4_ADDR) { |name| assert_equal(RELATIVE_NAME, name.to_s)}
+    DnsrubyResolv.each_name(IPV4_ADDR) { |name| assert_equal(RELATIVE_NAME, name.to_s)}
   end
 
   def test_resolv_address_to_address
     local = '127.0.0.1'
-    assert_equal(local, Dnsruby::DnsrubyResolv.new.getaddress(local))
+    assert_equal(local, DnsrubyResolv.new.getaddress(local))
   end
 end

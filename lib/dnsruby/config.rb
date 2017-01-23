@@ -377,7 +377,7 @@ module Dnsruby
           end
         elsif /mswin32|cygwin|mingw|bccwin/ =~ RUBY_PLATFORM
           #  @TODO@ Need to get windows domain sorted
-          search, nameserver = Win32::DnsrubyResolv.get_resolv_info
+          search, nameserver = Win32::Resolv.get_resolv_info
           #           config_hash[:domain] = domain if domain
           config_hash[:nameserver] = nameserver if nameserver
           config_hash[:search] = [search].flatten if search
