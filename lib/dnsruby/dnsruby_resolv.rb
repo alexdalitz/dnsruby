@@ -91,7 +91,6 @@ class DnsrubyResolv
 
   # Looks up the first hostname of +address+
   def getname(address)
-    puts 'calling getnames'
     names = getnames(address)
     if names.empty?
       raise ResolvError.new("no name for #{address}")
@@ -102,9 +101,7 @@ class DnsrubyResolv
 
   # Looks up all hostnames of +address+
   def getnames(address)
-    puts "In getnames(#{address})"; sleep(2)
     @resolvers.each do |resolver|
-      puts "processing resolver #{resolver}"
       names = []
       resolver.each_name(address) { |name| names << name; puts "\nAdded name: #{name}\n"; File.write('name.txt', name) }
       return names unless names.empty?
