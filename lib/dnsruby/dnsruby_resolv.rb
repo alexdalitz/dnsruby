@@ -9,7 +9,7 @@ module Dnsruby
 # explicitly specify Dnsruby::Resolv to use the Dnsruby Resolv class,
 # even if you have include'd Dnsruby.
 
-class Resolv
+class DnsrubyResolv
 
   # Address RegExp to use for matching IP addresses
   ADDRESS_REGEX = /(?:#{IPv4::Regex})|(?:#{IPv6::Regex})/
@@ -41,6 +41,7 @@ class Resolv
 
   # Looks up the first hostname of +address+
   def self.getname(address)
+    puts 'in self.getname'
     instance.getname(address)
   end
 
@@ -90,6 +91,7 @@ class Resolv
 
   # Looks up the first hostname of +address+
   def getname(address)
+    puts 'calling getnames'
     names = getnames(address)
     if names.empty?
       raise ResolvError.new("no name for #{address}")
@@ -100,9 +102,11 @@ class Resolv
 
   # Looks up all hostnames of +address+
   def getnames(address)
+    puts "In getnames(#{address})"; sleep(2)
     @resolvers.each do |resolver|
+      puts "processing resolver #{resolver}"
       names = []
-      resolver.each_name(address) { |name| names << name }
+      resolver.each_name(address) { |name| names << name; puts "\nAdded name: #{name}\n"; File.write('name.txt', name) }
       return names unless names.empty?
     end
     []
@@ -114,14 +118,14 @@ class Resolv
   end
 
 
-  require 'dnsruby/cache'
-  require 'dnsruby/DNS'
-  require 'dnsruby/hosts'
-  require 'dnsruby/message/message'
-  require 'dnsruby/update'
-  require 'dnsruby/zone_transfer'
-  require 'dnsruby/dnssec'
-  require 'dnsruby/zone_reader'
+  # require 'dnsruby/cache'
+  # require 'dnsruby/DNS'
+  # require 'dnsruby/hosts'
+  # require 'dnsruby/message/message'
+  # require 'dnsruby/update'
+  # require 'dnsruby/zone_transfer'
+  # require 'dnsruby/dnssec'
+  # require 'dnsruby/zone_reader'
 
 end
 end
