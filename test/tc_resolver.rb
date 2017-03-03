@@ -321,7 +321,7 @@ class TestRawQuery < Minitest::Test
   # an ArgumentError is raised.
   def test_bad_strategy
     assert_raises(ArgumentError) do
-      resolver_returning_error.query_raw(Message.new, :invalid_strategy)
+      resolver_returning_error.query_raw(Dnsruby::Message.new, :invalid_strategy)
     end
   end
 
@@ -329,47 +329,47 @@ class TestRawQuery < Minitest::Test
   # and the error strategy is :raise, query_raw raises an error.
   def test_raise_error
     assert_raises(CustomError) do
-      resolver_returning_error.query_raw(Message.new, :raise)
+      resolver_returning_error.query_raw(Dnsruby::Message.new, :raise)
     end
   end
 
   # Tests that if you don't specify an error strategy, an error will be
   # returned rather than raised (i.e. strategy defaults to :return).
   def test_return_error_is_default
-    _response, error = resolver_returning_error.query_raw(Message.new)
+    _response, error = resolver_returning_error.query_raw(Dnsruby::Message.new)
     assert error.is_a?(CustomError)
   end
 
   # Tests that when no error is returned, no error is raised.
   def test_raise_no_error
-    response, _error = resolver_returning_response.query_raw(Message.new, :raise)
+    response, _error = resolver_returning_response.query_raw(Dnsruby::Message.new, :raise)
     assert_equal :response_from_send_plain_message, response
   end
 
   # Test that when send_plain_message returns an error, and the error strategy
   # is set to :return, then an error is returned.
   def test_return_error
-    _response, error = resolver_returning_error.query_raw(Message.new, :return)
+    _response, error = resolver_returning_error.query_raw(Dnsruby::Message.new, :return)
     assert error.is_a?(CustomError)
   end
 
   # Test that when send_plain_message returns a valid and response
   # and nil error, the same are returned by query_raw.
   def test_return_no_error
-    response, error = resolver_returning_response.query_raw(Message.new, :return)
+    response, error = resolver_returning_response.query_raw(Dnsruby::Message.new, :return)
     assert_nil error
     assert_equal :response_from_send_plain_message, response
   end
 
   def test_2_args_init
-    options = Resolver.create_tsig_options(KEY_NAME, KEY)
+    options = Dnsruby::Resolver.create_tsig_options(KEY_NAME, KEY)
     assert_equal KEY_NAME, options[:name]
     assert_equal KEY, options[:key]
     assert_nil options[:algorithm]
   end
 
   def test_3_args_init
-    options = Resolver.create_tsig_options(KEY_NAME,KEY,ALGO)
+    options = Dnsruby::Resolver.create_tsig_options(KEY_NAME,KEY,ALGO)
     assert_equal KEY_NAME, options[:name]
     assert_equal KEY, options[:key]
     assert_equal ALGO, options[:algorithm]
