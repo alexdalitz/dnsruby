@@ -9,7 +9,7 @@ module Dnsruby
 # explicitly specify Dnsruby::Resolv to use the Dnsruby Resolv class,
 # even if you have include'd Dnsruby.
 
-class Resolv
+class DnsrubyResolv
 
   # Address RegExp to use for matching IP addresses
   ADDRESS_REGEX = /(?:#{IPv4::Regex})|(?:#{IPv6::Regex})/

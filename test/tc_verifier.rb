@@ -74,7 +74,7 @@ class VerifierTest < Minitest::Test
     #  Run some queries on the .se zone
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
-    res = Dnsruby::Resolver.new(Dnsruby::Resolv.getaddress("a.ns.se"))
+    res = Dnsruby::Resolver.new(DnsrubyResolv.getaddress("a.ns.se"))
     res.dnssec = true
     r = res.query("se", Dnsruby::Types.ANY)
     #  See comment below
@@ -87,7 +87,7 @@ class VerifierTest < Minitest::Test
   def test_verify_message
     Dnsruby::Dnssec.clear_trusted_keys
     Dnsruby::Dnssec.clear_trust_anchors
-    res = Dnsruby::Resolver.new(Dnsruby::Resolv.getaddress("a.ns.se"))
+    res = Dnsruby::Resolver.new(DnsrubyResolv.getaddress("a.ns.se"))
     res.udp_size = 5000
     r = res.query("se", Dnsruby::Types.DNSKEY)
     #  This shouldn't be in the code - but the key is rotated by the .se registry
