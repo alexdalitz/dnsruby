@@ -1,7 +1,5 @@
 require_relative 'spec_helper'
 
-include Dnsruby
-
 class TestDNS < Minitest::Test
 
   def setup

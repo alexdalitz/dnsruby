@@ -59,10 +59,6 @@ if online?
       res_config
   )
 
-  # online_tests = %w(
-  #     resolv
-  #     tcp_pipelining
-  # )
 
   # Excluded are:
   #
