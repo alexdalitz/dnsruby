@@ -238,7 +238,8 @@ class TestUpdate < Minitest::Test
     assert_equal(rr.ttl,   0,                          'nxdomain - right ttl')
     assert_equal(rr.klass.string, 'NONE',                     'nxdomain - right class')
     assert_equal(rr.type.string,  'CNAME',                      'nxdomain - right type')
-    assert_nil(rr.rdata, 'nxdomain - data empty')
+    # assert_nil(rr.rdata, 'nxdomain - data empty')
+    assert(is_empty(rr.rdata), 'nxdomain - data empty')
   end
 
   def test_delete_specific_cname
@@ -264,7 +265,7 @@ class TestUpdate < Minitest::Test
     assert_equal 0, rr.ttl, 'delete_cname - right ttl'
     assert_equal 'ANY', rr.klass.string, 'delete_cname - right class'
     assert_equal 'CNAME', rr.type.string, 'delete_cname - right type'
-    assert_nil rr.rdata, 'delete_cname - right rdata'
+    assert(is_empty(rr.rdata), 'delete_cname - right rdata')
   end
 
   def test_txt
