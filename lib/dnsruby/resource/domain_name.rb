@@ -51,7 +51,7 @@ module Dnsruby
       def self.decode_rdata(msg) #:nodoc: all
         n = msg.get_name
         if n.length == 0
-          n = nil
+          # n = nil
         end
         self.new(n)
       end
