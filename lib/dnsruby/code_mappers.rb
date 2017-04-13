@@ -173,6 +173,7 @@ module Dnsruby
     MAILB     = 253     # RFC 1035 (MB, MG, MR)
     MAILA     = 254     # RFC 1035 (obsolete - see MX)
     ANY       = 255     # RFC 1035
+    CAA       = 257     # RFC 6844
     DLV       = 32769   # RFC 4431 (informational)
     update()
 
