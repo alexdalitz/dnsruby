@@ -19,6 +19,108 @@ require 'nio'
 require 'socket'
 require 'thread'
 
+module PipelineTest
+  class BinaryStringIO < StringIO
+    def initialize
+      super
+
+      set_encoding("BINARY")
+    end
+  end
+
+  def self.read_chunk(socket)
+    # The data buffer:
+    buffer = BinaryStringIO.new
+
+    # First we need to read in the length of the packet
+    while buffer.size < 2
+      r = socket.read(1)
+      return "" if r.nil?
+      buffer.write r
+    end
+
+    # Read in the length, the first two bytes:
+    length = buffer.string.byteslice(0, 2).unpack('n')[0]
+
+    # Read data until we have the amount specified:
+    while (buffer.size - 2) < length
+      required = (2 + length) - buffer.size
+
+      # Read precisely the required amount:
+      r = socket.read(required)
+      return "" if r.nil?
+      buffer.write r
+    end
+
+    return buffer.string.byteslice(2, length)
+  end
+
+end
+
+class TcpPipelineHandler < Async::DNS::GenericHandler
+
+  def initialize(server, host, port)
+    super(server)
+
+    @socket = TCPServer.new(host, port)
+    @selector = NIO::Selector.new
+    monitor = @selector.register(@socket, :r)
+    monitor.value = proc { accept }
+  end
+
+  def accept
+    handle_connection(@socket.accept)
+  end
+
+  def handle_connection(socket)
+    @logger.debug "New connection"
+    @logger.debug "Add socket to @selector"
+
+    monitor = @selector.register(socket, :r)
+    monitor.value = proc { process_socket(socket) }
+  end
+
+  def process_socket(socket)
+    @logger.debug "Processing socket"
+    _, _remote_port, remote_host = socket.peeraddr
+    options = { peer: remote_host }
+
+    #we read all data until timeout
+    input_data = PipelineTest.read_chunk(socket)
+
+    if input_data == ""
+      remove(socket)
+      return
+    end
+
+    response = process_query(input_data, options)
+    Async::DNS::StreamTransport.write_message(socket, response)
+  rescue EOFError
+    _, port, host = socket.peeraddr
+    @logger.debug("*** #{host}:#{port} disconnected")
+
+    remove(socket)
+  end
+
+  def remove(socket, update_connections=true)
+    @logger.debug("Removing socket from selector")
+    socket.close rescue nil
+    @selector.deregister(socket) rescue nil
+  end
+
+  def run(reactor: Async::Task.current.reactor)
+    Thread.new() do
+      while true
+        @selector.select() do |monitor|
+          reactor.async(@socket) do |socket|
+            monitor.value.call(monitor)
+          end
+        end
+      end
+    end
+  end
+end
+
 class SimpleTimers
   def initialize
     @events = {}
@@ -57,7 +159,7 @@ end
 # either the client closes the connection, @max_requests_per_connection is reached
 # or @timeout is attained.
 
-class NioTcpPipeliningHandler < RubyDNS::GenericHandler
+class NioTcpPipeliningHandler < Async::DNS::GenericHandler
 
   DEFAULT_MAX_REQUESTS = 4
   DEFAULT_TIMEOUT = 3
@@ -66,6 +168,7 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
     super(server)
     @max_requests_per_connection = max_requests
     @timeout = timeout
+
     @socket = TCPServer.new(host, port)
     @count = {}
 
@@ -77,20 +180,10 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
     monitor = @selector.register(@socket, :r)
     monitor.value = proc { accept }
 
-    async.run
   end
 
-  finalizer :finalize
-
-  def finalize
-    @socket.close if @socket
-    @selector.close
-    @selector_thread.join
-  end
-
-  def run
-    @logger.debug "Running selector thread"
-    @selector_thread = create_selector_thread
+  def run(reactor: Async::Task.current.reactor)
+    @selector_threead = create_selector_thread
   end
 
   def accept
@@ -108,11 +201,11 @@ class NioTcpPipeliningHandler < RubyDNS::GenericHandler
     @server.class.stats.connection_accept(new_connection, @count.keys.count)
 
     #we read all data until timeout
-    input_data = RubyDNS::StreamTransport.read_chunk(socket)
+    input_data = PipelineTest.read_chunk(socket)
 
     if @count[socket] <= @max_requests_per_connection
       response = process_query(input_data, options)
-      RubyDNS::StreamTransport.write_message(socket, response)
+      Async::DNS::StreamTransport.write_message(socket, response)
     end
 
 =begin

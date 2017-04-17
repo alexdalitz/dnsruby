@@ -19,7 +19,7 @@ require_relative 'test_dnsserver'
 
 # The TCPPipeliningServer links our NioTcpPipeliningHandler on
 # the loopback interface.
-class TCPPipeliningServer < RubyDNS::Server
+class TCPPipeliningServer < Async::DNS::Server
   PORT     = 53937
   IP   = '127.0.0.1'
 
@@ -32,18 +32,17 @@ class TCPPipeliningServer < RubyDNS::Server
     @@stats
   end
 
+  def initialize(**options)
+    super(options)
+
+    @handlers << NioTcpPipeliningHandler.new(self, IP, PORT, DEFAULT_MAX_REQUESTS, DEFAULT_TIMEOUT) #4 max request
+  end
+
   def process(name, resource_class, transaction)
     @logger.debug "name: #{name}"
-    transaction.respond!("93.184.216.34", { resource_class: Resolv::DNS::Resource::IN::A })
+    transaction.respond!("93.184.216.34", { resource_class: ::Resolv::DNS::Resource::IN::A })
   end
 
-  def run
-    fire(:setup)
-
-    link NioTcpPipeliningHandler.new(self, IP, PORT, DEFAULT_MAX_REQUESTS, DEFAULT_TIMEOUT) #4 max request
-
-    fire(:start)
-  end
 end
 
 class TestTCPPipelining < Minitest::Test
@@ -54,14 +53,12 @@ class TestTCPPipelining < Minitest::Test
 
   def self.init
     unless @initialized
-      Celluloid.boot
-      # By default, Celluloid logs output to console. Use Dnsruby.log instead
-      Celluloid.logger = Dnsruby.log
-      #Dnsruby.log.level = Logger::ERROR
       @initialized = true
       @query_id = 0
     end
   end
+
+  @@server = nil
 
   def setup
     self.class.init
@@ -70,10 +67,16 @@ class TestTCPPipelining < Minitest::Test
     # For each query the server sends the query upstream (193.0.14.129)
     options = {
         server_class: TCPPipeliningServer,
-        asynchronous: true
     }
 
-    @@supervisor ||= RubyDNS::run_server(options)
+    #RubyDNS::run_server(options) || true
+    if !@@server
+      @@server = TCPPipeliningServer.new()
+
+      Thread.new do
+        @@server.run
+      end
+    end
 
     # Instantiate our resolver. The resolver will use the same pipeline as much as possible.
     # If a timeout occurs or max_request_per_connection a new connection should be initiated
@@ -90,10 +93,10 @@ class TestTCPPipelining < Minitest::Test
 
   # Send x number of queries asynchronously to our resolver
   def send_async_messages(number_of_messages, queue, wait_seconds = 0)
-    Celluloid.logger.debug "Sending #{number_of_messages} messages"
+    Dnsruby.log.debug "Sending #{number_of_messages} messages"
     number_of_messages.times do
       name = "#{self.class.query_id}.com"
-      Celluloid.logger.debug "Sending #{name}"
+      Dnsruby.log.debug "Sending #{name}"
       message = Dnsruby::Message.new(name)
       # self.class.query_id identifies our query, must be different for each message
       @@resolver.send_async(message, queue, self.class.query_id)
@@ -144,7 +147,7 @@ class TestTCPPipelining < Minitest::Test
   # This test initiates multiple asynchronous requests and verifies they go on the same tcp
   # pipeline or a new one depending on timeouts
   def test_TCP_pipelining_timeout
-    Celluloid.logger.debug "test_TCP_pipelining_timeout"
+    Dnsruby.log.debug "test_TCP_pipelining_timeout"
     connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
 
     accept_count  = TCPPipeliningServer.stats.accept_count
@@ -180,7 +183,7 @@ class TestTCPPipelining < Minitest::Test
 
   # Test timeout occurs and new connection is initiated inbetween 2 sends
   def test_TCP_pipelining_timeout_in_send
-    Celluloid.logger.debug "test_TCP_pipelining_timeout_in_send"
+    Dnsruby.log.debug "test_TCP_pipelining_timeout_in_send"
     connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
 
     accept_count  = TCPPipeliningServer.stats.accept_count
