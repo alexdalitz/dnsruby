@@ -1,5 +1,19 @@
 # Release Notes
 
+## v1.60.1
+
+* DNSSEC validation switched OFF by default (but can still be switched on)
+* Add APL RR support (thanks Manabu Sonoda)
+* Various test fixes (thanks Keith Bennett)
+* 'include' issues fixed (thanks Keith Bennett!)
+* Fixnum replacement (thanks Keith Bennett)
+* Zone transfer fixes (thanks Manabu Sonoda)
+* Name decoding fix
+* MX record passing error now raised
+* CAA RR support (thanks Richard Luther)
+* TLSA RR support (thanks Manabu Sonoda)
+
+
 ## v1.60.0
 
 * TCP multi-packet support fixed
