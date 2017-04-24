@@ -261,7 +261,7 @@ module Dnsruby
     def self.try_validation(last_level, last_error, last_error_level, proc, msg, query)   # :nodoc:
       begin
         proc.call(msg, query)
-        last_level = Message::SecurityLevel.new([msg.security_level.code, last_level].max)
+        last_level = Message::SecurityLevel.new([msg.security_level.code, last_level.code].max)
       rescue VerifyError => e
         if (last_error_level < last_level)
           last_error = e.to_s
