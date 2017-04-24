@@ -34,6 +34,7 @@ TESTS = %w(
     nsec3
     nsec3param
     nxt
+    tlsa
     packet
     packet_unique_push
     ptrin
