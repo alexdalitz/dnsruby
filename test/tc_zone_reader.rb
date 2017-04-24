@@ -25,6 +25,7 @@ www                 IN A      192.0.2.10
                     IN AAAA   2001:DB8::10
 ftp.example.com.    IN CNAME  www
 db                  IN CNAME  www.example.com.
+foo.example.com.    IN CAA    0 issue "ca.example.net; account=230123"
 ZONEDATA
 
     @zone_file = Tempfile.new('zonefile')
@@ -49,6 +50,7 @@ ZONEDATA
     assert_equal("2001:DB8::10", zone[6].rdata)
     assert_equal("www.example.com.", zone[7].rdata)
     assert_equal("www.example.com.", zone[8].rdata)
+    assert_equal('0 issue "ca.example.net; account=230123"', zone[9].rdata)
   end
 
   def test_process_file_with_filename

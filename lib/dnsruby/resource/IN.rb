@@ -54,7 +54,8 @@ module Dnsruby
       Types::HIP => HIP,
       Types::DHCID => DHCID,
       Types::GPOS => GPOS,
-      Types::NXT => NXT
+      Types::NXT => NXT,
+      Types::CAA => CAA,
     } #:nodoc: all
 
     #  module IN contains ARPA Internet specific RRs
