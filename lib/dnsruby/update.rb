@@ -49,7 +49,7 @@ module Dnsruby
   # 
   #     update = Dnsruby::Update.new('example.com')
   #     update.present('example.com')
-  #     update.add('example.com', Dnsruby::Types.MX, 10, 'mailhost.example.com')
+  #     update.add('example.com', Dnsruby::Types.MX, 86400, 10, 'mailhost.example.com')
   # 
   # == Add a TXT record for a name that doesn't exist
   # 
@@ -75,8 +75,8 @@ module Dnsruby
   #     key      = 'awwLOtRfpGE+rRKF2+DEiw=='
   # 
   #     update = Dnsruby::Update.new('example.com')
-  #     update.add('foo.example.com', 'A', 86400, 10.1.2.3'))
-  #     update.add('bar.example.com', 'A', 86400, 10.4.5.6'))
+  #     update.add('foo.example.com', 'A', 86400, '10.1.2.3'))
+  #     update.add('bar.example.com', 'A', 86400, '10.4.5.6'))
   #     res.tsig=(key_name,key)
   # 
   class Update < Message
