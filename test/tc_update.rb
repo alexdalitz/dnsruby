@@ -274,6 +274,18 @@ class TestUpdate < Minitest::Test
     assert(update.to_s.index("test signed update"))
   end
 
+  def test_delete_txt
+    update = Update.new 'example.com'
+    update.delete 'test.example.com', 'TXT', 'foo bar'
+
+    encoded_msg = Message.decode update.encode
+    rr = encoded_msg.authority.first
+    assert_equal rr.name.to_s, 'test.example.com', 'delete_txt - right name'
+    assert_equal 0, rr.ttl, 'delete_txt - right ttl'
+    assert_equal 'TXT', rr.type.string, 'delete_txt - right type'
+    assert_equal ['foo bar'], rr.rdata, 'delete_txt - right rdata'
+  end
+
   def test_array
     update = Update.new
     update.add("target_name", "TXT", 100, ['"test signed update"', 'item#2'])
