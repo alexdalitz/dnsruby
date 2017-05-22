@@ -487,6 +487,7 @@ module Dnsruby
         @config.nameserver.each do |ns|
           res = PacketSender.new({
               server:             ns,
+              port:               @port,
               dnssec:             @dnssec,
               use_tcp:            @use_tcp,
               no_tcp:             @no_tcp,
