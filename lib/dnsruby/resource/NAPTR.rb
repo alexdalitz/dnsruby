@@ -52,7 +52,7 @@ module Dnsruby
       end
 
       def from_string(input) #:nodoc: all
-        if (input.length > 0)
+        if (input.strip.length > 0)
           values = input.split(" ")
           @order = values [0].to_i
           @preference = values [1].to_i
@@ -76,12 +76,14 @@ module Dnsruby
       end
 
       def encode_rdata(msg, canonical=false) #:nodoc: all
-        msg.put_pack('n', @order)
-        msg.put_pack('n', @preference)
-        msg.put_string(@flags)
-        msg.put_string(@service)
-        msg.put_string(@regexp)
-        msg.put_name(@replacement, true)
+        if (@order != nil)
+          msg.put_pack('n', @order)
+          msg.put_pack('n', @preference)
+          msg.put_string(@flags)
+          msg.put_string(@service)
+          msg.put_string(@regexp)
+          msg.put_name(@replacement, true)
+        end
       end
 
       def self.decode_rdata(msg) #:nodoc: all
