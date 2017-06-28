@@ -54,15 +54,17 @@ module Dnsruby
       end
 
       def encode_rdata(msg, canonical=false) #:nodoc: all
-        msg.put_pack('n', flag)
+        msg.put_pack('C', flag)
         msg.put_string(@property_tag)
-        msg.put_string(@property_value)
+        # We don't put a length byte on the final string.
+        msg.put_bytes(@property_value)
       end
 
       def self.decode_rdata(msg) #:nodoc: all
-        flag, = msg.get_unpack('n')
+        flag, = msg.get_unpack('C')
         property_tag = msg.get_string
-        property_value = msg.get_string
+        # The final string has no length byte - its length is implicit as the remainder of the packet length
+        property_value = msg.get_bytes
         return self.new("#{flag} #{property_tag} \"#{property_value}\"")
       end
     end
