@@ -24,7 +24,6 @@ require 'set'
 require 'singleton'
 require 'dnsruby/validator_thread.rb'
 module Dnsruby
-  Thread::abort_on_exception = true
   class SelectThread #:nodoc: all
     class SelectWakeup < RuntimeError; end
     include Singleton
