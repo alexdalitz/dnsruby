@@ -1,6 +1,7 @@
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'dnsruby/version'
+require 'rake'
 
 SPEC = Gem::Specification.new do |s|
   s.name = "dnsruby"
@@ -15,7 +16,7 @@ SPEC = Gem::Specification.new do |s|
 stub resolver. It aims to comply with all DNS RFCs, including
 DNSSEC NSEC3 support.'
   s.license = "Apache License, Version 2.0"
-  s.files = `git ls-files -z`.split("\x0")
+  s.files = FileList['**/*.*'].exclude('*.gem*')
 
   s.post_install_message = \
 "Installing dnsruby...
