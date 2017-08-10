@@ -1,5 +1,13 @@
 # Release Notes
 
+## v1.60.2
+
+* Fix deletion of TXT records with spaces in dynamic updates (thanks Sean Dilda)
+* Fix use of non-default ports in Dnsruby::Resolver (thanks Thomas Morgan)
+* Fix NAPTR encoding for null rdata dynamic update packets
+* Fix CAA resource record encoding
+* Avoid changing ruby global thread abort behavior (thanks Brent Cook)
+
 ## v1.60.1
 
 * DNSSEC validation switched OFF by default (but can still be switched on)
