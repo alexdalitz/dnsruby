@@ -153,7 +153,7 @@ module Dnsruby
       end
     end
     attr_accessor :nameservers, :callback, :recurse, :ipv6_ok
-    attr_reader :hints
+    attr_reader :hints, :dnssec
     #  The resolver to use for the queries
     attr_accessor :resolver
 
@@ -163,6 +163,11 @@ module Dnsruby
     @@authority_cache = Hash.new
     @@zones_cache = nil
     @@nameservers = nil
+
+    def dnssec=(dnssec_on)
+      @dnssec = dnssec_on
+      @resolver.dnssec = dnssec_on
+    end
 
     def initialize(res = nil)
       if (res)
@@ -174,6 +179,7 @@ module Dnsruby
           @resolver = Resolver.new
         end
       end
+      @resolver.dnssec = @dnssec
       @ipv6_ok = false
     end
     # Initialize the hint servers.  Recursive queries need a starting name
@@ -196,6 +202,7 @@ module Dnsruby
       @resolver = resolver
       if (resolver.single_resolvers.length == 0)
         resolver = Resolver.new()
+        resolver.dnssec = @dnssec
       end
       if (hints && hints.length > 0)
         resolver.nameservers=hints
@@ -372,6 +379,7 @@ module Dnsruby
     end
 
     def Recursor.clear_caches(resolver = Resolver.new)
+      resolver.dnssec = @dnssec
       Recursor.set_hints(Hash.new, resolver)
       @@zones_cache = Hash.new # key zone_name, values Hash of servers and AddressCaches
       @@zones_cache["."] = @@hints
@@ -613,6 +621,7 @@ module Dnsruby
         }
       end
       resolver = Resolver.new({:nameserver=>nameservers})
+      resolver.dnssec = @dnssec
       servers = []
       resolver.single_resolvers.each {|s|
         servers.push(s.server)

@@ -51,7 +51,9 @@ end
 
 inner_resolver = Dnsruby::Resolver.new
 inner_resolver.do_validation = true
+inner_resolver.dnssec = true
 resolver = Dnsruby::Recursor.new(inner_resolver)
+resolver.dnssec = true
 
 #    Dnsruby::TheLog.level=Logger::DEBUG
 

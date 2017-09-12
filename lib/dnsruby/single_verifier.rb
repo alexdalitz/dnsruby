@@ -65,6 +65,7 @@ module Dnsruby
           @@recursor = Recursor.new
         end
       end
+      @@recursor.dnssec = true
       return @@recursor
     end
 
@@ -72,12 +73,15 @@ module Dnsruby
       #       if (Dnssec.do_validation_with_recursor?)
       #         return Recursor.new
       #       else
+      resolver = nil
       if (Dnssec.default_resolver)
-        return Dnssec.default_resolver
+        resolver = Dnssec.default_resolver
       else
-        return Resolver.new
+        resolver = Resolver.new
       end
       #       end
+      resolver.dnssec = true
+      return resolver
     end
     def add_dlv_key(key)
       #  Is this a ZSK or a KSK?
@@ -848,6 +852,7 @@ module Dnsruby
           end
         end
       end
+      res.dnssec = true
       #       query = Message.new(name, Types.DNSKEY)
       #       query.do_validation = false
       ret = nil
@@ -1011,6 +1016,7 @@ module Dnsruby
                 end
               end
             end
+            parent_res.dnssec = true
           end
           #  Use that Resolver to query for DS record and NS for children
           ds_rrset = current_anchor
@@ -1068,6 +1074,7 @@ module Dnsruby
                 child_res = Resolver.new
               end
             end
+            child_res.dnssec = true
           end
         end
         #  Query for DNSKEY record, and verify against DS in parent.
@@ -1143,11 +1150,14 @@ module Dnsruby
       if (Dnssec.do_validation_with_recursor?)
         return get_recursor
       else
+        resolver = nil
         if (Dnssec.default_resolver)
-          return Dnssec.default_resolver
+          resolver = Dnssec.default_resolver
         else
-          return Resolver.new
+          resolver = Resolver.new
         end
+        resolver.dnssec = true
+        return resolver
       end
     end
 
