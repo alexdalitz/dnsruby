@@ -190,29 +190,29 @@ class Header
     retval = ";; id = #{@id}\n"
 
     if (@opcode == OpCode::Update)
-      retval += ";; qr = #{@qr}    " +\
-        "opcode = #{@opcode.string}    "+\
+      retval += ";; qr = #{@qr}    " \
+        "opcode = #{@opcode.string}    "\
         "rcode = #{@rcode.string}\n"
 
-      retval += ";; zocount = #{@qdcount}  "+\
-        "prcount = #{@ancount}  " +\
-        "upcount = #{@nscount}  "  +\
+      retval += ";; zocount = #{@qdcount}  "\
+        "prcount = #{@ancount}  " \
+        "upcount = #{@nscount}  "  \
         "adcount = #{@arcount}\n"
     else
-      retval += ";; qr = #{@qr}    "  +\
-        "opcode = #{@opcode.string}    " +\
-        "aa = #{@aa}    "  +\
-        "tc = #{@tc}    " +\
+      retval += ";; qr = #{@qr}    "  \
+        "opcode = #{@opcode.string}    " \
+        "aa = #{@aa}    "  \
+        "tc = #{@tc}    " \
         "rd = #{@rd}\n"
 
-      retval += ";; ra = #{@ra}    " +\
-        "ad = #{@ad}    "  +\
-        "cd = #{@cd}    "  +\
+      retval += ";; ra = #{@ra}    " \
+        "ad = #{@ad}    "  \
+        "cd = #{@cd}    "  \
         "rcode  = #{rcode.string}\n"
 
-      retval += ";; qdcount = #{@qdcount}  " +\
-        "ancount = #{@ancount}  " +\
-        "nscount = #{@nscount}  " +\
+      retval += ";; qdcount = #{@qdcount}  " \
+        "ancount = #{@ancount}  " \
+        "nscount = #{@nscount}  " \
         "arcount = #{@arcount}\n"
     end
 
