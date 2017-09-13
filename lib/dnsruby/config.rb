@@ -434,7 +434,9 @@ module Dnsruby
       else
         if (@apply_domain)
           if @ndots > name.length - 1
-            candidates.push(Name.create(name.to_a+@domain))
+            if (@domain != nil)
+              candidates.push(Name.create(name.to_a+@domain))
+            end
           end
         end
         if (!@apply_search_list)
