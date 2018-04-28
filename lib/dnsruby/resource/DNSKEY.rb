@@ -340,8 +340,12 @@ module Dnsruby
         @key_length = (@key.length - pos) * 8
 
         pkey = OpenSSL::PKey::RSA.new
-        pkey.e = exponent
-        pkey.n = modulus
+        begin
+          pkey.set_key(modulus, exponent, nil)
+        rescue NoMethodError
+          pkey.e = exponent
+          pkey.n = modulus
+        end
         return pkey
       end
 
