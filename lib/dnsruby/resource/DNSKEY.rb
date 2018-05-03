@@ -365,10 +365,15 @@ module Dnsruby
         @key_length = (pgy_len * 8)
 
         pkey = OpenSSL::PKey::DSA.new
-        pkey.p = p
-        pkey.q = q
-        pkey.g = g
-        pkey.pub_key = y
+        begin
+          pkey.set_pgq(p,g,q)
+          pkey.set_key(y, nil)
+        rescue NoMethodError
+          pkey.p = p
+          pkey.q = q
+          pkey.g = g
+          pkey.pub_key = y
+        end
 
         pkey
       end
