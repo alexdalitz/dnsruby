@@ -331,7 +331,15 @@ module Dnsruby
         client_query_id = Time.now + rand(10000) # is this safe?!
       end
 
-      query_packet = make_query_packet(msg, use_tcp)
+      begin
+        query_packet = make_query_packet(msg, use_tcp)
+      rescue Exception => err
+        err=ResolvError.new("Can't send message - encoding error : " + err.to_s )
+        Dnsruby.log.error { "#{err}" }
+        st = SelectThread.instance
+        st.push_exception_to_select(client_query_id, client_queue, err, nil)
+        return
+      end
 
       if (msg.do_caching && (msg.class != Update))
         #  Check the cache!!
