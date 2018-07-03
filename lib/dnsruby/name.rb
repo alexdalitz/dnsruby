@@ -317,7 +317,7 @@ module Dnsruby
       i=0;
 
       while (i < length )
-        c=presentation.unpack("x#{i}C1") [0]
+        c=presentation.unpack("x#{i}C1")[0]
         if (c == 46) # ord('.')
           endstring = presentation[i+1, presentation.length-(i+1)]
           return Label.new(wire),endstring

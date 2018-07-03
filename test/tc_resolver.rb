@@ -377,27 +377,24 @@ class TestRawQuery < Minitest::Test
   
   def test_threads
     resolver = Dnsruby::Resolver.new(nameserver: ["8.8.8.8", "8.8.4.4"])
-     resolver.query("google.com", "MX")
-      resolver.query("google.com", "MX")
-       resolver.query("google.com", "MX")
         resolver.query("google.com", "MX")
          resolver.query("google.com", "MX")
           resolver.query("google.com", "MX")
           begin
             resolver.query("googlöe.com", "MX") 
-          rescue Dnsruby::ResolvError, Timeout::Error => e
+          rescue Dnsruby::ResolvError => e
             # fine
           end
           resolver.query("google.com", "MX")
           resolver.query("google.com", "MX")
           begin
-            resolver.query("googlöe.com", "MX") 
-          rescue Dnsruby::ResolvError, Timeout::Error => e
+            resolver.query("googlöe.com", "MX")
+          rescue Dnsruby::ResolvError => e
             # fine
           end
           begin
             resolver.query("googlöe.com", "MX") 
-          rescue Dnsruby::ResolvError, Timeout::Error => e
+          rescue Dnsruby::ResolvError => e
             # fine
           end
 #          Dnsruby::Cache.delete("googlöe.com", "MX")

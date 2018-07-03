@@ -194,7 +194,7 @@ module Dnsruby
         rescue SelectWakeup
           #  If SelectWakeup, then just restart this loop - the select call will be made with the new data
           next
-        rescue IOError => e
+        rescue IOError, EncodeError => e
           #           print "IO Error  =: #{e}\n"
           exceptions = clean_up_closed_sockets
           exceptions.each { |exception| send_exception_to_client(*exception) }

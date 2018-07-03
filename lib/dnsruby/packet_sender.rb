@@ -333,8 +333,7 @@ module Dnsruby
 
       begin
         query_packet = make_query_packet(msg, use_tcp)
-      rescue Exception => err
-        err=ResolvError.new("Can't send message - encoding error : " + err.to_s )
+      rescue EncodeError => err
         Dnsruby.log.error { "#{err}" }
         st = SelectThread.instance
         st.push_exception_to_select(client_query_id, client_queue, err, nil)
@@ -629,6 +628,11 @@ module Dnsruby
         if (sig_value != :okay)
           #  Should send error back up to Resolver here, and then NOT QUERY AGAIN!!!
           return sig_value
+        end
+        if ((response.header.get_header_rcode == RCode.FORMERR) &&
+            (query.header.arcount == 0))
+          # Raise an error
+          return true
         end
         #  Should check that question section is same as question that was sent! RFC 5452
         #  If it's not an update...

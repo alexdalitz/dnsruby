@@ -891,6 +891,14 @@ module Dnsruby
         return
       end
 
+      begin
+        msg.encode
+      rescue EncodeError => err
+        Dnsruby.log.error { "Can't encode " + msg.to_s + " : #{err}" }
+        client_queue.push([client_query_id, err])
+        return
+      end
+
       tick_needed = false
       #  add to our data structures
       #       @mutex.synchronize{
@@ -1124,6 +1132,9 @@ module Dnsruby
         increment_resolver_priority(resolver) unless response.cached
         stop_querying(client_query_id)
         #  @TODO@ Does the client want notified at this point?
+      elsif error.kind_of?(EncodeError)
+        Dnsruby.log.debug{'Encode error - sending to client'}
+        send_result_and_stop_querying(client_queue, client_query_id, select_queue, response, error)
       else
         #    - if it was any other error, then remove that server from the list for that query
         #    If a Too Many Open Files error, then don't remove, but let retry work.
