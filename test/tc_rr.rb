@@ -310,8 +310,6 @@ class TestRR < Minitest::Test
   def test_cdnskey
     rrString = "tjeb.nl.\t3600\tIN\tCDNSKEY\t256 3 RSASHA1-NSEC3-SHA1 ( AwEAAcglEOS7bECRK5fqTuGTMJycmDhTzmUu/EQbAhKJOYJxDb5SG/RYqsJgzG7wgtGy0W1aP7I4k6SPtHmwcqjLaZLVUwRNWCGr2adjb9JTFyBR7F99Ngi11lEGM6Uiw/eDRk66lhoSGzohjj/rmhRTV6gN2+0ADPnafv3MBkPgryA3 ) ; key_tag=53177"
     rr = RR.create(rrString)
-    puts rr
-    puts rrString
     assert(rrString.to_s == rr.to_s)
     m = Dnsruby::Message.new
     m.add_additional(rr)
