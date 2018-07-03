@@ -423,15 +423,16 @@ module Dnsruby
       end
     end
 
-    def generate_candidates(name) #:nodoc: all
+    def generate_candidates(name_in) #:nodoc: all
       if !@configured
         parse_config
       end
       candidates = []
-      name = Name.create(name)
+      name = Name.create(name_in)
       if name.absolute?
         candidates = [name]
       else
+        candidates.push(Name.create(name_in.to_s + "."))
         if (@apply_domain)
           if @ndots > name.length - 1
             if (@domain != nil)
