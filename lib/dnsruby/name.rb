@@ -26,7 +26,8 @@ module Dnsruby
   # * Name#wild?
   # * Name#subdomain_of?(other)
   # * Name#labels
-  # 
+  #
+  require 'addressable'
   class Name
     include Comparable
     MaxNameLength=255
@@ -52,6 +53,7 @@ module Dnsruby
         if (arg=="")
           return Name.new([],false)
         end
+        arg = punycode(arg)
         return Name.new(split_escaped(arg), /\.\z/ =~ arg ? true : false)
         #         return Name.new(Label.split(arg), /\.\z/ =~ arg ? true : false)
       when Array
@@ -59,6 +61,22 @@ module Dnsruby
       else
         raise ArgumentError.new("cannot interpret as DNS name: #{arg.inspect}")
       end
+    end
+
+    def self.punycode(d)
+        begin
+          c = Addressable::URI.parse("http://" + d.to_s)
+          ret = c.normalized_host.sub("http://", "")
+          if (!d.end_with?".")
+            return ret.chomp(".")
+          end
+          if (!ret.end_with?".")
+            return ret + "."
+          end
+          return ret
+        rescue Exception => e
+          return d
+        end
     end
 
     def self.split_escaped(arg) #:nodoc: all
