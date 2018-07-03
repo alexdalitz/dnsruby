@@ -286,12 +286,38 @@ class TestRR < Minitest::Test
   end
 
   def test_uri
-    rr = RR.create("_ftp._tcp.    IN URI 10 1 \"ftp://ftp1.example.com/public\"")
+    rrString = "_ftp._tcp.\t300\tIN\tURI\t10\ 1 \"ftp://ftp1.example.com/public\""
+    rr = RR.create(rrString)
+    assert(rrString.to_s == rr.to_s)
     m = Dnsruby::Message.new
     m.add_additional(rr)
     m2 = Message.decode(m.encode)
     rr2 = m2.additional()[0]
     assert(rr == rr2)
+  end
+
+  def test_cds
+    rrString = "dskey.example.com.\t86400\tIN\tCDS\t60485 RSASHA1 1 ( 2BB183AF5F22588179A53B0A98631FAD1A292118 )"
+    rr = RR.create(rrString)
+    assert(rrString.to_s == rr.to_s)
+    m = Dnsruby::Message.new
+    m.add_additional(rr)
+    m2 = Message.decode(m.encode)
+    rr2 = m2.additional()[0]
+    assert(rr.to_s == rr2.to_s)
+  end
+
+  def test_cdnskey
+    rrString = "tjeb.nl.\t3600\tIN\tCDNSKEY\t256 3 RSASHA1-NSEC3-SHA1 ( AwEAAcglEOS7bECRK5fqTuGTMJycmDhTzmUu/EQbAhKJOYJxDb5SG/RYqsJgzG7wgtGy0W1aP7I4k6SPtHmwcqjLaZLVUwRNWCGr2adjb9JTFyBR7F99Ngi11lEGM6Uiw/eDRk66lhoSGzohjj/rmhRTV6gN2+0ADPnafv3MBkPgryA3 ) ; key_tag=53177"
+    rr = RR.create(rrString)
+    puts rr
+    puts rrString
+    assert(rrString.to_s == rr.to_s)
+    m = Dnsruby::Message.new
+    m.add_additional(rr)
+    m2 = Message.decode(m.encode)
+    rr2 = m2.additional()[0]
+    assert(rr.to_s == rr2.to_s)
   end
 
   def test_cert

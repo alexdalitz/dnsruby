@@ -162,6 +162,8 @@ module Dnsruby
     NSEC3PARAM= 51      # RFC still pending at time of writing
     TLSA      = 52      # RFC 6698
     HIP       = 55      # RFC 5205
+    CDS       = 59      # RFC 7344
+    CDNSKEY   = 60      # RFC 7344
     SPF       = 99      # RFC 4408
     UINFO     = 100     # non-standard
     UID       = 101     # non-standard
