@@ -76,6 +76,10 @@ class TestSingleResolverSoak < Minitest::Test
     end
   end
 
+  def teardown
+    Celluloid.shutdown
+  end
+
   SINGLE_RESOLVER_QUERY_TIMES = 63
 
   def setup

@@ -63,6 +63,13 @@ class TestTCPPipelining < Minitest::Test
     end
   end
 
+  def teardown
+    if @initialized
+      Celluloid.shutdown
+      @initialized = false
+    end
+  end
+
   def setup
     self.class.init
 
