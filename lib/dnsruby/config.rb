@@ -101,6 +101,7 @@ module Dnsruby
         dom=""
         nd = 1
         @ndots = 1
+        @port = 53
         @apply_search_list = true
         @apply_domain = true
         config_hash = Config.default_config_hash
@@ -122,6 +123,7 @@ module Dnsruby
         ns = config_hash[:nameserver] if config_hash.include? :nameserver
         s = config_hash[:search] if config_hash.include? :search
         nd = config_hash[:ndots] if config_hash.include? :ndots
+        p = config_hash[:port] if config_hash.include? :port
         @apply_search_list = config_hash[:apply_search_list] if config_hash.include? :apply_search_list
         @apply_domain= config_hash[:apply_domain] if config_hash.include? :apply_domain
         dom = config_hash[:domain] if config_hash.include? :domain
@@ -132,6 +134,7 @@ module Dnsruby
         @configured = true
         send("search=",s)
         send("ndots=",nd)
+        send("port=",p)
         send("domain=",dom)
       }
       Dnsruby.log.info{to_s}
@@ -156,6 +159,15 @@ module Dnsruby
       @ndots=nd
       if !@ndots.kind_of?(Integer)
         raise ArgumentError.new("invalid ndots config: #{@ndots.inspect}")
+      end
+    end
+
+    #  Set port
+    def port=(p)
+      @configured = true
+      @port=p
+      if !@port.kind_of?(Integer)
+        raise ArgumentError.new("invalid port config: #{@port.inspect}")
       end
     end
 
@@ -303,6 +315,7 @@ module Dnsruby
       search = nil
       domain = nil
       ndots = 1
+      port = 53
       open(filename) {|f|
         f.each {|line|
           line.sub!(/[#;].*/, '')
@@ -312,6 +325,8 @@ module Dnsruby
           }
           next unless keyword
           case keyword
+          when 'port'
+            port = args[0].to_i
           when 'nameserver'
             nameserver += args
           when 'domain'
@@ -337,7 +352,7 @@ module Dnsruby
           end
         }
       }
-      return { :nameserver => nameserver, :domain => domain, :search => search, :ndots => ndots }
+      return { :nameserver => nameserver, :domain => domain, :search => search, :ndots => ndots, :port => port }
     end
 
     def inspect #:nodoc: all
@@ -357,6 +372,7 @@ module Dnsruby
       ret += " domain : #{domain_string}, search : "
       search.each {|s| ret += s + ", " }
       ret += " ndots : #{@ndots}"
+      ret += " port : #{@port}"
       return ret
     end
 

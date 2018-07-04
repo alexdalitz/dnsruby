@@ -248,5 +248,10 @@ class TestDNS < Minitest::Test
       # assert_equal(a[0].name.to_s, 'a.t.dnsruby.validation-test-servers.nominet.org.uk',"Correct name (with persistent socket and #{method})")
     end
 
+    def test_port
+      d = DNS.new({:port => 5353})
+      assert_true(d.to_s.include?"5353")
+    end
+
   end
 end
