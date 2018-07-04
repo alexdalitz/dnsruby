@@ -33,6 +33,8 @@ module Dnsruby
     attr_reader :tsig
     #  Returns the tsigstate of the last transfer (nil if no TSIG signed transfer has occurred)
     attr_reader :last_tsigstate
+    # Sets the connect timeout in seconds
+    attr_accessor :connect_timeout
 
     # Sets the TSIG to sign the zone transfer with.
     # Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
@@ -54,6 +56,7 @@ module Dnsruby
       @tsig = nil
       @axfr = nil
       @src_address = nil
+      @connect_timeout = 5
     end
 
     #  Perform a zone transfer (RFC1995)
@@ -107,7 +110,8 @@ module Dnsruby
     def do_transfer(zone, server) #:nodoc: all
       @transfer_type = Types.new(@transfer_type)
       @state = :InitialSoa
-      socket = TCPSocket.new(server, @port, @src_address)
+      socket = Socket.tcp(server, @port, @src_address, connect_timeout: @connect_timeout)
+      # socket = TCPSocket.new(server, @port, @src_address)
       begin
         #  Send an initial query
         msg = Message.new(zone, @transfer_type, @klass)
