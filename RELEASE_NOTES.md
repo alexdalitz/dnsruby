@@ -1,5 +1,21 @@
 # Release Notes
 
+## v1.61.0
+
+* Add URI, CDS and CDNSKEY records
+* Supply port to DNS.new as optiona parameter
+* Supply timeout to zone transfer connect
+* Fix multi-line strings
+* Try absolute name as candidate in DNS even if not dot supplied
+* Do not try to generate candidates if no domain is given
+* Handle new OpenSSL interface as well as old
+* Handle new DSA interface
+* fix encode error select thread issue
+* handle encoding errors
+* add punycode support
+* Make sure dnssec is enabled in verifier and also in digroot demo
+* Other minor fixes and changes to test code and infrastructure
+
 ## v1.60.2
 
 * Fix deletion of TXT records with spaces in dynamic updates (thanks Sean Dilda)
