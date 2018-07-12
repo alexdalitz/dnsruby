@@ -40,5 +40,7 @@ DNSSEC NSEC3 support.'
   if RUBY_VERSION >= "1.9.3"
     s.add_development_dependency 'coveralls', '~> 0.7'
   end
+
+  s.add_runtime_dependency 'addressable', '~> 2.5'
 end
 
