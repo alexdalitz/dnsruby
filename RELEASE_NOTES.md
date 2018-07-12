@@ -1,5 +1,9 @@
 # Release Notes
 
+## v1.61.1
+
+* Add Addressable as a gem runtime dependency
+
 ## v1.61.0
 
 * Add URI, CDS and CDNSKEY records
