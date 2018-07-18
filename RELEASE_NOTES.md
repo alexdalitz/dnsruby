@@ -1,5 +1,9 @@
 # Release Notes
 
+##v1.61.2
+
+* Add new root key
+
 ## v1.61.1
 
 * Add Addressable as a gem runtime dependency
