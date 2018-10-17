@@ -23,7 +23,6 @@ DNSSEC NSEC3 support.'
   For general discussion (please tell us how you use dnsruby): https://groups.google.com/forum/#!forum/dnsruby"
 
   s.test_file = "test/ts_offline.rb"
-  s.has_rdoc = true
   s.extra_rdoc_files = ["DNSSEC", "EXAMPLES", "README.md", "EVENTMACHINE"]
 
   unless /java/ === RUBY_PLATFORM
