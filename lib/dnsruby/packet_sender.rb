@@ -456,7 +456,7 @@ module Dnsruby
                 socket, new_socket = tcp_pipeline_socket(src_port)
                 src_port = @tcp_pipeline_local_port
               else
-                socket = TCPSocket.new(@server, @port, src_address, src_port)
+                socket = Socket.tcp(@server, @port, src_address, src_port, connect_timeout: @packet_timeout)
                 new_socket = true
               end
             rescue Errno::EBADF, Errno::ENETUNREACH => e
