@@ -22,6 +22,7 @@ def create_task(task_name, test_suite_filespec)
     t.name = task_name
     t.test_files = FileList[test_suite_filespec]
     t.verbose = true
+    t.warning = false
   end
 end
 

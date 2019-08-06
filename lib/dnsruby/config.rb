@@ -38,6 +38,7 @@ module Dnsruby
   #  a query is performed (or a config parameter requested on) a Resolver which has
   #  not yet been configured.
   class Config
+    DEFAULT_PORT = 53
     # --
     # @TODO@ Switches for :
     # 
@@ -101,7 +102,7 @@ module Dnsruby
         dom=""
         nd = 1
         @ndots = 1
-        @port = 53
+        @port = DEFAULT_PORT
         @apply_search_list = true
         @apply_domain = true
         config_hash = Config.default_config_hash
@@ -165,7 +166,7 @@ module Dnsruby
     #  Set port
     def port=(p)
       @configured = true
-      @port=p
+      @port=p if p
       if !@port.kind_of?(Integer)
         raise ArgumentError.new("invalid port config: #{@port.inspect}")
       end
@@ -315,7 +316,7 @@ module Dnsruby
       search = nil
       domain = nil
       ndots = 1
-      port = 53
+      port = DEFAULT_PORT
       open(filename) {|f|
         f.each {|line|
           line.sub!(/[#;].*/, '')
