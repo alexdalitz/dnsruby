@@ -138,7 +138,7 @@ class TestResolver < Minitest::Test
     ret.each_answer do |answer|
       if (answer.type==Types.PTR)
         no_pointer=false
-        assert(answer.domainname.to_s=~/google-public-dns/)
+        assert(answer.domainname.to_s=~/google/)
       end
     end
     assert(!no_pointer)

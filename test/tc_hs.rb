@@ -12,11 +12,11 @@ class TestDNS < Minitest::Test
   # the response returns with an rcode of NOTIMP and a Dnsruby::NotImp error.
   def test_hs_class_returns_notimp_code_and_error
     resolver_host = 'a.gtld-servers.net'
-    resolver = Resolver.new(resolver_host)
-    message = Message.new('test.com', 'A', 'HS')
+    resolver = Dnsruby::Resolver.new(resolver_host)
+    message = Dnsruby::Message.new('test.com', 'A', 'HS')
     response, error = resolver.send_plain_message(message)
 
-    assert_equal(RCode::NOTIMP, response.rcode)
+    assert_equal(Dnsruby::RCode::NOTIMP, response.rcode)
     assert_equal(Dnsruby::NotImp, error.class)
   end
 

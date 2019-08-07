@@ -19,61 +19,21 @@ require_relative 'spec_helper'
 # require_relative 'tc_single_resolver'
 require_relative 'tc_soak_base'
 require_relative 'test_dnsserver'
+require_relative 'localdns'
 
 
 # This class tries to soak test the Dnsruby library.
 # It can't do this very well, owing to the small number of sockets allowed to be open simultaneously.
 # @TODO@ Future versions of dnsruby will allow random streaming over a fixed number of (cycling) random sockets,
 # so this test can be beefed up considerably at that point.
-# @todo@ A test DNS server running on localhost is really needed here
-
-class MyServer < RubyDNS::Server
-
-  include Dnsruby
-
-  IP   = "127.0.0.1"
-  PORT = 53927
-
-  @@stats = Stats.new
-
-  def self.stats
-    @@stats
-  end
-
-  def process(name, resource_class, transaction)
-    transaction.respond!("93.184.216.34", { resource_class: Resolv::DNS::Resource::IN::A })
-    Celluloid.logger.debug "got message"
-  end
-end
-
-class PipeliningServer < MyServer
-  def run
-    fire(:setup)
-
-    link NioTcpPipeliningHandler.new(self, IP, PORT, 5) #5 max request
-    link RubyDNS::UDPHandler.new(self, IP, PORT)
-
-    fire(:start)
-  end
-end
 
 class TestSingleResolverSoak < Minitest::Test
 
-  IP   = MyServer::IP
-  PORT = MyServer::PORT
+  IP   = SimpleTCPPipeliningUDPServer::IP
+  PORT = SimpleTCPPipeliningUDPServer::PORT
 
   def initialize(arg)
     super(arg)
-    self.class.init
-  end
-
-  def self.init
-    unless @initialized
-      Celluloid.boot
-      # By default, Celluloid logs output to console. Use Dnsruby.log instead.
-      Celluloid.logger = Dnsruby.log
-      @initialized = true
-    end
   end
 
   def teardown
@@ -83,12 +43,15 @@ class TestSingleResolverSoak < Minitest::Test
   SINGLE_RESOLVER_QUERY_TIMES = 63
 
   def setup
-    # Instantiate a new server
-    # For each query respond with 93.184.216.34
+    # Instantiate a local dns server
+    pipe = IO.popen("./test/localdns.rb")
+    @dnspid = pipe.pid
+    sleep 1
+  end
 
-    @@supervisor ||= RubyDNS::run_server(asynchronous: true,
-                                         server_class: PipeliningServer)
-
+  def teardown
+    Process.kill("KILL", @dnspid)
+    sleep 1
   end
 
   def test_many_asynchronous_queries_one_single_resolver
@@ -119,14 +82,14 @@ class TestSingleResolverSoak < Minitest::Test
     q = Queue.new
     timeout_count = 0
     resolvers = Array.new(num_resolvers) do
-      SingleResolver.new(server:                     IP,
-                         port:                       PORT,
-                         do_caching:                 false,
-                         do_validation:              false,
-                         tcp_pipelining:             pipelining,
-                         packet_timeout:             10,
-                         tcp_pipelining_max_queries: 5,
-                         use_tcp:                    tcp)
+      Dnsruby::SingleResolver.new(server:                     IP,
+                                  port:                       PORT,
+                                  do_caching:                 false,
+                                  do_validation:              false,
+                                  tcp_pipelining:             pipelining,
+                                  packet_timeout:             10,
+                                  tcp_pipelining_max_queries: 5,
+                                  use_tcp:                    tcp)
     end
     start = Time.now
 
@@ -134,7 +97,7 @@ class TestSingleResolverSoak < Minitest::Test
     #  this test while we're not using single sockets.
     #  We run four queries per iteration, so we're limited to 64 runs.
     messages = TestSoakBase::Rrs.map do |data|
-      message = Message.new(data[:name], data[:type])
+      message = Dnsruby::Message.new(data[:name], data[:type])
       message.do_validation = false
       message.do_caching    = false
       message
@@ -145,9 +108,9 @@ class TestSingleResolverSoak < Minitest::Test
     receive_thread = Thread.new do
       query_count.times do
         _id, ret, error = q.pop
-        if error.is_a?(ResolvTimeout)
+        if error.is_a?(Dnsruby::ResolvTimeout)
           timeout_count+=1
-        elsif ret.class != Message
+        elsif ret.class != Dnsruby::Message
           p "ERROR RETURNED : #{error}"
         end
       end
@@ -197,7 +160,7 @@ class TestSingleResolverSoak < Minitest::Test
             packet=nil
             begin
               packet = res.query(data[:name], data[:type])
-            rescue ResolvTimeout
+            rescue Dnsruby::ResolvTimeout
               mutex.synchronize { timeout_count += 1 }
               next
             end
@@ -252,19 +215,19 @@ class TestSingleResolverSoak < Minitest::Test
             end
             q = Queue.new
 
-            message = Message.new(data[:name], data[:type])
+            message = Dnsruby::Message.new(data[:name], data[:type])
             message.do_validation = false
             message.do_caching    = false
 
             res.send_async(message, q, [i,j])
 
             id, packet, error = q.pop
-            if (error.class == ResolvTimeout)
+            if (error.class == Dnsruby::ResolvTimeout)
               mutex.synchronize {
                 timeout_count+=1
               }
               next
-            elsif (packet.class!=Message)
+            elsif (packet.class!=Dnsruby::Message)
               puts "ERROR! #{error}"
             end
 
@@ -282,13 +245,12 @@ class TestSingleResolverSoak < Minitest::Test
     assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
 
-
   def create_default_single_resolver
-    SingleResolver.new(server:         IP,
-                       port:           PORT,
-                       do_caching:     false,
-                       do_validation:  false,
-                       packet_timeout: 10)
+    Dnsruby::SingleResolver.new(server:         IP,
+                                port:           PORT,
+                                do_caching:     false,
+                                do_validation:  false,
+                                packet_timeout: 10)
 
   end
 end
