@@ -165,7 +165,7 @@ module Dnsruby
     #  Set port
     def port=(p)
       @configured = true
-      @port=p
+      @port=p if p
       if !@port.kind_of?(Integer)
         raise ArgumentError.new("invalid port config: #{@port.inspect}")
       end
