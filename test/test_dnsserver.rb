@@ -165,11 +165,11 @@ class NioTcpPipeliningHandler < Async::DNS::GenericHandler
   DEFAULT_TIMEOUT = 3
   # TODO Add timeout
   def initialize(server, host, port, max_requests = DEFAULT_MAX_REQUESTS, timeout = DEFAULT_TIMEOUT)
-    super(server, host)
+    @socket = TCPServer.new(host, port)
+    super(server, @socket)
     @max_requests_per_connection = max_requests
     @timeout = timeout
 
-    @socket = TCPServer.new(host, port)
     @count = {}
 
     @server.class.stats.connections = @count.keys.count
