@@ -40,6 +40,9 @@ class TestRrOpt < Minitest::Test
 
       query = create_test_query.(bufsize)
       response, _error = resolver.send_plain_message(query)
+      if (_error != nil) then
+        print "Error at #{bufsize} : #{_error}"
+      end
       # puts "\nBufsize is #{bufsize}, binary message size is #{response.encode.size}"
       assert_equal(true, response.header.tc)
       assert(response.encode.size <= bufsize)
