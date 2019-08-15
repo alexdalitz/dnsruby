@@ -52,8 +52,8 @@ class TestRrOpt < Minitest::Test
       assert(response.encode.size <= bufsize)
     end
 
-    run_test.(512)
-    run_test.(612)
+    #run_test.(512)
+    #run_test.(612)
     run_test.(4096)
   end
 
