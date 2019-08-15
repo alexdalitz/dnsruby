@@ -14,6 +14,7 @@ class TestDNS < Minitest::Test
     resolver_host = 'a.gtld-servers.net'
     resolver = Dnsruby::Resolver.new(resolver_host)
     resolver.packet_timeout = 10
+    resolver.query_timeout = 10
     message = Dnsruby::Message.new('test.com', 'A', 'HS')
     response, error = resolver.send_plain_message(message)
 
