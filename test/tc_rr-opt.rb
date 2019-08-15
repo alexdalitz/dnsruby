@@ -29,11 +29,12 @@ class TestRrOpt < Minitest::Test
   def test_plain_respects_bufsize
 
 
-    run_test = ->(bufsize, host) do
+      #resolver = Resolver.new(['a.gtld-servers.net', 'b.gtld-servers.net', 'c.gtld-servers.net'])
+      resolver = Resolver.new('a.gtld-servers.net')
+      resolver.query_timeout=20
 
-      resolver = Resolver.new(host)
-      #resolver.packet_timeout=10
-      resolver.query_timeout=10
+    run_test = ->(bufsize) do
+
 
       create_test_query = ->(bufsize) do
         message = Message.new('com', Types.ANY, Classes.IN)
@@ -51,9 +52,9 @@ class TestRrOpt < Minitest::Test
       assert(response.encode.size <= bufsize)
     end
 
-    run_test.(512, 'a.gtld-servers.net')
-    run_test.(612, 'b.gtld-servers.net')
-    run_test.(4096, 'c.gtld-servers.net')
+    run_test.(512)
+    run_test.(612)
+    run_test.(4096)
   end
 
 
