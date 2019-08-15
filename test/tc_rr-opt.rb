@@ -29,8 +29,7 @@ class TestRrOpt < Minitest::Test
   def test_plain_respects_bufsize
 
 
-      #resolver = Resolver.new(['a.gtld-servers.net', 'b.gtld-servers.net', 'c.gtld-servers.net'])
-      resolver = Resolver.new('a.gtld-servers.net')
+      resolver = Resolver.new(['a.gtld-servers.net', 'b.gtld-servers.net', 'c.gtld-servers.net'])
       resolver.query_timeout=20
 
     run_test = ->(bufsize) do
