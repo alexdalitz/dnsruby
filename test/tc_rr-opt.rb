@@ -39,6 +39,7 @@ class TestRrOpt < Minitest::Test
       end
 
       query = create_test_query.(bufsize)
+      resolver.packet_timeout=10
       response, _error = resolver.send_plain_message(query)
       if (_error != nil) then
         print "Error at #{bufsize} : #{_error}"
