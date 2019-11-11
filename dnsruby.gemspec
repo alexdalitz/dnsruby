@@ -15,6 +15,7 @@ SPEC = Gem::Specification.new do |s|
 stub resolver. It aims to comply with all DNS RFCs, including
 DNSSEC NSEC3 support.'
   s.license = "Apache License, Version 2.0"
+  
   s.files = `git ls-files -z`.split("\x0")
 
   s.post_install_message = \
@@ -30,11 +31,21 @@ DNSSEC NSEC3 support.'
     s.add_development_dependency 'pry-byebug', '~> 2.0' if RUBY_VERSION >= '2'
   end
 
+  s.metadata = {
+    'yard.run'          => 'yard',
+    'bug_tracker_uri'   => 'https://github.com/alexdalitz/dnsruby/issues',
+    'changelog_uri'     => 'https://github.com/alexdalitz/dnsruby/blob/master/RELEASE_NOTES.md',
+    'documentation_uri' => 'https://www.rubydoc.info/gems/dnsruby/',
+    'homepage_uri'      => 'https://github.com/alexdalitz/dnsruby',
+    'source_code_uri'   => 'https://github.com/alexdalitz/dnsruby',
+  }
+
   s.add_development_dependency 'rake', '~> 10', '>= 10.3.2'
   s.add_development_dependency 'minitest', '~> 5.4'
   s.add_development_dependency 'rubydns', '~> 2.0.1'
   s.add_development_dependency 'nio4r', '~> 2.0'
   s.add_development_dependency 'minitest-display', '>= 0.3.0'
+  s.add_development_dependency('yard', '~> 0.9')
 
   if RUBY_VERSION >= "1.9.3"
     s.add_development_dependency 'coveralls', '~> 0.7'
