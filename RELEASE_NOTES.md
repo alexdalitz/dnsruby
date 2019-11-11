@@ -1,6 +1,6 @@
 # Release Notes
 
-##v1.61.2
+## v1.61.2
 
 * Add new root key
 
