@@ -93,3 +93,4 @@ Contact/Links
 | Github | https://github.com/alexdalitz/dnsruby |
 | Google Group | https://groups.google.com/forum/#!forum/dnsruby |
 | Rubygems | http://rubygems.org/gems/dnsruby/ |
+| Documentation | https://www.rubydoc.info/gems/dnsruby/ |
