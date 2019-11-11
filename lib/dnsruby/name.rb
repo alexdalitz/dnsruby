@@ -63,6 +63,12 @@ module Dnsruby
       end
     end
 
+    # Convert IDN domain from Unicode UTF-8 to ASCII punycode
+    # @param [Object|String] d Unicode domain with emoji inside
+    # @return [String] ASCII punycode domain
+    # @example
+    #   Dnsruby::Name.punycode('🏳.cf')
+    #   => "xn--en8h.cf"
     def self.punycode(d)
         begin
           c = Addressable::URI.parse("http://" + d.to_s)
