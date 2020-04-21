@@ -40,7 +40,7 @@ DNSSEC NSEC3 support.'
     'source_code_uri'   => 'https://github.com/alexdalitz/dnsruby',
   }
 
-  s.add_development_dependency 'rake', '~> 10', '>= 10.3.2'
+  s.add_development_dependency 'rake', '~> 10', '>= 12.3.3'
   s.add_development_dependency 'minitest', '~> 5.4'
   s.add_development_dependency 'rubydns', '~> 2.0.1'
   s.add_development_dependency 'nio4r', '~> 2.0'
