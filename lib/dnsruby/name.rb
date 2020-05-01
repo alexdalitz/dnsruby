@@ -27,7 +27,7 @@ module Dnsruby
   # * Name#subdomain_of?(other)
   # * Name#labels
   #
-  require 'addressable'
+  require 'simpleidn'
   class Name
     include Comparable
     MaxNameLength=255
@@ -70,19 +70,11 @@ module Dnsruby
     #   Dnsruby::Name.punycode('🏳.cf')
     #   => "xn--en8h.cf"
     def self.punycode(d)
-        begin
-          c = Addressable::URI.parse("http://" + d.to_s)
-          ret = c.normalized_host.sub("http://", "")
-          if (!d.end_with?".")
-            return ret.chomp(".")
-          end
-          if (!ret.end_with?".")
-            return ret + "."
-          end
-          return ret
-        rescue Exception => e
-          return d
-        end
+      begin
+        return SimpleIDN.to_ascii(d)
+      rescue
+        return d
+      end
     end
 
     def self.split_escaped(arg) #:nodoc: all
