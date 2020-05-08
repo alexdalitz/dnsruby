@@ -51,6 +51,6 @@ DNSSEC NSEC3 support.'
     s.add_development_dependency 'coveralls', '~> 0.7'
   end
 
-  s.add_runtime_dependency 'simpleidn', '~> 0.16'
+  s.add_runtime_dependency 'simpleidn', '~> 0.1'
 end
 
