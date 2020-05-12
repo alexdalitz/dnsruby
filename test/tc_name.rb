@@ -80,4 +80,23 @@ class TestName < Minitest::Test
     n2 = Name.create("nall.all.")
     assert(n1 == n2, n1.to_s)
   end
+
+  def test_punycode
+    [
+      [
+        "møllerriis.com",
+        "xn--mllerriis-l8a.com"
+      ],
+      [
+        "フガフガ。hogehoge.エグザンプル.JP",
+        "xn--mcka5jb.hogehoge.xn--ickqs6k2dyb.jp"
+      ],
+      [
+        "フガ#フガ。hogehoge.エグザンプル.JP",
+        "xn--#-yeub5nc.hogehoge.xn--ickqs6k2dyb.jp"
+      ]
+    ].each do |tc|
+      assert_equal(Dnsruby::Name.create(tc[0]).to_s, tc[1])
+    end
+  end
 end
