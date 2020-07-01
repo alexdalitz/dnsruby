@@ -31,6 +31,7 @@ class VerifierTest < Minitest::Test
       do_test_sha256
       do_test_sha512
       do_test_nsec
+      do_test_ecdsa256
     else
       print "OpenSSL doesn't support SHA2 - disabling SHA256/SHA512 tests. DNSSEC validation will not work with these type of signatures.\n"
     end
@@ -68,6 +69,20 @@ class VerifierTest < Minitest::Test
     rrset.add(sig)
     verifier = Dnsruby::SingleVerifier.new(nil)
     verifier.verify_rrset(rrset, key512)
+  end
+
+  def do_test_ecdsa256
+    Time.stub :now, Time.parse("Wed, 01 Jul 2020 11:54:04 EEST +03:00") do
+      ecdsa256 = Dnsruby::RR.create("rainiselevi.ee.	3600	IN	DNSKEY	256 3 ECDSAP256SHA256 ( oJMRESz5E
+        4gYzS/q6XDrvU1qMPYIjCWzJaOau8XNEZeqCYKD5ar0IRd8KqXXFJkqmVfRvMGPmM1x8fGAa2XhSA== ) ; key_tag=34505")
+      a = Dnsruby::RR.create("rainiselevi.ee.	3600	IN	A	35.228.30.236")
+      sig = Dnsruby::RR.create("rainiselevi.ee.	3600	IN	RRSIG	A ECDSAP256SHA256 2 300 20200702092142 ( 20200630072142 34505
+         rainiselevi.ee. kf3Fl1mSIso2kB12QOr+aNWYTUXtx9nRC/v+Kn1454u9I/YAFQd6nJQAsFd9vCTsZY+nL4wpj5pV+EsAMIxccA== )")
+      rrset = Dnsruby::RRSet.new(a)
+      rrset.add(sig)
+      verifier = Dnsruby::SingleVerifier.new(nil)
+      assert(verifier.verify_rrset(rrset, ecdsa256))
+    end
   end
 
   def test_se_query

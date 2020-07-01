@@ -85,4 +85,33 @@ class DnskeyTest < Minitest::Test
     dnskey.protocol=3
 
   end
+
+  def test_ecdsa_integrity
+    ecdsa_256_pub = 'example.com. 3600 IN DNSKEY 256 3 13 ( oJMRESz5E4gYzS/q6XD' +
+    'rvU1qMPYIjCWzJaOau8XNEZeqCYKD5ar0IRd8KqXXFJkqmVfRvMGPmM1x8fGAa2XhSA== )'
+
+    dnskey = Dnsruby::RR.create(ecdsa_256_pub)
+    assert_equal(3, dnskey.protocol)
+    assert_equal(256, dnskey.flags)
+    assert_equal(Dnsruby::Algorithms::ECDSAP256SHA256, dnskey.algorithm)
+    assert_equal(Dnsruby::RR::DNSKEY::ZONE_KEY, dnskey.flags & Dnsruby::RR::DNSKEY::ZONE_KEY)
+    assert_equal(0, dnskey.flags & Dnsruby::RR::DNSKEY::SEP_KEY)
+
+    dnskey2 = Dnsruby::RR.create(dnskey.to_s)
+    assert(dnskey2.to_s == dnskey.to_s, "#{dnskey} not equal to \n#{dnskey2}")
+
+    ecdsa_384_pub = 'example.com. 3600 IN DNSKEY 256 3 14 ( Bl2HDw98sGin4lNlx7n' +
+    'QX3w98jx6UhAgC73Jq+6LFlD12gnVTMHecM8Z GoTFSh+mV+qEPFZ5s3NbC4qvwUW0kkPb+0ip' +
+    'CuLRwZYhYKk7D+RDb+fX XozI9hhZrsXBcEhss )'
+
+    dnskey = Dnsruby::RR.create(ecdsa_384_pub)
+    assert_equal(3, dnskey.protocol)
+    assert_equal(256, dnskey.flags)
+    assert_equal(Dnsruby::Algorithms::ECDSAP384SHA384, dnskey.algorithm)
+    assert_equal(Dnsruby::RR::DNSKEY::ZONE_KEY, dnskey.flags & Dnsruby::RR::DNSKEY::ZONE_KEY)
+    assert_equal(0, dnskey.flags & Dnsruby::RR::DNSKEY::SEP_KEY)
+
+    dnskey2 = Dnsruby::RR.create(dnskey.to_s)
+    assert(dnskey2.to_s == dnskey.to_s, "#{dnskey} not equal to \n#{dnskey2}")
+  end
 end
