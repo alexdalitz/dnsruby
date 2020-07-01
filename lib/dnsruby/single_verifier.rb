@@ -800,6 +800,19 @@ module Dnsruby
 
         asn1 = OpenSSL::ASN1::Sequence.new([r_asn1, s_asn1]).to_der
         verified = keyrec.public_key.verify(OpenSSL::Digest::DSS1.new, asn1, sig_data)
+      elsif [Algorithms.ECDSAP256SHA256, Algorithms.ECDSAP384SHA384].include?(sigrec.algorithm)
+        byte_size = (keyrec.public_key.group.degree + 7) / 8
+        sig_bytes = sigrec.signature[0..(byte_size - 1)]
+        sig_char = sigrec.signature[byte_size..-1] || ''
+        asn1 = OpenSSL::ASN1::Sequence.new([sig_bytes, sig_char].map { |int| OpenSSL::ASN1::Integer.new(OpenSSL::BN.new(int, 2)) }).to_der
+
+        digest_obj = if sigrec.algorithm == Algorithms.ECDSAP384SHA384
+                       OpenSSL::Digest::SHA384.new
+                     else
+                       OpenSSL::Digest::SHA256.new
+                     end
+
+        verified = keyrec.public_key.dsa_verify_asn1(digest_obj.digest(sig_data), asn1)
       else
         raise RuntimeError.new("Algorithm #{sigrec.algorithm.code} unsupported by Dnsruby")
       end
