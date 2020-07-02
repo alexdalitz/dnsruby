@@ -128,6 +128,7 @@ module Dnsruby
       @@validation_policy = ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT
       @@root_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ROOT)
       @@root_verifier.add_root_ds(@@root_key)
+      @@root_verifier.add_root_ds(@@root_key_new)
 
       @@dlv_verifier = SingleVerifier.new(SingleVerifier::VerifierType::DLV)
 
