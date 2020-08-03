@@ -26,11 +26,6 @@ DNSSEC NSEC3 support.'
   s.test_file = "test/ts_offline.rb"
   s.extra_rdoc_files = ["DNSSEC", "EXAMPLES", "README.md", "EVENTMACHINE"]
 
-  unless /java/ === RUBY_PLATFORM
-    s.add_development_dependency 'pry', '~> 0.10'
-    s.add_development_dependency 'pry-byebug', '~> 2.0' if RUBY_VERSION >= '2'
-  end
-
   s.metadata = {
     'yard.run'          => 'yard',
     'bug_tracker_uri'   => 'https://github.com/alexdalitz/dnsruby/issues',

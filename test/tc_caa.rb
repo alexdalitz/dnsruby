@@ -16,7 +16,6 @@
 # ++
 
 require_relative 'spec_helper'
-require 'pry'
 
 class TestCAA < Minitest::Test
 
