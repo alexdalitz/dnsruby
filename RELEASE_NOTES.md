@@ -1,5 +1,19 @@
 # Release Notes
 
+## v1.61.4
+
+* Dnsruby::Name : document .punycode
+* gemspec enhancement
+* add yard build file
+* fix create name include url special characters
+* Fix uninitialized constant error when using via Rails
+* Implement ECDSAP256SHA256 (13) / ECDSAP384SHA384 (14) algorithms for DNSKEY
+* Reinitialize all IANA TAR keys with Dnssec.reset
+
+## v1.61.3
+
+* TCP timeout and port changes
+
 ## v1.61.2
 
 * Add new root key
