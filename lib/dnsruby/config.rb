@@ -321,9 +321,11 @@ module Dnsruby
         f.each {|line|
           line.sub!(/[#;].*/, '')
           keyword, *args = line.split(/\s+/)
-          args.each { |arg|
-            arg.untaint
-          }
+            if Gem::Version.new(RUBY_VERSION) < Gem::Version.new("2.8")
+              args.each { |arg|
+                arg.untaint
+              }
+            end
           next unless keyword
           case keyword
           when 'port'

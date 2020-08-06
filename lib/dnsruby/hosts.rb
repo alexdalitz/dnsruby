@@ -57,15 +57,19 @@ module Dnsruby
                 line.sub!(/#.*/, '')
                 addr, hostname, *aliases = line.split(/\s+/)
                 next unless addr
-                addr.untaint
-                hostname.untaint
+                if Gem::Version.new(RUBY_VERSION) < Gem::Version.new("2.8")
+                  addr.untaint
+                  hostname.untaint
+                end
                 @addr2name[addr] = [] unless @addr2name.include? addr
                 @addr2name[addr] << hostname
                 @addr2name[addr] += aliases
                 @name2addr[hostname] = [] unless @name2addr.include? hostname
                 @name2addr[hostname] << addr
                 aliases.each {|n|
-                  n.untaint
+                  if Gem::Version.new(RUBY_VERSION) < Gem::Version.new("2.8")
+                    n.untaint
+                  end
                   @name2addr[n] = [] unless @name2addr.include? n
                   @name2addr[n] << addr
                 }
