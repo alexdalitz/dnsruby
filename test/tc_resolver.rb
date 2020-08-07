@@ -171,7 +171,7 @@ class TestResolver < Minitest::Test
     # test timeout behaviour for different retry, retrans, total timeout etc.
     # Problem here is that many sockets will be created for queries which time out.
     #  Run a query which will not respond, and check that the timeout works
-    if (!RUBY_PLATFORM=~/darwin/)
+    if (RUBY_PLATFORM !~ /darwin/)
       start=stop=0
       retry_times = 3
       retry_delay=1
