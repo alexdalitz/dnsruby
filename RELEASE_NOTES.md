@@ -1,5 +1,10 @@
 # Release Notes
 
+## v1.61.5
+
+* CAA record fixes - add contactphone and contactemail
+* Fix eprecation warnings
+
 ## v1.61.4
 
 * Dnsruby::Name : document .punycode
