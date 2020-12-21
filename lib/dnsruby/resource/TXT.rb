@@ -82,7 +82,17 @@ module Dnsruby
             end
           else
             if (seen_strings && !in_string)
-              next
+              if (c == ";")
+                 # Comment in zone file!
+                 return strings
+              end
+              if (c != " " && c != "\t")
+                in_string = true
+                count+=1
+                strings[count] = ""
+              else
+                next
+              end
             end
             if (pos == 0)
               unquoted = true

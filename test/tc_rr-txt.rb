@@ -143,7 +143,13 @@ class TestRrTest < Minitest::Test
 
    r1 = RR.create("auto._domainkey.cacert.org.  43200 IN	TXT	\"v=DKIM1\;g=*\;k=rsa\;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDDNFxiNr+NHJwih3OPhGr4iwLE+BBDu72YrMSzUnU1FF50CW7iOtuhg796UZ6xrZ5VuhAix6YmmzcvF2UxYzoD/XpfZ4MzBu0ND4/nkt9/YOTyIBzwQqn9uMNve0Y76Zsel89dIJtOI+y+lfnFExV0jKwe53gzmxMVpMSSCcZPGwIDAQAB\"	; ----- DKIM auto for cacert.org")
    r2 = RR.create("auto._domainkey.cacert.org.	43200	IN	TXT	\"v=DKIM1;g=*;k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDDNFxiNr+NHJwih3OPhGr4iwLE+BBDu72YrMSzUnU1FF50CW7iOtuhg796UZ6xrZ5VuhAix6YmmzcvF2UxYzoD/XpfZ4MzBu0ND4/nkt9/YOTyIBzwQqn9uMNve0Y76Zsel89dIJtOI+y+lfnFExV0jKwe53gzmxMVpMSSCcZPGwIDAQAB\"")
-   assert(r1.to_s == r2.to_s)
+   assert_equal(r1.to_s, r2.to_s)
+  end
+
+  def test_quote_and_unquoted
+    t = Dnsruby::RR::TXT.parse '"a" b'
+    assert_equal("a", t[0])
+    assert_equal("b", t[1])
   end
 
 end
