@@ -1080,7 +1080,7 @@ module Dnsruby
         if event_type == Resolver::EventType::RECEIVED ||
               event_type == Resolver::EventType::ERROR
           unless outstanding.include?(id)
-            log_and_raise("Query id not on outstanding list! #{outstanding.length} items. #{id} not on #{outstanding}")
+            Dnsruby.log.error{"Query id not on outstanding list! # {outstanding.length} items. #{id} not on #{outstanding}"}
           end
           outstanding.delete(id)
         end
