@@ -18,6 +18,8 @@
 require 'dnsruby/packet_sender'
 require 'dnsruby/recursor'
 
+include Dnsruby
+
 module Dnsruby
   #  == Description
   #  Dnsruby::Resolver is a DNS stub resolver.
