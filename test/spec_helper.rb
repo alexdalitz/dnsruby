@@ -1,3 +1,9 @@
+$VERBOSE = true
+
+if Warning.respond_to?(:[]=)
+  Warning[:deprecated] = true
+end
+
 if ENV['RUN_EXTRA_TASK'] == 'TRUE'
   require 'coveralls'
   Coveralls.wear!

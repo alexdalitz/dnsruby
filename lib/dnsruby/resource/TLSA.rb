@@ -33,8 +33,8 @@ module Dnsruby
         # 255 Private use
         attr_accessor :matching_type
         # sec 2.1.4
-        attr_accessor :data
-        attr_accessor :databin
+        attr_reader :data
+        attr_reader :databin
 
         def verify
           raise ArgumentError, "usage with invalid value: #{@usage}" if @usage < 0 || @usage > 255
@@ -71,7 +71,7 @@ module Dnsruby
           if @matching_type == 0 && @selector == 0 && @databin
             begin
               cert = OpenSSL::X509::Certificate.new(@databin)
-            rescue => e
+            rescue
               raise ArgumentError, 'data is invalid cert '
             end
           end

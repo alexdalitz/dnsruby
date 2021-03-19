@@ -142,14 +142,14 @@ class TestTcp < Minitest::Test
       ans = HackMessage.decode(received_query)
       ans.wipe_additional
       100.times {|i|
-      ans.add_additional(Dnsruby::RR.create("example.com 3600 IN A 1.2.3.#{i}"))
+        ans.add_additional(Dnsruby::RR.create("example.com 3600 IN A 1.2.3.#{i}"))
       }
       ans.header.arcount = 110
       ans.header.tc = true
       socket.send(ans.encode,0)
     }
 
-        server_thread = Thread.new {
+    _server_thread = Thread.new {
       ts = TCPServer.new(port)
       t = ts.accept
       packet = t.recvfrom(2)[0]

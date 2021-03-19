@@ -1,5 +1,3 @@
-require_relative 'spec_helper'
-
 # Use this in tests in the tests directory with:
 # require_relative 'test_utils'
 # include TestUtils

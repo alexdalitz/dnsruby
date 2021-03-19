@@ -259,7 +259,7 @@ module Dnsruby
     #  in: dName a string with a domain name in presentation format (1035
     #  sect 5.1)
     #  out: an array of labels in wire format.
-    def self.name2encodedlabels (dName) #:nodoc: all
+    def self.name2encodedlabels(dName) #:nodoc: all
       #  Check for "\" in the name  : If there, then decode properly - otherwise, cheat and split on "."
       if (dName.index("\\"))
         names=[]

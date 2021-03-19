@@ -140,7 +140,7 @@ module Dnsruby
       }
       begin
         @@wakeup_sockets[0].send("wakeup!", 0)
-      rescue Exception => e
+      rescue Exception
         #          do nothing
       end
     end
@@ -190,12 +190,11 @@ module Dnsruby
         end
         #         next if (timeout < 0)
         begin
-          ready, write, errors = IO.select(sockets, nil, nil, timeout)
+          _ready, _write, _errors = IO.select(sockets, nil, nil, timeout)
         rescue SelectWakeup
           #  If SelectWakeup, then just restart this loop - the select call will be made with the new data
           next
-        rescue IOError, EncodeError => e
-          #           print "IO Error  =: #{e}\n"
+        rescue IOError, EncodeError
           exceptions = clean_up_closed_sockets
           exceptions.each { |exception| send_exception_to_client(*exception) }
 
@@ -248,7 +247,7 @@ module Dnsruby
     # Removes closed sockets from @@sockets, and returns an array containing 1
     # exception for each closed socket contained in @@socket_hash.
     def clean_up_closed_sockets
-      exceptions = @@mutex.synchronize do
+      @@mutex.synchronize do
         closed_sockets_in_hash = @@sockets.select(&:closed?).select { |s| @@socket_hash[s] }
         @@sockets.delete_if { | socket | socket.closed? }
         closed_sockets_in_hash.each_with_object([]) do |socket, exceptions|
@@ -257,6 +256,7 @@ module Dnsruby
           end
         end
       end
+      exceptions
     end
 
     def process_error(errors)
@@ -295,7 +295,6 @@ module Dnsruby
       @@mutex.synchronize do
         ids = get_active_ids(@@query_hash, msg.header.id)
         return if ids.empty? # should be only one
-        query_settings = @@query_hash[ids[0]].clone
       end
 
       answerip = msg.answerip.downcase
@@ -732,7 +731,7 @@ module Dnsruby
       }
 
       responses.each do |item|
-        client_id, client_queue, msg, err, query, res = item
+        client_id, client_queue, msg, err, _query, _res = item
         #         push_to_client(client_id, client_queue, msg, err)
         client_queue.push([client_id, Resolver::EventType::VALIDATED, msg, err])
         notify_queue_observers(client_queue, client_id)

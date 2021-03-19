@@ -204,26 +204,22 @@ module Dnsruby
       @tcp_pipelining_max_queries = :infinite
       @use_counts = {}
 
-      if (arg==nil)
-        #  Get default config
-        config = Config.new
-        #         @server = config.nameserver[0]
-      elsif (arg.kind_of? String)
-        @server=arg
-      elsif (arg.kind_of? Name)
-        @server=arg
-      elsif (arg.kind_of? Hash)
+      if arg.nil?
+      elsif arg.kind_of? String
+        @server = arg
+      elsif arg.kind_of? Name
+        @server = arg
+      elsif arg.kind_of? Hash
         arg.keys.each do |attr|
           begin
-            if (((attr.to_s == "src_address")||(attr.to_s == "src_address6")) &&
-                ((arg[attr] == nil) || (arg[attr] == "")))
+            if ((attr.to_s == "src_address" || attr.to_s == "src_address6") &&
+                (arg[attr] == nil || arg[attr] == ""))
             else
-              send(attr.to_s+"=", arg[attr])
+              send(attr.to_s + "=", arg[attr])
             end
           rescue Exception => e
             Dnsruby.log.error { "PacketSender : Argument #{attr}, #{arg[attr]} not valid : #{e}\n" }
           end
-          #         end
         end
       end
       # Check server is IP
@@ -235,12 +231,12 @@ module Dnsruby
 
     def check_ipv6
       begin
-        i = IPv4.create(@server)
+        IPv4.create(@server)
         #         @src_address = '0.0.0.0'
         @ipv6=false
       rescue Exception
         begin
-          i = IPv6.create(@server)
+          IPv6.create(@server)
           #           @src_address6 = '::'
           @ipv6=true
         rescue Exception
