@@ -190,7 +190,7 @@ module Dnsruby
         end
         #         next if (timeout < 0)
         begin
-          _ready, _write, _errors = IO.select(sockets, nil, nil, timeout)
+          ready, _write, _errors = IO.select(sockets, nil, nil, timeout)
         rescue SelectWakeup
           #  If SelectWakeup, then just restart this loop - the select call will be made with the new data
           next
