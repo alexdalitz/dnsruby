@@ -73,8 +73,8 @@ class TestResolver < Minitest::Test
   end
 
   def test_send_plain_message
-    resolver = Resolver.new
-    response, error = resolver.send_plain_message(Message.new("example.com"))
+    resolver = Resolver.new('1.1.1.1')
+    response, error = resolver.send_plain_message(Message.new("example.com", Types.A))
     assert_nil_error(error)
     assert_valid_response(response)
 
