@@ -28,15 +28,14 @@ class TestRrOpt < Minitest::Test
   # This works only with send_plain_message, not send_message, query, etc.
   def test_plain_respects_bufsize
 
-
-      resolver = Resolver.new(['a.gtld-servers.net', 'b.gtld-servers.net', 'c.gtld-servers.net'])
+      resolver = Resolver.new('a.gtld-servers.net')
       resolver.query_timeout=20
 
     run_test = ->(bufsize) do
 
 
       create_test_query = ->(bufsize) do
-        message = Message.new('com', Types.ANY, Classes.IN)
+        message = Message.new('com', Types.RRSIG, Classes.IN)
         message.add_additional(RR::OPT.new(bufsize))
         message
       end
@@ -46,14 +45,12 @@ class TestRrOpt < Minitest::Test
       if (_error != nil) then
         print "Error at #{bufsize} : #{_error}"
       end
-      # puts "\nBufsize is #{bufsize}, binary message size is #{response.encode.size}"
+#       puts "\nBufsize is #{bufsize}, binary message size is #{response.encode.size}"
       assert_equal(true, response.header.tc)
       assert(response.encode.size <= bufsize)
     end
 
-    #run_test.(512)
-    #run_test.(612)
-    run_test.(4096)
+    run_test.(612)
   end
 
 
