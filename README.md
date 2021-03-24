@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/alexdalitz/dnsruby.svg?branch=master)](https://travis-ci.org/alexdalitz/dnsruby)
+[![Build Status](https://github.com/alexdalitz/dnsruby/actions/workflows/ci.yml/badge.svg)]
 [![Coverage Status](https://img.shields.io/coveralls/alexdalitz/dnsruby.svg)](https://coveralls.io/r/alexdalitz/dnsruby?branch=master)
 
 <img src="http://caerkettontech.com/dnsruby/DNSRuby-colour-mid.png" width="200" height="200" />
