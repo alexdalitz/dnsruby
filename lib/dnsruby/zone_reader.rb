@@ -68,7 +68,7 @@ module Dnsruby
             end
             zone.push(rr)
           end
-        rescue Exception => e
+        rescue Exception
           raise ParseException.new("Error reading line #{io.lineno} of #{io.inspect} : [#{line}]")
         end
       end
@@ -303,7 +303,7 @@ module Dnsruby
         (split.length - 2).times {|i| line += "#{split[i+2]} "}
         line += "\n"
         split = line.split
-      rescue Error => e
+      rescue Error
       end
 
       #  Add the type so we can load the zone one RRSet at a time.

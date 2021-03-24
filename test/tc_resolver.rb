@@ -132,7 +132,7 @@ class TestResolver < Minitest::Test
     r = Resolver.new
     q=Queue.new
     r.send_async(m,q,q)
-    id,ret, error=q.pop
+    _id, ret, _error=q.pop
     assert(ret.kind_of?(Message))
     no_pointer=true
     ret.each_answer do |answer|
@@ -185,14 +185,14 @@ class TestResolver < Minitest::Test
         res.retry_times=retry_times
         res.retry_delay=retry_delay
         start=Time.now
-        m = res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
+        res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
         fail
       rescue ResolvTimeout
         stop=Time.now
         time = stop-start
         assert(time <= expected * 1.3 && time >= expected * 0.9, "Wrong time take, expected #{expected}, took #{time}")
       end
-  end
+    end
   end
 
   def test_packet_timeout
@@ -209,7 +209,7 @@ class TestResolver < Minitest::Test
         #  Work out what time should be, then time it to check
         expected = query_timeout
         start=Time.now
-        m = res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
+        res.send_message(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A))
         fail
       rescue Dnsruby::ResolvTimeout
         stop=Time.now
@@ -227,7 +227,7 @@ class TestResolver < Minitest::Test
       res.query_timeout=expected
       q = Queue.new
       start = Time.now
-      m = res.send_async(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A), q, q)
+      res.send_async(Message.new("a.t.dnsruby.validation-test-servers.nominet.org.uk", Types.A), q, q)
       id,ret,err = q.pop
       stop = Time.now
       assert(id=q)
@@ -382,19 +382,19 @@ class TestRawQuery < Minitest::Test
           resolver.query("google.com", "MX")
           begin
             resolver.query("googlöe.com", "MX") 
-          rescue Dnsruby::ResolvError => e
+          rescue Dnsruby::ResolvError
             # fine
           end
           resolver.query("google.com", "MX")
           resolver.query("google.com", "MX")
           begin
             resolver.query("googlöe.com", "MX")
-          rescue Dnsruby::ResolvError => e
+          rescue Dnsruby::ResolvError
             # fine
           end
           begin
             resolver.query("googlöe.com", "MX") 
-          rescue Dnsruby::ResolvError => e
+          rescue Dnsruby::ResolvError
             # fine
           end
 #          Dnsruby::Cache.delete("googlöe.com", "MX")

@@ -85,7 +85,7 @@ module Dnsruby
       #       end
       # 
       def from_data(data) #:nodoc: all
-        hash_alg, flags, iterations, salt_length, salt = data
+        hash_alg, flags, iterations, _salt_length, salt = data
         self.hash_alg=(hash_alg)
         self.flags=(flags)
         self.iterations=(iterations)

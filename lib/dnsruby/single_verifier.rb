@@ -462,7 +462,6 @@ module Dnsruby
     def check_no_wildcard_expansion(msg) # :nodoc:
       #  @TODO@ Do this for NSEC3 records!!!
       proven_no_wildcards = false
-      name = msg.question()[0].qname
       [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
         nsec_rrsets.each {|nsecs|
           nsecs.rrs.each {|nsec|
@@ -1329,8 +1328,7 @@ module Dnsruby
             msg.security_level = Message::SecurityLevel.SECURE
             return true
           end
-        rescue VerifyError => e
-          #           print "Verify failed : #{e}\n"
+        rescue VerifyError
         end
       end
       if (error)

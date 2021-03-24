@@ -244,7 +244,6 @@ module Dnsruby
     end
 
     def parseRR(rec) #:nodoc: all
-      name = rec.name
       type = rec.type
       delta = Delta.new
 

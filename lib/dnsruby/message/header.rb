@@ -31,9 +31,6 @@ class Header
   #  and is allowed to set the bit by policy.)
   attr_accessor :ad
 
-  #  The query response flag
-  attr_accessor :qr
-
   #  Recursion available flag
   attr_accessor :ra
 

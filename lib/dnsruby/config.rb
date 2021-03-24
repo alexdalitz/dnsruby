@@ -85,13 +85,10 @@ module Dnsruby
     def initialize()
       @mutex = Mutex.new
       @configured = false
-      #       parse_config
     end
     #  Reset the config to default values
     def Config.reset
-      c = Config.new
       @configured = false
-      #       c.parse_config
     end
 
     def parse_config(config_info=nil) #:nodoc: all
@@ -207,13 +204,13 @@ module Dnsruby
         if (String ===n)
           #  Make sure we can make a Name or an address from it
           begin
-            a = IPv4.create(n)
+            IPv4.create(n)
           rescue ArgumentError
             begin
-              a = IPv6.create(n)
+              IPv6.create(n)
             rescue ArgumentError
               begin
-                a = Name.create(n)
+                Name.create(n)
               rescue ArgumentError
                 raise ArgumentError.new("Can't interpret #{n} as IPv4, IPv6 or Name")
               end

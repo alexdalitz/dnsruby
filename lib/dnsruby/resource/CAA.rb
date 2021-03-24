@@ -26,7 +26,7 @@ module Dnsruby
       # The value for the property_tag
       attr_accessor :property_value
       # The value for the flag
-      attr_accessor :flag
+      attr_writer :flag
 
       def from_hash(hash) #:nodoc: all
         @property_tag = hash[:property_tag]
