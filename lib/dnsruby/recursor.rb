@@ -227,7 +227,7 @@ module Dnsruby
       #  Nice idea.
 
       #       if (!@@hints || @@hints.length == 0)
-      resolver.recurse=(1)
+      resolver.recurse = true
       packet=resolver.query_no_validation_or_recursion(".", "NS", "IN")
       hints = Hash.new
       if (packet)
@@ -303,7 +303,7 @@ module Dnsruby
       end
 
       #  Disable recursion flag.
-      resolver.recurse=(0)
+      resolver.recurse = false
       #       end
 
       #   return $self->nameservers( map { @{ $_ } } values %{ $self->{'hints'} } );
@@ -406,7 +406,7 @@ module Dnsruby
       @@mutex.synchronize {
         self.hints=(Hash.new) unless @@hints
       }
-      @resolver.recurse=(0)
+      @resolver.recurse = false
       #  Make sure the authority cache is clean.
       #  It is only used to store A and AAAA records of
       #  the suposedly authoritative name servers.
@@ -622,6 +622,7 @@ module Dnsruby
       end
       resolver = Resolver.new({:nameserver=>nameservers})
       resolver.dnssec = @dnssec
+      resolver.recurse = false
       servers = []
       resolver.single_resolvers.each {|s|
         servers.push(s.server)
