@@ -1,5 +1,13 @@
 # Release Notes
 
+## v1.61.6
+
+* RD bit not set on Recursor queries (thanks Sean Dilda!)
+* Handle quoted strings followed by unquoted strings in TXT records
+* do not worry about rogue repeated Ids - just log an error and get on with life
+* Clear Ruby warnings
+* Use GitHub Actions rather than Travis
+
 ## v1.61.5
 
 * CAA record fixes - add contactphone and contactemail
