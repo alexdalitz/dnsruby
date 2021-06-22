@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ++
-
 require 'dnsruby/code_mappers'
 require 'dnsruby/message/message'
 require 'dnsruby/ipv4'
@@ -26,7 +25,6 @@ require 'dnsruby/DNS'
 require 'dnsruby/hosts'
 require 'dnsruby/update'
 require 'dnsruby/zone_transfer'
-require 'dnsruby/zone_reader'
 
 # = Dnsruby library
 # Dnsruby is a thread-aware DNS stub resolver library written in Ruby.
@@ -238,5 +236,6 @@ module Dnsruby
   end
 end
 
-require 'dnsruby/resolv'
 require 'dnsruby/dnssec'
+require 'dnsruby/zone_reader'
+require 'dnsruby/resolv'
