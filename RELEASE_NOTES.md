@@ -1,5 +1,9 @@
 # Release Notes
 
+## v1.61.7
+
+* Fix namespace issue from v1.61.6
+
 ## v1.61.6
 
 * RD bit not set on Recursor queries (thanks Sean Dilda!)
