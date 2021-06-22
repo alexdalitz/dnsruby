@@ -18,8 +18,6 @@
 require 'dnsruby/packet_sender'
 require 'dnsruby/recursor'
 
-include Dnsruby
-
 module Dnsruby
   #  == Description
   #  Dnsruby::Resolver is a DNS stub resolver.
@@ -567,7 +565,7 @@ module Dnsruby
     def add_server(server)# :nodoc:
       @configured = true
       res = PacketSender.new(server)
-      log_and_raise("Can't create server #{server}", ArgumentError) unless res
+      Dnsruby.log_and_raise("Can't create server #{server}", ArgumentError) unless res
       update_internal_res(res)
       @single_res_mutex.synchronize { @single_resolvers.push(res) }
     end
@@ -643,7 +641,7 @@ module Dnsruby
         a = Resolver.get_ports_from(p)
         a.each do |x|
           if (@src_port.length > 0) && (x == 0)
-            log_and_raise("src_port of 0 only allowed as only src_port value (currently #{@src_port.length} values",
+            Dnsruby.log_and_raise("src_port of 0 only allowed as only src_port value (currently #{@src_port.length} values",
                 ArgumentError)
           end
           @src_port.push(x)
@@ -667,7 +665,7 @@ module Dnsruby
         return ! ((p == 0) && (src_port.length > 0))
       else
         Dnsruby.log.error("Illegal port (#{p})")
-        log_and_raise("Illegal port #{p}", ArgumentError)
+        Dnsruby.log_and_raise("Illegal port #{p}", ArgumentError)
       end
     end
 
@@ -836,7 +834,7 @@ module Dnsruby
             timeouts[base + offset]=[res, retry_count]
           else
             if timeouts.has_key?(base + retry_delay + offset)
-              log_and_raise('Duplicate timeout key!')
+              Dnsruby.log_and_raise('Duplicate timeout key!')
             end
             timeouts[base + retry_delay + offset]=[res, retry_count]
           end
@@ -877,7 +875,7 @@ module Dnsruby
       end
 
       unless client_queue.kind_of?(Queue)
-        log_and_raise('Wrong type for client_queue in Resolver# send_async')
+        Dnsruby.log_and_raise('Wrong type for client_queue in Resolver# send_async')
         #  @TODO@ Handle different queue tuples - push this to generic send_error method
         client_queue.push([client_query_id, ArgumentError.new('Wrong type of client_queue passed to Dnsruby::Resolver# send_async - should have been Queue, was #{client_queue.class}')])
         return
@@ -1058,13 +1056,13 @@ module Dnsruby
       #  @TODO@ Also, should have option to speak only to configured resolvers (not follow authoritative chain)
       #
       if queue.empty?
-        log_and_raise('Severe internal error - Queue empty in handle_queue_event')
+        Dnsruby.log_and_raise('Severe internal error - Queue empty in handle_queue_event')
       end
       event_id, event_type, response, error = queue.pop
       #  We should remove this packet from the list of outstanding packets for this query
       _resolver, _msg, client_query_id, _retry_count = id
       if id != event_id
-        log_and_raise("Serious internal error!! #{id} expected, #{event_id} received")
+        Dnsruby.log_and_raise("Serious internal error!! #{id} expected, #{event_id} received")
       end
       #       @mutex.synchronize{
       @parent.single_res_mutex.synchronize {
@@ -1207,7 +1205,7 @@ module Dnsruby
       #       @mutex.synchronize{
       _query, _client_queue, s_queue, _outstanding = @query_list[client_query_id]
       if s_queue != select_queue
-        log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
+        Dnsruby.log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
       end
       stop_querying(client_query_id)
       #  @TODO@ Does the client want notified at this point?
@@ -1220,7 +1218,7 @@ module Dnsruby
       #       @mutex.synchronize {
       _query, client_queue, s_queue, _outstanding = @query_list[client_query_id]
       if s_queue != select_queue
-        log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
+        Dnsruby.log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
       end
       if response.rcode == RCode.NXDOMAIN
         send_result(client_queue, client_query_id, select_queue, response, NXDomain.new)
@@ -1236,7 +1234,7 @@ module Dnsruby
       _resolver, _msg, client_query_id, _retry_count = query_id
       _query, client_queue, s_queue, _outstanding = @query_list[client_query_id]
       if s_queue != select_queue
-        log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
+        Dnsruby.log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
       end
       #       For some errors, we immediately send result. For others, should we retry?
       #       Either :
