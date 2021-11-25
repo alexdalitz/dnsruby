@@ -35,11 +35,11 @@ DNSSEC NSEC3 support.'
     'source_code_uri'   => 'https://github.com/alexdalitz/dnsruby',
   }
 
-  s.add_development_dependency 'rake', '>= 12.3.3'
-  s.add_development_dependency 'minitest', '~> 5.4'
+  s.add_development_dependency 'rake', '>= 13.0.6'
+  s.add_development_dependency 'minitest', '~> 5.14.4'
   s.add_development_dependency 'rubydns', '~> 2.0.1'
   s.add_development_dependency 'nio4r', '~> 2.0'
-  s.add_development_dependency 'minitest-display', '>= 0.3.0'
+  s.add_development_dependency 'minitest-display', '>= 0.3.1'
   s.add_development_dependency('yard', '~> 0.9')
 
   if RUBY_VERSION >= "1.9.3"
