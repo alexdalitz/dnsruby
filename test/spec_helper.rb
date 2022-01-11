@@ -10,12 +10,12 @@ if ENV['RUN_EXTRA_TASK'] == 'TRUE'
 
   require 'simplecov'
 
-  # SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new(
-      # [SimpleCov::Formatter::HTMLFormatter, Coveralls::SimpleCov::Formatter])
-  SimpleCov.formatter = Coveralls::SimpleCov::Formatter
-  SimpleCov.start do
-    add_filter 'test/'
-  end
+  # # SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new(
+  #     # [SimpleCov::Formatter::HTMLFormatter, Coveralls::SimpleCov::Formatter])
+  # SimpleCov.formatter = Coveralls::SimpleCov::Formatter
+  # SimpleCov.start do
+  #   add_filter 'test/'
+  # end
 end
 
 require 'minitest'
