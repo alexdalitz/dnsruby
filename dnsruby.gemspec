@@ -47,5 +47,4 @@ DNSSEC NSEC3 support.'
   end
 
   s.add_runtime_dependency 'simpleidn', '~> 0.1'
-  s.add_runtime_dependency 'net-ftp'
 end
