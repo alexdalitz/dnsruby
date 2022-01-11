@@ -300,7 +300,7 @@ module Dnsruby
             end
           rescue Exception => e
             Dnsruby.log.error{"Can't make sense of nameserver : #{server}, exception : #{e}"}
-                         raise ArgumentError.new("Can't make sense of nameserver : #{server}, exception : #{e}")
+            raise ArgumentError.new("Can't make sense of nameserver : #{server}, exception : #{e}")
             return nil
           end
         end
