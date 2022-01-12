@@ -1,5 +1,9 @@
 # Release Notes
 
+## v.1.61.9
+
+* Remove unused net-ftp dependency
+
 ## v.1.61.8
 
 * Fix compatability with Ruby 3.1 - thanks @byroot Jean Boussier
