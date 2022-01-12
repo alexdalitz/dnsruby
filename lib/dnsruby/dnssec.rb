@@ -14,7 +14,6 @@
 # limitations under the License.
 # ++
 require 'digest/sha2'
-require 'net/ftp'
 require 'dnsruby/key_cache'
 require 'dnsruby/single_verifier'
 module Dnsruby
