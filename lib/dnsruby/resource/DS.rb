@@ -14,11 +14,8 @@
 # limitations under the License.
 # ++
 require 'base64'
-begin
-require 'Digest/sha2'
-rescue LoadError
-  require 'digest/sha2'
-end
+require 'digest/sha2'
+
 module Dnsruby
   class RR
     # RFC4034, section 4
