@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ruby: [ '2.6', '2.7', '3.0', '3.1', "3.2" ] # , 'ruby-head' ]
+        ruby: [ '2.6', '2.7', '3.0', '3.1', "3.2.1" ] # , 'ruby-head' ]
     name: Ruby ${{ matrix.ruby }} tests
     steps:
       - uses: actions/checkout@v2
