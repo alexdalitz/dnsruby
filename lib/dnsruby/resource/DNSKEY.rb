@@ -344,7 +344,7 @@ module Dnsruby
         pkey = OpenSSL::PKey::RSA.new
         begin
           pkey.set_key(modulus, exponent, nil) # use set_key, present in later versions of openssl gem
-        rescue NoMethodError
+        rescue NoMethodError, PKeyError
           pkey.e = exponent # set_key not available in earlier versions, use this approach instead
           pkey.n = modulus
         end
@@ -370,7 +370,7 @@ module Dnsruby
         begin
           pkey.set_pgq(p,g,q)
           pkey.set_key(y, nil) # use set_pgq and set_key, present in later versions of openssl gem
-        rescue NoMethodError
+        rescue NoMethodError, PKeyError
           pkey.p = p # set_key not available in earlier versions, use this approach instead
           pkey.q = q
           pkey.g = g
