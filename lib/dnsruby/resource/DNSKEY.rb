@@ -341,17 +341,12 @@ module Dnsruby
         modulus = RR::get_num(@key[pos, @key.length])
         @key_length = (@key.length - pos) * 8
 
-        pkey = OpenSSL::PKey::RSA.new
-        begin
-        pkey = OpenSSL::PKey::RSA.new(modulus, exponent, nil)
-        rescue ArgumentError
-          begin
-            pkey.set_key(modulus, exponent, nil) # use set_key, present in later versions of openssl gem
-          rescue NoMethodError
-            pkey.e = exponent # set_key not available in earlier versions, use this approach instead
-            pkey.n = modulus
-          end
-        end
+        data_sequence = OpenSSL::ASN1::Sequence([
+                                                  OpenSSL::ASN1::Integer(modulus),
+                                                  OpenSSL::ASN1::Integer(exponent)
+                                                ])
+        asn1 = OpenSSL::ASN1::Sequence(data_sequence)
+        pkey = OpenSSL::PKey::RSA.new(asn1.to_der)
         return pkey
       end
 
