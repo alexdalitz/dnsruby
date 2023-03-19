@@ -365,18 +365,25 @@ module Dnsruby
         pos += pgy_len
         @key_length = (pgy_len * 8)
 
-        pkey = OpenSSL::PKey::DSA.new
-        begin
-          pkey.set_pgq(p,g,q)
-          pkey.set_key(y, nil) # use set_pgq and set_key, present in later versions of openssl gem
-        rescue NoMethodError
-          pkey.p = p # set_key not available in earlier versions, use this approach instead
-          pkey.q = q
-          pkey.g = g
-          pkey.pub_key = y
-        end
+        asn1 = OpenSSL::ASN1::Sequence.new(
+          [
+            OpenSSL::ASN1::Sequence.new(
+              [
+                OpenSSL::ASN1::ObjectId.new('DSA'),
+                OpenSSL::ASN1::Sequence.new(
+                  [
+                    OpenSSL::ASN1::Integer.new(p),
+                    OpenSSL::ASN1::Integer.new(q),
+                    OpenSSL::ASN1::Integer.new(g)
+                  ]
+                )
+              ]
+            ),
+            OpenSSL::ASN1::BitString.new(OpenSSL::ASN1::Integer.new(y).to_der)
+          ]
+        )
 
-        pkey
+        pkey = OpenSSL::PKey::DSA.new(asn1.to_der)
       end
 
       # RFC6605, section 4
