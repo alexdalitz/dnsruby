@@ -392,14 +392,14 @@ module Dnsruby
       # uncompressed form of a curve point, "x | y".
       def ec_key(curve = 'prime256v1')
         group = OpenSSL::PKey::EC::Group.new(curve)
-        pkey = OpenSSL::PKey::EC.new(group)
+        # # DNSSEC pub does not have first octet that determines whether it's uncompressed
+        # # or compressed form, but it's required by OpenSSL to parse EC point correctly
+        bn = OpenSSL::BN.new("\x04" + @key.to_s, 2)
+        ecdsa_public_key = OpenSSL::PKey::EC.new(group)
+        ecdsa_public_key.public_key = OpenSSL::PKey::EC::Point.new(group, bn)
 
-        # DNSSEC pub does not have first octet that determines whether it's uncompressed
-        # or compressed form, but it's required by OpenSSL to parse EC point correctly
-        point_from_pub = "\x04" + @key.to_s # octet string, \x04 prefix determines uncompressed
-        pkey.public_key = OpenSSL::PKey::EC::Point.new(group, point_from_pub)
+        ecdsa_public_key
 
-        pkey
       end
     end
   end
