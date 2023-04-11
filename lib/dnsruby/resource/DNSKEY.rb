@@ -394,8 +394,12 @@ module Dnsruby
         group = OpenSSL::PKey::EC::Group.new(curve)
         # # DNSSEC pub does not have first octet that determines whether it's uncompressed
         # # or compressed form, but it's required by OpenSSL to parse EC point correctly
-        bn = OpenSSL::BN.new("\x04" + @key.to_s, 2)
+        # TODO Perhaps we need to NOT add the first octet in OpenSSL 3.1, as github actions are still failing :-(
         ecdsa_public_key = OpenSSL::PKey::EC.new(group)
+        bn = OpenSSL::BN.new("\x04" + @key.to_s, 2)
+        if !(OpenSSL::OPENSSL_VERSION.clone.sub!("OpenSSL ", "").start_with?"1")
+          bn = OpenSSL::BN.new(@key.to_s, 2)
+        end
         ecdsa_public_key.public_key = OpenSSL::PKey::EC::Point.new(group, bn)
 
         ecdsa_public_key
