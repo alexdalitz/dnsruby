@@ -392,17 +392,15 @@ module Dnsruby
       # uncompressed form of a curve point, "x | y".
       def ec_key(curve = 'prime256v1')
         group = OpenSSL::PKey::EC::Group.new(curve)
-        # # DNSSEC pub does not have first octet that determines whether it's uncompressed
-        # # or compressed form, but it's required by OpenSSL to parse EC point correctly
-        # TODO Perhaps we need to NOT add the first octet in OpenSSL 3.1, as github actions are still failing :-(
-        ecdsa_public_key = OpenSSL::PKey::EC.new(group)
-        bn = OpenSSL::BN.new("\x04" + @key.to_s, 2)
-        if !(OpenSSL::OPENSSL_VERSION.clone.sub!("OpenSSL ", "").start_with?"1")
-          bn = OpenSSL::BN.new(@key.to_s, 2)
-        end
-        ecdsa_public_key.public_key = OpenSSL::PKey::EC::Point.new(group, bn)
+        pkey = OpenSSL::PKey::EC.new(group)
+        # DNSSEC pub does not have first octet that determines whether it's uncompressed
+        # or compressed form, but it's required by OpenSSL to parse EC point correctly
+        public_key_with_prefix = "\x04" + @key.to_s
+        # bn = OpenSSL::BN.new(public_key_with_prefix, 2)
+        # pkey.public_key = OpenSSL::PKey::EC::Point.new(group, bn)
+        pkey.public_key = OpenSSL::PKey::EC::Point.new(group, public_key_with_prefix)
 
-        ecdsa_public_key
+        pkey
 
       end
     end
