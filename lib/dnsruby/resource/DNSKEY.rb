@@ -297,7 +297,8 @@ module Dnsruby
           @key=Base64.decode64(key_text)
           public_key
           get_new_key_tag
-        rescue Exception
+        rescue Exception => e
+          Dnsruby.log.error(e)
           raise ArgumentError.new("Key #{key_text} invalid")
         end
       end
@@ -395,10 +396,9 @@ module Dnsruby
         # DNSSEC pub does not have first octet that determines whether it's uncompressed
         # or compressed form, but it's required by OpenSSL to parse EC point correctly
         public_key_with_prefix = "\x04" + @key.to_s
-        bn = OpenSSL::BN.new(public_key_with_prefix, 2)
-        pkey.public_key = OpenSSL::PKey::EC::Point.new(group, bn)
+        pkey = OpenSSL::PKey::EC.new(group, public_key_with_prefix)
 
-        pkey.to_pem
+        pkey
 
       end
     end
