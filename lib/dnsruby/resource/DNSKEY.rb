@@ -294,8 +294,7 @@ module Dnsruby
         begin
           key_text.gsub!(/\n/, "")
           key_text.gsub!(/ /, "")
-          #         @key=Base64.decode64(key_text)
-          @key=key_text.unpack("m*")[0]
+          @key=Base64.decode64(key_text)
           public_key
           get_new_key_tag
         rescue Exception
