@@ -396,11 +396,10 @@ module Dnsruby
         # DNSSEC pub does not have first octet that determines whether it's uncompressed
         # or compressed form, but it's required by OpenSSL to parse EC point correctly
         public_key_with_prefix = "\x04" + @key.to_s
-        # bn = OpenSSL::BN.new(public_key_with_prefix, 2)
-        # pkey.public_key = OpenSSL::PKey::EC::Point.new(group, bn)
-        pkey.public_key = OpenSSL::PKey::EC::Point.new(group, public_key_with_prefix)
+        bn = OpenSSL::BN.new(public_key_with_prefix, 2)
+        pkey.public_key = OpenSSL::PKey::EC::Point.new(group, bn)
 
-        pkey
+        pkey.to_pem
 
       end
     end
