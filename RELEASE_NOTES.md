@@ -1,5 +1,11 @@
 # Release Notes
 
+## v.1.70.0
+
+* OpenSSL 3 support
+* Resource record hashes no longer include the rdata
+* Removed requite to title-cased Digest - thanks jhawthron
+
 ## v.1.61.9
 
 * Remove unused net-ftp dependency
