@@ -398,7 +398,10 @@ module Dnsruby
         public_key_with_prefix = "\x04" + @key.to_s
         pkey = OpenSSL::PKey::EC.new(group, public_key_with_prefix)
 
-        pkey.public_key=OpenSSL::PKey::EC::Point.new(group, public_key_with_prefix)
+        begin
+          pkey.public_key=OpenSSL::PKey::EC::Point.new(group, public_key_with_prefix)
+        rescue Error => e
+        end
         return pkey
       end
     end
