@@ -395,8 +395,15 @@ module Dnsruby
         # DNSSEC pub does not have first octet that determines whether it's uncompressed
         # or compressed form, but it's required by OpenSSL to parse EC point correctly
         dnskey_bn = OpenSSL::BN.new("\x04" + @key, 2)
-        key = OpenSSL::PKey::EC.new(group, dnskey_bn)
+        key = OpenSSL::PKey::EC.new(group)
+        begin
+          key.public_key = OpenSSL::PKey::EC::Point.new(group, dnskey_bn)
+        rescue
+          TheLog.info("Sadly, this version of OpenSSL does not let us generate an ECDSA key from the public key. This means, unfortunately, that Dnsruby will be unable to verify ECDSA signatures with this OpenSSL")
+        end
+
         return key
+
       end
     end
   end
