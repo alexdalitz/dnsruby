@@ -25,7 +25,7 @@ class TestDNS < Minitest::Test
   end
 
   def test_ipv4_address
-    Dnsruby::DNS.open { |dns| dns.getnames(Dnsruby::IPv4.create("221.186.184.68")) }
+    Dnsruby::DNS.open { |dns| dns.getnames(Dnsruby::IPv4.create("8.8.8.8")) }
   end
 
   # def test_resolv_rb_api
