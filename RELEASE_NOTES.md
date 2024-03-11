@@ -1,5 +1,9 @@
 # Release Notes
 
+## v.1.71.0
+
+* Fix assigning public_key in ECDSA - thanks Jiří Kubíček!
+
 ## v.1.70.0
 
 * OpenSSL 3 support
