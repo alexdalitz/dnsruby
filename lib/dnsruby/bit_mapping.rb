@@ -15,7 +15,7 @@ module Dnsruby
 
     # Converts from a binary string to a number, e.g. "\x01\x00" => 256
     def binary_string_to_number(string)
-      string = string.clone.force_encoding(Encoding::ASCII_8BIT)
+      string = string.b
       string.bytes.inject(0) do |number, byte|
         number * 256 + byte.ord
       end
@@ -25,7 +25,7 @@ module Dnsruby
     # Converts a number to a binary encoded string, e.g. 256 => "\x01\x00"
     def number_to_binary_string(number, min_length = 0)
       assert_non_negative(number)
-      binary_string = ''.force_encoding(Encoding::ASCII_8BIT)
+      binary_string = ''.b
 
       while number > 0
         byte_value = number & 0xFF

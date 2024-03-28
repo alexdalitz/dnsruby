@@ -152,7 +152,7 @@ module Dnsruby
       end
 
       def self.encode_types(nsec)
-        output = ''
+        output = +''
         # types represents all 65536 possible RR types.
         # Split up types into sets of 256 different types.
         type_codes = []
@@ -171,7 +171,7 @@ module Dnsruby
 
           unless types_to_go.empty?
             #  Then create the bitmap for them
-            bitmap = ''
+            bitmap = +''
             #  keep on adding them until there's none left
             pos = 0
             bitmap_pos = 0

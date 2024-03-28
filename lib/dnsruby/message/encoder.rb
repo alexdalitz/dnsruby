@@ -1,7 +1,7 @@
 module Dnsruby
 class MessageEncoder #:nodoc: all
   def initialize
-    @data = ''
+    @data = +''
     @names = {}
     yield self if block_given?
   end

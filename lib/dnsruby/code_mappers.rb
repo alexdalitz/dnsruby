@@ -70,7 +70,8 @@ module Dnsruby
     #  (RFC3597)
     #  See typesbyval and typesbyname, these beasts have the same functionality
     def Classes.classesbyname(name) #:nodoc: all
-      name.upcase!;
+      name = name.upcase
+
       if to_code(name)
         return to_code(name)
       end
@@ -202,7 +203,7 @@ module Dnsruby
     #  mnemonic. If the TYPE mapping is not specified the generic mnemonic
     #  TYPE### is returned.
     def Types.typesbyname(name)  #:nodoc: all
-      name.upcase!
+      name = name.upcase
 
       if to_code(name)
         return to_code(name)

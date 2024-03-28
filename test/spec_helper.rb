@@ -5,8 +5,12 @@ if Warning.respond_to?(:[]=)
 end
 
 if ENV['RUN_EXTRA_TASK'] == 'TRUE'
-  require 'coveralls'
-  Coveralls.wear!
+  unless "test".frozen?
+    # Coverall setup term-ansi-color which isn't yet frozen string literal compatible
+    # Ref: https://github.com/flori/term-ansicolor/pull/38
+    require 'coveralls'
+    Coveralls.wear!
+  end
 
   require 'simplecov'
 

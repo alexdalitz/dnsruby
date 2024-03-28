@@ -414,12 +414,12 @@ module Dnsruby
       #  Keep buffer for all TCP sockets, and return
       #  to select after reading available data. Once all data has been received,
       #  then process message.
-      buf=""
+      buf = +""
       expected_length = 0
       @@mutex.synchronize {
         buf, expected_length = @@tcp_buffers[socket]
         if (!buf)
-          buf = ""
+          buf = +""
           expected_length = 2
           @@tcp_buffers[socket]=[buf, expected_length]
         end
@@ -443,7 +443,7 @@ module Dnsruby
 
             return false
           end
-          buf << input
+          buf << input if input
         rescue
           #  Oh well - better luck next time!
           return false
@@ -455,7 +455,7 @@ module Dnsruby
           #  We just read the data_length field. Now we need to start reading that many bytes.
           @@mutex.synchronize {
             answersize = buf.unpack('n')[0]
-            @@tcp_buffers[socket] = ["", answersize]
+            @@tcp_buffers[socket] = [+"", answersize]
           }
           return tcp_read(socket)
         else

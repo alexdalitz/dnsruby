@@ -500,7 +500,7 @@ module Dnsruby
         return nil
       end
 
-      known_zone.sub!(/\.*$/, ".")
+      known_zone = known_zone.sub(/\.*$/, ".")
 
       ns = [] # Array of AddressCaches (was array of array of addresses)
       @@mutex.synchronize{

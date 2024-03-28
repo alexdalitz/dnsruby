@@ -63,7 +63,7 @@ module Dnsruby
         unquoted = false
         seen_strings = false
         pos = 0
-        input.sub!(/^\s*\(\s*/, "")
+        input = input.sub(/^\s*\(\s*/, "")
         input.sub!(/\s*\)\s*$/, "")
         input.each_char {|c|
           if (((c == "'") || (c == '"')) && (!in_escaped) && (!unquoted))
