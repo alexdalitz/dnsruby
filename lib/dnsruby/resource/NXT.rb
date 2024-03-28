@@ -95,7 +95,7 @@ class NXT < RR
     next_domain = Name.create(next_domain) if next_domain.is_a?(String)
     types = TypeBitmap.from_type_codes(types) if types.is_a?(Array)
 
-    binary_string = ''.force_encoding('ASCII-8BIT')
+    binary_string = ''.b
     binary_string << next_domain.canonical
     binary_string << BitMapping.reverse_binary_string_bits(types.to_binary_string)
     binary_string

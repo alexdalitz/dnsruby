@@ -93,7 +93,7 @@ class TestGPOS < Minitest::Test
     response_binary = "E0\x84\x80\x00\x01\x00\x01\x00\x01\x00\x01\x01a\adnsruby\x03com\x00\x00\e\x00\x01\xC0\f\x00\e\x00\x01\x00\x00*0\x00\x0F\x0410.0\x0420.0\x0430.0\xC0\x0E\x00\x02\x00\x01\x00\x00*0\x00\x06\x03ns1\xC0\x0E\xC0F\x00\x01\x00\x01\x00\x00*0\x00\x04\x7F\x00\x00\x01"
     message_object = Message.decode(response_binary)
     reconstructed_binary = message_object.encode
-    assert_equal response_binary.force_encoding('ASCII-8BIT'), reconstructed_binary
+    assert_equal response_binary.b, reconstructed_binary
   end
 end
 

@@ -773,7 +773,7 @@ module Dnsruby
         }.to_s # @TODO@ worry about wildcards here?
         rec.ttl = old_ttl
         if (RUBY_VERSION >= "1.9")
-          data.force_encoding("ASCII-8BIT")
+          data.force_encoding(Encoding::BINARY)
         end
         sig_data += data
       end

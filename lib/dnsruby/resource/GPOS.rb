@@ -104,7 +104,7 @@ module Dnsruby
       end
 
       def self.build_rdata(longitude, latitude, altitude)
-        binary_string = ''.force_encoding('ASCII-8BIT')
+        binary_string = ''.b
 
         binary_string << longitude.length.chr
         binary_string << longitude

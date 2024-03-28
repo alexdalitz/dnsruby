@@ -408,7 +408,7 @@ module Dnsruby
     end
 
     def to_s
-      s = ''  # the output string to return
+      s = +''  # the output string to return
 
       if @answerfrom && (! @answerfrom.empty?)
         s << ";; Answer received from #{@answerfrom} (#{@answersize} bytes)\n;;\n"
@@ -457,7 +457,7 @@ module Dnsruby
 
 
     def old_to_s
-      retval = ''
+      retval = +''
 
       if (@answerfrom != nil && @answerfrom != '')
         retval = retval + ";; Answer received from #{@answerfrom} (#{@answersize} bytes)\n;;\n"
