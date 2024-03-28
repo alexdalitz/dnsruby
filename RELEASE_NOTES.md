@@ -1,5 +1,9 @@
 # Release Notes
 
+## v.1.72.0
+
+* Fix compatibility with the `--enable-string-literal` Ruby option - thanks Jean byroot Boussier!
+
 ## v.1.71.0
 
 * Fix assigning public_key in ECDSA - thanks Jiří Kubíček!
