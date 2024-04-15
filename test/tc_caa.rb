@@ -25,6 +25,7 @@ class TestCAA < Minitest::Test
     {'foo.com. IN CAA 0 issue "ca.example.net"' => [0, 'issue', 'ca.example.net'],
      'foo.com. IN CAA 1 issue "ca.example.net"' => [1, 'issue', 'ca.example.net'],
      'foo.com. IN CAA 0 issuewild "ca.example.net"' => [0, 'issuewild', 'ca.example.net'],
+     'foo.com. IN CAA 0 issuemail "ca.example.net"' => [0, 'issuemail', 'ca.example.net'],
      'foo.com. IN CAA 0 iodef "mailto:security@example.com"' => [0, 'iodef', 'mailto:security@example.com'],
      'foo.com. IN CAA 0 issue "ca.example.net; account=230123"' => [0, 'issue', 'ca.example.net; account=230123']
     }.each do |text, data|
