@@ -1,5 +1,9 @@
 # Release Notes
 
+## v.1.72.1
+
+* Add issuemail CAA record support - thanks Ryan Doherty!
+
 ## v.1.72.0
 
 * Fix compatibility with the `--enable-string-literal` Ruby option - thanks Jean byroot Boussier!
