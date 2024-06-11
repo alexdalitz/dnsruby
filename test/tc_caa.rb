@@ -45,5 +45,16 @@ class TestCAA < Minitest::Test
     end
   end
 
+  def test_caa_error
+    {
+      'foo.com. IN CAA 0 ca.example.net "issue"' => [0, 'ca.example.net', 'issue'],
+      'foo.com. IN CAA 0 Issue "ca.example.net"' => [0, 'Issue', 'ca.example.net']
+    }.each do |text, data|
+      assert_raises DecodeError do
+        RR.create(text)
+      end
+    end
+  end
+
 end
 
