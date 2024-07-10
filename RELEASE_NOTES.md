@@ -1,5 +1,9 @@
 # Release Notes
 
+## v1.72.2
+
+* Invalid CAA handling fixes - thanks Noah Smethwick and Ryan Doherty!
+
 ## v.1.72.1
 
 * Add issuemail CAA record support - thanks Ryan Doherty!
