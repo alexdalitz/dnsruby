@@ -2,7 +2,8 @@
 
 ## v1.72.3
 
-* Add base64 as a dependency for Ruby 3.4.0+ support
+* Fix cached answer response time - thanks Andre Meij!
+* Add base64 as a dependency for Ruby 3.4.0+ support - thanks Alexandre ZANNI!
 
 ## v1.72.2
 
