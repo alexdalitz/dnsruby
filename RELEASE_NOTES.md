@@ -2,6 +2,7 @@
 
 ## v1.72.4
 
+* allow parsing case insensitive property tags for CAA records - thanks ruby-dev!
 * Add logger as a dependency for Ruby 3.5.0+ support - thanks Alexandre ZANNI!
 
 ## v1.72.3
