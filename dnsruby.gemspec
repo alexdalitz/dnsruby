@@ -36,18 +36,14 @@ DNSSEC NSEC3 support.'
   }
 
   s.add_development_dependency 'rake', '>= 13.0.6'
-  s.add_development_dependency 'minitest', '~> 5.18.0'
+  s.add_development_dependency 'minitest', '~> 5.25'
   s.add_development_dependency 'rubydns', '>= 2.0.2'
   s.add_development_dependency 'nio4r', '>= 2.5.8'
   s.add_development_dependency 'minitest-display', '>= 0.3.1'
-  s.add_development_dependency('yard', '>= 0.9')
-  # s.add_development_dependency('io-event', '>=1.1.7')
+  s.add_development_dependency 'yard', '>= 0.9'
+  s.add_development_dependency 'coveralls', '~> 0.8.23'
 
-  if RUBY_VERSION >= "1.9.3"
-    s.add_development_dependency 'coveralls', '~> 0.8.23'
-  end
-
-  s.add_runtime_dependency 'base64', '~> 0.2.0'
-  s.add_runtime_dependency 'logger', '~> 1.6.5'
+  s.add_runtime_dependency 'base64', '~> 0.2'
+  s.add_runtime_dependency 'logger', '~> 1.6'
   s.add_runtime_dependency 'simpleidn', '~> 0.2.1'
 end

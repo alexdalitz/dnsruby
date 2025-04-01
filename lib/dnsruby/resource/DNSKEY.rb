@@ -383,7 +383,7 @@ module Dnsruby
           ]
         )
 
-        pkey = OpenSSL::PKey::DSA.new(asn1.to_der)
+        OpenSSL::PKey::DSA.new(asn1.to_der)
       end
 
       # RFC6605, section 4
