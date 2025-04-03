@@ -26,7 +26,7 @@ require 'minitest'
 require 'minitest/autorun'
 require 'minitest/display'
 
-MiniTest::Display.options = {
+Minitest::Display.options = {
   suite_names: true,
   color: true,
   print: {
