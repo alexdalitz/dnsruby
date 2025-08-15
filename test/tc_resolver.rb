@@ -284,6 +284,36 @@ class TestResolver < Minitest::Test
   def test_eventtype_api
     #  @TODO@ TEST THE Resolver::EventType interface!
   end
+
+  def test_custom_udp_size
+    [false, true].each do |dnssec_value|
+      res = Dnsruby::Resolver.new(:udp_size => 1232, :dnssec => dnssec_value)
+      q = Queue.new
+      # Call send_async once to initialize @resolver_ruby
+      res.send_async(Dnsruby::Message.new("test.invalid"), q)
+      q.pop
+      resolver_ruby = res.instance_variable_get("@resolver_ruby")
+      class << resolver_ruby
+        attr_accessor :message
+        alias_method :original_send_async, :send_async
+        def send_async(msg, client_queue, client_query_id=nil)
+          @message = msg
+          original_send_async(msg, client_queue, client_query_id)
+        end
+      end
+      res.send_async(Dnsruby::Message.new("example.com"), q)
+      _id, _response, _error = q.pop
+      opt = resolver_ruby.message.get_opt
+      assert(opt)
+      if dnssec_value
+        assert_equal(4096, opt.klass.code) # DNSSEC overrides to 4096
+      else
+        assert_equal(1232, opt.klass.code)
+      end
+      assert_equal(0, opt.version)
+      assert_equal(0, opt.flags)
+    end
+  end
 end
 
 

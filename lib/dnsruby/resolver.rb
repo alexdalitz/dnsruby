@@ -888,6 +888,13 @@ module Dnsruby
         return
       end
 
+      # According to RFC 6891, a UDP payload size >512 bytes requires an
+      # EDNS OPT RR in the message.
+      if @parent.udp_size > 512 && !msg.get_opt
+        TheLog.debug("Automatically adding EDNS OPT RR for udp_size=#{ @parent.udp_size }")
+        msg.add_additional(Dnsruby::RR::OPT.new(@parent.udp_size))
+      end
+
       begin
         msg.encode
       rescue EncodeError => err
