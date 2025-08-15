@@ -128,7 +128,7 @@ class TestSingleResolver < Minitest::Test
   end
 
   def test_queries
-    res = SingleResolver.new("127.0.0.1")
+    res = SingleResolver.new
 
     Rrs.each do |data|
       packet=nil
