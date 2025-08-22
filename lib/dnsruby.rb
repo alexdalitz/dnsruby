@@ -158,7 +158,12 @@ module Dnsruby
   end
 
   # A timeout error raised while querying for a resource
-  class ResolvTimeout < Timeout::Error
+  if defined?(Timeout::Error)
+    class ResolvTimeout < Timeout::Error
+    end
+  else
+    class ResolvTimeout < ::TimeoutError
+    end
   end
 
   # The requested domain does not exist
