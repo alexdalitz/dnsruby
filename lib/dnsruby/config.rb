@@ -320,7 +320,7 @@ module Dnsruby
           keyword, *args = line.split(/\s+/)
             if Gem::Version.new(RUBY_VERSION) < Gem::Version.new("2.8")
               args.each { |arg|
-                arg.untaint
+                arg = arg.respond_to?(:untaint) ? arg.untaint : input
               }
             end
           next unless keyword
