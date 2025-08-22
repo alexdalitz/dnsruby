@@ -15,7 +15,10 @@ SPEC = Gem::Specification.new do |s|
 stub resolver. It aims to comply with all DNS RFCs, including
 DNSSEC NSEC3 support.'
   s.license = "Apache License, Version 2.0"
-  
+
+  # Add explicit Ruby version requirement
+  s.required_ruby_version = '>= 2.7.0'
+
   s.files = `git ls-files -z`.split("\x0")
 
   s.post_install_message = \
