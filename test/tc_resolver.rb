@@ -284,8 +284,73 @@ class TestResolver < Minitest::Test
   def test_eventtype_api
     #  @TODO@ TEST THE Resolver::EventType interface!
   end
-end
 
+  def capture_sent_message(res, domain, pre_opt=nil)
+    q = Queue.new
+    res.send_async(Dnsruby::Message.new("test.invalid"), q)
+    q.pop
+    resolver_ruby = res.instance_variable_get("@resolver_ruby")
+    class << resolver_ruby
+      attr_accessor :message
+      alias_method :original_send_async, :send_async
+      def send_async(msg, client_queue, client_query_id=nil)
+        @message = msg
+        original_send_async(msg, client_queue, client_query_id)
+      end
+    end
+    msg = Dnsruby::Message.new(domain)
+    msg.add_additional(pre_opt) if pre_opt
+    res.send_async(msg, q)
+    _id, _response, _error = q.pop
+    resolver_ruby.message
+  end
+
+  def test_custom_udp_size
+    [false, true].each do |dnssec_setting|
+      [512, 513].each do |udp_size_setting|
+        res = Dnsruby::Resolver.new(:udp_size => udp_size_setting, :dnssec => dnssec_setting)
+        sent_msg = capture_sent_message(res, "example.com")
+
+        # The OPT RR is only present if the udp_size is > 512
+        opt = sent_msg.get_opt
+        if dnssec_setting
+          # DNSSEC overrides udp_size to 4096
+          assert(opt)
+          assert_equal(4096, opt.klass.code)
+        else
+          if udp_size_setting <= 512
+            assert_nil(opt)
+          else
+            assert(opt)
+            assert_equal(udp_size_setting, opt.klass.code)
+          end
+        end
+        if opt
+          assert_equal(0, opt.version)
+          assert_equal(0, opt.flags)
+        end
+      end
+    end
+  end
+
+  def test_no_duplicate_opt_when_pre_existing
+    [false, true].each do |dnssec_setting|
+      [512, 513].each do |udp_size_setting|
+        res = Dnsruby::Resolver.new(:udp_size => udp_size_setting, :dnssec => dnssec_setting)
+        pre_size = dnssec_setting ? 4096 : 1024
+        pre_opt = Dnsruby::RR::OPT.new(pre_size)
+        sent_msg = capture_sent_message(res, "example.com", pre_opt)
+
+        opt = sent_msg.get_opt
+        assert(opt)
+        assert_equal(1, sent_msg.additional.length) # No duplicate added
+        assert_equal(pre_size, opt.klass.code) # Original payload size unchanged
+        assert_equal(0, opt.version)
+        assert_equal(0, opt.flags) # Flags unchanged (code doesn't modify existing OPT)
+      end
+    end
+  end
+end
 
 # Tests to see that query_raw handles send_plain_message's return values correctly.
 class TestRawQuery < Minitest::Test
