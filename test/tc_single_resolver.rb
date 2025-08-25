@@ -1,12 +1,12 @@
 # --
 # Copyright 2007 Nominet UK
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -132,14 +132,15 @@ class TestSingleResolver < Minitest::Test
 
     Rrs.each do |data|
       packet=nil
-      2.times do
+      5.times do |attempt|
         begin
           packet = res.query(data[:name], data[:type])
-        rescue ResolvTimeout
+        rescue Dnsruby::ResolvTimeout, Dnsruby::ServFail => e
+          sleep(1)
         end
         break if packet
       end
-      assert(packet)
+      assert(packet, "Failed to get response for #{data[:name]} IN #{data[:type]} after retries")
       assert_equal(packet.question[0].qclass, 'IN', 'Class correct')
 
       assert(packet, "Got an answer for #{data[:name]} IN #{data[:type]}")
@@ -189,11 +190,25 @@ class TestSingleResolver < Minitest::Test
   def test_res_config
     res = Dnsruby::SingleResolver.new
 
-    res.server=('a.t.net-dns.org')
+    5.times do |attempt|
+      begin
+        res.server=('a.t.net-dns.org')
+        break
+      rescue ArgumentError => e
+        sleep(1)
+      end
+    end
     ip = res.server
     assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up IP.')
 
-    res.server=('cname.t.net-dns.org')
+    5.times do |attempt|
+      begin
+        res.server=('cname.t.net-dns.org')
+        break
+      rescue ArgumentError => e
+        sleep(1)
+      end
+    end
     ip = res.server
     assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up cname.')
   end
