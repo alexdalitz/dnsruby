@@ -131,16 +131,7 @@ class TestSingleResolver < Minitest::Test
     res = SingleResolver.new
 
     Rrs.each do |data|
-      packet=nil
-      5.times do |attempt|
-        begin
-          packet = res.query(data[:name], data[:type])
-        rescue Dnsruby::ResolvTimeout, Dnsruby::ServFail => e
-          sleep(1)
-        end
-        break if packet
-      end
-      assert(packet, "Failed to get response for #{data[:name]} IN #{data[:type]} after retries")
+      packet = with_retries { res.query(data[:name], data[:type]) }
       assert_equal(packet.question[0].qclass, 'IN', 'Class correct')
 
       assert(packet, "Got an answer for #{data[:name]} IN #{data[:type]}")
@@ -190,25 +181,11 @@ class TestSingleResolver < Minitest::Test
   def test_res_config
     res = Dnsruby::SingleResolver.new
 
-    5.times do |attempt|
-      begin
-        res.server=('a.t.net-dns.org')
-        break
-      rescue ArgumentError => e
-        sleep(1)
-      end
-    end
+    with_retries(exceptions: [ArgumentError], success_check: ->(_) { true }) { res.server=('a.t.net-dns.org') }
     ip = res.server
     assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up IP.')
 
-    5.times do |attempt|
-      begin
-        res.server=('cname.t.net-dns.org')
-        break
-      rescue ArgumentError => e
-        sleep(1)
-      end
-    end
+    with_retries(exceptions: [ArgumentError], success_check: ->(_) { true }) { res.server=('cname.t.net-dns.org') }
     ip = res.server
     assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up cname.')
   end

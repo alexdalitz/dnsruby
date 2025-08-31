@@ -53,45 +53,23 @@ class TestResolv < Minitest::Test
 
   def test_resolv_address_to_name
 
-    name = nil
-    5.times do
-      begin
-        name = Dnsruby::Resolv.getname(IPV4_ADDR)
-        break
-      rescue Dnsruby::ServFail, Dnsruby::ResolvTimeout
-        sleep(1)
-      end
-    end
-    assert name, "Failed to get name for #{IPV4_ADDR} after retries"
+    name = with_retries { Dnsruby::Resolv.getname(IPV4_ADDR) }
     assert_equal(SHORT_ABSOLUTE_NAME, name.to_s(true))
 
     assert_raises(Dnsruby::ResolvError) do
       Dnsruby::Resolv.getname(SHORT_ABSOLUTE_NAME)
     end
 
-    names = nil
-    5.times do
-      begin
-        names = Dnsruby::Resolv.getnames(IPV4_ADDR)
-        break
-      rescue Dnsruby::ServFail, Dnsruby::ResolvTimeout
-        sleep(1)
-      end
-    end
-    assert names, "Failed to get names for #{IPV4_ADDR} after retries"
+    names = with_retries { Dnsruby::Resolv.getnames(IPV4_ADDR) }
     assert_equal(1, names.size)
     assert_equal(SHORT_ABSOLUTE_NAME, names.first.to_s(true))
 
-    found_names = []
-    5.times do
-      begin
-        Dnsruby::Resolv.each_name(IPV4_ADDR) { |name| found_names << name }
-        break
-      rescue Dnsruby::ServFail, Dnsruby::ResolvTimeout
-        sleep(1)
-      end
+    found_names = with_retries(success_check: ->(_) { true }) do
+      names = []
+      Dnsruby::Resolv.each_name(IPV4_ADDR) { |name| names << name }
+      names
     end
-    assert found_names.any?, "Failed to get names via each_name for #{IPV4_ADDR} after retries"
+
     assert_equal(SHORT_ABSOLUTE_NAME, found_names.first.to_s(true))
   end
 

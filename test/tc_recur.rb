@@ -20,18 +20,7 @@ class TestRecur < Minitest::Test
   def test_recur
     Dnsruby::PacketSender.clear_caches
     r = Dnsruby::Recursor.new
-    ret = nil
-    10.times do |attempt|
-      begin
-        ret = r.query("uk", Dnsruby::Types.DNSKEY)
-      rescue Dnsruby::ResolvError
-      end
-      if ret
-        break
-      end
-      sleep(1)
-    end
-    assert ret, "Query result was nil after retries."
+    ret = with_retries(max_attempts: 10, exceptions: [Dnsruby::ResolvError]) { r.query("uk", Dnsruby::Types.DNSKEY) }
     assert ret.answer.length > 0, "Answer length should > 0, but was #{ret.answer.length}."
 #    ret = r.query_dorecursion("aaa.bigzone.uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
 #    ret = r.query_dorecursion("uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
