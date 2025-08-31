@@ -2,11 +2,6 @@ require_relative 'spec_helper'
 
 class TestDNS < Minitest::Test
 
-  def setup
-    Dnsruby::Config.reset
-  end
-
-
   # Illustrates that when a message whose class is 'HS' is sent to
   # a DNS server that does not support the HS class, using send_plain_message,
   # the response returns with an rcode of NOTIMP and a Dnsruby::NotImp error.

@@ -53,7 +53,7 @@ class TestSingleResolver < Minitest::Test
 
   def test_simple
     res = SingleResolver.new()
-    m = res.query("ns1.google.com.")
+    res.query("ns1.google.com.")
   end
 
   def test_timeout
@@ -71,7 +71,7 @@ class TestSingleResolver < Minitest::Test
         res.port = port
         res.packet_timeout=1
         start_time = Time.now.to_i
-        m = res.query("a.t.net-dns.org")
+        res.query("a.t.net-dns.org")
         fail "Got response when should have got none"
       rescue ResolvTimeout
         stop_time = Time.now.to_i
@@ -87,7 +87,7 @@ class TestSingleResolver < Minitest::Test
         res.packet_timeout=1
         start_time = Time.now.to_i
 #      TheLog.level = Logger::DEBUG
-        m = res.query("a.t.net-dns.org")
+        res.query("a.t.net-dns.org")
         fail "TCP timeouts"
       rescue ResolvTimeout
         #         print "Got Timeout for TCP\n"

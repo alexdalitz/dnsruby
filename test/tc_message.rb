@@ -49,7 +49,7 @@ class TestMessage < Minitest::Test
   def test_rd_flag_displayed_when_true
     message = sample_message
     message.header.instance_variable_set(:@rd, true)
-    assert /;; flags(.+)rd/.match(message.to_s), message
+    assert(/;; flags(.+)rd/.match(message.to_s), message)
   end
 
   def test_header_line_contains_opcode_and_status_and_id

@@ -235,7 +235,7 @@ class TestDNS < Minitest::Test
         res.config.apply_search_list=true
       end
 
-      ans, query = res.send_query(test[:name])
+      ans, _ = res.send_query(test[:name])
 
       assert_instance_of(Message, ans)
 
@@ -249,14 +249,14 @@ class TestDNS < Minitest::Test
     end
   end
 
-    def test_port
-      d = DNS.new({:port => 5353})
-      assert(d.to_s.include?"5353")
-    end
+  def test_port
+    d = DNS.new({:port => 5353})
+    assert(d.to_s.include?"5353")
+  end
 
-    def test_port_nil
-        d = DNS.new({:port => nil})
-        assert(d.to_s.include? Dnsruby::Config::DEFAULT_PORT.to_s)
-      end
+  def test_port_nil
+    d = DNS.new({:port => nil})
+    assert(d.to_s.include? Dnsruby::Config::DEFAULT_PORT.to_s)
+  end
 
 end

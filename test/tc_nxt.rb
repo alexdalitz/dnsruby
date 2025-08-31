@@ -60,7 +60,6 @@ class TestNXT < Minitest::Test
   def test_binary_string_to_codes
     test_type_codes_as_code_array = [1, 6, 28, 100]
     test_type_codes_as_name_array = %w(A  SOA  AAAA  UINFO)
-    test_type_codes_as_number = 1267650600228229401496971640898  # (2 ** 1) + (2 ** 6) + (2 ** 28) + (2 ** 100)
     test_type_codes_as_binary_string = "\x10\x0\x0\x0\x0\x0\x0\x0\x0\x10\x0\x0\x42"
     assert_equal(test_type_codes_as_code_array, RR::NXT::NxtTypes.binary_string_to_codes(test_type_codes_as_binary_string))
     assert_equal(test_type_codes_as_name_array, RR::NXT::NxtTypes.binary_string_to_names(test_type_codes_as_binary_string))

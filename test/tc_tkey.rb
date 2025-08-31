@@ -29,12 +29,7 @@ class TestTKey < Minitest::Test
     #  Canned data.
     # ------------------------------------------------------------------------------
 
-    zone	= "example.com"
-    name	= "123456789-test"
-    klass	= "IN"
-    type	= Dnsruby::Types.TKEY
     algorithm   = "fake.algorithm.example.com"
-    key         = "fake key"
     inception   = 100000 # use a strange fixed inception time to give a fixed
     #  checksum
     expiration  = inception + 24*60*60
@@ -72,5 +67,4 @@ class TestTKey < Minitest::Test
     # @TODO@ Test TKEY against server!
 
   end
-
-  end
+end
