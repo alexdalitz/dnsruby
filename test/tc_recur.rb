@@ -21,14 +21,15 @@ class TestRecur < Minitest::Test
     Dnsruby::PacketSender.clear_caches
     r = Dnsruby::Recursor.new
     ret = nil
-    5.times do |attempt|
+    10.times do |attempt|
       begin
         ret = r.query("uk", Dnsruby::Types.DNSKEY)
-      rescue Dnsruby::ServFail, Dnsruby::ResolvTimeout => e
-        sleep(1)
-        next
+      rescue Dnsruby::ResolvError
       end
-      break if ret
+      if ret
+        break
+      end
+      sleep(1)
     end
     assert ret, "Query result was nil after retries."
     assert ret.answer.length > 0, "Answer length should > 0, but was #{ret.answer.length}."

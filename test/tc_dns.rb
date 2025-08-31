@@ -167,9 +167,9 @@ class TestDNS < Minitest::Test
   end # test_online
 
   def test_search_query_reverse
-    # 
+    #
     #  test that getname() DTRT with reverse lookups
-    # 
+    #
     tests = [
     {
       :ip => '198.41.0.4',
@@ -183,7 +183,16 @@ class TestDNS < Minitest::Test
 
     res = DNS.new
     tests.each do |test|
-      name = res.getname(test[:ip])
+      name = nil
+      5.times do
+        begin
+          name = res.getname(test[:ip])
+          break
+        rescue Dnsruby::ServFail, Dnsruby::ResolvTimeout
+          sleep(1)
+        end
+      end
+      assert name, "Failed to get name for #{test[:ip]} after retries"
 
       assert_instance_of(Name,name)
 
