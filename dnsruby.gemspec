@@ -17,7 +17,7 @@ DNSSEC NSEC3 support.'
   s.license = "Apache License, Version 2.0"
 
   # Add explicit Ruby version requirement
-  s.required_ruby_version = '>= 2.7.0'
+  s.required_ruby_version = '>= 2.8.0'
 
   s.files = `git ls-files -z`.split("\x0")
 
