@@ -350,7 +350,7 @@ d0
     packet     = Message.decode(packetdata)
     assert_equal( '\\\\e.eg.secret-wg.org',(packet.answer)[0].name.to_s,"Correctly dealt escaped backslash from wireformat \\\..eg.secret-wg.org")
 
-    testrr=RR.create(
+    RR.create(
                            :name => '\\e.eg.secret-wg.org',
     :type         => 'TXT',
     :txtdata      => '"WildCard Match"',
@@ -360,7 +360,6 @@ d0
 
 
 
-    klass = "IN"
     ttl = 43200
     name = 'def0au&lt.example.com'
 
@@ -471,17 +470,17 @@ d0
       type = data[:type]
       # 		foreach my $meth (keys %{$data}) {
        (data.keys.each do |meth|
-        if (meth == :type)
-          assert_equal(Types.new(data[meth]).to_s, rr.send(meth).to_s, "#{type} - #meth() correct")
-        else
-          assert_equal(data[meth].to_s, rr.send(meth).to_s, "#{type} - #meth() correct")
-        end
+          if (meth == :type)
+            assert_equal(Types.new(data[meth]).to_s, rr.send(meth).to_s, "#{type} - #meth() correct")
+          else
+            assert_equal(data[meth].to_s, rr.send(meth).to_s, "#{type} - #meth() correct")
+          end
         end)
 
         rr2 = RR.new_from_string(rr.to_s)
         assert_equal(rr.to_s,   rr2.to_s, "#{type} - Parsing from string works")
-      end
+    end
 
     Name::Label.set_max_length(Name::Label::MaxLabelLength)
-    end
   end
+end

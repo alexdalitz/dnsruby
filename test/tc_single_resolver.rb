@@ -1,12 +1,12 @@
 # --
 # Copyright 2007 Nominet UK
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -53,7 +53,7 @@ class TestSingleResolver < Minitest::Test
 
   def test_simple
     res = SingleResolver.new()
-    m = res.query("ns1.google.com.")
+    res.query("ns1.google.com.")
   end
 
   def test_timeout
@@ -71,7 +71,7 @@ class TestSingleResolver < Minitest::Test
         res.port = port
         res.packet_timeout=1
         start_time = Time.now.to_i
-        m = res.query("a.t.net-dns.org")
+        res.query("a.t.net-dns.org")
         fail "Got response when should have got none"
       rescue ResolvTimeout
         stop_time = Time.now.to_i
@@ -87,7 +87,7 @@ class TestSingleResolver < Minitest::Test
         res.packet_timeout=1
         start_time = Time.now.to_i
 #      TheLog.level = Logger::DEBUG
-        m = res.query("a.t.net-dns.org")
+        res.query("a.t.net-dns.org")
         fail "TCP timeouts"
       rescue ResolvTimeout
         #         print "Got Timeout for TCP\n"
@@ -131,15 +131,7 @@ class TestSingleResolver < Minitest::Test
     res = SingleResolver.new
 
     Rrs.each do |data|
-      packet=nil
-      2.times do
-        begin
-          packet = res.query(data[:name], data[:type])
-        rescue ResolvTimeout
-        end
-        break if packet
-      end
-      assert(packet)
+      packet = with_retries { res.query(data[:name], data[:type]) }
       assert_equal(packet.question[0].qclass, 'IN', 'Class correct')
 
       assert(packet, "Got an answer for #{data[:name]} IN #{data[:type]}")
@@ -189,11 +181,11 @@ class TestSingleResolver < Minitest::Test
   def test_res_config
     res = Dnsruby::SingleResolver.new
 
-    res.server=('a.t.net-dns.org')
+    with_retries(exceptions: [ArgumentError], success_check: ->(_) { true }) { res.server=('a.t.net-dns.org') }
     ip = res.server
     assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up IP.')
 
-    res.server=('cname.t.net-dns.org')
+    with_retries(exceptions: [ArgumentError], success_check: ->(_) { true }) { res.server=('cname.t.net-dns.org') }
     ip = res.server
     assert_equal('10.0.1.128', ip.to_s, 'nameserver() looks up cname.')
   end

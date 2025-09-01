@@ -34,7 +34,6 @@ class TestUpdate < Minitest::Test
     zone	= "example.com";
     name	= "foo.example.com";
     klass	= Classes.CLASS32;
-    klass2  = Classes.CH;
     type	= Types.A;
     ttl	    = 43200;
     rdata	= "10.1.2.3";

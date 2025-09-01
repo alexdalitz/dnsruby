@@ -74,13 +74,25 @@ class TestResolver < Minitest::Test
 
   def test_send_plain_message
     resolver = Resolver.new('1.1.1.1')
-    response, error = resolver.send_plain_message(Message.new("example.com", Types.A))
+
+    response, error = with_retries(success_check: ->((res, err)) { err.nil? || ! [Dnsruby::ServFail, Dnsruby::ResolvTimeout].include?(err.class) }) do
+      res, err = resolver.send_plain_message(Message.new("example.com", Types.A))
+      raise err if [Dnsruby::ServFail, Dnsruby::ResolvTimeout].include?(err.class)
+      [res, err]
+    end
+
     assert_nil_error(error)
     assert_valid_response(response)
 
     m = Message.new(BAD_DOMAIN_NAME)
     m.header.rd = true
-    response, error = resolver.send_plain_message(m)
+
+    response, error = with_retries(success_check: ->((res, err)) { err.class == Dnsruby::NXDomain || ! [Dnsruby::ServFail, Dnsruby::ResolvTimeout].include?(err.class) }) do
+      res, err = resolver.send_plain_message(m)
+      raise err if [Dnsruby::ServFail, Dnsruby::ResolvTimeout].include?(err.class)
+      [res, err]
+    end
+
     assert_valid_response(response)
     assert_error_is_exception(error, NXDomain)
   end

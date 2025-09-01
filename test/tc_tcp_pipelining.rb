@@ -67,9 +67,9 @@ class TestTCPPipelining < Minitest::Test
 
     # Instantiate a new server that uses our tcp pipelining handler
     # For each query the server sends the query upstream (193.0.14.129)
-    options = {
-        server_class: TCPPipeliningServer,
-    }
+    # options = {
+    #     server_class: TCPPipeliningServer,
+    # }
 
     #RubyDNS::run_server(options) || true
     if !@@server

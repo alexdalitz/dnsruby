@@ -58,7 +58,7 @@ class TestRrUnknown < Minitest::Test
     assert_equal('10.0.0.1', rr.address.to_s,'Unknown RR representation for A parsed OK')
 
     begin
-      res=RR.new_from_string('e.example IN A \# 4  0A0000 01 11 ')
+      RR.new_from_string('e.example IN A \# 4  0A0000 01 11 ')
       flunk "Should fail on inconsistent length and hex presentation"
     rescue Exception
       # like($@, '/\\\# 4  0A0000 01 11 assert_equal inconsistent\ length does not match content/', 'Fails on inconsassert_equaltent length and hex presentation')
