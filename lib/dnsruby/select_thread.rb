@@ -372,12 +372,12 @@ module Dnsruby
     end
 
     def remove_id(id)
-
       @@mutex.synchronize do
         remove_id_from_mutex_synchronized_block(id)
       end
     end
 
+    # THIS MUST BE CALLED FROM INSIDE A @@mutex SYNCHRONISED BLOCK!
     def remove_id_from_mutex_synchronized_block(id)
       socket = @@query_hash[id].socket
       @@timeouts.delete(id)
