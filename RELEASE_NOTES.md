@@ -1,5 +1,14 @@
 # Release Notes
 
+## v1.73.0
+
+* Ruby 3.4 updates - thanks @zarqman!
+* Enable setting up a custom UDP size when DNSSEC validation is disabled
+* EDNS OPT RR for udp_size > 512 - thanks @mrideout!
+* Test code improvements - thanks @mrideout!
+* base64 gem version fixes
+* Fix for file descriptor leak on truncated UDP messages
+
 ## v1.72.4
 
 * allow parsing case insensitive property tags for CAA records - thanks ruby-dev!

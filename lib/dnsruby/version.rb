@@ -1,3 +1,3 @@
 module Dnsruby
-  VERSION = '1.72.4'
+  VERSION = '1.73.0'
 end
