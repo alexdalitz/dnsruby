@@ -372,21 +372,25 @@ module Dnsruby
     end
 
     def remove_id(id)
-
       @@mutex.synchronize do
-        socket = @@query_hash[id].socket
-        @@timeouts.delete(id)
-        @@query_hash.delete(id)
-        @@socket_hash[socket].delete(id)
+        remove_id_from_mutex_synchronized_block(id)
+      end
+    end
 
-        decrement_remaining_queries(socket) if persistent?(socket)
+    # THIS MUST BE CALLED FROM INSIDE A @@mutex SYNCHRONISED BLOCK!
+    def remove_id_from_mutex_synchronized_block(id)
+      socket = @@query_hash[id].socket
+      @@timeouts.delete(id)
+      @@query_hash.delete(id)
+      @@socket_hash[socket].delete(id)
 
-        if !persistent?(socket) || max_attained?(socket)
-          @@sockets.delete(socket)
-          @@socket_hash.delete(socket)
-          Dnsruby.log.debug("Closing socket #{socket}")
-          socket.close rescue nil
-        end
+      decrement_remaining_queries(socket) if persistent?(socket)
+
+      if !persistent?(socket) || max_attained?(socket)
+        @@sockets.delete(socket)
+        @@socket_hash.delete(socket)
+        Dnsruby.log.debug("Closing socket #{socket}")
+        socket.close rescue nil
       end
     end
 
@@ -550,12 +554,10 @@ module Dnsruby
               query_header_id = @@query_hash[id].query.header.id
               if (query_header_id == e.partial_message.header.id)
                 #  process the response
-                client_queue = nil
-                res = nil
-                query=nil
                 client_queue = @@query_hash[id].client_queue
                 res = @@query_hash[id].single_resolver
                 query = @@query_hash[id].query
+                remove_id_from_mutex_synchronized_block(id)
 
                 #  NOW RESEND OVER TCP!
                 Thread.new {
