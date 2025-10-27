@@ -21,7 +21,7 @@ module Dnsruby
       ClassValue = nil #:nodoc: all
       TypeValue= Types::CAA #:nodoc: all
 
-      # The property tag for the record (issue|issuewild|iodef)
+      # The property tag for the record (issue|issuewild|issuemail|issuevmc|iodef|contactemail|contactphone)
       attr_accessor :property_tag
       # The value for the property_tag
       attr_accessor :property_value
@@ -43,7 +43,7 @@ module Dnsruby
       end
 
       def from_string(input) #:nodoc: all
-        matches = (/(\d+) (issuewild|issuemail|issue|iodef|contactemail|contactphone) "(.+)"$/i).match(input)
+        matches = (/(\d+) (issuewild|issuemail|issuevmc|issue|iodef|contactemail|contactphone) "(.+)"$/i).match(input)
         if matches.nil?
           raise DecodeError.new("Cannot parse record: #{input[0...1000]}")
         end
