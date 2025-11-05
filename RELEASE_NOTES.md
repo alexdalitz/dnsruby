@@ -1,5 +1,8 @@
 # Release Notes
 
+## v1.73.1
+* fix(caa): add support for issuevmc (#214) - thanks Mark McDonnell!
+
 ## v1.73.0
 
 * Ruby 3.4 updates - thanks @zarqman!
