@@ -481,10 +481,11 @@ module Dnsruby
         @config.get_ready
       end
       @configured = true
-      @single_res_mutex.synchronize {
         #  Add the Config nameservers
-        @config.nameserver.each do |ns|
-          res = PacketSender.new({
+      threads = []
+      @config.nameserver.each do |ns|
+        threads << Thread.new do
+          PacketSender.new({
               server:             ns,
               port:               @port,
               dnssec:             @dnssec,
@@ -500,9 +501,11 @@ module Dnsruby
               src_port:           @src_port,
               recurse:            @recurse,
               udp_size:           @udp_size})
-          @single_resolvers.push(res) if res
         end
-      }
+      end
+
+      new_resolvers = threads.map(&:value).compact
+      @single_res_mutex.synchronize { @single_resolvers.concat(new_resolvers) }
     end
 
     def set_config_nameserver(n)
