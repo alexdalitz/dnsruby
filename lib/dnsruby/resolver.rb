@@ -501,7 +501,6 @@ module Dnsruby
               src_port:           @src_port,
               recurse:            @recurse,
               udp_size:           @udp_size,
-              udp_size:           @udp_size,
               ignore_config_resolv_errors: true})
         end
       end
