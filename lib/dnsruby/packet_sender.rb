@@ -204,6 +204,7 @@ module Dnsruby
       @tcp_pipelining_max_queries = :infinite
       @use_counts = {}
 
+      ignore_config_resolv_errors = false;
       if arg.nil?
       elsif arg.kind_of? String
         @server = arg
@@ -212,18 +213,32 @@ module Dnsruby
       elsif arg.kind_of? Hash
         arg.keys.each do |attr|
           begin
-            if ((attr.to_s == "src_address" || attr.to_s == "src_address6") &&
-                (arg[attr] == nil || arg[attr] == ""))
+            if (attr.to_s == "ignore_config_resolv_errors")
+              ignore_config_resolv_errors = arg[attr]
             else
-              send(attr.to_s + "=", arg[attr])
-            end
+              if ((attr.to_s == "src_address" || attr.to_s == "src_address6") &&
+                  (arg[attr] == nil || arg[attr] == ""))
+              else
+                send(attr.to_s + "=", arg[attr])
+              end
+           end
           rescue Exception => e
             Dnsruby.log.error { "PacketSender : Argument #{attr}, #{arg[attr]} not valid : #{e}\n" }
           end
         end
       end
       # Check server is IP
-      @server=Config.resolve_server(@server)
+      # We should allow the call of PacketSender.new to flag just to log an error if this fails
+      # and then return null
+        if ignore_config_resolv_errors
+          begin
+            @server=Config.resolve_server(@server)
+          rescue ArgumentError
+            return
+          end
+          else
+            @server=Config.resolve_server(@server)
+        end
 
       check_ipv6
       #       ResolverRegister::register_single_resolver(self)

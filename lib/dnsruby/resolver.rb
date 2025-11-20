@@ -500,11 +500,16 @@ module Dnsruby
               src_address6:       @src_address6,
               src_port:           @src_port,
               recurse:            @recurse,
-              udp_size:           @udp_size})
+              udp_size:           @udp_size,
+              udp_size:           @udp_size,
+              ignore_config_resolv_errors: true})
         end
       end
 
       new_resolvers = threads.map(&:value).compact
+      if new_resolvers.empty?
+        throw new ArgumentError, "No valid nameservers found in config"
+      end
       @single_res_mutex.synchronize { @single_resolvers.concat(new_resolvers) }
     end
 

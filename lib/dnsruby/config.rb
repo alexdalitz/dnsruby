@@ -294,6 +294,8 @@ module Dnsruby
                   end
                 }
                 if (!found)
+                  # Log the error, in case Resolver is resolving a set of nameservers, and swallows the exception
+                  TheLog.error{"Recursor can't locate #{server}"}
                   raise ArgumentError.new("Recursor can't locate #{server}")
                 end
               end
