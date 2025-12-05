@@ -401,7 +401,7 @@ module Dnsruby
       if @single_resolvers.length == 0
         Thread.start {
           sleep(@query_timeout == 0 ? 1 : @query_timeout)
-          client_queue.push([client_query_id, nil, ResolvTimeout.new('Query timed out - no nameservers configured')])
+          client_queue.push([client_query_id, nil, ResolvTimeout.new('Query timed out - no valid nameservers configured')])
         }
       end
       client_query_id
@@ -436,7 +436,7 @@ module Dnsruby
     #  * :tcp_pipelining
     #  * :tcp_pipelining_max_queries - can be a number or :infinite symbol
     def initialize(*args)
-      #  @TODO@ Should we allow :namesver to be an RRSet of NS records? Would then need to randomly order them?
+      #  @TODO@ Should we allow :nameserver to be an RRSet of NS records? Would then need to randomly order them?
       @resolver_ruby = nil
       @src_address = nil
       @src_address6 = nil
@@ -506,10 +506,16 @@ module Dnsruby
       end
 
       new_resolvers = threads.map(&:value).compact
+      new_resolvers = new_resolvers.select do |resolver|
+        !resolver.nil? && !resolver.server.nil?
+      end
       if new_resolvers.empty?
-        throw new ArgumentError, "No valid nameservers found in config"
+        raise ArgumentError.new("No valid nameservers found in config")
       end
       @single_res_mutex.synchronize { @single_resolvers.concat(new_resolvers) }
+      if @single_resolvers.nil? || @single_resolvers.empty?
+        raise ArgumentError.new("No valid nameservers found")
+      end
     end
 
     def set_config_nameserver(n)

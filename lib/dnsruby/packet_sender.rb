@@ -221,7 +221,7 @@ module Dnsruby
               else
                 send(attr.to_s + "=", arg[attr])
               end
-           end
+            end
           rescue Exception => e
             Dnsruby.log.error { "PacketSender : Argument #{attr}, #{arg[attr]} not valid : #{e}\n" }
           end
@@ -236,7 +236,7 @@ module Dnsruby
           rescue ArgumentError
             return
           end
-          else
+        else
             @server=Config.resolve_server(@server)
         end
 

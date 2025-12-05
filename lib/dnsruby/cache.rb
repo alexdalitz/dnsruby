@@ -68,14 +68,12 @@ module Dnsruby
     #  This method "fixes up" the response, so that the header and ttls are OK
     #  The resolver will still need to copy the flags and ID across from the query
     def find(qname, qtype, qclass = Classes.IN)
-#      print "CACHE find : #{qname}, #{qtype}\n"
       qn = Name.create(qname)
       qn.absolute = true
       key = CacheKey.new(qn, qtype, qclass).to_s
       @mutex.synchronize {
         data = @cache[key]
         if (!data)
-#          print "CACHE lookup failed\n"
           return nil
         end
         if (data.expiration <= Time.now.to_i)

@@ -92,4 +92,33 @@ class TestResolverConfig < Minitest::Test
     end;
   end
 
+  def test_bad_ns
+    begin
+      res = Dnsruby::Resolver.new(:nameserver => ["ns32.domiancontrol.com."])
+      res.query("example.com")
+      assert(false, "Should not query with bad nameserver")
+    rescue Exception => e
+      # OK
+    end
+  end
+
+  def test_bad_ns_post_init
+    begin
+      resolver = Dnsruby::Resolver.new(recurse: false, do_caching: false, retry_times: 2)
+      resolver.nameserver = ["ns32.domiancontrol.com."]
+      assert(false, "Should not allow bad nameserver")
+      resolver.query("example.com")
+    rescue ArgumentError
+    end
+  end
+
+  def test_one_good_ns_rest_bad
+    begin
+      resolver = Dnsruby::Resolver.new(recurse: false, do_caching: false, retry_times: 2)
+      resolver.nameserver = ["ns32.domiancontrol.com.", "1.1.1.1"]
+      resolver.query("example.com")
+    rescue ArgumentError
+      assert(false, "Should allow one good nameserver")
+    end
+  end
 end
