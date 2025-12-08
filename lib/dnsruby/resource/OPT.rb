@@ -227,13 +227,12 @@ module Dnsruby
         if @options
           @options.each do |opt|
             if opt.code == EDNS_SUBNET_OPTION
-              ret = ret + "CLIENT-SUBNET: #{get_client_subnet(opt)}"
+              ret = ret + "CLIENT-SUBNET: #{get_client_subnet(opt)}\n"
             else
-              ret = ret + " " + opt.to_s
+              ret = ret + "OPT=#{opt.code}: #{opt.data}\n"
             end
           end
         end
-        ret = ret + "\n"
         return ret
       end
 
