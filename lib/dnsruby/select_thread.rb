@@ -228,17 +228,20 @@ module Dnsruby
           if (unused_loop_count > 10 && @@query_hash.empty? && @@observers.empty?)
             Dnsruby.log.debug("Try stop select loop")
 
+            # We leave the @@wakeup_sockets here, but remove everything else
             non_persistent_sockets = @@sockets.select { |s| ! @@socket_is_persistent[s] }
             non_persistent_sockets.each do |socket|
-              socket.close rescue nil
-              @@sockets.delete(socket)
+              if socket != @@wakeup_sockets[1]
+                socket.close rescue nil
+                @@sockets.delete(socket)
+              end
             end
 
-            Dnsruby.log.debug("Deleted #{non_persistent_sockets.size} non-persistent sockets," +
-                              " #{@@sockets.count} persistent sockets remain.")
+            Dnsruby.log.debug("Deleted #{non_persistent_sockets.size - 1} non-persistent sockets," +
+                              " #{@@sockets.count - 1} persistent sockets remain.")
             @@socket_hash.clear
 
-            if @@sockets.empty?
+            if @@sockets.size == 1
               Dnsruby.log.debug("Stopping select loop")
               return
             end
@@ -251,10 +254,11 @@ module Dnsruby
     # Removes closed sockets from @@sockets, and returns an array containing 1
     # exception for each closed socket contained in @@socket_hash.
     def clean_up_closed_sockets
+      exceptions = []
       @@mutex.synchronize do
         closed_sockets_in_hash = @@sockets.select(&:closed?).select { |s| @@socket_hash[s] }
         @@sockets.delete_if { | socket | socket.closed? }
-        closed_sockets_in_hash.each_with_object([]) do |socket, exceptions|
+        closed_sockets_in_hash.each_with_object([]) do |socket, exception|
           @@socket_hash[socket].each do | client_id |
             exceptions << [SocketEofResolvError.new("TCP socket closed before all answers received"), socket, client_id]
           end
