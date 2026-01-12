@@ -393,6 +393,9 @@ module Dnsruby
       if !persistent?(socket) || max_attained?(socket)
         @@sockets.delete(socket)
         @@socket_hash.delete(socket)
+        @@socket_remaining_queries.delete(socket)
+        @@socket_is_persistent.delete(socket)
+        @@tcp_buffers.delete(socket)
         Dnsruby.log.debug("Closing socket #{socket}")
         socket.close rescue nil
       end
