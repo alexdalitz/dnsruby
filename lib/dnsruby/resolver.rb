@@ -453,6 +453,7 @@ module Dnsruby
             begin
               if key == :config_info
                 @config.set_config_info(args[0][:config_info])
+                add_config_nameservers
               elsif key == :nameserver
                 set_config_nameserver(args[0][:nameserver])
               elsif key == :nameservers
@@ -509,9 +510,9 @@ module Dnsruby
       new_resolvers = new_resolvers.select do |resolver|
         !resolver.nil? && !resolver.server.nil?
       end
-      if new_resolvers.empty?
-        raise ArgumentError.new("No valid nameservers found in config")
-      end
+      # if new_resolvers.empty?
+      #   raise ArgumentError.new("No valid nameservers found in config")
+      # end
       @single_res_mutex.synchronize { @single_resolvers.concat(new_resolvers) }
       if @single_resolvers.nil? || @single_resolvers.empty?
         raise ArgumentError.new("No valid nameservers found")

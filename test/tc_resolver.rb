@@ -477,5 +477,18 @@ class TestRawQuery < Minitest::Test
 #          Dnsruby::Cache.delete("googlöe.com", "MX")
           
   end
+
+  def test_config_info
+    res = Dnsruby::Resolver.new(
+      config_info: {
+        # contents here doesn't matter; even setting to {} is enough to cause ResolvTimeout
+        apply_domain: false,
+        apply_search_list: false,
+      },
+      query_timeout: 3, # make the timeout faster
+      )
+    res.do_caching = false
+    res.query("a.root-servers.net.", "A")
+  end
 end
 
