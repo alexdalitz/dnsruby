@@ -678,7 +678,8 @@ module Dnsruby
                 if (of.length <= known_zone.length)
                   TheLog.debug(";; _dorecursion() Deadbeat name server did not provide new information.")
                   next
-                elsif (of =~ /#{known_zone}/)
+                # elsif (of =~ /#{known_zone}/)
+                elsif (of == known_zone || known_zone.length == 1 || of.end_with?(".#{known_zone}"))
                   TheLog.debug(";; _dorecursion() FOUND closer authority for [#{of}] at [#{server}].")
                   auth[server] ||= AddressCache.new #[] @TODO@ If there is no additional record for this, then we want to use the authority!
                   if (rr.type == Types.NS)
@@ -688,7 +689,7 @@ module Dnsruby
                       end
                   end
                 else
-                  TheLog.debug(";; _dorecursion() Confused name server [" + @answerfrom + "] thinks [#{of}] is closer than [#{known_zone}]?")
+                  TheLog.debug(";; _dorecursion() Confused name server [" + @answerfrom.to_s + "] thinks " + of.to_s + " is closer than " + known_zone.to_s + "?")
                   return nil
                 end
               else
@@ -750,9 +751,9 @@ module Dnsruby
       #  Now prune the response of any unrelated rrsets (RFC5452 section6)
       #  "One very simple way to achieve this is to only accept data if it is
       #  part of the domain for which the query was intended."
-      if (!packet.header.aa)
-        return
-      end
+      # if (!packet.header.aa)
+      #   return
+      # end
       if (!packet.question()[0])
         return
       end
