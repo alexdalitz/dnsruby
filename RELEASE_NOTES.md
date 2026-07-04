@@ -1,6 +1,18 @@
 # Release Notes
 
+## v1.74.0
+
+* Resolve all configured nameservers in parallel
+* Only raise ArgumentError from Resolver if _all_ configured nameservers are invalid - otherwise, just log the bad one(s) and continue
+* print out extra OPT data
+*  Fix wakeup socket deletion on stopping of select thread
+* Make sure to add nameservers if using config_info in Resolver
+* Fix for RRSET pruning and potential cache poisoning - thanks Alexander Tan
+* Fix WKS record protocol field encoding and decoding size according to RFC 1035 Section 3.4.2 where PROTOCOL is an 8 bit (#220)
+* Updating workflows to include Ruby 4, and get rdoc working for it
+
 ## v1.73.1
+
 * fix(caa): add support for issuevmc (#214) - thanks Mark McDonnell!
 
 ## v1.73.0
