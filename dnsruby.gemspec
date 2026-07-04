@@ -43,6 +43,7 @@ DNSSEC NSEC3 support.'
   s.add_development_dependency 'rubydns', '>= 2.0.2'
   s.add_development_dependency 'nio4r', '>= 2.5.8'
   s.add_development_dependency 'minitest-display', '>= 0.3.1'
+  s.add_development_dependency 'rdoc', '>= 6.5', '< 8.0'
   s.add_development_dependency 'yard', '>= 0.9'
   s.add_development_dependency 'coveralls', '~> 0.8.23'
 
