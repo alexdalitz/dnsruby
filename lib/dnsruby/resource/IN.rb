@@ -87,13 +87,13 @@ module Dnsruby
 
         def encode_rdata(msg, canonical=false) #:nodoc: all
           msg.put_bytes(@address.address)
-          msg.put_pack("n", @protocol)
+          msg.put_pack("C", @protocol)
           msg.put_bytes(@bitmap)
         end
 
         def self.decode_rdata(msg) #:nodoc: all
           address = IPv4.new(msg.get_bytes(4))
-          protocol, = msg.get_unpack("n")
+          protocol, = msg.get_unpack("C")
           bitmap = msg.get_bytes
           return self.new(address, protocol, bitmap)
         end
