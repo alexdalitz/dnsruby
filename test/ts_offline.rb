@@ -40,6 +40,7 @@ TESTS = %w(
     ptrin
     question
     res_config
+    res_config_nameserver
     res_file
     res_opt
     rr

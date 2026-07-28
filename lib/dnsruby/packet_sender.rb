@@ -255,7 +255,14 @@ module Dnsruby
           #           @src_address6 = '::'
           @ipv6=true
         rescue Exception
-          Dnsruby.log.error { "Server is neither IPv4 or IPv6!\n" }
+          #  A scoped IPv6 link-local literal ("fe80::1%en0") is IPv6 even
+          #  though IPv6.create can't parse the %zone suffix — send it over an
+          #  IPv6 socket, not IPv4. See issue #184.
+          if Config.scoped_ipv6?(@server)
+            @ipv6 = true
+          else
+            Dnsruby.log.error { "Server is neither IPv4 or IPv6!\n" }
+          end
         end
       end
     end
