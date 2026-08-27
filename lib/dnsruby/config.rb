@@ -202,6 +202,10 @@ module Dnsruby
       end
       ns.each {|n|
         if (String ===n)
+          #  A scoped IPv6 link-local literal ("fe80::1%en0") is a valid
+          #  nameserver that IPv4/IPv6.create can't parse; accept it rather than
+          #  misreading it as a domain Name below. See issue #184.
+          next if Config.scoped_ipv6?(n)
           #  Make sure we can make a Name or an address from it
           begin
             IPv4.create(n)
@@ -247,6 +251,42 @@ module Dnsruby
       Dnsruby.log.debug{"Nameservers = #{@nameserver.join(", ")}"}
     end
 
+    #  An IPv6 scope (zone) id — the "%en0" in "fe80::1%en0". Link-local
+    #  nameservers carry one. Neither Dnsruby::IPv6 nor Ruby's IPAddr can parse
+    #  the suffix, so recognise a scoped address separately: strip the zone and
+    #  validate the address part. See issue #184.
+    def Config.scoped_ipv6?(str)
+      return false unless String === str
+      m = str.match(/\A(?<addr>[^%]+)%(?<zone>[^%]+)\z/)
+      return false unless m
+      begin
+        IPv6.create(m[:addr])
+        true
+      rescue ArgumentError
+        false
+      end
+    end
+
+    #  True when +str+ can be used verbatim as a nameserver: an IPv4, IPv6, or
+    #  scoped (link-local) IPv6 literal. resolv.conf nameservers must be IP
+    #  literals by definition — anything else cannot be a nameserver and must
+    #  never be handed to the hostname-resolution path, which re-reads
+    #  resolv.conf and recurses forever. See issues #179 and #184.
+    def Config.ip_nameserver?(str)
+      return false unless String === str
+      begin
+        IPv4.create(str)
+        return true
+      rescue ArgumentError
+      end
+      begin
+        IPv6.create(str)
+        return true
+      rescue ArgumentError
+      end
+      scoped_ipv6?(str)
+    end
+
     def Config.resolve_server(ns) #:nodoc: all
       #  Sanity check server
       #  If it's an IP address, then use that for server
@@ -263,6 +303,13 @@ module Dnsruby
           addr=IPv6.create(ns)
           server = ns
         rescue Exception
+          #  A scoped IPv6 link-local literal (e.g. "fe80::1%en0") is a valid
+          #  nameserver even though IPv6.create can't parse the %zone suffix.
+          #  Accept it verbatim; the OS socket layer understands the zone. Do
+          #  NOT fall through to hostname resolution below, which re-reads
+          #  resolv.conf and would recurse forever. See issues #184 and #179.
+          return ns if Config.scoped_ipv6?(ns)
+
           begin
             #  try to resolve server to address
             if ns == "localhost"
@@ -349,6 +396,16 @@ module Dnsruby
           end
         }
       }
+      #  resolv.conf nameservers must be IP literals. Drop anything that isn't
+      #  (a malformed entry such as "8.8.8.8," or a hostname): handing it to the
+      #  hostname-resolution path re-reads this very file and recurses forever.
+      #  Keep scoped IPv6 link-local addresses. See issues #179 and #184.
+      nameserver = nameserver.select do |n|
+        next true if ip_nameserver?(n)
+
+        Dnsruby.log.warn { "Ignoring invalid nameserver #{n.inspect} in #{filename} (not an IP address)" }
+        false
+      end
       return { :nameserver => nameserver, :domain => domain, :search => search, :ndots => ndots, :port => port }
     end
 
