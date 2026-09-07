@@ -49,5 +49,5 @@ DNSSEC NSEC3 support.'
 
   s.add_runtime_dependency 'base64', '>= 0.2'
   s.add_runtime_dependency 'logger', '~> 1.6'
-  s.add_runtime_dependency 'simpleidn', '~> 0.2.1'
+  s.add_runtime_dependency 'simpleidn', '>= 0.2.1', '< 0.4.0'
 end
