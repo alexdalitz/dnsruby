@@ -202,6 +202,10 @@ module Dnsruby
       end
       ns.each {|n|
         if (String ===n)
+          if n.include?('%')
+            Config.ipv6_server_address(n)
+            next
+          end
           #  Make sure we can make a Name or an address from it
           begin
             IPv4.create(n)
@@ -247,6 +251,19 @@ module Dnsruby
       Dnsruby.log.debug{"Nameservers = #{@nameserver.join(", ")}"}
     end
 
+    # Validate an IPv6 socket endpoint without putting its local interface zone
+    # into a DNS address. Callers must retain the original string for socket I/O.
+    def Config.ipv6_server_address(server) #:nodoc: all
+      if String === server && server.include?('%')
+        address, zone = server.split('%', 2)
+        unless /\A[0-9A-Za-z_.-]+\z/.match?(zone)
+          raise ArgumentError, "invalid IPv6 zone identifier: #{server.inspect}"
+        end
+        return IPv6.create(address)
+      end
+      IPv6.create(server)
+    end
+
     def Config.resolve_server(ns) #:nodoc: all
       #  Sanity check server
       #  If it's an IP address, then use that for server
@@ -254,6 +271,12 @@ module Dnsruby
       server=ns
       if (Name === ns)
         ns = ns.to_s
+      end
+      # A scoped literal is never a hostname. Validate it before the hostname
+      # fallback, and preserve the zone so the OS can choose the interface.
+      if String === ns && ns.include?('%')
+        ipv6_server_address(ns)
+        return ns
       end
       begin
         addr = IPv4.create(ns)

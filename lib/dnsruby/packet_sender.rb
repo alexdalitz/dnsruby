@@ -251,7 +251,7 @@ module Dnsruby
         @ipv6=false
       rescue Exception
         begin
-          IPv6.create(@server)
+          Config.ipv6_server_address(@server)
           #           @src_address6 = '::'
           @ipv6=true
         rescue Exception
@@ -423,7 +423,8 @@ module Dnsruby
         @tcp_pipeline_local_port = src_port
         src_address = @ipv6 ? @src_address6 : @src_address
         begin
-          @pipeline_socket = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
+          family = @ipv6 ? Socket::AF_INET6 : Socket::AF_INET
+          @pipeline_socket = Socket.new(family, Socket::SOCK_STREAM, 0)
           @pipeline_socket.bind(Addrinfo.tcp(src_address, src_port))
           @pipeline_socket.connect(sockaddr)
           Dnsruby.log.debug("Creating socket #{src_address}:#{src_port}")

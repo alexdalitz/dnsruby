@@ -43,6 +43,9 @@ TESTS = %w(
     res_config
     res_file
     res_opt
+    scoped_ipv6
+    scoped_ipv6_select
+    scoped_ipv6_transport
     rr
     rr-txt
     rr-unknown

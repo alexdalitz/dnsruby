@@ -77,6 +77,18 @@ bundle exec rake test
 Usage Help
 ----------
 
+IPv6 link-local nameservers need an interface zone, supplied as an interface
+name or numeric index. For example:
+
+```ruby
+resolver = Dnsruby::Resolver.new(nameserver: 'fe80::1%en0')
+response = resolver.query('example.com')
+```
+
+Use the address and interface of your DNS server. Scoped addresses also work
+in `resolv.conf` (for example, `nameserver fe80::1%en0`). The zone is local
+socket routing information and must not be included in an AAAA record.
+
 There are a couple of blog articles that might be helpful
 in understanding how to use Dnsruby. These used to be hosted by
 Nominet UK, however the original content has been copied to the

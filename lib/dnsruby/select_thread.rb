@@ -307,7 +307,9 @@ module Dnsruby
 
       answerip = msg.answerip.downcase
       answerfrom = msg.answerfrom.downcase
-      answeripaddr = IPAddr.new(answerip)
+      # The zone selects the interface on the connected socket; it is not part
+      # of the numeric address. IPAddr also rejects some valid interface names.
+      answeripaddr = IPAddr.new(answerip.split('%', 2).first)
       dest_server = IPAddr.new("0.0.0.0")
 
       begin
@@ -621,7 +623,11 @@ module Dnsruby
         ids.each do |id|
           #  Does this id speak to this dest_server?
           query_settings = @@query_hash[id]
-          if (answerip == query_settings.dest_server && answerport == query_settings.dest_port)
+          # recvfrom may spell a numeric zone as an interface name. The socket
+          # is already connected to the scoped peer, so compare address bytes.
+          source = IPAddr.new(answerip.split('%', 2).first)
+          destination = IPAddr.new(query_settings.dest_server.to_s.split('%', 2).first)
+          if (source == destination && answerport == query_settings.dest_port)
             #  We have a match
             client_id = id
             break
