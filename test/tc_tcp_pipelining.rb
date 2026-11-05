@@ -15,241 +15,132 @@
 # ++
 
 require_relative 'spec_helper'
-require_relative 'test_dnsserver'
-
-# The TCPPipeliningServer links our NioTcpPipeliningHandler on
-# the loopback interface.
-class TCPPipeliningServer < Async::DNS::Server
-  PORT     = 53937
-  IP   = '127.0.0.1'
-
-  DEFAULT_MAX_REQUESTS = 4
-  DEFAULT_TIMEOUT = 3
-
-  @@stats = Stats.new
-
-  def self.stats
-    @@stats
-  end
-
-  def initialize(**options)
-    super(options)
-
-    @handlers = []
-    @handlers << NioTcpPipeliningHandler.new(self, IP, PORT, DEFAULT_MAX_REQUESTS, DEFAULT_TIMEOUT) #4 max request
-  end
-
-  def process(name, resource_class, transaction)
-    @logger.debug "name: #{name}"
-    transaction.respond!("93.184.216.34", { resource_class: ::Resolv::DNS::Resource::IN::A })
-  end
-
-end
+require_relative 'tcp_pipelining_server'
+require 'timeout'
 
 class TestTCPPipelining < Minitest::Test
-
-  class << self
-    attr_accessor :query_id
-  end
-
-  def self.init
-    unless @initialized
-      @initialized = true
-      @query_id = 0
-    end
-  end
-
-  @@server = nil
+  WAIT_TIMEOUT = 5
 
   def setup
-  return
-    self.class.init
-
-    # Instantiate a new server that uses our tcp pipelining handler
-    # For each query the server sends the query upstream (193.0.14.129)
-    # options = {
-    #     server_class: TCPPipeliningServer,
-    # }
-
-    #RubyDNS::run_server(options) || true
-    if !@@server
-      @@server = TCPPipeliningServer.new()
-
-      Thread.new do
-        @@server.run
-      end
-    end
-
-    # Instantiate our resolver. The resolver will use the same pipeline as much as possible.
-    # If a timeout occurs or max_request_per_connection a new connection should be initiated
-    @@resolver ||= Dnsruby::Resolver.new(
-        use_tcp:                    true,
-        do_caching:                 false,
-        tcp_pipelining:             true,
-        dnssec:                     false,
-        packet_timeout:             10,
-        tcp_pipelining_max_queries: 10,
-        nameserver:                 TCPPipeliningServer::IP,
-        port:                       TCPPipeliningServer::PORT)
+    @server = PipelineTest::Server.new
+    @query_id = 0
+    @resolver = Dnsruby::Resolver.new(
+      use_tcp: true,
+      do_caching: false,
+      tcp_pipelining: true,
+      dnssec: false,
+      retry_times: 1,
+      packet_timeout: WAIT_TIMEOUT,
+      query_timeout: WAIT_TIMEOUT,
+      tcp_pipelining_max_queries: 10,
+      nameserver: PipelineTest::Server::IP,
+      port: @server.port
+    )
   end
 
-  # Send x number of queries asynchronously to our resolver
-  def send_async_messages(number_of_messages, queue, wait_seconds = 0)
-    Dnsruby.log.debug "Sending #{number_of_messages} messages"
-    number_of_messages.times do
-      name = "#{self.class.query_id}.com"
-      Dnsruby.log.debug "Sending #{name}"
-      message = Dnsruby::Message.new(name)
-      # self.class.query_id identifies our query, must be different for each message
-      @@resolver.send_async(message, queue, self.class.query_id)
-      self.class.query_id += 1
+  def teardown
+    @resolver.close if @resolver
+  ensure
+    @server.stop if @server
+    wait_for_client_close if @resolver
+  end
 
-      # Note: For 0, we don't sleep at all instead of sleeping 0 since sleeping 0
-      # involves yielding the CPU.
-      sleep wait_seconds unless wait_seconds == 0
+  def send_async_messages(count, queue)
+    Array.new(count) do
+      id = @query_id
+      @query_id += 1
+      message = Dnsruby::Message.new("pipeline-#{id}.example.invalid")
+      message.do_caching = false
+      message.do_validation = false
+      @resolver.send_async(message, queue, id)
+      id
     end
   end
 
-  # Verify x responses with no exception
-  def verify_responses(number_of_messages, queue)
-    number_of_messages.times do
-      _response_id, response, exception = queue.pop
-      assert_nil(exception)
-      assert(response.is_a?(Dnsruby::Message))
+  def responses_for(ids, queue)
+    responses = Timeout.timeout(WAIT_TIMEOUT + 1) do
+      Array.new(ids.length) { queue.pop }
+    end
+    @server.stats # Propagate any exception in the server thread.
+    assert_equal ids.sort, responses.map(&:first).sort
+    responses.sort_by(&:first)
+  end
+
+  def verify_responses(ids, queue)
+    responses_for(ids, queue).each do |id, response, exception|
+      assert_nil exception
+      assert_instance_of Dnsruby::Message, response
+      assert_equal "pipeline-#{id}.example.invalid", response.question.first.qname.to_s
+      assert_equal PipelineTest::Server::ANSWER, response.answer.first.address.to_s
     end
   end
 
-  def accept_wait(accept_count, max)
-    i = 0
-    while TCPPipeliningServer.stats.accept_count < accept_count
-      sleep 0.5
-      i+=0.5
-      assert(i<max, "Max wait for accept reached #{TCPPipeliningServer.stats.accept_count} accepts < #{accept_count}")
+  def wait_for_timeouts(count)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + WAIT_TIMEOUT
+    until @server.stats[:timeouts] == count && @server.stats[:connections].zero?
+      flunk "Timed out waiting for #{count} connection expiry/expiries: #{@server.stats}" if
+        Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+      sleep 0.01
+    end
+    # A server-side close does not mean the client's select thread has seen
+    # the FIN yet. Reconnect only after it has processed EOF.
+    wait_for_client_close
+  end
+
+  def wait_for_client_close
+    sender = @resolver.single_resolvers.first
+    socket = sender.instance_variable_get(:@pipeline_socket)
+    Timeout.timeout(WAIT_TIMEOUT) do
+      sleep 0.01 while socket && !socket.closed?
     end
   end
 
-  def connection_wait(connection_count, max)
-    i = 0
-    while TCPPipeliningServer.stats.connections > connection_count
-      sleep 0.5
-      i+=0.5
-      assert(i<max, "Max wait for connection reached: #{TCPPipeliningServer.stats.connections} active connections > #{connection_count}")
-    end
-  end
-
-  def timeout_wait(timeout_count, max)
-    i = 0
-    while TCPPipeliningServer.stats.timeout_count < timeout_count
-      sleep 0.5
-      i+=0.5
-      assert(i<max, "Max wait for timeout reached #{TCPPipeliningServer.stats.timeout_count} timeounts < #{timeout_count}")
-    end
-  end
-
-  # This test initiates multiple asynchronous requests and verifies they go on the same tcp
-  # pipeline or a new one depending on timeouts
+  # Multiple outstanding queries share one TCP connection; after it expires,
+  # the next batch must use a new connection.
   def test_TCP_pipelining_timeout
-  return
-    Dnsruby.log.debug "test_TCP_pipelining_timeout"
-    connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
+    queue = Queue.new
+    verify_responses(send_async_messages(3, queue), queue)
+    assert_equal 1, @server.stats[:accepts]
+    wait_for_timeouts(1)
 
-    accept_count  = TCPPipeliningServer.stats.accept_count
-    timeout_count = TCPPipeliningServer.stats.timeout_count
-
-    # This is the main queue used to communicate between Dnsruby in async mode and the client
-    query_queue = Queue.new
-
-    # Test basic pipelining. All request should go on the same tcp connection.
-    # TCPPipeliningServer.stats.accept_count should be 1.
-    send_async_messages(3, query_queue)
-    verify_responses(3, query_queue)
-
-    assert_equal(accept_count + 1, TCPPipeliningServer.stats.accept_count)
-
-    connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
-    timeout_wait(timeout_count + 1, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
-
-    assert_equal(timeout_count + 1, TCPPipeliningServer.stats.timeout_count)
-
-    # Initiate another 3 queries, check accept_count and timeout_count
-    send_async_messages(3, query_queue)
-    verify_responses(3, query_queue)
-
-    connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
-    timeout_wait(timeout_count + 2, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
-
-    assert_equal(accept_count + 2, TCPPipeliningServer.stats.accept_count)
-    assert_equal(timeout_count + 2, TCPPipeliningServer.stats.timeout_count)
-
-    connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
+    verify_responses(send_async_messages(3, queue), queue)
+    assert_equal 2, @server.stats[:accepts]
+    wait_for_timeouts(2)
+    assert_equal 2, @server.stats[:timeouts]
   end
 
-  # Test timeout occurs and new connection is initiated inbetween 2 sends
+  # The server closes the pipeline between sends, and a single subsequent
+  # query must reconnect successfully.
   def test_TCP_pipelining_timeout_in_send
-  return
-    Dnsruby.log.debug "test_TCP_pipelining_timeout_in_send"
-    connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
+    queue = Queue.new
+    verify_responses(send_async_messages(2, queue), queue)
+    assert_equal 1, @server.stats[:accepts]
+    wait_for_timeouts(1)
 
-    accept_count  = TCPPipeliningServer.stats.accept_count
-    timeout_count = TCPPipeliningServer.stats.timeout_count
-
-    query_queue = Queue.new
-
-    # Initiate another 2 queries wait and then send a final query
-    # Check accept_count. Wait for timeout and verify we got 2 additional timeouts.
-    send_async_messages(2, query_queue)
-    verify_responses(2, query_queue)
-
-    accept_wait(accept_count+1, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
-    connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
-
-    send_async_messages(1, query_queue)
-
-    verify_responses(1, query_queue)
-
-    assert_equal(accept_count + 2, TCPPipeliningServer.stats.accept_count)
-
-    connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
-
-    timeout_wait(timeout_count + 2, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
+    verify_responses(send_async_messages(1, queue), queue)
+    assert_equal 2, @server.stats[:accepts]
+    wait_for_timeouts(2)
+    assert_equal 2, @server.stats[:timeouts]
   end
 
-  # Test that we get a SocketEofResolvError if the servers closes the socket before
-  # all queries are answered
+  # The peer answers only four of six outstanding queries before closing.
+  # Each unanswered query must receive EOF, rather than a resolver timeout.
   def test_TCP_pipelining_socket_eof
-  return
-    connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
-
-    query_queue = Queue.new
-
-    # Issue 6 queries. Only 4 should be replied since max_request_per_connection = 4
-    # Verify we get Dnsruby::SocketEofResolvError on the last 2.
-    # Verify we got max_count was incremented
-    send_async_messages(6, query_queue)
-
-    responses = []
-
-    6.times do
-      response = query_queue.pop
-      responses << response
-    end
-
-    responses.sort_by { |response| response[0] }
-
-    step = 0
-
-    responses.each do | response |
-      _response_id, response, exception = response
-      if step < TCPPipeliningServer::DEFAULT_MAX_REQUESTS
-        assert_nil(exception, "Exception not nil for msg #{step} < #{TCPPipeliningServer::DEFAULT_MAX_REQUESTS} requests")
-        assert(response.is_a?(Dnsruby::Message))
+    queue = Queue.new
+    ids = send_async_messages(6, queue)
+    responses_for(ids, queue).each do |id, response, exception|
+      if id < PipelineTest::Server::MAX_REQUESTS
+        assert_nil exception
+        assert_instance_of Dnsruby::Message, response
+        assert_equal "pipeline-#{id}.example.invalid", response.question.first.qname.to_s
+        assert_equal PipelineTest::Server::ANSWER, response.answer.first.address.to_s
       else
-        assert_equal(Dnsruby::SocketEofResolvError, exception.class)
-        assert_nil(response)
+        assert_instance_of Dnsruby::SocketEofResolvError, exception
+        assert_nil response
       end
-      step += 1
     end
-
-    connection_wait(0, TCPPipeliningServer::DEFAULT_TIMEOUT*5)
+    wait_for_timeouts(1)
+    assert_equal 1, @server.stats[:accepts]
+    assert_equal 1, @server.stats[:limits]
   end
 end

@@ -53,6 +53,7 @@ TESTS = %w(
     rrset
     rrsig
     svcb
+    tcp_pipelining
     tkey
     update
     zone_reader

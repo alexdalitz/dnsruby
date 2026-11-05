@@ -444,7 +444,8 @@ module Dnsruby
       if (buf.length() < expected_length)
         begin
           input, = socket.recv_nonblock(expected_length-buf.length)
-          if (input=="")
+          # Depending on the Ruby version, EOF is nil or an empty string.
+          if input.nil? || input.empty?
             Dnsruby.log.debug("EOF from server - no bytes read - closing socket")
             socket.close #EOF closed by server, if we were interrupted we need to resend
 
