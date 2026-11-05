@@ -14,6 +14,7 @@
 # limitations under the License.
 # ++
 require_relative 'spec_helper'
+require_relative 'local_dns_server'
 
 require 'socket'
 
@@ -25,6 +26,7 @@ require 'socket'
 class TestResolver < Minitest::Test
 
   include Dnsruby
+  include LocalDnsServer
 
   Thread::abort_on_exception = true
 
@@ -170,13 +172,19 @@ class TestResolver < Minitest::Test
 #  end
 #
   def test_nxdomain
-    resolver = Resolver.new
-    q = Queue.new
-    resolver .send_async(Message.new(BAD_DOMAIN_NAME, Types.A), q, 1)
-    id, m, error = q.pop
-    assert(id==1, "Id should have been 1 but was #{id}")
-    assert(m.rcode == RCode.NXDOMAIN, "Expected NXDOMAIN but got #{m.rcode} instead.")
-    assert_error_is_exception(error, NXDomain)
+    with_local_dns_server(:udp, rcode: RCode.NXDOMAIN) do |resolver|
+      message = Message.new(BAD_DOMAIN_NAME, Types.A)
+      message.do_caching = false
+      message.do_validation = false
+      q = Queue.new
+      resolver.send_async(message, q, 1)
+      id, response, error = q.pop
+      assert_equal(1, id)
+      assert_error_is_exception(error, NXDomain)
+      assert_valid_response(response)
+      assert_equal(RCode.NXDOMAIN, response.rcode)
+      assert_equal(message.header.id, response.header.id)
+    end
   end
 
   def test_timeouts

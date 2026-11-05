@@ -15,14 +15,19 @@
 # ++
 
 require_relative 'spec_helper'
+require_relative 'local_dns_server'
 
 require 'socket'
 class TestTcp < Minitest::Test
+  include LocalDnsServer
+
   def test_TCP
-    res = Dnsruby::Resolver.new()
-    res.use_tcp = true
-    ret=res.query("example.com")
-    assert(ret.is_a?(Dnsruby::Message))
+    with_local_dns_server(:tcp, answer: 'example.com 60 IN A 192.0.2.1') do |resolver|
+      response = resolver.query('example.com')
+      assert_kind_of(Dnsruby::Message, response)
+      assert_equal(Dnsruby::RCode.NOERROR, response.rcode)
+      assert_equal(['192.0.2.1'], response.answer.map { |rr| rr.address.to_s })
+    end
   end
   def test_TCP_port
     #  Need a test server so we can tell what port this message was actually sent on!
