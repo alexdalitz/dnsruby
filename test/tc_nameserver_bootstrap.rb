@@ -105,6 +105,55 @@ class TestNameserverBootstrap < Minitest::Test
     end
   end
 
+  def test_invalid_scoped_file_entries_do_not_hide_valid_fallbacks
+    contents = "nameserver fe80::1%\nnameserver fe80::gggg%en0\n" \
+               "nameserver 192.0.2.1\nnameserver fe80::1%3\n"
+    with_resolv_conf(contents) do |path|
+      defaults = -> { Dnsruby::Config.parse_resolv_conf(path) }
+      with_lookup(defaults, nil) do |state, original_new|
+        [nil, {config_info: path}, {config_info: {search: ['example.test']}}].each do |options|
+          resolver = options ? original_new.call(options) : original_new.call
+          resolver.add_config_nameservers unless options
+          assert_equal(['192.0.2.1', 'fe80::1%3'], resolver.config.nameserver)
+          assert_equal(['192.0.2.1', 'fe80::1%3'], resolver.single_resolvers.map(&:server))
+        ensure
+          resolver.close if resolver
+        end
+        assert(state[:queries].empty?)
+        assert_equal(0, state[:counts][:resolver_constructions])
+      end
+    end
+  end
+
+  def test_invalid_scoped_defaults_do_not_block_explicit_nameserver
+    with_resolv_conf("nameserver fe80::1%\n") do |path|
+      defaults = -> { Dnsruby::Config.parse_resolv_conf(path) }
+      with_lookup(defaults, nil) do |state, original_new|
+        ['192.0.2.53', {nameserver: '2001:db8::53'}].each do |options|
+          resolver = original_new.call(options)
+          expected = options.is_a?(Hash) ? options[:nameserver] : options
+          assert_equal([expected], resolver.single_resolvers.map(&:server))
+        ensure
+          resolver.close if resolver
+        end
+        resolver = original_new.call
+        assert_raises(ArgumentError) { resolver.add_config_nameservers }
+        assert_empty(resolver.config.nameserver)
+        assert(state[:queries].empty?)
+        assert_equal(0, state[:counts][:resolver_constructions])
+      ensure
+        resolver.close if resolver
+      end
+    end
+  end
+
+  def test_explicit_config_hash_still_rejects_invalid_scoped_nameservers
+    config = Dnsruby::Config.new
+    assert_raises(ArgumentError) do
+      config.set_config_info(nameserver: ['fe80::1%', '192.0.2.1'])
+    end
+  end
+
   def test_default_file_hostname_uses_literal_nameserver_without_changing_config
     hostname = 'ns.example.test'
     with_resolv_conf("nameserver #{hostname}\nnameserver 192.0.2.1\n") do |path|

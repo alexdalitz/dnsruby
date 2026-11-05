@@ -127,6 +127,19 @@ module Dnsruby
         dom = config_hash[:domain] if config_hash.include? :domain
 
         if (!@configured)
+          # A bad file entry must not hide the other servers or prevent an
+          # explicit resolver override. Keep programmatic configuration strict.
+          unless config_info.kind_of?(Hash) && config_info.key?(:nameserver)
+            ns = ns.select do |server|
+              begin
+                check_ns([server])
+                true
+              rescue ArgumentError => error
+                Dnsruby.log.warn { "Ignoring invalid nameserver #{server.inspect}: #{error.message}" }
+                false
+              end
+            end
+          end
           send("nameserver=",ns)
         end
         @configured = true

@@ -52,6 +52,7 @@ if online?
       resolver
       tcp
       tcp_pipelining
+      scoped_ipv6_transport
       single_resolver
       cache
       dns

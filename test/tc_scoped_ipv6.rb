@@ -39,6 +39,7 @@ class TestScopedIPv6 < Minitest::Test
       "fe80::1%en0\n", "fe80::1%en0\0", 'fe80::1%en0/64',
       'fe80::1/64%en0', '[fe80::1%en0]', '192.0.2.1%en0',
       'example.test%en0', '%en0', 'fe80::gggg%en0',
+      '1:2:3:4:5:6:7::8%en0', '1:2:3:4:5:6::192.0.2.1%3',
     ]
     without_hostname_lookup do
       invalid.each do |server|
@@ -92,6 +93,24 @@ class TestScopedIPv6 < Minitest::Test
     end
     [Dnsruby::IPv4.create('192.0.2.1'), Dnsruby::IPv6.create('2001:db8::1')].each do |server|
       assert_same(server, Dnsruby::Config.resolve_server(server))
+    end
+  end
+
+  def test_config_accepts_mixed_plain_and_scoped_literals_without_dns
+    servers = ['192.0.2.1', '2001:DB8:0:0:0:0:0:53', '::1',
+               '::ffff:192.0.2.53', SCOPED_SERVERS.first, 'fe80::1%3']
+    without_hostname_lookup do
+      config = Dnsruby::Config.new
+      config.nameserver = servers
+      assert_equal(servers, config.nameserver)
+      Tempfile.create('dnsruby-mixed-ip-resolv') do |file|
+        servers.each { |server| file.puts("nameserver #{server}") }
+        file.flush
+        assert_equal(servers, Dnsruby::Config.parse_resolv_conf(file.path)[:nameserver])
+        config = Dnsruby::Config.new
+        config.set_config_info(file.path)
+        assert_equal(servers, config.nameserver)
+      end
     end
   end
 

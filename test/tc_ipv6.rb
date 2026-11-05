@@ -5,6 +5,17 @@ class TestIPv6 < Minitest::Test
 
   include Dnsruby
 
+  def test_compression_requires_at_least_one_omitted_field
+    %w[
+      1:2:3:4:5:6:7::8 ::1:2:3:4:5:6:7:8 1:2:3:4:5:6:7:8::
+      1:2:3:4:5:6::192.0.2.1 ::1:2:3:4:5:6:192.0.2.1
+    ].each do |address|
+      assert_raises(ArgumentError, address) { IPv6.create(address) }
+    end
+    assert_equal('1:2:3:4:5:6:0:8', IPv6.create('1:2:3:4:5:6::8').to_s)
+    assert_equal('1:2:3:4:5:0:c000:201', IPv6.create('1:2:3:4:5::192.0.2.1').to_s)
+  end
+
   # RFC 5952 section 4.1: leading zeros in a field are suppressed
   def test_leading_zeros_suppressed
     assert_equal('2001:db8::1', IPv6.create('2001:0db8:0000:0000:0000:0000:0000:0001').to_s)

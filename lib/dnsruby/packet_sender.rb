@@ -430,6 +430,9 @@ module Dnsruby
           Dnsruby.log.debug("Creating socket #{src_address}:#{src_port}")
           @use_counts[@pipeline_socket] = 0
         rescue Exception => e
+          # A failed bind/connect never reaches the select thread, which would
+          # otherwise own closing the socket (for example, an unusable zone).
+          @pipeline_socket.close rescue nil
           @pipeline_socket = nil
           raise e
         end

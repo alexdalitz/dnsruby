@@ -101,6 +101,49 @@ class TestScopedIPv6Transport < Minitest::Test
     end
   end
 
+  def test_tcp_pipeline_closes_socket_when_scoped_connection_fails
+    [:bind, :connect].each do |failed_operation|
+      sender = Dnsruby::PacketSender.new(server: SCOPED_SERVERS.first, port: 5300)
+      socket = Minitest::Mock.new(Object.new)
+      error = Errno::ENETUNREACH.new('unusable scoped destination')
+      socket.expect(:bind, 0) do |_source|
+        raise error if failed_operation == :bind
+        true
+      end
+      if failed_operation == :connect
+        socket.expect(:connect, nil) do |destination|
+          assert_equal 'scoped destination', destination
+          raise error
+        end
+      end
+      socket.expect(:close, nil)
+
+      Socket.stub(:sockaddr_in, 'scoped destination') do
+        Socket.stub(:new, socket) do
+          assert_same error, assert_raises(Errno::ENETUNREACH) { sender.tcp_pipeline_socket(0) }
+        end
+      end
+      assert_nil sender.instance_variable_get(:@pipeline_socket)
+      socket.verify
+    end
+  end
+
+  def test_ipv6_loopback_udp_roundtrip
+    assert_local_roundtrip(:udp, scoped: false)
+  end
+
+  def test_ipv6_loopback_tcp_roundtrip
+    assert_local_roundtrip(:tcp, scoped: false)
+  end
+
+  def test_ipv6_loopback_tcp_pipeline_has_multiple_outstanding_queries
+    assert_local_roundtrip(:pipeline, 3, scoped: false)
+  end
+
+  def test_ipv6_loopback_truncated_udp_retries_over_tcp
+    assert_local_roundtrip(:fallback, scoped: false)
+  end
+
   def test_scoped_ipv6_udp_roundtrip
     assert_local_roundtrip(:udp)
   end
@@ -113,8 +156,16 @@ class TestScopedIPv6Transport < Minitest::Test
     assert_local_roundtrip(:tcp)
   end
 
-  def test_scoped_ipv6_tcp_pipeline_reuses_connection
+  def test_scoped_ipv6_numeric_zone_tcp_roundtrip
+    assert_local_roundtrip(:tcp, 1, true)
+  end
+
+  def test_scoped_ipv6_tcp_pipeline_has_multiple_outstanding_queries
     assert_local_roundtrip(:pipeline, 2)
+  end
+
+  def test_scoped_ipv6_numeric_zone_tcp_pipeline_has_multiple_outstanding_queries
+    assert_local_roundtrip(:pipeline, 2, true)
   end
 
   def test_scoped_ipv6_truncated_udp_retries_over_tcp
@@ -123,8 +174,8 @@ class TestScopedIPv6Transport < Minitest::Test
 
   private
 
-  def assert_local_roundtrip(transport, count = 1, numeric_scope = false)
-    server, udp, tcp = bind_local_servers(transport, numeric_scope)
+  def assert_local_roundtrip(transport, count = 1, numeric_scope = false, scoped: true)
+    server, udp, tcp = bind_local_servers(transport, numeric_scope, scoped)
     port = (udp || tcp).local_address.ip_port
     received = []
     server_errors = Queue.new
@@ -144,10 +195,15 @@ class TestScopedIPv6Transport < Minitest::Test
         if tcp
           wait_readable(tcp)
           connection, = tcp.accept
-          count.times do
+          queries = Array.new(count) do
             length = read_exactly(connection, 2).unpack1('n')
             query = Dnsruby::Message.decode(read_exactly(connection, length))
             received << [:tcp, query.question.first.qname.to_s]
+            query
+          end
+          # Read every request before replying, then reverse the responses.
+          # This requires concurrent outstanding queries on one connection.
+          queries.reverse_each do |query|
             response = answer_for(query).encode
             connection.write([response.bytesize].pack('n') + response)
           end
@@ -166,8 +222,26 @@ class TestScopedIPv6Transport < Minitest::Test
       use_tcp: [:tcp, :pipeline].include?(transport),
       tcp_pipelining: transport == :pipeline
     )
-    count.times do |index|
-      name = "scoped-#{transport}-#{index}.example.invalid"
+    names = Array.new(count) { |index| "scoped-#{transport}-#{index}.example.invalid" }
+    if transport == :pipeline
+      queue = Queue.new
+      names.each_with_index do |name, index|
+        message = Dnsruby::Message.new(name)
+        # Keep outstanding queries distinct without relying on random DNS IDs.
+        message.header.id = index
+        message.do_caching = false
+        message.do_validation = false
+        resolver.send_async(message, queue, index)
+      end
+      responses = Timeout.timeout(5) { Array.new(count) { queue.pop } }
+      assert_equal (0...count).to_a, responses.map(&:first).sort
+      responses.each do |index, response, error|
+        assert_nil error
+        assert_equal ANSWER, response.answer.first.address.to_s
+        assert_equal names[index], response.question.first.qname.to_s
+      end
+    else
+      name = names.first
       response = Timeout.timeout(5) { resolver.query(name) }
       assert_equal ANSWER, response.answer.first.address.to_s
       assert_equal name, response.question.first.qname.to_s
@@ -208,16 +282,21 @@ class TestScopedIPv6Transport < Minitest::Test
     bytes
   end
 
-  def bind_local_servers(transport, numeric_scope)
-    unless Socket.respond_to?(:getifaddrs)
-      skip 'Socket.getifaddrs is unavailable; socket-boundary tests cover scoped transport'
+  def bind_local_servers(transport, numeric_scope, scoped)
+    servers = ['::1']
+    if scoped
+      unless Socket.respond_to?(:getifaddrs)
+        skip 'Socket.getifaddrs is unavailable; socket-boundary tests cover scoped transport'
+      end
+      interfaces = Socket.getifaddrs.select { |entry| entry.addr && entry.addr.ipv6? && entry.addr.ipv6_linklocal? }
+      interfaces.sort_by! { |entry| (entry.flags & Socket::IFF_LOOPBACK).zero? ? 1 : 0 }
+      servers = interfaces.filter_map do |entry|
+        next if numeric_scope && !entry.respond_to?(:ifindex)
+        zone = numeric_scope ? entry.ifindex : entry.name
+        "#{entry.addr.ip_address.split('%').first}%#{zone}"
+      end
     end
-    interfaces = Socket.getifaddrs.select { |entry| entry.addr && entry.addr.ipv6? && entry.addr.ipv6_linklocal? }
-    interfaces.sort_by! { |entry| (entry.flags & Socket::IFF_LOOPBACK).zero? ? 1 : 0 }
-    interfaces.each do |entry|
-      next if numeric_scope && !entry.respond_to?(:ifindex)
-      zone = numeric_scope ? entry.ifindex : entry.name
-      server = "#{entry.addr.ip_address.split('%').first}%#{zone}"
+    servers.each do |server|
       udp = tcp = nil
       begin
         if [:udp, :fallback].include?(transport)
@@ -234,6 +313,7 @@ class TestScopedIPv6Transport < Minitest::Test
         [udp, tcp].compact.each { |socket| socket.close unless socket.closed? }
       end
     end
-    skip 'No bindable local IPv6 link-local address; socket-boundary tests cover scoped transport'
+    skip(scoped ? 'No bindable local IPv6 link-local address; socket-boundary tests cover scoped transport' :
+      'IPv6 loopback is unavailable; socket-boundary tests cover IPv6 transport')
   end
 end
