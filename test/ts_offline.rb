@@ -66,10 +66,8 @@ def have_open_ssl?
   have_open_ssl = true
   begin
     require "openssl"
-    OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
-    key = OpenSSL::PKey::RSA.new
-    key.e = 111
-  rescue
+    OpenSSL::Digest::SHA256.digest("data")
+  rescue LoadError, StandardError
     have_open_ssl = false
   end
   have_open_ssl
@@ -77,9 +75,9 @@ end
 
 if have_open_ssl?
   require_relative 'tc_ds.rb'
+  require_relative 'tc_dnssec_trust_anchors.rb'
 else
   puts "-----------------------------------------------------------------------"
-  puts "OpenSSL not present (with full functionality) - skipping DS digest test"
+  puts "OpenSSL SHA256 unavailable - skipping DS and DNSSEC trust-anchor tests"
   puts "-----------------------------------------------------------------------"
 end
-

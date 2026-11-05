@@ -27,13 +27,10 @@ module Dnsruby
   #    able to treat the DNSSEC signatures as trust relationships between
   #    the zone administrators and the stub resolver itself. "
   # 
-  #  Dnsruby is configured to validate responses by default. However, it is not
-  #  configured with any trusted keys by default. Applications may use the
-  #  verify() method to perform verification with of RRSets of Messages with
-  #  given keys. Alternatively, trusted keys may be added to this class (either
-  #  directly, or by loading the IANA TAR or the DLV ISC ZSK). Validation will then
-  #  be performed from these keys (or the DLV registry, if configured). Negative
-  #  and positive responses are validation.
+  #  Resolver queries do not validate responses by default; set
+  #  Resolver#do_validation to true to enable validation. Root DS trust anchors
+  #  are configured below. Applications may also use verify() to verify RRSets
+  #  or Messages with given keys, or add their own trust anchors to this class.
   # 
   #  Messages are tagged with the current security_level (Message::SecurityLevel).
   #  UNCHECKED means Dnsruby has not attempted to validate the response.
@@ -74,15 +71,16 @@ module Dnsruby
       @@validation_policy
     end
 
-    @@root_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ROOT)
-
     #  #NOTE# You may wish to import these via a secure channel yourself, if
     #  using Dnsruby for validation.
-    @@root_key = RR.create(". IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5")
-    @@root_verifier.add_root_ds(@@root_key)
+    #  KSK-2017 and KSK-2024, published at https://data.iana.org/root-anchors/root-anchors.xml
+    ROOT_TRUST_ANCHORS = [
+      ". IN DS 20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D".freeze,
+      ". IN DS 38696 8 2 683D2D0ACB8C9B712A1948B27F741219298D0A450D612C483AF444A4C0FB2B16".freeze
+    ].freeze
 
-    @@root_key_new = RR.create(". IN DS 20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D")
-    @@root_verifier.add_root_ds(@@root_key_new)
+    @@root_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ROOT)
+    ROOT_TRUST_ANCHORS.each {|ds| @@root_verifier.add_root_ds(RR.create(ds))}
 
     @@dlv_verifier = SingleVerifier.new(SingleVerifier::VerifierType::DLV)
 
@@ -104,11 +102,12 @@ module Dnsruby
       #  Create a new verifier?
       @@anchor_verifier.add_trust_anchor_with_expiration(k, expiration)
     end
-    #  Remove the trusted key
+    #  Remove a configured trust anchor and clear keys learned from local anchors.
     def Dnssec.remove_trust_anchor(t)
       @@anchor_verifier.remove_trust_anchor(t)
     end
-    #  Wipes the cache of trusted keys
+    #  Remove all local trust anchors and keys learned from them.
+    #  Built-in root anchors are unaffected.
     def self.clear_trust_anchors
       @@anchor_verifier.clear_trust_anchors
     end
@@ -117,6 +116,7 @@ module Dnsruby
       return @@anchor_verifier.trust_anchors
     end
 
+    #  Clear learned keys and DS records, preserving configured trust anchors.
     def self.clear_trusted_keys
       [@@anchor_verifier, @@root_verifier, @@dlv_verifier].each {|v|
         v.clear_trusted_keys
@@ -126,8 +126,7 @@ module Dnsruby
     def self.reset
       @@validation_policy = ValidationPolicy::LOCAL_ANCHORS_THEN_ROOT
       @@root_verifier = SingleVerifier.new(SingleVerifier::VerifierType::ROOT)
-      @@root_verifier.add_root_ds(@@root_key)
-      @@root_verifier.add_root_ds(@@root_key_new)
+      ROOT_TRUST_ANCHORS.each {|ds| @@root_verifier.add_root_ds(RR.create(ds))}
 
       @@dlv_verifier = SingleVerifier.new(SingleVerifier::VerifierType::DLV)
 

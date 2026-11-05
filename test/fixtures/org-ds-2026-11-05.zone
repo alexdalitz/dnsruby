@@ -1,0 +1,5 @@
+; Captured 2026-11-05 from https://dns.google/resolve?name=org&type=DS&do=true
+; Original answer RDATA and TTLs; no signatures or keys synthesized.
+; Tests use Time.utc(2026, 11, 5, 12) within both signature validity periods.
+org. 8211 IN DS 26974 8 2 4FEDE294C53F438A158C41D39489CD78A86BEB0D8A0AEAFF14745C0D16E1DE32
+org. 8211 IN RRSIG ds 8 1 86400 1794891600 1793764800 8763 . b4V+K2vEqTwsd5SLh5TOrGHF1HVKHsP292XLRV1mmufaG8JO6f6oI/leUNvOy/hm3yPPYShuJvhAQCtcnxe+q+odD6/e8PZ8bW6QlgzcltauMVrphV4rXsxI8XgxLQv/mQDHaBVY/3smBijb96QxnBNfL83MNnYg+n/BR1wckIVMz5u4EKaVTat+MYI/2iffqkKbcQX3mWo/Fm3+69bkJr7fCUxGXu7EAvjOvuAM73SQRsaDnfoaUIkfGsjPSv2YEdYg6jgoYxC8AVdtS8OW2vd/XUoeKEpjUnC/jZ0b1fZFkVT4vK+hw1bb/z0VD9bI6O7LZGgKntz6KXO57HY4Cg==

@@ -76,6 +76,18 @@ module Dnsruby
       remove_expired_keys
       @keys.values.each {|v| yield v[1]}
     end
+    def delete(key)
+      cached = @keys[key.key_tag]
+      #  A key tag alone does not uniquely identify a DNSKEY.
+      return nil unless cached
+      candidate = cached[1]
+      #  Compare DNS data, excluding TTL and cached OpenSSL public key objects.
+      return nil unless candidate.name.canonical == key.name.canonical &&
+        candidate.klass == key.klass && candidate.type == key.type &&
+        candidate.flags == key.flags && candidate.protocol == key.protocol &&
+        candidate.algorithm == key.algorithm && candidate.key == key.key
+      @keys.delete(key.key_tag)[1]
+    end
     def keys
       #  Only offer currently-valid keys here
       remove_expired_keys

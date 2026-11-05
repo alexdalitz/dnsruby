@@ -135,11 +135,20 @@ module Dnsruby
     end
 
     def remove_trust_anchor(t)
-      @trust_anchors.delete(t)
+      removed = if (t.type == Types.DNSKEY)
+        @trust_anchors.delete(t)
+      else
+        @configured_ds_store.delete(t)
+      end
+      #  Cached keys may have been authenticated by this anchor.
+      clear_trusted_keys if removed
+      removed
     end
-    #  Wipes the cache of trusted keys
+    #  Remove configured anchors and any keys learned from them.
     def clear_trust_anchors
       @trust_anchors = KeyCache.new
+      @configured_ds_store = []
+      clear_trusted_keys
     end
 
     def trust_anchors
@@ -187,12 +196,11 @@ module Dnsruby
       @configured_ds_store.push(ds)
     end
 
-    #  Wipes the cache of trusted keys
+    #  Clear learned trust, retaining configured DNSKEY, DS and DLV anchors.
     def clear_trusted_keys
       @trusted_keys = KeyCache.new
       @res = nil
       @discovered_ds_store = []
-      @configured_ds_store = []
     end
 
     def trusted_keys

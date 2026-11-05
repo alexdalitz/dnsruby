@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Trust root KSK-2024 (key tag 38696) at startup and after Dnssec.reset, and remove the revoked KSK-2010 anchor (19036).
+* Preserve configured DNSSEC trust anchors when clearing learned keys with Dnssec.clear_trusted_keys; support explicitly removing and clearing local DS and DNSKEY anchors.
+* Add offline DNSSEC rollover and trust-anchor lifecycle regression tests, and run DS digest tests with modern OpenSSL.
+
 * Enforce the 255-octet name limit (RFC 1035 Section 2.3.4, RFC 2181 Section 11) against the wire length rather than the dotted presentation length: names of 256 and 257 wire octets were accepted and encoded into messages, and now raise ResolvError
 * Add support for SVCB (type 64) and HTTPS (type 65) resource records - RFC 9460, including zone file parsing with TargetName origin resolution
   * Recognises the registered SvcParamKey mnemonics `mandatory`, `alpn`, `no-default-alpn`, `port`, `ipv4hint`, `ipv6hint` (RFC 9460), `ech` (RFC 9848), `dohpath` (RFC 9461), `ohttp` (RFC 9540) and `docpath` (RFC 9953). Any other key reads and writes as `keyNNNNN`
@@ -303,4 +307,3 @@
 * Minor bug fixes
 * IPSECKEY RR added
 * Clients can now manipulate Name::Labels
-
