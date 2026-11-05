@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby: [ '3.2.10', '3.3.11', '3.4.10', '4.0.5' ] # , 'ruby-head' ]
+        ruby: [ '3.2', '3.3', '3.4', '4.0' ] # , 'ruby-head' ]
         rubyopt: ['']
         include:
           - ruby: '3.4'
@@ -16,7 +16,7 @@ jobs:
 
     name: Ruby ${{ matrix.ruby }} tests
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
