@@ -264,6 +264,29 @@ module Dnsruby
       IPv6.create(server)
     end
 
+    def Config.nameserver_resolver #:nodoc: all
+      config = Config.default_config_hash
+      # Bootstrap hostname lookups only through servers that need no DNS
+      # lookup themselves. Keep hostnames in the caller's configuration.
+      servers = Array(config[:nameserver]).select do |server|
+        next true if server == 'localhost'
+        begin
+          IPv4.create(server)
+        rescue ArgumentError
+          begin
+            Config.ipv6_server_address(server)
+          rescue ArgumentError
+            next false
+          end
+        end
+        true
+      end
+      if servers.empty?
+        raise ArgumentError, 'No nameserver addresses available for hostname lookup'
+      end
+      Resolver.new(config_info: config.merge(nameserver: servers))
+    end
+
     def Config.resolve_server(ns) #:nodoc: all
       #  Sanity check server
       #  If it's an IP address, then use that for server
@@ -292,8 +315,8 @@ module Dnsruby
               server = "127.0.0.1"
             else
               #  Use Dnsruby to resolve the servers
-              #  First, try the default resolvers
-              resolver = Resolver.new
+              #  First, try the default resolvers with known addresses
+              resolver = Config.nameserver_resolver
               found = false
               begin
                 ret = resolver.query(ns)
@@ -308,12 +331,13 @@ module Dnsruby
               end
               if (!found)
                 #  That didn't work - try recursing from the root
-                recursor = Recursor.new
+                recursor = Recursor.new(resolver)
                 ret = recursor.query(ns)
                 ret.answer.each {|rr|
                   if ([Types::A, Types::AAAA].include?rr.type)
                     addr = rr.address.to_s
                     server = addr
+                    found = true
                   end
                 }
                 if (!found)
@@ -327,6 +351,8 @@ module Dnsruby
             Dnsruby.log.error{"Can't make sense of nameserver : #{server}, exception : #{e}"}
             raise ArgumentError.new("Can't make sense of nameserver : #{server}, exception : #{e}")
             return nil
+          ensure
+            resolver.close if resolver
           end
         end
       end

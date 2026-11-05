@@ -30,6 +30,7 @@ TESTS = %w(
     message
     misc
     name
+    nameserver_bootstrap
     naptr
     nsec
     nsec3
