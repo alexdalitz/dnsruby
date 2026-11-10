@@ -34,11 +34,18 @@ class TestTcp < Minitest::Test
       listener = reservation = server = resolver = nil
       begin
         listener = TCPServer.new('127.0.0.1', 0)
-        # Reserve a free port without SO_REUSEADDR, then give that explicit
-        # nonzero port to the resolver immediately before connecting.
+        # OS-selected ephemeral ports can be below the resolver's permitted
+        # source-port range. Reserve an allowed port without SO_REUSEADDR.
         reservation = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
-        reservation.bind(Socket.sockaddr_in(0, '127.0.0.1'))
-        src_port = reservation.local_address.ip_port
+        src_port = (50_000..65_535).to_a.shuffle.find do |port|
+          begin
+            reservation.bind(Socket.sockaddr_in(port, '127.0.0.1'))
+            true
+          rescue Errno::EADDRINUSE
+            false
+          end
+        end
+        raise IOError, 'No available resolver source port' unless src_port
         server = Thread.new do
           begin
             client = listener.accept
@@ -60,6 +67,7 @@ class TestTcp < Minitest::Test
           src_address: '127.0.0.1', src_port: src_port, do_caching: false,
           dnssec: false, packet_timeout: 2
         )
+        assert_equal(src_port, resolver.src_port)
         Timeout.timeout(5) do
           reservation.close
           response = resolver.query('example.com')

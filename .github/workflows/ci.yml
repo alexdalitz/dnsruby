@@ -24,3 +24,11 @@ jobs:
           bundler-cache: true
       - name: Run tests ${{ matrix.rubyopt }}
         run: bundle exec rake test RUBYOPT="${{ matrix.rubyopt }}"
+      - name: Upload coverage
+        if: matrix.ruby == '3.4' && matrix.rubyopt == ''
+        uses: coverallsapp/github-action@v2
+        with:
+          file: coverage/coverage.json
+          format: simplecov
+          # Reporting outages must not change the test result.
+          fail-on-error: false

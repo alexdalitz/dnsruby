@@ -480,23 +480,84 @@ class TestGenericCache < Minitest::Test
     end
   end
 
-  def test_merge_callback_lookups_are_visible_and_remain_bounded
-    pair = [62_140, 1]
-    held = Dnsruby::RR.get_class(*pair)
-    generated = nil
-    Dnsruby::ClassHash.merge!({pair => held}) do |_, _, value|
-      worker = Thread.new do
-        generated = Dnsruby::RR.get_class(62_141, 1)
-        assert_same(generated, Dnsruby::ClassHash[[62_141, 1]])
-        assert_same(generated, Generic.const_get('Type62141_Class1'))
+  def test_merge_callback_cached_lookups_are_visible_and_remain_bounded
+    [:merge!, :update].each_with_index do |operation, index|
+      pair = [62_140 + 2 * index, 1]
+      lookup_pair = [pair[0] + 1, 1]
+      held = Dnsruby::RR.get_class(*pair)
+      cached = Dnsruby::RR.get_class(*lookup_pair)
+      Dnsruby::ClassHash.public_send(operation, {pair => held}) do |_, _, value|
+        worker = Thread.new do
+          assert_same(cached, Dnsruby::RR.get_class(*lookup_pair))
+          assert_same(cached, Dnsruby::ClassHash[lookup_pair])
+          assert_same(cached, Generic.const_get("Type#{lookup_pair[0]}_Class1"))
+        end
+        raise 'lookup blocked by registry mutation' unless worker.join(2)
+        worker.value
+        value
       end
-      raise 'lookup blocked by registry mutation' unless worker.join(2)
-      worker.value
-      value
+      evict
+      assert_same(held, Dnsruby::ClassHash[pair])
+      refute(Dnsruby::ClassHash.key?(lookup_pair))
+      assert_same(cached, Dnsruby::RR.get_class(*lookup_pair))
     end
+  end
+
+  def test_merge_callback_new_lookups_follow_native_hash_mutation_rules
+    [:merge!, :update].each_with_index do |operation, index|
+      # Recent Ruby releases forbid new keys while a merge conflict block is
+      # running. Probe native Hash behavior so older supported Rubies retain
+      # coverage too, without bypassing the registry's native mutation rules.
+      native = {existing: true}
+      native_error = begin
+        native.public_send(operation, {existing: true}) { native[:added] = true }
+        nil
+      rescue RuntimeError => error
+        error
+      end
+      pair = [62_144 + 2 * index, 1]
+      lookup_pair = [pair[0] + 1, 1]
+      held = Dnsruby::RR.get_class(*pair)
+      generated = nil
+      merge = lambda do
+        Dnsruby::ClassHash.public_send(operation, {pair => held}) do |_, _, value|
+          worker = Thread.new do
+            Thread.current.report_on_exception = false
+            Dnsruby::RR.get_class(*lookup_pair)
+          end
+          raise 'lookup blocked by registry mutation' unless worker.join(2)
+          generated = worker.value
+          assert_same(generated, Dnsruby::ClassHash[lookup_pair])
+          value
+        end
+      end
+      if native_error
+        error = assert_raises(native_error.class, &merge)
+        assert_equal(native_error.message, error.message)
+        refute(Dnsruby::ClassHash.key?(lookup_pair))
+      else
+        assert_same(Dnsruby::ClassHash, merge.call)
+      end
+      generated ||= Dnsruby::RR.get_class(*lookup_pair)
+      assert_same(generated, Dnsruby::ClassHash[lookup_pair])
+      evict
+      refute(Dnsruby::ClassHash.key?(lookup_pair))
+      assert_same(generated, Dnsruby::RR.get_class(*lookup_pair))
+    end
+  end
+
+  def test_rejected_registry_publication_can_be_retried
+    pair = [62_148, 1]
+    error = assert_raises(RuntimeError) do
+      Dnsruby::ClassHash.each_pair { Dnsruby::RR.get_class(*pair) }
+    end
+    assert_match(/can't add a new key into hash during iteration/, error.message)
+    refute(Dnsruby::ClassHash.key?(pair))
+    generated = Dnsruby::RR.get_class(*pair)
+    assert_same(generated, Dnsruby::ClassHash[pair])
     evict
-    refute(Dnsruby::ClassHash.key?([62_141, 1]))
-    assert_same(generated, Dnsruby::RR.get_class(62_141, 1))
+    refute(Dnsruby::ClassHash.key?(pair))
+    assert_same(generated, Dnsruby::RR.get_class(*pair))
   end
 
   def test_hash_and_equality_callbacks_run_outside_the_cache_lock

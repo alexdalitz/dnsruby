@@ -12,9 +12,6 @@ if ENV['RUN_EXTRA_TASK'] == 'TRUE'
     rd.main = "Dnsruby"
     #  rd.options << "--ri"
   end
-
-  require 'coveralls/rake/task'
-  Coveralls::RakeTask.new
 end
 
 def create_task(task_name, test_suite_filespec)

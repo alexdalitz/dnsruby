@@ -5,21 +5,15 @@ if Warning.respond_to?(:[]=)
 end
 
 if ENV['RUN_EXTRA_TASK'] == 'TRUE'
-  unless "test".frozen?
-    # Coverall setup term-ansi-color which isn't yet frozen string literal compatible
-    # Ref: https://github.com/flori/term-ansicolor/pull/38
-    require 'coveralls'
-    Coveralls.wear!
-  end
-
   require 'simplecov'
+  require 'simplecov_json_formatter'
 
-  # # SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new(
-  #     # [SimpleCov::Formatter::HTMLFormatter, Coveralls::SimpleCov::Formatter])
-  # SimpleCov.formatter = Coveralls::SimpleCov::Formatter
-  # SimpleCov.start do
-  #   add_filter 'test/'
-  # end
+  # Generate reports locally; CI uploads coverage after the tests complete.
+  SimpleCov.formatters = [SimpleCov::Formatter::HTMLFormatter,
+                          SimpleCov::Formatter::JSONFormatter]
+  SimpleCov.start do
+    add_filter '/test/'
+  end
 end
 
 require 'minitest'
