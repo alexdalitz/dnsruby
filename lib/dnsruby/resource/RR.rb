@@ -359,13 +359,17 @@ class RR
   def self.find_class(type_value, class_value) # :nodoc: all
     if !! (ret = ClassHash[[type_value, class_value]])
       return ret
+    elsif !! (ret = GenericCache.find(type_value, class_value))
+      return ret
     elsif !! (val = ClassInsensitiveTypes[type_value])
       klass = Class.new(val)
       klass.const_set(:TypeValue, type_value)
       klass.const_set(:ClassValue, class_value)
       return klass
     else
-      return Generic.create(type_value, class_value)
+      return GenericCache.factory(type_value, class_value) do
+        Generic.create(type_value, class_value)
+      end
     end
   end
 

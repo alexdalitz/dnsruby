@@ -281,7 +281,7 @@ module Dnsruby
       persistent_sockets, nonpersistent_sockets = @@mutex.synchronize { ready.partition { |socket| persistent?(socket) } }
 
       nonpersistent_sockets.each do |socket|
-        query_settings =  @@mutex.synchronize { @@query_hash[@@socket_hash[socket][0]] }
+        query_settings = @@mutex.synchronize { @@query_hash[(@@socket_hash[socket] || []).first] }
         next if !query_settings
 
         udp_packet_size = query_settings.udp_packet_size
@@ -332,24 +332,18 @@ module Dnsruby
       #  @TODO@ Can get rid of this, as we only have one query per socket.
       client_ids=[]
       @@mutex.synchronize{
-        client_ids = @@socket_hash[socket].clone
+        client_ids = (@@socket_hash[socket] || []).dup
       }
       #  get the queries associated with them
       client_ids.each do |id|
-        query_header_id=nil
-        @@mutex.synchronize{
-          query_header_id = @@query_hash[id].query.header.id
-        }
+        settings = @@mutex.synchronize { @@query_hash[id] }
+        next unless settings && settings.socket == socket
+        query_header_id = settings.query.header.id
         if (query_header_id == msg.header.id)
           #  process the response
-          client_queue = nil
-          res = nil
-          query=nil
-          @@mutex.synchronize{
-            client_queue = @@query_hash[id].client_queue
-            res = @@query_hash[id].single_resolver
-            query = @@query_hash[id].query
-          }
+          client_queue = settings.client_queue
+          res = settings.single_resolver
+          query = settings.query
           tcp = tcp?(socket)
           #  At this point, we should check if the response is OK
           if (ret = res.check_response(msg, bytes, query, client_queue, id, tcp))
@@ -370,7 +364,6 @@ module Dnsruby
       end
       #  If not, then we have an error
       Dnsruby.log.error{"Stray packet - " + msg.inspect + "\n from " + socket.inspect}
-      print("Stray packet - " + msg.question()[0].qname.to_s + " from " + msg.answerip.to_s + ", #{client_ids.length} client_ids\n")
     end
 
     def persistent?(socket)
@@ -388,7 +381,7 @@ module Dnsruby
       socket = @@query_hash[id].socket
       @@timeouts.delete(id)
       @@query_hash.delete(id)
-      @@socket_hash[socket].delete(id)
+      (@@socket_hash[socket] || []).delete(id)
 
       decrement_remaining_queries(socket) if persistent?(socket)
 
@@ -433,12 +426,14 @@ module Dnsruby
       #  then process message.
       buf = +""
       expected_length = 0
+      reading_length = nil
       @@mutex.synchronize {
-        buf, expected_length = @@tcp_buffers[socket]
+        buf, expected_length, reading_length = @@tcp_buffers[socket]
         if (!buf)
           buf = +""
           expected_length = 2
-          @@tcp_buffers[socket]=[buf, expected_length]
+          reading_length = true
+          @@tcp_buffers[socket]=[buf, expected_length, reading_length]
         end
       }
       if (buf.length() < expected_length)
@@ -452,12 +447,18 @@ module Dnsruby
             exceptions = @@mutex.synchronize do
               @@sockets.delete(socket) #remove ourselves from select, app will have to retry
               #maybe fire an event
-              @@socket_hash[socket].map do | client_id |
+              (@@socket_hash[socket] || []).map do | client_id |
                 [SocketEofResolvError.new("TCP socket closed before all answers received"), socket, client_id]
               end
             end
 
             exceptions.each { |exception| send_exception_to_client(*exception) }
+            @@mutex.synchronize do
+              @@socket_hash.delete(socket)
+              @@tcp_buffers.delete(socket)
+              @@socket_remaining_queries.delete(socket)
+              @@socket_is_persistent.delete(socket)
+            end
 
             return false
           end
@@ -469,11 +470,11 @@ module Dnsruby
       end
       #  If data is complete, then return it.
       if (buf.length == expected_length)
-        if (expected_length == 2)
+        if reading_length
           #  We just read the data_length field. Now we need to start reading that many bytes.
           @@mutex.synchronize {
             answersize = buf.unpack('n')[0]
-            @@tcp_buffers[socket] = [+"", answersize]
+            @@tcp_buffers[socket] = [+"", answersize, false]
           }
           return tcp_read(socket)
         else
@@ -485,7 +486,7 @@ module Dnsruby
         end
       else
         @@mutex.synchronize {
-          @@tcp_buffers[socket]=[buf, expected_length]
+          @@tcp_buffers[socket]=[buf, expected_length, reading_length]
         }
         return false
       end
@@ -531,60 +532,57 @@ module Dnsruby
       begin
         ans = Message.decode(buf)
 
-        if is_tcp
-          @@mutex.synchronize do
-            ids = get_active_ids(@@query_hash, ans.header.id)
-            if ids.empty?
-              Dnsruby.log.error("Decode error from #{answerip} but can't determine packet id")
-              #todo add error event? The problem is we don't have a valid id so we don't
-              #know which client queue to send the exception to
-            end
-            answerfrom = @@query_hash[ids[0]].dest_server
-            answerip = answerfrom
-            answerport = @@query_hash[ids[0]].dest_port
-          end
-        end
-
       rescue Exception => e
         Dnsruby.log.error("Decode error! #{e.class}, #{e}\nfor msg (length=#{buf.length}) : #{buf}")
-        client_id=get_client_id_from_answerfrom(socket, answerip, answerport)
+        # A partial Message has a newly allocated, random header if decoding
+        # failed before the complete header. Only the bytes identify its ID.
+        header_id = buf.unpack('n').first if buf.bytesize >= 2
+        client_id=get_client_id_from_answerfrom(socket, answerip, answerport, header_id)
         if (client_id == nil)
           Dnsruby.log.error{"Decode error from #{answerip} but can't determine packet id"}
+          return
         end
-        #  We should check if the TC bit is set (if we can get that far)
-        if ((DecodeError === e) && (e.partial_message.header.tc))
-          Dnsruby.log.error{"Decode error (from {answerip})! Header shows truncation, so trying again over TCP"}
-          #  If it is, then we should retry over TCP
-          sent = false
-          @@mutex.synchronize{
-            client_ids = @@socket_hash[socket]
-            #  get the queries associated with them
-            client_ids.each do |id|
-              query_header_id=nil
-              query_header_id = @@query_hash[id].query.header.id
-              if (query_header_id == e.partial_message.header.id)
-                #  process the response
-                client_queue = @@query_hash[id].client_queue
-                res = @@query_hash[id].single_resolver
-                query = @@query_hash[id].query
-                remove_id_from_mutex_synchronized_block(id)
-
-                #  NOW RESEND OVER TCP!
-                Thread.new {
-                  res.send_async(query, client_queue, id, true)
-                }
-                sent = true
-              end
+        # Truncation permits a UDP-to-TCP fallback, never another TCP attempt.
+        # Repeating malformed TCP replies must not renew the packet deadline.
+        settings = nil
+        if !is_tcp && (DecodeError === e) && e.partial_message && e.partial_message.header.tc
+          settings = @@mutex.synchronize do
+            current = @@query_hash[client_id]
+            if current && current.socket == socket && !current.ignore_truncation && !current.single_resolver.no_tcp
+              remove_id_from_mutex_synchronized_block(client_id)
+              current
             end
-          }
-          if !sent
-            send_exception_to_client(e, socket, client_id)
           end
-
+        end
+        if settings
+          Dnsruby.log.error{"Decode error (from #{answerip})! Header shows truncation, so trying again over TCP"}
+          Thread.new {
+            settings.single_resolver.send_async(settings.query, settings.client_queue, client_id, true)
+          }
         else
           send_exception_to_client(e, socket, client_id)
         end
         return
+      end
+
+      if is_tcp
+        # This supplies peer metadata only. Normal response checks below still
+        # validate the question and TSIG, including sequential duplicate IDs.
+        settings = @@mutex.synchronize do
+          ids = @@socket_hash[socket] || []
+          id = ids.find do |candidate|
+            current = @@query_hash[candidate]
+            current && current.socket == socket && current.query.header.id == ans.header.id
+          end
+          @@query_hash[id]
+        end
+        unless settings
+          Dnsruby.log.debug { "Ignoring TCP response with no matching query on this socket" }
+          return
+        end
+        answerfrom = settings.dest_server
+        answerip = answerfrom
+        answerport = settings.dest_port
       end
 
       if (ans!= nil)
@@ -615,15 +613,27 @@ module Dnsruby
       end
     end
 
-    def get_client_id_from_answerfrom(socket, answerip, answerport)
-      #  @TODO@ Can get rid of this, as there is only one query per socket
+    def get_client_id_from_answerfrom(socket, answerip, answerport, header_id=nil)
+      #  A pipelined socket can have several outstanding queries.
       client_id=nil
       #  Figure out client id from answerfrom
       @@mutex.synchronize{
-        ids = @@socket_hash[socket]
+        ids = (@@socket_hash[socket] || []).select { |id| @@query_hash[id] }
+        # TCP decoding can fail before the peer address has been assigned. The
+        # socket and partial header identify its query, including pipeline use.
+        if answerip.nil?
+          if header_id
+            matching = ids.select { |id| @@query_hash[id].query.header.id == header_id }
+            return matching.first if matching.length == 1
+            return nil
+          end
+          return ids.first if ids.length == 1
+          return nil
+        end
         ids.each do |id|
           #  Does this id speak to this dest_server?
           query_settings = @@query_hash[id]
+          next if header_id && query_settings.query.header.id != header_id
           # recvfrom may spell a numeric zone as an interface name. The socket
           # is already connected to the scoped peer, so compare address bytes.
           source = IPAddr.new(answerip.split('%', 2).first)
@@ -642,9 +652,11 @@ module Dnsruby
       #  find the client response queue
       client_queue = nil
       @@mutex.synchronize {
-        client_queue = @@query_hash[client_id].client_queue
+        settings = @@query_hash[client_id]
+        return unless settings && (!socket || settings.socket == socket)
+        client_queue = settings.client_queue
+        remove_id_from_mutex_synchronized_block(client_id)
       }
-      remove_id(client_id)
       #       push_to_client(client_id, client_queue, msg, err)
       client_queue.push([client_id, Resolver::EventType::ERROR, msg, err])
       notify_queue_observers(client_queue, client_id)

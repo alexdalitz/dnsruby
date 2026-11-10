@@ -1,5 +1,6 @@
 require_relative 'spec_helper'
 require 'minitest/mock'
+require 'timeout'
 
 class TestScopedIPv6Select < Minitest::Test
   def test_scoped_response_with_interface_punctuation_is_delivered
@@ -42,6 +43,61 @@ class TestScopedIPv6Select < Minitest::Test
         assert_equal(first_id, selector.get_client_id_from_answerfrom(first_socket, 'fe80::1%eth0', 53))
         assert_equal(second_id, selector.get_client_id_from_answerfrom(second_socket, 'fe80::1%eth1', 53))
       end
+    end
+  end
+
+  def test_malformed_truncated_udp_response_retries_over_tcp
+    with_registered_query('fe80::1%7') do |selector, socket, client_id, query|
+      query.header.id = 12_345
+      settings = Dnsruby::SelectThread.class_variable_get(:@@query_hash)[client_id]
+      settings.client_queue = Queue.new
+      sent = Queue.new
+      sender = Object.new
+      sender.define_singleton_method(:send_async) { |*args| sent << args }
+      sender.define_singleton_method(:no_tcp) { false }
+      settings.single_resolver = sender
+      # The header advertises a question but no question bytes follow it.
+      packet = [query.header.id, 0x8200, 1, 0, 0, 0].pack('n6')
+      socket.define_singleton_method(:recvfrom) { |_| [packet, ['AF_INET6', 53, 'fe80::1%7', 'fe80::1%7']] }
+      removed = []
+      selector.stub(:tcp?, false) do
+        selector.stub(:remove_id_from_mutex_synchronized_block, ->(id) { removed << id }) do
+          assert_nil(selector.get_incoming_data(socket, 512))
+          assert_equal([query, settings.client_queue, client_id, true], Timeout.timeout(2) { sent.pop })
+        end
+      end
+      assert_equal([client_id], removed)
+    end
+  end
+
+  def test_tcp_decode_error_uses_partial_header_on_receiving_pipeline_socket
+    with_registered_query('fe80::1%7') do |selector, socket, first_id, query|
+      query.header.id = 12_346
+      second_id = Object.new
+      second = Dnsruby::SelectThread::QuerySettings.new
+      second.query = Dnsruby::Message.new('other.example')
+      second.query.header.id = 12_347
+      queries = Dnsruby::SelectThread.class_variable_get(:@@query_hash)
+      sockets = Dnsruby::SelectThread.class_variable_get(:@@socket_hash)
+      queries[second_id] = second
+      sockets[socket] << second_id
+      assert_equal(second_id, selector.get_client_id_from_answerfrom(socket, nil, nil, 12_347))
+      assert_nil(selector.get_client_id_from_answerfrom(socket, nil, nil, 12_348))
+      assert_nil(selector.get_client_id_from_answerfrom(socket, nil, nil))
+      packet = [query.header.id, 0x8000, 1, 0, 0, 0].pack('n6')
+      errors = []
+      selector.stub(:tcp?, true) do
+        selector.stub(:tcp_read, packet) do
+          selector.stub(:send_exception_to_client, ->(*args) { errors << args }) do
+            assert_nil(selector.get_incoming_data(socket, 0))
+          end
+        end
+      end
+      assert_equal(1, errors.length)
+      assert_kind_of(Dnsruby::DecodeError, errors[0][0])
+      assert_equal([socket, first_id], errors[0][1..])
+    ensure
+      queries.delete(second_id) if queries
     end
   end
 

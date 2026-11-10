@@ -116,7 +116,8 @@ module Dnsruby
       return @@anchor_verifier.trust_anchors
     end
 
-    #  Clear learned keys and DS records, preserving configured trust anchors.
+    #  Clear learned keys and all DS/DLV anchors, including the built-in root DS
+    #  anchors. Configured DNSKEY anchors are retained.
     def self.clear_trusted_keys
       [@@anchor_verifier, @@root_verifier, @@dlv_verifier].each {|v|
         v.clear_trusted_keys

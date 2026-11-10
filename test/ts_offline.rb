@@ -23,10 +23,13 @@ TESTS = %w(
     dnskey
     escapedchars
     gpos
+    generic_cache
+    generic_yaml
     hash
     header
     ipseckey
     ipv6
+    malformed_tcp
     message
     misc
     name

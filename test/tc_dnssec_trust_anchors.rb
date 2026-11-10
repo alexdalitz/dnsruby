@@ -42,6 +42,7 @@ class DnssecTrustAnchorsTest < Minitest::Test
       File.join(FIXTURE_DIRECTORY, 'root-dnskey-2026-11-05.zone')
     )
     assert(status.success?, "Cold-start validation failed:\n#{stdout}\n#{stderr}")
+    assert_empty(stderr)
   end
 
   def test_reset_restores_only_current_anchors_and_authenticates_ksk_2024
@@ -79,12 +80,13 @@ class DnssecTrustAnchorsTest < Minitest::Test
       assert(verifier.verify_key_rrset(@root_keys))
       assert_raises(Dnsruby::VerifyError) { verifier.verify_key_rrset(corrupted) }
       Dnsruby::Dnssec.clear_trusted_keys
+      ROOT_DS.each { |text| verifier.add_root_ds(Dnsruby::RR.create(text)) }
       assert_raises(Dnsruby::VerifyError) { verifier.verify_key_rrset(corrupted) }
       assert(verifier.verify_key_rrset(@root_keys))
     end
   end
 
-  def test_cache_clear_preserves_root_anchors_and_discards_learned_dnskeys_and_ds
+  def test_cache_clear_removes_root_anchors_and_learned_dnskeys_and_ds
     Time.stub(:now, FIXTURE_TIME) do
       verifier = Dnsruby::Dnssec.root_verifier
       assert(verifier.verify_key_rrset(@root_keys))
@@ -94,17 +96,16 @@ class DnssecTrustAnchorsTest < Minitest::Test
 
       Dnsruby::Dnssec.clear_trusted_keys
 
-      assert_equal(ROOT_DS.map { |text| Dnsruby::RR.create(text) }, verifier.trust_anchors)
-      assert_equal(verifier.trust_anchors, verifier.trusted_keys)
+      assert_empty(verifier.trust_anchors)
+      assert_empty(verifier.trusted_keys)
       assert_empty(verifier.get_keys_to_check)
-      refute(Dnsruby::Dnssec.no_keys?)
+      assert(Dnsruby::Dnssec.no_keys?)
       assert_raises(Dnsruby::VerifyError) { verifier.verify_ds_rrset(@org_ds) }
-      assert(verifier.verify_key_rrset(@root_keys))
-      assert(verifier.verify_ds_rrset(@org_ds))
+      assert_raises(Dnsruby::VerifyError) { verifier.verify_key_rrset(@root_keys) }
     end
   end
 
-  def test_cache_clear_preserves_custom_dnskey_ds_and_dlv_anchors
+  def test_cache_clear_retains_custom_dnskey_anchors_but_removes_ds_and_dlv_anchors
     Time.stub(:now, FIXTURE_TIME) do
       key = signing_key
       ds = Dnsruby::RR.create(ROOT_DS.last)
@@ -117,12 +118,40 @@ class DnssecTrustAnchorsTest < Minitest::Test
 
       Dnsruby::Dnssec.clear_trusted_keys
 
-      assert_equal([key, ds], Dnsruby::Dnssec.trust_anchors)
+      assert_equal([key], Dnsruby::Dnssec.trust_anchors)
       assert_equal([key], Dnsruby::Dnssec.anchor_verifier.get_keys_to_check)
-      assert_equal([dlv], Dnsruby::Dnssec.dlv_verifier.trust_anchors)
+      assert_empty(Dnsruby::Dnssec.dlv_verifier.trust_anchors)
       assert_empty(Dnsruby::Dnssec.dlv_verifier.get_keys_to_check)
       assert(Dnsruby::Dnssec.anchor_verifier.verify_key_rrset(@root_keys))
-      assert(Dnsruby::Dnssec.dlv_verifier.verify_key_rrset(@root_keys))
+      assert_raises(Dnsruby::VerifyError) { Dnsruby::Dnssec.dlv_verifier.verify_key_rrset(@root_keys) }
+    end
+  end
+
+  def test_public_clear_sequence_removes_local_and_root_trust
+    Time.stub(:now, FIXTURE_TIME) do
+      # Existing clients use this sequence before supplying their own isolated
+      # trust anchors. Retaining root trust here would change their validation.
+      Dnsruby::Dnssec.add_trust_anchor(signing_key)
+      Dnsruby::Dnssec.add_trust_anchor(Dnsruby::RR.create(ROOT_DS.last))
+      assert(Dnsruby::Dnssec.root_verifier.verify_key_rrset(@root_keys))
+      assert(Dnsruby::Dnssec.anchor_verifier.verify_key_rrset(@root_keys))
+
+      Dnsruby::Dnssec.clear_trust_anchors
+      Dnsruby::Dnssec.clear_trusted_keys
+
+      assert_empty(Dnsruby::Dnssec.trust_anchors)
+      assert_empty(Dnsruby::Dnssec.root_verifier.trust_anchors)
+      assert(Dnsruby::Dnssec.no_keys?)
+      assert_raises(Dnsruby::VerifyError) { Dnsruby::Dnssec.root_verifier.verify_key_rrset(@root_keys) }
+      assert_raises(Dnsruby::VerifyError) { Dnsruby::Dnssec.anchor_verifier.verify_key_rrset(@root_keys) }
+
+      Dnsruby::Dnssec.validation_policy = Dnsruby::Dnssec::ValidationPolicy::ALWAYS_LOCAL_ANCHORS_ONLY
+      query = Dnsruby::Message.new('.', 'DNSKEY')
+      message = Dnsruby::Message.new('.', 'DNSKEY')
+      @root_keys.rrs.each { |rr| message.add_answer(rr) }
+      @root_keys.sigs.each { |rr| message.add_answer(rr) }
+      Dnsruby::Dnssec.validate_with_query(query, message)
+      assert_equal('UNCHECKED', message.security_level.to_s)
     end
   end
 

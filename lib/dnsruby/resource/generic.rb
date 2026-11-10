@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ++
+require 'dnsruby/resource/generic_cache'
+
 module Dnsruby
   class RR
     # Class to store generic RRs (RFC 3597)
@@ -44,6 +46,9 @@ module Dnsruby
       end
 
       def self.create(type_value, class_value) #:nodoc:
+        if GenericCache.automatic?(type_value, class_value)
+          return GenericCache.create(type_value, class_value)
+        end
         c = Class.new(Generic)
         #           c.type = type_value
         #           c.klass = class_value
@@ -52,6 +57,29 @@ module Dnsruby
         Generic.const_set("Type#{type_value}_Class#{class_value}", c)
         ClassHash[[type_value, class_value]] = c
         return c
+      end
+
+      def self.name
+        @generic_display_owner.equal?(self) ? @generic_display_name : super
+      end
+
+      def self.to_s
+        @generic_display_owner.equal?(self) ? @generic_display_name.dup : super
+      end
+
+      def self.inspect
+        @generic_display_owner.equal?(self) ? @generic_display_name.dup : super
+      end
+
+      def self.const_missing(name)
+        # A subclass lookup with inherit=false must still reject a native
+        # ancestor binding. Only virtual generated names need this fallback.
+        return super if !equal?(Generic) && GenericConstantInspection::NATIVE_DEFINED.bind_call(self, name)
+        found = GenericCache.named(name.to_s)
+        return found if found
+        pair = /\AType(\d+)_Class(\d+)\z/.match(name.to_s)
+        return RR.find_class(*pair.captures.map(&:to_i)) if pair
+        super
       end
     end
 
@@ -171,3 +199,4 @@ require 'dnsruby/resource/NXT'
 require 'dnsruby/resource/CAA'
 require 'dnsruby/resource/SVCB'
 require 'dnsruby/resource/HTTPS'
+require 'dnsruby/resource/generic_constants'

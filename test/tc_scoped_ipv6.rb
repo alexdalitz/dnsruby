@@ -33,7 +33,7 @@ class TestScopedIPv6 < Minitest::Test
     end
   end
 
-  def test_invalid_scoped_literals_do_not_fall_back_to_dns
+  def test_explicit_ipv6_endpoint_validation_rejects_malformed_literals
     invalid = [
       'fe80::1%', 'fe80::1%en0%en1', 'fe80::1%en 0',
       "fe80::1%en0\n", "fe80::1%en0\0", 'fe80::1%en0/64',
@@ -43,8 +43,35 @@ class TestScopedIPv6 < Minitest::Test
     ]
     without_hostname_lookup do
       invalid.each do |server|
-        assert_raises(ArgumentError, server) { Dnsruby::Config.resolve_server(server) }
-        assert_raises(ArgumentError, server) { Dnsruby::Config.new.nameserver = [server] }
+        assert_raises(ArgumentError, server) { Dnsruby::Config.ipv6_server_address(server) }
+        refute(Dnsruby::Config.scoped_ipv6_server?(server), server)
+      end
+    end
+  end
+
+  def test_percent_containing_dns_names_remain_nameserver_names
+    queried = []
+    lookup = Object.new
+    lookup.define_singleton_method(:query) do |name|
+      queried << name.to_s
+      response = Dnsruby::Message.new(name)
+      response.add_answer(Dnsruby::RR.create(name: name, type: 'A', address: '192.0.2.53'))
+      Dnsruby::Message.decode(response.encode)
+    end
+    lookup.define_singleton_method(:close) { }
+    Dnsruby::Config.stub(:nameserver_resolver, lookup) do
+      ['ns%blue.example', 'ns:blue%en0.example', 'example.test%en0', '%en0',
+       '192.0.2.1%en0', 'fe80::1%', 'fe80::1%en0/64', 'fe80::gggg%en0'].each do |name|
+        [name, Dnsruby::Name.create(name)].each do |input|
+          config = Dnsruby::Config.new
+          config.nameserver = [input]
+          assert_equal([input], config.nameserver)
+          assert_equal('192.0.2.53', Dnsruby::Config.resolve_server(input))
+          assert_equal(name, queried.last)
+          resolver = Dnsruby::Resolver.new(nameserver: [input])
+          assert_equal(['192.0.2.53'], resolver.single_resolvers.map(&:server))
+          resolver.close
+        end
       end
     end
   end

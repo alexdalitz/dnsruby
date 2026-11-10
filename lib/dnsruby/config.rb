@@ -215,8 +215,7 @@ module Dnsruby
       end
       ns.each {|n|
         if (String ===n)
-          if n.include?('%')
-            Config.ipv6_server_address(n)
+          if Config.scoped_ipv6_server?(n)
             next
           end
           #  Make sure we can make a Name or an address from it
@@ -277,6 +276,16 @@ module Dnsruby
       IPv6.create(server)
     end
 
+    # DNS labels can contain both ':' and '%'. Recognize an endpoint only
+    # when the complete address and zone are valid; otherwise keep DNS lookup.
+    def Config.scoped_ipv6_server?(server) #:nodoc: all
+      return false unless String === server && server.include?('%')
+      ipv6_server_address(server)
+      true
+    rescue ArgumentError
+      false
+    end
+
     def Config.nameserver_resolver #:nodoc: all
       config = Config.default_config_hash
       # Bootstrap hostname lookups only through servers that need no DNS
@@ -308,10 +317,8 @@ module Dnsruby
       if (Name === ns)
         ns = ns.to_s
       end
-      # A scoped literal is never a hostname. Validate it before the hostname
-      # fallback, and preserve the zone so the OS can choose the interface.
-      if String === ns && ns.include?('%')
-        ipv6_server_address(ns)
+      # Keep the complete endpoint so the OS can choose the interface.
+      if scoped_ipv6_server?(ns)
         return ns
       end
       begin

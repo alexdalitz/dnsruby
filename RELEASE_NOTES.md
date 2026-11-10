@@ -1,18 +1,168 @@
 # Release Notes
 
-## Unreleased
+## v2.0.0
 
-* Trust root KSK-2024 (key tag 38696) at startup and after Dnssec.reset, and remove the revoked KSK-2010 anchor (19036).
-* Preserve configured DNSSEC trust anchors when clearing learned keys with Dnssec.clear_trusted_keys; support explicitly removing and clearing local DS and DNSKEY anchors.
-* Add offline DNSSEC rollover and trust-anchor lifecycle regression tests, and run DS digest tests with modern OpenSSL.
+This release fixes resolver hangs and unbounded memory growth, updates DNSSEC
+trust anchors, and adds support for SVCB and HTTPS records.
 
-* Enforce the 255-octet name limit (RFC 1035 Section 2.3.4, RFC 2181 Section 11) against the wire length rather than the dotted presentation length: names of 256 and 257 wire octets were accepted and encoded into messages, and now raise ResolvError
-* Add support for SVCB (type 64) and HTTPS (type 65) resource records - RFC 9460, including zone file parsing with TargetName origin resolution
-  * Recognises the registered SvcParamKey mnemonics `mandatory`, `alpn`, `no-default-alpn`, `port`, `ipv4hint`, `ipv6hint` (RFC 9460), `ech` (RFC 9848), `dohpath` (RFC 9461), `ohttp` (RFC 9540) and `docpath` (RFC 9953). Any other key reads and writes as `keyNNNNN`
-* **Breaking (text output only)** - `Dnsruby::IPv6#to_s` and `#inspect` now emit the RFC 5952 canonical form: lowercase hex, no leading zeros, and `::` for the longest run of all-zero fields (never a single field)
-  * Affects `AAAA`, `IPSECKEY` and `APL` records and log output; code that string-compares the old uppercase form needs updating. Parsing and wire format are unchanged
-  * `::ffff:0:0/96` now uses the mixed notation (`::ffff:192.0.2.1`); the deprecated IPv4-compatible `::/96` range keeps the hexadecimal form, unlike `IPAddr#to_s` and `inet_ntop`
-* Fix `Dnsruby::ZoneReader` splitting an unquoted character-string in two at a backslash-escaped quote - RFC 1035 Section 5.1 makes `\"` a literal quote, so `TXT \"escaped` is one string and was previously read as `"", "\"escaped"`
+**Before upgrading:** v2 changes Ruby persistence and reflection for automatically
+generated record classes, makes their YAML compatibility opt-in, and changes
+IPv6 text formatting. See the upgrade notes below if you cache Ruby objects,
+customise record classes, or compare address strings.
+
+### Main fixes and new features
+
+* **Bound memory use for unknown record types.** Dnsruby now keeps at most 256
+  automatically generated record classes in its strong-reference cache. Unused
+  classes can be collected; classes and records still held by your application
+  remain usable. Explicit registrations are retained.
+* **Update the DNSSEC root trust anchors.** Add KSK-2024 (key tag 38696), remove the
+  revoked KSK-2010 key (19036), and restore the current anchors on `Dnssec.reset`.
+  Fixes [#225](https://github.com/alexdalitz/dnsruby/issues/225).
+* **Fix nameserver-related hangs.** Hostname nameservers no longer cause recursive
+  resolver configuration, and IPv6 link-local nameservers can include an interface
+  zone such as `%eth0`. Fixes [#179](https://github.com/alexdalitz/dnsruby/issues/179)
+  and [#184](https://github.com/alexdalitz/dnsruby/issues/184), with separate fixes
+  for the problems discussed in [PR #221](https://github.com/alexdalitz/dnsruby/pull/221).
+* **Make TCP queries recover cleanly from bad replies and disconnects.** Restore
+  local pipelining tests ([#155](https://github.com/alexdalitz/dnsruby/issues/155))
+  and handle peer closure correctly.
+  Malformed replies no longer stop the shared selector or prevent unrelated
+  queries from finishing. Malformed truncated TCP replies fail with a decode
+  error instead of starting an endless retry loop. UDP-to-TCP fallback respects
+  `no_tcp` and `ignore_truncation`.
+* **Add SVCB and HTTPS record support.** Parse, encode and read these records from
+  zone files, including relative TargetName values. Also fix escaped quotes in
+  zone-file character strings, and use standard IPv6 text formatting (see below).
+  Included in [PR #222](https://github.com/alexdalitz/dnsruby/pull/222).
+* **Enforce the DNS name-length limit correctly.** Check the 255-octet limit
+  against the encoded wire name. Names of 256 or 257 wire octets that previously
+  slipped through now raise `ResolvError`.
+  [PR #223](https://github.com/alexdalitz/dnsruby/pull/223).
+* **Allow `simpleidn` 0.3.x as well as 0.2.x.** The supported range is now
+  `>= 0.2.1`, `< 0.4.0`. Updating this dependency can change Unicode name
+  conversion; see below. [PR #224](https://github.com/alexdalitz/dnsruby/pull/224).
+
+### Upgrading to v2
+
+#### Automatically generated record classes
+
+These changes affect classes Dnsruby creates for unknown DNS type/class pairs.
+Ordinary named record classes, such as `Dnsruby::RR::IN::A`, are unaffected by
+these persistence and reflection changes.
+
+* **Marshal is no longer supported for automatically generated classes.** This
+  includes their records and any message, array or hash containing those records.
+  Previously saved Marshal data using generated class names may also fail to
+  load. DNS wire encoding remains available, but it is not a replacement for
+  arbitrary Ruby object persistence.
+* **Keep a reference to classes you customise.** Obtain the class with
+  `RR.get_class(type, klass)` and use `class_eval` instead of reopening it with a
+  `class Generic::TypeN_ClassN` declaration. While you hold the class or one of its
+  records, its identity and customisations are preserved. If it is collected and
+  later recreated, those customisations are lost.
+* **Do not treat `ClassHash` as a history of every generated type.** Automatic
+  entries can be evicted. Explicit `Generic.create` and `ClassHash` registrations
+  remain persistent, including entries supplied through `ClassHash.replace`.
+  Custom factories that allocate their own classes remain responsible for their
+  memory use.
+* **Generated names are resolved on demand, rather than stored as permanent Ruby
+  constants.** Ordinary lookup and `Generic.const_defined?` still work. Code that
+  depends on native constant enumeration, `defined?`, `const_source_location`,
+  `remove_const`, or exact `inspect` output needs adjustment. Explicitly named
+  registrations retain their normal Ruby constant behaviour.
+
+For a finite set of application-owned record types, call
+`Generic.create(type, klass)` before creating records if you need permanent class
+names and normal Marshal behaviour. Do not do this for arbitrary types received
+from the network: permanent registrations would restore unbounded retention.
+
+#### Optional YAML support and existing caches
+
+YAML compatibility for automatically generated record classes is now an explicit
+opt-in. If you save or load those records, their class objects, or messages that
+contain them, load the adapter shipped with Dnsruby:
+
+```ruby
+require 'dnsruby/optional/yaml'
+```
+
+This loads Dnsruby and YAML, respecting an already selected Psych version.
+Ordinary named records, such as `Dnsruby::RR::IN::TXT`, do not need the adapter.
+Loading the core library alone neither loads Psych nor installs YAML hooks or
+load-order observers.
+
+With the adapter enabled, existing YAML using generated record paths remains
+supported. Safe loading still requires the appropriate permitted classes and
+aliases. Without it, loading YAML for automatically generated classes fails;
+use the explicit require above when migrating an application that relied on
+this behaviour.
+
+Two limits remain:
+
+* **Custom classes nested beneath an automatically generated class are not
+  supported.** Their old YAML paths may fail to load, and new dumps may not round
+  trip. Put custom data classes in a stable application namespace, or explicitly
+  register a finite set of record types with `Generic.create` before defining
+  nested classes or creating records.
+* **Load the adapter before freezing `Psych::ClassLoader`.** Installing it on an
+  already frozen loader raises `FrozenError` with an explanation. Freezing the
+  loader after installation is supported. The core library and ordinary named
+  record YAML continue to work without installing the adapter.
+
+The AXFR demo keeps its existing Marshal cache format. It prints transfers that
+contain unsupported dynamic records with a warning, leaving any previous cache
+unchanged. It refetches legacy caches whose generated class names cannot be
+loaded. After an uncached transfer, use `-f` to force another transfer rather than
+reuse an older cache.
+
+#### Address and name formatting
+
+* **IPv6 text now follows RFC 5952.** `IPv6#to_s` and `#inspect` use lowercase hex,
+  omit leading zeros and compress the longest run of zero fields. This also
+  affects text from AAAA, IPSECKEY and APL records. IPv4-mapped addresses use forms
+  such as `::ffff:192.0.2.1`; deprecated IPv4-compatible addresses remain in hex.
+  This formatting change does not alter wire encoding. Update tests or code that
+  compares the old text literally.
+* **Unicode conversion depends on your `simpleidn` version.** Version 0.3 uses
+  Unicode 17 mappings, while 0.2.3 uses Unicode 15.1. For example,
+  `"\u04C0.example"` converts to `xn--s5a.example` with 0.3 instead of
+  `xn--d5a.example` with 0.2.3. Existing lockfiles may retain 0.2.x; review conversion
+  results when updating the dependency if exact DNS names matter to your code.
+
+### Other behaviour and compatibility details
+
+* Simplify the generated-record cache by removing duplicate lookup bookkeeping.
+  Registration, deletion, live-class lookup and eviction behaviour are preserved.
+* `Dnssec.clear_trusted_keys` continues to clear learned keys and all DS/DLV
+  anchors, including built-in root DS anchors, while retaining configured DNSKEY
+  anchors. Removing a local anchor also discards keys learned from it.
+  `Dnssec.reset` restores the built-in root anchors.
+* Hostname nameserver bootstrap preserves the configured UDP payload size.
+  Names containing `:` or `%` still undergo DNS lookup unless the complete string
+  is a valid scoped IPv6 endpoint. Explicit IPv6 parsing rejects malformed
+  compression and invalid zones.
+* A malformed reply is assigned only to an identifiable query on its receiving
+  socket. Unknown or ambiguous IDs leave queries active so valid replies and
+  timeouts can still be processed. TCP framing handles even zero-, one- and
+  two-byte malformed payloads. Malformed UDP replies must match the expected
+  address and port, and the ID when present.
+* SVCB/HTTPS recognise `mandatory`, `alpn`, `no-default-alpn`, `port`, `ipv4hint`,
+  `ech`, `ipv6hint`, `dohpath`, `ohttp` and `docpath`; other keys use `keyNNNNN`.
+* `Generic.const_defined?` reports whether a generated name can be resolved,
+  including numeric names not used before. Native reflection and checks through
+  other receivers, such as `Object.const_defined?`, do not gain this behaviour.
+  On a `Generic` subclass, `const_get(name, false)` can still resolve a virtual
+  generated name even when `const_defined?(name, false)` is false. This exception
+  does not apply to permanently defined classes. When an explicit registration is
+  deleted and regenerated, its stale native binding is removed so YAML can find
+  the replacement live class.
+* Add offline DNSSEC rollover, trust-anchor lifecycle and malformed-response
+  regression tests, local TCP/scoped IPv6 transport tests, and DS digest coverage
+  with modern OpenSSL.
+* Make the TCP source-port test use an available local port, and isolate YAML
+  load-order tests from Bundler and inherited Ruby preloads. This prevents test
+  failures caused by occupied ports or the test runner activating Psych early.
 
 ## v1.74.0
 

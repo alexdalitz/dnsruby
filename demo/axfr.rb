@@ -31,6 +31,11 @@
 # output, and stores the zone to a file.  If the zone has already been
 # stored in a file, axfr will read the file instead of performing a
 # zone transfer.
+#
+# Records with dynamically generated classes cannot be stored with Marshal.
+# Such transfers are printed without updating the cache; use -f to transfer
+# again if an older cache exists. Unreadable legacy dynamic-record caches are
+# ignored and the zone is transferred again.
 # 
 # Zones will be stored in a directory hierarchy.  For example, the
 # zone transfer for foo.bar.com will be stored in the file
@@ -68,7 +73,7 @@ unless (1..2).include?(ARGV.length)
 end
 
 
-require 'getoptLong'
+require 'getoptlong'
 require 'dnsruby'
 
 
@@ -134,16 +139,22 @@ end
 # ------------------------------------------------------------------------------
 
 if FileTest.exist?(zonefile) && !opt_f
-  zoneref = Marshal.load(File.open(zonefile))
-  if zoneref.nil?
-    raise RuntimeError, "couldn't retrieve zone from #{zonefile}: #{$!}\n"
+  begin
+    zoneref = File.open(zonefile, 'rb') { |file| Marshal.load(file) }
+    if zoneref.nil?
+      raise RuntimeError, "couldn't retrieve zone from #{zonefile}: #{$!}\n"
+    end
+  rescue ArgumentError => error
+    raise unless error.message.match?(/\Aundefined class\/module Dnsruby::RR::Generic::Type\d+_Class\d+\z/)
+    warn "Cannot read dynamic records from #{zonefile}; transferring the zone again."
+    opt_f = true
   end
 
   # ----------------------------------------------------------------------
   #  Check the SOA serial number if desired.
   # ----------------------------------------------------------------------
 
-  if opt_s
+  if opt_s && !opt_f
     serial_file = serial_zone = nil
 
     zoneref.each do |rr|
@@ -185,7 +196,14 @@ if opt_f
   if zoneref.nil?
     raise RuntimeError,  "couldn't transfer zone\n"
   end
-  Marshal.dump(zoneref, File.open(zonefile, File::CREAT | File::RDWR))
+  begin
+    cache = Marshal.dump(zoneref)
+  rescue TypeError => error
+    raise unless error.message.start_with?("can't dump anonymous class")
+    warn "Zone transferred but dynamic records cannot be cached; #{zonefile} was not changed. Use -f to transfer again."
+  else
+    File.binwrite(zonefile, cache)
+  end
 end
 
 # ------------------------------------------------------------------------------

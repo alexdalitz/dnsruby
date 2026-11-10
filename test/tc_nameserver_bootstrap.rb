@@ -105,22 +105,25 @@ class TestNameserverBootstrap < Minitest::Test
     end
   end
 
-  def test_invalid_scoped_file_entries_do_not_hide_valid_fallbacks
+  def test_scoped_looking_dns_names_do_not_hide_valid_fallbacks
     contents = "nameserver fe80::1%\nnameserver fe80::gggg%en0\n" \
                "nameserver 192.0.2.1\nnameserver fe80::1%3\n"
     with_resolv_conf(contents) do |path|
       defaults = -> { Dnsruby::Config.parse_resolv_conf(path) }
-      with_lookup(defaults, nil) do |state, original_new|
-        [nil, {config_info: path}, {config_info: {search: ['example.test']}}].each do |options|
+      [nil, {config_info: path}, {config_info: {search: ['example.test']}}].each do |options|
+        with_lookup(defaults, nil) do |state, original_new|
           resolver = options ? original_new.call(options) : original_new.call
           resolver.add_config_nameservers unless options
-          assert_equal(['192.0.2.1', 'fe80::1%3'], resolver.config.nameserver)
+          assert_equal(['fe80::1%', 'fe80::gggg%en0', '192.0.2.1', 'fe80::1%3'], resolver.config.nameserver)
           assert_equal(['192.0.2.1', 'fe80::1%3'], resolver.single_resolvers.map(&:server))
+          queried = []
+          queried << state[:queries].pop(true)[1] until state[:queries].empty?
+          # PacketSender also retries with nil after a failed server setter.
+          assert_equal(['', '', 'fe80::1%', 'fe80::gggg%en0'].sort, queried.sort)
+          assert_equal(4, state[:counts][:resolver_constructions])
         ensure
           resolver.close if resolver
         end
-        assert(state[:queries].empty?)
-        assert_equal(0, state[:counts][:resolver_constructions])
       end
     end
   end
@@ -138,7 +141,7 @@ class TestNameserverBootstrap < Minitest::Test
         end
         resolver = original_new.call
         assert_raises(ArgumentError) { resolver.add_config_nameservers }
-        assert_empty(resolver.config.nameserver)
+        assert_equal(['fe80::1%'], resolver.config.nameserver)
         assert(state[:queries].empty?)
         assert_equal(0, state[:counts][:resolver_constructions])
       ensure
@@ -147,11 +150,12 @@ class TestNameserverBootstrap < Minitest::Test
     end
   end
 
-  def test_explicit_config_hash_still_rejects_invalid_scoped_nameservers
+  def test_explicit_config_hash_preserves_scoped_looking_dns_names
     config = Dnsruby::Config.new
-    assert_raises(ArgumentError) do
-      config.set_config_info(nameserver: ['fe80::1%', '192.0.2.1'])
-    end
+    servers = ['fe80::1%', '192.0.2.1']
+    config.set_config_info(nameserver: servers)
+    assert_equal(servers, config.nameserver)
+    assert_raises(ArgumentError) { Dnsruby::Config.ipv6_server_address(servers.first) }
   end
 
   def test_default_file_hostname_uses_literal_nameserver_without_changing_config

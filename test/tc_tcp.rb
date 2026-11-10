@@ -30,46 +30,57 @@ class TestTcp < Minitest::Test
     end
   end
   def test_TCP_port
-    #  Need a test server so we can tell what port this message was actually sent on!
-    port = nil
-    src_port = 57923
-    Dnsruby::PacketSender.clear_caches
-    received_port = nil
-    server_thread = Thread.new {
-      ts = TCPServer.new(0)
-      port = ts.addr[1]
-        t = ts.accept
-      #  Check that the source port was src_port
-      received_port = t.peeraddr()[1]
-      packet = t.recvfrom(2)[0]
-
-      len = (packet[0]<<8)+packet[1]
-      if (RUBY_VERSION >= "1.9")
-        len = (packet[0].getbyte(0)<<8)+packet[1].getbyte(0)# Ruby 1.9
+    3.times do |attempt|
+      listener = reservation = server = resolver = nil
+      begin
+        listener = TCPServer.new('127.0.0.1', 0)
+        # Reserve a free port without SO_REUSEADDR, then give that explicit
+        # nonzero port to the resolver immediately before connecting.
+        reservation = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
+        reservation.bind(Socket.sockaddr_in(0, '127.0.0.1'))
+        src_port = reservation.local_address.ip_port
+        server = Thread.new do
+          begin
+            client = listener.accept
+            received_port = client.peeraddr[1]
+            length = client.read(2).unpack1('n')
+            response = Dnsruby::Message.decode(client.read(length))
+            response.header.qr = true
+            wire = response.encode
+            client.write([wire.bytesize].pack('n') + wire)
+            received_port
+          rescue StandardError => error
+            error
+          ensure
+            client.close if client && !client.closed?
+          end
+        end
+        resolver = Dnsruby::SingleResolver.new(
+          server: '127.0.0.1', port: listener.addr[1], use_tcp: true,
+          src_address: '127.0.0.1', src_port: src_port, do_caching: false,
+          dnssec: false, packet_timeout: 2
+        )
+        Timeout.timeout(5) do
+          reservation.close
+          response = resolver.query('example.com')
+          received_port = server.value
+          raise received_port if received_port.is_a?(StandardError)
+          assert_equal(src_port, received_port)
+          assert_kind_of(Dnsruby::Message, response)
+        end
+        return
+      rescue IOError => error
+        # Another process can claim the port between release and bind.
+        # PacketSender wraps that specific bind failure in IOError.
+        port_in_use = error.message.match?(/\Adnsruby can't connect to [^,\n]+, use_tcp=true, exception = Errno::EADDRINUSE,/)
+        raise unless attempt < 2 && port_in_use
+      ensure
+        resolver.close if resolver
+        server.kill.join if server
+        reservation.close if reservation && !reservation.closed?
+        listener.close if listener && !listener.closed?
       end
-      packet = t.recvfrom(len)[0]
-      tcpPacket = Dnsruby::Message.decode(packet)
-      tcpPacket.header.tc = true
-      lenmsg = [tcpPacket.encode.length].pack('n')
-      t.send(lenmsg, 0)
-      t.write(tcpPacket.encode)
-      t.close
-      ts.close
-    }
-    ret = nil
-    sleep(1)
-    client_thread = Thread.new {
-#      res = Dnsruby::SingleResolver.new("127.0.0.1")
-      res = Dnsruby::SingleResolver.new("localhost")
-       res.port = port
-      res.use_tcp = true
-      res.src_port=src_port
-      ret=res.query("example.com")
-    }
-    server_thread.join
-    client_thread.join
-    assert(received_port == src_port)
-      assert(ret.is_a?(Dnsruby::Message))
+    end
   end
 
 #  def test_no_tcp
