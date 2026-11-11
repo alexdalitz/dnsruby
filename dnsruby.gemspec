@@ -14,10 +14,10 @@ SPEC = Gem::Specification.new do |s|
 'Dnsruby is a pure Ruby DNS client library which implements a
 stub resolver. It aims to comply with all DNS RFCs, including
 DNSSEC NSEC3 support.'
-  s.license = "Apache License, Version 2.0"
+  s.license = "Apache-2.0"
 
   # Add explicit Ruby version requirement
-  s.required_ruby_version = '>= 2.8.0'
+  s.required_ruby_version = '>= 3.0.0'
 
   s.files = `git ls-files -z`.split("\x0")
 
@@ -40,6 +40,7 @@ DNSSEC NSEC3 support.'
 
   s.add_development_dependency 'rake', '>= 13.0.6'
   s.add_development_dependency 'minitest', '~> 5.25'
+  # The optional rake soak harness still uses test/localdns.rb and NIO.
   s.add_development_dependency 'rubydns', '>= 2.0.2'
   s.add_development_dependency 'nio4r', '>= 2.5.8'
   s.add_development_dependency 'minitest-display', '>= 0.3.1'

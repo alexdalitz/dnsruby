@@ -147,7 +147,6 @@ module Dnsruby
     #  Remove configured anchors and any keys learned from them.
     def clear_trust_anchors
       @trust_anchors = KeyCache.new
-      @configured_ds_store = []
       clear_trusted_keys
     end
 

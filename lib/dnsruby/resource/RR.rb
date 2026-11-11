@@ -14,6 +14,7 @@
 #
 
 require 'dnsruby/code_mappers'
+require 'dnsruby/presentation'
 
 module Dnsruby
 class RR
@@ -178,10 +179,10 @@ class RR
   #
   #
   def RR.new_from_string(rrstring)
-    #  strip out comments
-    #  Test for non escaped ";" by means of the look-behind assertion
-    #  (the backslash is escaped)
-    rrstring = rrstring.gsub(/(\?<!\\);.*/o, '')
+    # A standalone RR string has historically accepted unmatched grouping
+    # parentheses. Preserve that permissiveness while recognizing literal
+    # parentheses correctly; ZoneReader still needs balanced continuations.
+    rrstring, = Presentation.scan(rrstring, allow_unbalanced: true)
 
     matches = (/#{@@RR_REGEX}/xo).match(rrstring)
     unless matches
@@ -214,13 +215,6 @@ class RR
 
     if rrtype == ''
       rrtype = 'ANY'
-    end
-
-    unless %w(NAPTR TXT).include?(rrtype)
-      if rdata
-        rdata.gsub!('(', '')
-        rdata.gsub!(')', '')
-      end
     end
 
     test_length = ->(hexdump, rdlength) do

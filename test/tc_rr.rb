@@ -376,6 +376,20 @@ class TestRR < Minitest::Test
     assert_equal a1.hash, a3.hash
   end
 
+  # RR.create has long accepted incomplete grouping around otherwise complete
+  # RDATA (including the TLSA certificate fixtures). A zone file must balance
+  # its continuation lines, but this standalone constructor remains permissive.
+  def test_unbalanced_grouping_in_standalone_record_strings
+    prefix = '_443._tcp.example. 60 IN TLSA 3 0 1 '
+    digest = 'aa' * 32
+    expected = RR.create(prefix + digest)
+    ["( #{digest}", "#{digest} )", "( #{digest} )"].each do |rdata|
+      rr = RR.create(prefix + rdata)
+      assert_equal(expected, rr, rdata)
+      assert_equal([digest].pack('H*'), rr.databin, rdata)
+    end
+  end
+
   def _test_duplicate_answer(method_as_symbol)
     expected_count = case method_as_symbol
     when :add_answer

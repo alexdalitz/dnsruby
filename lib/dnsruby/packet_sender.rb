@@ -24,6 +24,8 @@ module Dnsruby
 
     @@authoritative_cache = Cache.new
     @@recursive_cache = Cache.new
+    PIPELINE_MUTEX_CREATION = Mutex.new
+    private_constant :PIPELINE_MUTEX_CREATION
 
 
     def PacketSender.cache(query, response)
@@ -341,13 +343,18 @@ module Dnsruby
       if (!client_query_id)
         client_query_id = Time.now + rand(10000) # is this safe?!
       end
+      response_settings = response_query_settings(client_query_id)
 
       begin
         query_packet = make_query_packet(msg, use_tcp)
       rescue EncodeError => err
         Dnsruby.log.error { "#{err}" }
         st = SelectThread.instance
-        st.push_exception_to_select(client_query_id, client_queue, err, nil)
+        if response_settings
+          st.fail_query_if_current(client_query_id, client_queue, response_settings, err)
+        else
+          st.push_exception_to_select(client_query_id, client_queue, err, nil)
+        end
         return
       end
 
@@ -366,7 +373,11 @@ module Dnsruby
           #  If we can find the answer, send it to the client straight away
           #  Post the result to the client using SelectThread
           st = SelectThread.instance
-          st.push_response_to_select(client_query_id, client_queue, cachedanswer, msg, self)
+          if response_settings
+            st.push_response_for_query(response_settings, cachedanswer, msg, self)
+          else
+            st.push_response_to_select(client_query_id, client_queue, cachedanswer, msg, self)
+          end
           return client_query_id
         end
       end
@@ -376,7 +387,12 @@ module Dnsruby
           #  Can't send the message - abort!
           err=IOError.new("Can't send message - too big for UDP and no_tcp=true")
           Dnsruby.log.error { "#{err}" }
-          st.push_exception_to_select(client_query_id, client_queue, err, nil)
+          st = SelectThread.instance
+          if response_settings
+            st.fail_query_if_current(client_query_id, client_queue, response_settings, err)
+          else
+            st.push_exception_to_select(client_query_id, client_queue, err, nil)
+          end
           return
         end
         Dnsruby.log.debug { "Query packet length exceeds max UDP packet size - using TCP" }
@@ -423,10 +439,8 @@ module Dnsruby
         @tcp_pipeline_local_port = src_port
         src_address = @ipv6 ? @src_address6 : @src_address
         begin
-          family = @ipv6 ? Socket::AF_INET6 : Socket::AF_INET
-          @pipeline_socket = Socket.new(family, Socket::SOCK_STREAM, 0)
-          @pipeline_socket.bind(Addrinfo.tcp(src_address, src_port))
-          @pipeline_socket.connect(sockaddr)
+          @pipeline_socket = Socket.tcp(@server, @port, src_address, src_port,
+            connect_timeout: @pipeline_connect_timeout || @packet_timeout)
           Dnsruby.log.debug("Creating socket #{src_address}:#{src_port}")
           @use_counts[@pipeline_socket] = 0
         rescue Exception => e
@@ -452,8 +466,101 @@ module Dnsruby
     #  This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
     def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp) #:nodoc: all
       endtime = Time.now + @packet_timeout
+      st = SelectThread.instance
+      response_settings = response_query_settings(client_query_id)
+      previous_settings = response_settings ||
+        (st.query_settings_for_id(client_query_id) if use_tcp && @tcp_pipelining)
+      operation = -> do
+        send_dnsruby_with_socket(query_bytes, query, client_query_id, client_queue,
+          use_tcp, endtime, previous_settings, !response_settings.nil?)
+      end
+      unless use_tcp && @tcp_pipelining
+        return operation.call
+      end
+      # Configuration-only PacketSenders remain marshalable, including objects
+      # stored before this mutex existed. Creation is serialized for first use.
+      pipeline_mutex = PIPELINE_MUTEX_CREATION.synchronize { @pipeline_mutex ||= Mutex.new }
+
+      # Serialize socket allocation and complete frames, but never make the
+      # selector wait for another sender. Response checking and tick callbacks
+      # can themselves send a query while a different thread owns this writer.
+      if pipeline_mutex.try_lock
+        begin
+          operation.call
+        ensure
+          pipeline_mutex.unlock
+        end
+      else
+        wait_for_writer = -> do
+          locked = false
+          begin
+            until (locked = pipeline_mutex.try_lock)
+              break if Time.now >= endtime
+              sleep 0.005
+            end
+            if locked && Time.now < endtime
+              operation.call
+            else
+              st.fail_query_if_current(client_query_id, client_queue, previous_settings,
+                ResolvTimeout.new("Query timed out waiting for TCP pipeline"))
+            end
+          ensure
+            pipeline_mutex.unlock if locked
+          end
+        end
+        if st.selector_thread?
+          begin
+            Thread.new(&wait_for_writer)
+          rescue ThreadError => e
+            st.fail_query_if_current(client_query_id, client_queue, previous_settings, e)
+          end
+        else
+          # Public callers retain the existing synchronous-send contract.
+          wait_for_writer.call
+        end
+      end
+    end
+
+    # Socket#send may write only a prefix of a TCP frame. Nonblocking writes keep
+    # a stalled peer from holding the pipeline writer past the packet deadline.
+    def write_tcp_frame(socket, query_bytes, endtime)
+      frame = [query_bytes.bytesize].pack('n') + query_bytes
+      offset = 0
+      while offset < frame.bytesize
+        remaining = endtime - Time.now
+        raise ResolvTimeout, "Query timed out writing TCP frame" if remaining <= 0
+        begin
+          written = socket.write_nonblock(frame.byteslice(offset, frame.bytesize - offset))
+          raise IOError, "TCP write made no progress" unless written && written > 0
+          offset += written
+        rescue IO::WaitWritable
+          raise ResolvTimeout, "Query timed out writing TCP frame" unless IO.select(nil, [socket], nil, remaining)
+        end
+      end
+    end
+
+    def response_query_settings(client_query_id)
+      settings = Thread.current[:dnsruby_response_query]
+      settings if settings && settings.client_query_id == client_query_id &&
+        settings.single_resolver.equal?(self)
+    end
+
+    def send_dnsruby_with_socket(query_bytes, query, client_query_id, client_queue,
+        use_tcp, endtime, previous_settings, response_retry)
       #  First send the query (synchronously)
       st = SelectThread.instance
+      pipeline = use_tcp && @tcp_pipelining
+      guarded = pipeline || response_retry
+      # A timeout or another retry can win while this operation waits for the
+      # pipeline writer. Never resurrect that earlier attempt.
+      return if guarded && !st.query_settings_for_id(client_query_id).equal?(previous_settings)
+      report_error = ->(error) do
+        if guarded
+          st.fail_query_if_current(client_query_id, client_queue, previous_settings, error)
+        else
+          st.push_exception_to_select(client_query_id, client_queue, error, nil)
+        end
+      end
       socket = nil
       runnextportloop = true
       numtries = 0
@@ -463,22 +570,31 @@ module Dnsruby
       end
       while (runnextportloop) do
         begin
+          if Time.now >= endtime
+            report_error.call(ResolvTimeout.new("Query timed out before connect"))
+            return
+          end
           numtries += 1
           src_port = get_next_src_port
           if (use_tcp)
             begin
               if (@tcp_pipelining)
-                socket, new_socket = tcp_pipeline_socket(src_port)
+                begin
+                  @pipeline_connect_timeout = endtime - Time.now
+                  socket, new_socket = tcp_pipeline_socket(src_port)
+                ensure
+                  remove_instance_variable(:@pipeline_connect_timeout)
+                end
                 src_port = @tcp_pipeline_local_port
               else
-                socket = Socket.tcp(@server, @port, src_address, src_port, connect_timeout: @packet_timeout)
+                socket = Socket.tcp(@server, @port, src_address, src_port, connect_timeout: endtime - Time.now)
                 new_socket = true
               end
             rescue Errno::EBADF, Errno::ENETUNREACH => e
               #  Can't create a connection
               err=IOError.new("TCP connection error to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception = #{e.class}, #{e}")
               Dnsruby.log.error { "#{err}" }
-              st.push_exception_to_select(client_query_id, client_queue, err, nil)
+              report_error.call(err)
               return
             end
           else
@@ -512,9 +628,9 @@ module Dnsruby
             Dnsruby.log.error( "#{err}")
             Dnsruby.log.error(e.backtrace)
             if @tcp_pipelining
-              st.push_exception_to_select(client_query_id, client_queue, SocketEofResolvError.new(err_msg), nil)
+              report_error.call(SocketEofResolvError.new(err_msg))
             else
-              st.push_exception_to_select(client_query_id, client_queue, err, nil)
+              report_error.call(err)
             end
             return
           end
@@ -523,34 +639,66 @@ module Dnsruby
       if (socket==nil)
         err=IOError.new("dnsruby can't connect to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}")
         Dnsruby.log.error { "#{err}" }
-        st.push_exception_to_select(client_query_id, client_queue, err, nil)
+        report_error.call(err)
         return
       end
       Dnsruby.log.debug { "Sending packet to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}" }
       #             print "#{Time.now} : Sending packet to #{@server} : #{query.question()[0].qname}, #{query.question()[0].qtype}\n"
-      #  Listen for the response before we send the packet (to avoid any race conditions)
+      # A reused pipeline is already readable by the selector. Publish its new
+      # query before writing so an immediate answer always has an owner.
       query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
       query_settings.is_persistent_socket = @tcp_pipelining if use_tcp
       query_settings.tcp_pipelining_max_queries = @tcp_pipelining_max_queries if @tcp_pipelining
       begin
-        if (use_tcp)
-          lenmsg = [query_bytes.length].pack('n')
-          socket.send(lenmsg, 0)
+        if response_retry && !pipeline && !st.query_settings_for_id(client_query_id).equal?(previous_settings)
+          socket.close
+          return
         end
-        socket.send(query_bytes, 0)
+        if pipeline
+          unless st.register_query_if_current(query_settings, previous_settings)
+            # The original attempt can expire during connect. This socket was
+            # never handed to the selector, so release its unused reservation.
+            @use_counts[socket] -= 1 if @use_counts[socket]
+            socket.close if new_socket && !socket.closed?
+            if socket.closed?
+              @use_counts.delete(socket)
+              @pipeline_socket = nil if @pipeline_socket == socket
+            end
+            return
+          end
+          return unless st.query_settings_for_id(client_query_id).equal?(query_settings)
+        end
+        if (use_tcp)
+          write_tcp_frame(socket, query_bytes, endtime)
+        else
+          socket.send(query_bytes, 0)
+        end
 
         #  The select thread will now wait for the response and send that or a
         #  timeout back to the client_queue.
-        st.add_to_select(query_settings)
+        unless pipeline
+          if response_retry
+            socket.close unless st.register_query_if_current(query_settings, previous_settings)
+          else
+            st.add_to_select(query_settings)
+          end
+        end
       rescue Exception => e
         err_msg = "Send failed to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}"
         err=IOError.new(err_msg)
         Dnsruby.log.error { "#{err}" }
         Dnsruby.log.error(e.backtrace)
-        if @tcp_pipelining
-          st.push_exception_to_select(client_query_id, client_queue, SocketEofResolvError.new(err_msg), nil) if new_socket
+        if pipeline
+          error = e.kind_of?(ResolvTimeout) ? e : SocketEofResolvError.new(err_msg)
+          st.fail_tcp_send(query_settings, error)
+          @use_counts.delete(socket)
+          @pipeline_socket = nil if @pipeline_socket == socket
+        elsif e.kind_of?(ResolvTimeout)
+          report_error.call(e)
+        elsif @tcp_pipelining
+          report_error.call(SocketEofResolvError.new(err_msg))
         else
-          st.push_exception_to_select(client_query_id, client_queue, err, nil)
+          report_error.call(err)
         end
         begin
           #we let the select_thread close the socket when doing tcp

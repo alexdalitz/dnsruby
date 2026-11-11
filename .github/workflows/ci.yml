@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby: [ '3.2', '3.3', '3.4', '4.0' ] # , 'ruby-head' ]
+        ruby: [ '3.0', '3.1', '3.2', '3.3', '3.4', '4.0' ] # , 'ruby-head' ]
         rubyopt: ['']
         include:
           - ruby: '3.4'
@@ -28,7 +28,7 @@ jobs:
         if: matrix.ruby == '3.4' && matrix.rubyopt == ''
         uses: coverallsapp/github-action@v2
         with:
-          file: coverage/coverage.json
+          file: coverage/.resultset.json
           format: simplecov
           # Reporting outages must not change the test result.
           fail-on-error: false

@@ -16,6 +16,11 @@ complete DNS implementation.
 Dnsruby runs a single I/O thread to handle all concurrent
 queries. It is therefore suitable for high volume DNS applications.
 
+**Upgrading to v2?** Read the [upgrade notes](RELEASE_NOTES.md#upgrading-to-v2),
+particularly if you persist generated record classes or customise them. Legacy
+IPv6 string formatting is preserved, and stored generic SVCB/HTTPS records can
+be migrated by requiring `dnsruby/optional/yaml` before loading their YAML.
+
 The following is a (non-exhaustive) list of features :
 
 - Implemented RRs :  A, AAAA, AFSDB, ANY, CAA, CERT, CNAME, DNAME,
@@ -34,13 +39,9 @@ The following is a (non-exhaustive) list of features :
 Dependencies
 ------------
 
-Dnsruby can run with no dependencies. However, if you wish to
-use TSIG or DNSSEC then the OpenSSL library must be available.
-This is a part of the Ruby standard library, but appears not to
-be present on all Ruby platforms. If it is not available, then
-the test code will not run the tests which require it. Code which
-attempts to use the library (if it is not present) will raise an
-exception.
+Dnsruby requires Ruby 3.0 or later. RubyGems installs its `base64`, `logger` and
+`simpleidn` dependencies. TSIG and DNSSEC also require Ruby's OpenSSL library;
+tests that require OpenSSL are skipped when it is unavailable.
 
 Demo Code
 ---------
@@ -74,6 +75,11 @@ at runtime:
 bundle exec rake test
 ```
 
+The separate `rake soak` target uses the legacy manual harness in
+`test/localdns.rb` and `test/test_dnsserver.rb`, which still needs the RubyDNS
+and NIO development dependencies. It is not included in the standard suites;
+the normal TCP pipelining tests use their own local server.
+
 Usage Help
 ----------
 
@@ -88,6 +94,10 @@ response = resolver.query('example.com')
 Use the address and interface of your DNS server. Scoped addresses also work
 in `resolv.conf` (for example, `nameserver fe80::1%en0`). The zone is local
 socket routing information and must not be included in an AAAA record.
+
+IPv6 text keeps the historical Dnsruby format by default. To opt into canonical
+RFC 5952 output, call `Dnsruby::IPv6.create('2001:DB8::1').to_s_canonical`, which
+returns `2001:db8::1`.
 
 There are a couple of blog articles that might be helpful
 in understanding how to use Dnsruby. These used to be hosted by

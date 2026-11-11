@@ -30,6 +30,9 @@ TESTS = %w(
     ipseckey
     ipv6
     malformed_tcp
+    pipeline_send
+    pipeline_retirement
+    pipeline_retry
     message
     misc
     name

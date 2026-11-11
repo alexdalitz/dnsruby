@@ -60,15 +60,15 @@ module Dnsruby
       end
 
       def self.name
-        @generic_display_owner.equal?(self) ? @generic_display_name : super
+        @generic_cache_entry&.klass.equal?(self) ? @generic_display_name : super
       end
 
       def self.to_s
-        @generic_display_owner.equal?(self) ? @generic_display_name.dup : super
+        @generic_cache_entry&.klass.equal?(self) ? @generic_display_name.dup : super
       end
 
       def self.inspect
-        @generic_display_owner.equal?(self) ? @generic_display_name.dup : super
+        @generic_cache_entry&.klass.equal?(self) ? @generic_display_name.dup : super
       end
 
       def self.const_missing(name)

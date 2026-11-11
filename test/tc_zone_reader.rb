@@ -214,5 +214,59 @@ ZONEDATA
     assert_equal('AEX+DQBBzQAgACD/AA==', wrapped.params_to_hash['ech'])
     assert_equal('8443', wrapped.params_to_hash['port'])
   end
-end
 
+  def test_zone_literal_parentheses_do_not_continue_a_record
+    zone = <<~'ZONE'
+      quoted IN HTTPS 1 . key667="a(b)c"
+      escaped IN SVCB 1 . key667=a\(b\)c
+      decimal IN HTTPS 1 . key667=a\040b\041c
+      open IN HTTPS 1 . key667="a\("
+      close IN SVCB 1 . key667=a\)
+      quote IN HTTPS 1 . key667="a\"(b)c"
+      following IN A 192.0.2.1
+    ZONE
+    records = @reader.process_file(StringIO.new(zone))
+    assert_equal(7, records.size)
+    assert_equal(['a(b)c', 'a(b)c', 'a(b)c', 'a(', 'a)', 'a"(b)c'],
+                 records.first(6).map { |rr| rr.params[667] })
+    assert_equal('192.0.2.1', records.last.address.to_s)
+  end
+
+  def test_zone_grouping_ignores_parentheses_in_values_and_comments
+    zone = <<~'ZONE'
+      wrapped IN HTTPS (1 . key667="a;(b)c" ; unmatched ) in comment
+        key668=a\) ; unmatched ( in comment
+        port=443) ; ignored (
+      following IN A 192.0.2.1
+    ZONE
+    wrapped, following = @reader.process_file(StringIO.new(zone))
+    assert_equal('a;(b)c', wrapped.params[667])
+    assert_equal('a)', wrapped.params[668])
+    assert_equal('443', wrapped.params_to_hash['port'])
+    assert_equal('192.0.2.1', following.address.to_s)
+  end
+
+  def test_normalise_line_handles_grouping_when_called_directly
+    line = @reader.normalise_line('svc IN HTTPS (1 . key667="a\(b\)c")')
+    rr = RR.create(line)
+    assert_equal('svc.example.com.', rr.name.to_s(true))
+    assert_equal('a(b)c', rr.params[667])
+  end
+
+  def test_normalise_line_preserves_standalone_unmatched_grouping
+    ['host IN A (192.0.2.7', 'host IN A 192.0.2.7)'].each do |input|
+      rr = RR.create(@reader.normalise_line(input))
+      assert_equal('host.example.com.', rr.name.to_s(true))
+      assert_equal('192.0.2.7', rr.address.to_s)
+    end
+  end
+
+  def test_unbalanced_grouping_is_rejected
+    assert_raises(Dnsruby::ZoneReader::ParseException) do
+      @reader.process_file(StringIO.new('bad IN HTTPS 1 .)'))
+    end
+    assert_raises(Dnsruby::ZoneReader::ParseException) do
+      @reader.process_file(StringIO.new('bad IN HTTPS (1 .'))
+    end
+  end
+end

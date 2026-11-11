@@ -44,9 +44,9 @@ class TestScopedIPv6Transport < Minitest::Test
       sender = Dnsruby::PacketSender.new(server: server, port: 5300, src_port: 55000)
       message = Dnsruby::Message.new('scoped.example.invalid')
       bytes = message.encode
+      frame = [bytes.bytesize].pack('n') + bytes
       socket = Minitest::Mock.new(Object.new)
-      socket.expect(:send, 2, [[bytes.bytesize].pack('n'), 0])
-      socket.expect(:send, bytes.bytesize, [bytes, 0])
+      socket.expect(:write_nonblock, frame.bytesize, [frame])
       selector = Minitest::Mock.new
       selector.expect(:add_to_select, nil) do |settings|
         assert_equal server, settings.dest_server
@@ -56,7 +56,8 @@ class TestScopedIPv6Transport < Minitest::Test
 
       connector = lambda do |host, port, source, source_port, **options|
         assert_equal [server, 5300, '::', 55000], [host, port, source, source_port]
-        assert_equal sender.packet_timeout, options[:connect_timeout]
+        assert_operator options[:connect_timeout], :>, 0
+        assert_operator options[:connect_timeout], :<=, sender.packet_timeout
         socket
       end
       Dnsruby::SelectThread.stub(:instance, selector) do
@@ -69,62 +70,57 @@ class TestScopedIPv6Transport < Minitest::Test
     end
   end
 
-  def test_tcp_pipeline_preserves_scope_and_selects_socket_family
+  def test_tcp_pipeline_preserves_scope_and_selects_matching_source_address
     (SCOPED_SERVERS + ['127.0.0.1']).each do |server|
       ipv6 = server.include?(':')
       sender = Dnsruby::PacketSender.new(server: server, port: 5300)
-      source = Addrinfo.tcp(ipv6 ? '::' : '0.0.0.0', 0)
+      source = ipv6 ? '::' : '0.0.0.0'
       target = 'packed destination including scope'
       socket = Minitest::Mock.new(Object.new)
-      socket.expect(:bind, 0, [source])
-      socket.expect(:connect, 0, [target])
 
       address_builder = lambda do |port, host|
         assert_equal [5300, server], [port, host]
         target
       end
-      constructor = lambda do |family, type, protocol|
-        assert_equal ipv6 ? Socket::AF_INET6 : Socket::AF_INET, family
-        assert_equal [Socket::SOCK_STREAM, 0], [type, protocol]
+      connector = lambda do |host, port, local_address, local_port, **options|
+        assert_equal [server, 5300, source, 0], [host, port, local_address, local_port]
+        assert_operator options[:connect_timeout], :>, 0
+        assert_operator options[:connect_timeout], :<=, sender.packet_timeout
         socket
       end
       Socket.stub(:sockaddr_in, address_builder) do
-        Socket.stub(:new, constructor) do
-          Addrinfo.stub(:tcp, source) do
-            connected, new_socket = sender.tcp_pipeline_socket(0)
-            assert_equal socket.object_id, connected.object_id
-            assert new_socket
-          end
+        Socket.stub(:tcp, connector) do
+          connected, new_socket = sender.tcp_pipeline_socket(0)
+          assert_equal socket.object_id, connected.object_id
+          assert new_socket
         end
       end
       socket.verify
     end
   end
 
-  def test_tcp_pipeline_closes_socket_when_scoped_connection_fails
-    [:bind, :connect].each do |failed_operation|
-      sender = Dnsruby::PacketSender.new(server: SCOPED_SERVERS.first, port: 5300)
-      socket = Minitest::Mock.new(Object.new)
-      error = Errno::ENETUNREACH.new('unusable scoped destination')
-      socket.expect(:bind, 0) do |_source|
-        raise error if failed_operation == :bind
-        true
-      end
-      if failed_operation == :connect
-        socket.expect(:connect, nil) do |destination|
-          assert_equal 'scoped destination', destination
+  def test_tcp_pipeline_does_not_retain_a_failed_scoped_connection
+    SCOPED_SERVERS.each do |server|
+      [Errno::EADDRNOTAVAIL, Errno::ENETUNREACH].each do |error_class|
+        sender = Dnsruby::PacketSender.new(server: server, port: 5300, src_port: 55000)
+        error = error_class.new('unusable scoped source or destination')
+        connector = lambda do |host, port, source, source_port, **options|
+          assert_equal [server, 5300, '::', 55000], [host, port, source, source_port]
+          assert_operator options[:connect_timeout], :>, 0
+          assert_operator options[:connect_timeout], :<=, sender.packet_timeout
           raise error
         end
-      end
-      socket.expect(:close, nil)
 
-      Socket.stub(:sockaddr_in, 'scoped destination') do
-        Socket.stub(:new, socket) do
-          assert_same error, assert_raises(Errno::ENETUNREACH) { sender.tcp_pipeline_socket(0) }
+        # Socket.tcp owns and closes a socket whose bind/connect fails. The
+        # sender must not retain a pipeline or usage count for that failure.
+        Socket.stub(:sockaddr_in, 'scoped destination') do
+          Socket.stub(:tcp, connector) do
+            assert_same error, assert_raises(error_class) { sender.tcp_pipeline_socket(55000) }
+          end
         end
+        assert_nil sender.instance_variable_get(:@pipeline_socket)
+        assert_empty sender.instance_variable_get(:@use_counts)
       end
-      assert_nil sender.instance_variable_get(:@pipeline_socket)
-      socket.verify
     end
   end
 

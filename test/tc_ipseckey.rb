@@ -43,7 +43,7 @@ class TestIPSECKEY < Minitest::Test
       {"0.d.4.0.3.0.e.f.f.f.3.f.0.1.2.01.0.0.0.0.0.2.8.B.D.0.1.0.0.2.ip6.arpa. 7200 IN     IPSECKEY ( 10 2 2
                     2001:0DB8:0:8002::2000:1
                     AQNRU3mG7TVTO2BkR47usntb102uFJtugbo6BSGvgqt4AQ== )" =>
-          ["2001:db8:0:8002::2000:1", "AQNRU3mG7TVTO2BkR47usntb102uFJtugbo6BSGvgqt4AQ==",
+          ["2001:DB8:0:8002::2000:1", "AQNRU3mG7TVTO2BkR47usntb102uFJtugbo6BSGvgqt4AQ==",
         10, 2, 2]}
     ].each {|hash|
       hash.each {|txt, data|

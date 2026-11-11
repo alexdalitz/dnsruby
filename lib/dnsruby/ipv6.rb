@@ -110,8 +110,18 @@ module Dnsruby
     #  The raw IPv6 address as a String
     attr_reader :address
 
-    #  The RFC 5952 canonical text representation of the address
+    # The historical Dnsruby representation, retained for callers that compare
+    # address strings. Use #to_s_canonical for RFC 5952 formatting.
     def to_s
+      text = sprintf("%X:%X:%X:%X:%X:%X:%X:%X", *@address.unpack("n8"))
+      unless text.sub!(/(^|:)0(:0)+(:|$)/, '::')
+        text.sub!(/(^|:)0(:|$)/, '::')
+      end
+      text
+    end
+
+    # The RFC 5952 canonical text representation of the address, opt-in.
+    def to_s_canonical
       fields = @address.unpack("n8")
 
       #  RFC 5952 section 5: an address carrying an embedded IPv4 address

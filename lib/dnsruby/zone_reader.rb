@@ -39,6 +39,7 @@ module Dnsruby
       @last_explicit_class = Classes.new("IN")
       @last_name = nil
       @continued_line = nil
+      @group_depth = 0
       @in_quoted_section = false
     end
 
@@ -72,17 +73,28 @@ module Dnsruby
           raise ParseException.new("Error reading line #{io.lineno} of #{io.inspect} : [#{line}]")
         end
       end
+      if @continued_line
+        raise ParseException.new("Unclosed parenthesis at end of #{io.inspect}")
+      end
       return zone
     end
 
     #  Process the next line of the file
     #  Returns a string representing the normalised line.
     def process_line(line, do_prefix_hack = false)
-      return nil if (line[0,1] == ";")
-      line = strip_comments(line)
-      return nil if (line.strip.length == 0)
-      return nil if (!line || (line.length == 0))
       @in_quoted_section = false if !@continued_line
+      line, @group_depth, @in_quoted_section =
+        Presentation.scan(line, @group_depth, @in_quoted_section)
+
+      if @continued_line
+        line = @continued_line.rstrip + "\n" + line
+      end
+      if @group_depth.positive?
+        @continued_line = line
+        return nil
+      end
+      @continued_line = nil
+      return nil if line.strip.empty?
 
       if (line.index("$ORIGIN") == 0)
         @origin = line.split()[1].strip #  $ORIGIN <domain-name> [<comment>]
@@ -94,30 +106,7 @@ module Dnsruby
         #                 print "Setting $TTL to #{ttl}\n"
         return nil
       end
-      if (@continued_line)
-        #  Add the next line until we see a ")"
-        #  REMEMBER TO STRIP OFF COMMENTS!!!
-        @continued_line = strip_comments(@continued_line)
-        line = @continued_line.rstrip.chomp + " " + line
-        if (line.index(")"))
-          #  OK
-          @continued_line = false
-        end
-      end
-      open_bracket = line.index("(")
-      if (open_bracket)
-        #  Keep going until we see ")"
-        index = line.index(")")
-        if (index && (index > open_bracket))
-          #  OK
-          @continued_line = false
-        else
-          @continued_line = line
-        end
-      end
-      return nil if @continued_line
-
-      line = strip_comments(line) + "\n"
+      line += "\n"
 
       #  If SOA, then replace "3h" etc. with expanded seconds
       #       begin
@@ -209,8 +198,11 @@ module Dnsruby
     #  Take a line from the input zone file, and return the normalised form
     #  do_prefix_hack should always be false
     def normalise_line(line, do_prefix_hack = false)
+      # process_line has already checked continuation balance. Direct callers
+      # historically accepted unmatched grouping, just like RR.create.
+      line, = Presentation.scan(line, allow_unbalanced: true)
+
       #  Note that a freestanding "@" is used to denote the current origin - we can simply replace that straight away
-      #  Remove the ( and )
       #  Note that no domain name may be specified in the RR - in that case, last_name should be used. How do we tell? Tab or space at start of line.
 
       #  If we have text in the record, then ignore that in the parsing, and stick it on again at the end
@@ -323,11 +315,6 @@ module Dnsruby
 
       type_string=prefix_for_rrset_order(type, type_was)
       @last_name = name
-
-      if !([Types::NAPTR, Types::TXT].include?type_was)
-        line.sub!("(", "")
-        line.sub!(")", "")
-      end
 
       if (is_soa)
         if (@soa_ttl)

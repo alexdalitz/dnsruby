@@ -147,7 +147,7 @@ class TestScopedIPv6 < Minitest::Test
     message = Dnsruby::Message.new
     message.add_answer(Dnsruby::RR.create('host.test. 60 IN AAAA fe80::1'))
     answer = Dnsruby::Message.decode(message.encode).answer.first
-    assert_equal('fe80::1', answer.address.to_s)
+    assert_equal('FE80::1', answer.address.to_s)
     assert_equal(16, answer.address.address.bytesize)
   end
 end

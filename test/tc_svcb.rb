@@ -240,9 +240,8 @@ class TestSVCB < Minitest::Test
     end
   end
 
-  # Four printable octets are consumed before escapes resolve, so the emitter
-  # must write them numerically to survive a re-parse: space, semicolon, quote
-  # and the parentheses RR.create strips even inside a quoted value.
+  # The emitter uses numeric escapes for whitespace and characters with
+  # lexical meaning in the unquoted presentation form it produces.
   def test_presentation_escaping
     { # dohpath = /a()o
       '00010000070005' + '2f6128296f'     => '1 . dohpath=/a\040\041o',
@@ -267,6 +266,25 @@ class TestSVCB < Minitest::Test
       '1 . ALPN=h2 KEY667=hi'     => '1 . alpn=h2 key667=hi',
     }.each do |rdata, expected|
       assert_equal(expected, svcb(rdata).rdata_to_string)
+    end
+  end
+
+  def test_parentheses_are_data_when_quoted_or_escaped
+    {
+      'key667="a(b)c"'     => 'a(b)c',
+      'key667="a\(b\)c"'   => 'a(b)c',
+      'key667=a\(b\)c'     => 'a(b)c',
+      'key667=a\040b\041c' => 'a(b)c',
+      'key667="a\("'       => 'a(',
+      'key667=a\)'         => 'a)',
+      'key667="a\"(b)c"'  => 'a"(b)c',
+      'key667="a;(b)c"'    => 'a;(b)c',
+    }.each do |param, expected|
+      %w[SVCB HTTPS].each do |type|
+        rr = svcb("(1 . #{param}) ; comment with an unmatched (", type)
+        assert_equal(expected, rr.params[667], "#{type} #{param}")
+        assert_roundtrip(rr)
+      end
     end
   end
 
@@ -297,6 +315,7 @@ class TestSVCB < Minitest::Test
       'dohpath=/é{?dns}'             => { dohpath: '/é{?dns}' },
       'key667=é'                     => { key667: 'é' },
       'key667="a\032b" alpn=h2,h\,3' => { key667: '"a\032b"', alpn: 'h2,h\,3' },
+      'key1=\002h2 key3=\001\187' => { key1: '\002h2', key3: '\001\187' },
     }.each do |rdata, params|
       from_string = svcb("1 . #{rdata}", 'HTTPS')
       from_hash   = RR.create(name: 'example.com.', type: Types::HTTPS, ttl: 3600,
@@ -419,9 +438,43 @@ class TestSVCB < Minitest::Test
   def test_key_leading_zeros_rejected
     assert_all_rejected(['key01=h2', 'mandatory=key01,alpn alpn=h2']) { |p| svcb("1 . #{p}") }
 
-    # key0 is the unpadded spelling of mandatory, so the zero itself stays legal.
+    # key0 uses generic wire octets for mandatory, so the zero stays legal.
     assert_equal('1 . mandatory=alpn alpn=h2',
-                 svcb('1 . key0=alpn alpn=h2').rdata_to_string)
+                 svcb('1 . key0=\000\001 alpn=h2').rdata_to_string)
+  end
+
+  # Numeric syntax carries raw wire octets even for a key with a registered
+  # mnemonic. In particular alpn must not acquire a second length prefix, and
+  # a port's two binary octets must not be parsed as decimal text.
+  def test_numeric_keys_use_generic_wire_values
+    {
+      'key0=\000\001\000\003 alpn=h2 port=443' => 'mandatory=alpn,port alpn=h2 port=443',
+      'key1=\002h2' => 'alpn=h2',
+      'KEY1="\002h2"' => 'alpn=h2',
+      'key2 alpn=h2' => 'no-default-alpn alpn=h2',
+      'key3=\001\187' => 'port=443',
+      'key4=\192\000\002\001' => 'ipv4hint=192.0.2.1',
+      'key5=foo' => 'ech=Zm9v',
+      'key6=\032\001\013\184\000\000\000\000\000\000\000\000\000\000\000\001' => 'ipv6hint=2001:db8::1',
+      'key7=/dns{?dns}' => 'dohpath=/dns{?dns}',
+      'key8=""' => 'ohttp',
+      'key10=\003foo\003bar' => 'docpath=foo,bar',
+    }.each do |generic, mnemonic|
+      %w[SVCB HTTPS].each do |type|
+        rr = svcb("1 . #{generic}", type)
+        assert_equal(rdata_hex(svcb("1 . #{mnemonic}", type)), rdata_hex(rr), generic)
+        assert_roundtrip(rr)
+      end
+    end
+  end
+
+  def test_numeric_keys_still_validate_wire_values_and_duplicates
+    assert_all_rejected([
+      'key1=h2', 'key1', 'key3=443', 'key3', 'key2=x alpn=h2',
+      'key4=\192\000\002', 'key6=\000',
+      'key0=\000\003\000\001 alpn=h2 port=443',
+      'key1=\002h2 alpn=h2', 'alpn=h2 key1=\002h2',
+    ]) { |params| svcb("1 . #{params}") }
   end
 
   # RFC 9460 sec 8 puts the mandatory keys in "strictly increasing numeric

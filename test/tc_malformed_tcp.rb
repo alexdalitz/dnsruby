@@ -2,12 +2,15 @@ require_relative 'spec_helper'
 require 'minitest/mock'
 require 'timeout'
 require 'socket'
+require 'open3'
+require 'rbconfig'
 
 class TestMalformedTcp < Minitest::Test
   # Keep selector fixtures off IO.select: a live resolver in another test may
   # share these tables. Only the dedicated allocated receiver uses the fakes.
   class SocketBuffer
     attr_reader :closed
+    alias closed? closed
     attr_accessor :udp_response
 
     def initialize(bytes = ''.b)
@@ -33,7 +36,7 @@ class TestMalformedTcp < Minitest::Test
     @temporary_variables = []
     { :@@mutex => Mutex.new, :@@query_hash => {}, :@@socket_hash => {},
       :@@timeouts => {}, :@@sockets => Set.new, :@@tcp_buffers => {},
-      :@@socket_is_persistent => {}, :@@socket_remaining_queries => {} }.each do |name, value|
+      :@@socket_is_persistent => {}, :@@socket_remaining_queries => {}, :@@queued_exceptions => [] }.each do |name, value|
       next if @selector_class.class_variable_defined?(name)
       @selector_class.class_variable_set(name, value)
       @temporary_variables << name
@@ -245,7 +248,339 @@ class TestMalformedTcp < Minitest::Test
     end
   end
 
+  def test_idle_selector_drains_deliveries_registered_at_shutdown_boundary
+    # The singleton tables and IO.select stub must be isolated from any real
+    # resolver running elsewhere in the suite. No network sockets are needed.
+    script = <<~'RUBY'
+      require 'dnsruby'
+      require 'timeout'
+      klass = Dnsruby::SelectThread
+      [:closed_query, :response, :validation].each do |kind|
+        selector = klass.send(:allocate)
+        wakeup = Object.new
+        wakeup.define_singleton_method(:closed?) { false }
+        socket = Object.new
+        socket.define_singleton_method(:closed?) { true }
+        query = Dnsruby::Message.new('late.example.')
+        query.do_validation = query.do_caching = false
+        response = query.clone
+        response.header.qr = true
+        queue = Queue.new
+        settings = Dnsruby::SelectThread::QuerySettings.new
+        settings.query, settings.client_query_id = query, :late
+        settings.client_queue, settings.socket = queue, socket
+        settings.endtime = Time.now + 60
+        {
+          mutex: Mutex.new, sockets: Set.new([wakeup]), timeouts: {}, query_hash: {},
+          socket_hash: {}, socket_is_persistent: {}, socket_remaining_queries: {},
+          tcp_buffers: {}, select_thread: Thread.current, observers: {},
+          queued_exceptions: [], queued_responses: [], queued_validation_responses: [],
+          tick_observers: [], wakeup_sockets: [wakeup, wakeup]
+        }.each { |name, value| klass.class_variable_set("@@#{name}", value) }
+        selector.define_singleton_method(:wake_up_select_thread) {}
+        selector.define_singleton_method(:send_tick_to_observers) {}
+        selector.define_singleton_method(:notify_queue_observers) { |*| }
+        iterations = 0
+        selector.define_singleton_method(:process_timeouts) do
+          # IO.select has returned on the last otherwise-idle iteration. A
+          # producer gets the GVL here, just before the shutdown mutex is taken.
+          if iterations == 11
+            case kind
+            when :closed_query then add_to_select(settings)
+            when :response then push_response_to_select(:late, queue, response, query, nil)
+            when :validation then push_validation_response_to_select(:late, queue, response, nil, query, nil)
+            end
+          end
+        end
+        original_select = IO.method(:select)
+        IO.define_singleton_method(:select) { |*| iterations += 1; nil }
+        begin
+          Timeout.timeout(2) { selector.do_select }
+        ensure
+          IO.define_singleton_method(:select, original_select)
+        end
+        expected = kind == :response ? 2 : 1
+        raise "#{kind}: stranded delivery" unless queue.length == expected
+        if kind == :closed_query
+          raise 'wrong error' unless queue.pop.last.is_a?(Dnsruby::SocketEofResolvError)
+        end
+        [:queued_exceptions, :queued_responses, :queued_validation_responses].each do |name|
+          raise "#{kind}: pending #{name}" unless klass.class_variable_get("@@#{name}").empty?
+        end
+        # Publish the stop decision under the mutex, before the Ruby thread exits.
+        raise 'stopping selector still advertised as running' if selector.select_thread_alive?
+      end
+    RUBY
+    assert_selector_subprocess(script)
+  end
+
+  def test_simultaneous_delivery_producers_start_only_one_selector
+    assert_selector_subprocess(<<~'RUBY')
+      klass = Dnsruby::SelectThread
+      selector = klass.send(:allocate)
+      original_new = Thread.method(:new)
+      dead_worker = original_new.call {}.tap(&:join)
+      {
+        mutex: Mutex.new, select_thread: dead_worker, queued_exceptions: [],
+        queued_responses: [], queued_validation_responses: []
+      }.each { |name, value| klass.class_variable_set("@@#{name}", value) }
+      selector.define_singleton_method(:wake_up_select_thread) {}
+      factory_entered, release_factory = Queue.new, Queue.new
+      workers, release_workers = Queue.new, Queue.new
+      selector.define_singleton_method(:do_select) do
+        workers << Thread.current
+        release_workers.pop
+      end
+      Thread.define_singleton_method(:new) do |*args, &block|
+        if Thread.current[:selector_producer]
+          factory_entered << true
+          release_factory.pop
+        end
+        original_new.call(*args, &block)
+      end
+      producers = []
+      started = Queue.new
+      begin
+        [:exception, :response, :validation].each do |kind|
+          producers << original_new.call do
+            Thread.current[:selector_producer] = true
+            query = Dnsruby::Message.new('parallel.example.')
+            started << kind
+            case kind
+            when :exception
+              selector.push_exception_to_select(kind, Queue.new, Dnsruby::OtherResolvError.new, nil)
+            when :response
+              selector.push_response_to_select(kind, Queue.new, query, query, nil)
+            when :validation
+              selector.push_validation_response_to_select(kind, Queue.new, query, nil, query, nil)
+            end
+          end
+          # Hold the first producer inside Thread.new before starting its peers.
+          factory_entered.pop if kind == :exception
+        end
+        3.times { started.pop }
+        # Each producer is now blocked either at the selector mutex or at the
+        # intercepted thread factory. No timing delay determines the outcome.
+        Thread.pass until producers.all? { |thread| thread.status == 'sleep' }
+        factories = 1 + factory_entered.length
+        3.times { release_factory << true }
+        producers.each(&:value)
+        # Every created worker must enter do_select before checking its count.
+        active_workers = factories.times.map { workers.pop }
+        raise "started #{factories} selector workers" unless factories == 1
+        counts = [:queued_exceptions, :queued_responses, :queued_validation_responses].map do |name|
+          klass.class_variable_get("@@#{name}").length
+        end
+        raise "lost producer work: #{counts.inspect}" unless counts == [1, 1, 1]
+        active_workers.each { release_workers << true }
+        active_workers.each(&:value)
+      ensure
+        Thread.define_singleton_method(:new, original_new)
+        producers.each { |thread| thread.kill if thread.alive? }
+        worker = klass.class_variable_get(:@@select_thread)
+        worker.kill if worker && worker.alive?
+        until workers.empty?
+          thread = workers.pop(true)
+          thread.kill if thread.alive?
+        end
+        Array(active_workers).each { |thread| thread.kill if thread.alive? }
+      end
+    RUBY
+  end
+
+  def test_stopped_selector_restarts_before_the_old_ruby_thread_exits
+    assert_selector_subprocess(<<~'RUBY')
+      klass = Dnsruby::SelectThread
+      original_select = IO.method(:select)
+      IO.define_singleton_method(:select) { |*| nil }
+      begin
+        [:exception, :response, :validation, :closed_registration].each do |kind|
+          selector = klass.send(:allocate)
+          wakeup = Object.new
+          wakeup.define_singleton_method(:closed?) { false }
+          {
+            mutex: Mutex.new, sockets: Set.new([wakeup]), timeouts: {}, query_hash: {},
+            socket_hash: {}, socket_is_persistent: {}, socket_remaining_queries: {},
+            tcp_buffers: {}, select_thread: nil, observers: {}, tick_observers: [],
+            queued_exceptions: [], queued_responses: [], queued_validation_responses: [],
+            wakeup_sockets: [wakeup, wakeup]
+          }.each { |name, value| klass.class_variable_set("@@#{name}", value) }
+          selector.define_singleton_method(:wake_up_select_thread) {}
+          selector.define_singleton_method(:send_tick_to_observers) {}
+          selector.define_singleton_method(:notify_queue_observers) { |*| }
+          stopped, release_old, start_old, replacements = Queue.new, Queue.new, Queue.new, Queue.new
+          implementation = selector.method(:do_select)
+          old_worker = nil
+          replacement = nil
+          selector.define_singleton_method(:do_select) do
+            implementation.call
+            if Thread.current.equal?(old_worker)
+              stopped << true
+              release_old.pop
+            else
+              replacements << Thread.current
+            end
+          end
+          begin
+            old_worker = Thread.new { start_old.pop; selector.do_select }
+            klass.class_variable_set(:@@select_thread, old_worker)
+            start_old << true
+            stopped.pop
+            raise 'old worker exited before publication' unless old_worker.alive?
+            query = Dnsruby::Message.new('late.example.')
+            query.do_validation = query.do_caching = false
+            response = query.clone
+            response.header.qr = true
+            queue = Queue.new
+            error = Dnsruby::OtherResolvError.new('late error')
+            case kind
+            when :exception
+              selector.push_exception_to_select(:late, queue, error, nil)
+            when :response
+              selector.push_response_to_select(:late, queue, response, query, nil)
+            when :validation
+              selector.push_validation_response_to_select(:late, queue, response, nil, query, nil)
+            when :closed_registration
+              closed_socket = Object.new
+              closed_socket.define_singleton_method(:closed?) { true }
+              settings = klass::QuerySettings.new(query.encode, query, false, queue, :late,
+                closed_socket, '127.0.0.1', 53, Time.now + 60, 512, nil)
+              selector.add_to_select(settings)
+            end
+            expected_types = case kind
+            when :exception, :closed_registration then [Dnsruby::Resolver::EventType::ERROR]
+            when :response then [Dnsruby::Resolver::EventType::RECEIVED, Dnsruby::Resolver::EventType::VALIDATED]
+            when :validation then [Dnsruby::Resolver::EventType::VALIDATED]
+            end
+            events = Timeout.timeout(2, Timeout::Error, "#{kind}: stranded delivery while old worker is alive") do
+              expected_types.map { queue.pop }
+            end
+            replacement = Timeout.timeout(2, Timeout::Error, "#{kind}: replacement did not stop") { replacements.pop }
+            replacement.value
+            raise "#{kind}: old worker already exited" unless old_worker.alive?
+            raise "#{kind}: wrong delivery types" unless events.map { |event| event[1] } == expected_types
+            raise "#{kind}: wrong client ID" unless events.all? { |event| event[0] == :late }
+            raise "#{kind}: duplicate delivery" unless queue.empty?
+            case kind
+            when :exception
+              raise 'wrong exception' unless events.first.last.equal?(error)
+            when :closed_registration
+              raise 'wrong EOF error' unless events.first.last.is_a?(Dnsruby::SocketEofResolvError)
+              raise 'closed registration retained' unless klass.class_variable_get(:@@query_hash).empty? &&
+                klass.class_variable_get(:@@timeouts).empty? &&
+                !klass.class_variable_get(:@@sockets).include?(closed_socket)
+            else
+              raise "#{kind}: wrong response" unless events.all? { |event| event[2].equal?(response) && event.last.nil? }
+            end
+            [:queued_exceptions, :queued_responses, :queued_validation_responses].each do |name|
+              raise "#{kind}: pending #{name}" unless klass.class_variable_get("@@#{name}").empty?
+            end
+          ensure
+            release_old << true
+            old_worker.kill if old_worker && old_worker.alive?
+            old_worker.join if old_worker
+            worker = klass.class_variable_get(:@@select_thread)
+            worker.kill if worker && worker.alive?
+            replacement.kill if replacement && replacement.alive?
+          end
+        end
+      ensure
+        IO.define_singleton_method(:select, original_select)
+      end
+    RUBY
+  end
+
+  def test_send_failure_on_reused_pipeline_reports_the_registered_query
+    sender = Dnsruby::PacketSender.new(server: '127.0.0.1', tcp_pipelining: true)
+    socket = Object.new
+    socket.define_singleton_method(:write_nonblock) { |*| raise IOError, 'closed during send' }
+    queue = Queue.new
+    query = Dnsruby::Message.new('late.example.')
+    errors = []
+    selector = Object.new
+    current = nil
+    selector.define_singleton_method(:query_settings_for_id) { |_| current }
+    selector.define_singleton_method(:register_query_if_current) { |settings, _| current = settings; true }
+    selector.define_singleton_method(:fail_tcp_send) do |settings, error|
+      errors << [settings.client_query_id, settings.client_queue, error, nil]
+    end
+    Dnsruby::SelectThread.stub(:instance, selector) do
+      sender.stub(:tcp_pipeline_socket, [socket, false]) do
+        sender.send_dnsruby(query.encode, query, :late_send, queue, true)
+      end
+    end
+    assert_equal(1, errors.length)
+    assert_equal([:late_send, queue], errors.first[0, 2])
+    assert_kind_of(Dnsruby::SocketEofResolvError, errors.first[2])
+    assert_nil(errors.first[3])
+  end
+
+  def test_eof_callback_registration_gets_error_without_retaining_closed_socket
+    # add_to_select queues the second EOF in a class variable. Run the complete
+    # callback scenario in a child so a live singleton cannot steal its queue.
+    assert_selector_subprocess(<<~'RUBY')
+      klass = Dnsruby::SelectThread
+      {
+        mutex: Mutex.new, query_hash: {}, socket_hash: {}, timeouts: {}, sockets: Set.new,
+        tcp_buffers: {}, socket_is_persistent: {}, socket_remaining_queries: {}, queued_exceptions: []
+      }.each { |name, value| klass.class_variable_set("@@#{name}", value) }
+      selector = klass.send(:allocate)
+      selector.define_singleton_method(:check_select_thread_synchronized) {}
+      selector.define_singleton_method(:wake_up_select_thread) {}
+      closed = false
+      socket = Object.new
+      socket.define_singleton_method(:closed?) { closed }
+      socket.define_singleton_method(:close) { closed = true }
+      socket.define_singleton_method(:recv_nonblock) { |_| ''.b }
+      first, second = [:first, :second].map do |id|
+        settings = klass::QuerySettings.new
+        settings.query = Dnsruby::Message.new("#{id}.example.")
+        settings.client_query_id = [Object.new, settings.query]
+        settings.client_queue, settings.socket = Queue.new, socket
+        settings.endtime = Time.now + 60
+        settings.is_persistent_socket = true
+        settings.tcp_pipelining_max_queries = :infinite
+        settings
+      end
+      selector.add_to_select(first)
+      notifications = []
+      selector.define_singleton_method(:notify_queue_observers) do |_queue, id|
+        raise 'callback under selector mutex' if klass.class_variable_get(:@@mutex).owned?
+        notifications << id
+        # A sender resumes registration during an earlier query's EOF callback.
+        add_to_select(second) if id == first.client_query_id
+      end
+      raise 'unexpected EOF result' unless selector.tcp_read(socket) == false
+      selector.send_queued_exceptions
+      [first, second].each do |settings|
+        event = settings.client_queue.pop(true)
+        raise 'wrong EOF error' unless event.last.is_a?(Dnsruby::SocketEofResolvError)
+        raise 'duplicate EOF' unless settings.client_queue.empty?
+        [:query_hash, :timeouts].each do |name|
+          raise "retained #{name}" if klass.class_variable_get("@@#{name}").key?(settings.client_query_id)
+        end
+      end
+      raise 'missing callback' unless notifications == [first.client_query_id, second.client_query_id]
+      [:socket_hash, :tcp_buffers, :socket_is_persistent, :socket_remaining_queries].each do |name|
+        raise "retained #{name}" if klass.class_variable_get("@@#{name}").key?(socket)
+      end
+      raise 'retained socket' if klass.class_variable_get(:@@sockets).include?(socket)
+      raise 'undelivered EOF' unless klass.class_variable_get(:@@queued_exceptions).empty?
+    RUBY
+  end
+
   private
+
+  def assert_selector_subprocess(script)
+    options = ''.frozen? ? ['--enable-frozen-string-literal'] : []
+    # A child-side deadline also bounds broken synchronization regressions;
+    # capture3 otherwise waits forever for a child blocked at a test gate.
+    stdout, stderr, status = Open3.capture3(RbConfig.ruby, *options, '-I',
+      File.expand_path('../lib', __dir__), '-r', 'dnsruby', '-r', 'timeout',
+      '-e', "Timeout.timeout(10) do\n#{script}\nend")
+    assert(status.success?, "#{stdout}\n#{stderr}")
+    assert_empty(stderr)
+  end
 
   def table(name)
     @selector_class.class_variable_get("@@#{name}")

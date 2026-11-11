@@ -6,11 +6,9 @@ end
 
 if ENV['RUN_EXTRA_TASK'] == 'TRUE'
   require 'simplecov'
-  require 'simplecov_json_formatter'
 
   # Generate reports locally; CI uploads coverage after the tests complete.
-  SimpleCov.formatters = [SimpleCov::Formatter::HTMLFormatter,
-                          SimpleCov::Formatter::JSONFormatter]
+  SimpleCov.formatter = SimpleCov::Formatter::HTMLFormatter
   SimpleCov.start do
     add_filter '/test/'
   end

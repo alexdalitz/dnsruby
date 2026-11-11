@@ -77,9 +77,7 @@ module Dnsruby
           generated.const_set(:TypeValue, type)
           generated.const_set(:ClassValue, klass)
           name = key(type, klass)
-          generated.instance_variable_set(:@generic_cache_name, name)
           generated.instance_variable_set(:@generic_display_name, "Dnsruby::RR::Generic::#{name}".freeze)
-          generated.instance_variable_set(:@generic_display_owner, generated)
           entry = Entry.new(name, [type, klass].freeze, generated, nil, nil, true)
           # WeakMap's values are weak too. The class keeps its mutable bookkeeping
           # alive even when a client freezes the class itself.

@@ -102,7 +102,9 @@ require 'dnsruby/zone_transfer'
 # 
 # == DNSSEC
 # Dnsruby supports DNSSEC and NSEC(3).
-# DNSSEC support is on by default - but no trust anchors are configured by default.
+# Resolver#do_validation defaults to false; set it to true for local validation.
+# Built-in root DS trust anchors are configured. The dnssec flag controls requesting
+# DNSSEC records and is separate from validation.
 # See Dnsruby::Dnssec for more details.
 # 
 # == Codes
@@ -122,7 +124,6 @@ require 'dnsruby/zone_transfer'
 # == Bugs
 # * NIS is not supported.
 # * /etc/nsswitch.conf is not supported.
-# * NSEC3 validation still TBD
 module Dnsruby
 
   def Dnsruby.version

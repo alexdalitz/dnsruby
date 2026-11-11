@@ -73,7 +73,7 @@ module Dnsruby
         @params = {}
         if hash[:params]
           hash[:params].each do |key, value|
-            store_param(key_to_num(key.to_s),
+            store_param(key.to_s,
                         value.nil? ? nil : decode_presentation_value(value.to_s))
           end
         end
@@ -99,8 +99,7 @@ module Dnsruby
 
         tokens.each do |token|
           key, eq, value = token.partition('=')
-          num = key_to_num(key)
-          store_param(num, eq.empty? ? nil : decode_presentation_value(value))
+          store_param(key, eq.empty? ? nil : decode_presentation_value(value))
         end
         validate_svcparams(@priority, @params)
       end
@@ -189,11 +188,21 @@ module Dnsruby
       end
 
       # RFC 9460 sec 2.1 forbids a duplicate key.
-      def store_param(num, value)
+      def store_param(key, value)
+        num = key_to_num(key)
         if @params.key?(num)
           raise DecodeError.new("duplicate SvcParamKey: #{num_to_key(num)}")
         end
-        @params[num] = encode_param_value(num, value)
+        # RFC 9460 sec 2.1: keyNNNNN uses the generic character-string form,
+        # even when that number has a known mnemonic. Its decoded octets are
+        # already wire format, rather than input for the mnemonic's codec.
+        if key.downcase.start_with?('key')
+          wire = value.to_s.b
+          validate_param_value(num, wire)
+          @params[num] = wire
+        else
+          @params[num] = encode_param_value(num, value)
+        end
       end
 
       # The presentation <-> wire codec for the SvcParams, needed by
@@ -304,9 +313,9 @@ module Dnsruby
         end
 
         # Escapes raw octets into a presentation character-string. Four printable
-        # characters need the numeric form because each is consumed before
-        # escapes resolve: a token splits on the quote, a semicolon starts a
-        # comment, and RR.create strips parentheses even inside a quoted value.
+        # characters need escaping in an unquoted value: the quote delimits a
+        # character-string, a semicolon starts a comment, and parentheses group
+        # a record across lines. The numeric form handles them all uniformly.
         def escape_char_string(str)
           result = +''
           str.each_byte do |b|
@@ -477,8 +486,8 @@ module Dnsruby
           unless keys.uniq.length == keys.length
             raise DecodeError.new('mandatory must not list a key more than once')
           end
-          # Presentation format is unordered and the encoder sorts it, so this
-          # only ever catches wire input.
+          # Mnemonic presentation format is unordered and the encoder sorts
+          # it. Wire input and generic key0 presentation must already be sorted.
           unless keys == keys.sort
             raise DecodeError.new('mandatory keys must be in strictly increasing order, got ' \
                                   "#{keys.map { |k| num_to_key(k) }.join(', ')}")
@@ -583,7 +592,7 @@ module Dnsruby
           when 5 # ech
             Base64.strict_encode64(bytes)
           when 6 # ipv6hint
-            join_value_list(bytes.b.scan(/.{16}/m).map { |a| IPv6.new(a).to_s })
+            join_value_list(bytes.b.scan(/.{16}/m).map { |a| IPv6.new(a).to_s_canonical })
           else # dohpath and unknown keys
             bytes.empty? ? nil : escape_char_string(bytes)
           end

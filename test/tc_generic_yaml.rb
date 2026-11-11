@@ -32,6 +32,87 @@ class TestGenericYaml < Minitest::Test
     assert_equal(message.encode, copy[2].encode)
   end
 
+  def test_v1_74_svcb_and_https_yaml_migrates_in_place_without_changing_registry
+    classes = [Dnsruby::RR::IN::SVCB, Dnsruby::RR::IN::HTTPS]
+    fixture = File.read(File.join(__dir__, 'fixtures/legacy-svcb-https-v1.74.yaml'))
+    copy = YAML.unsafe_load(fixture)
+    records = copy.fetch('records')
+    records.each_with_index do |rr, index|
+      assert_instance_of(classes[index], rr)
+      assert_same(classes[index], Dnsruby::RR.get_class(64 + index, 1))
+      assert_equal(1, rr.priority)
+      assert_equal('.', rr.target.to_s(true))
+      assert_equal({ 1 => "\x02h2".b }, rr.params)
+      assert_equal('1 . alpn=h2', rr.rdata_to_string)
+      assert_equal(index.zero? ? 'SVCB' : 'HTTPS', rr.type.to_s)
+      client = rr.instance_variable_get(:@client)
+      assert_same(rr, client.fetch('self'))
+      assert_same(rr.class, client.fetch('class'))
+      assert_equal('saved by Dnsruby 1.74.0', client.fetch('note'))
+      assert_same(rr, copy.fetch('message').answer[index])
+      encoder = Dnsruby::MessageEncoder.new
+      rr.encode_rdata(encoder)
+      assert_equal('00010000010003026832', encoder.to_s.unpack1('H*'))
+    end
+    assert_same(records.first, copy.fetch('repeated'))
+    wire = copy.fetch('message').encode
+    assert_equal([Dnsruby::Types::SVCB, Dnsruby::Types::HTTPS],
+                 Dnsruby::Message.decode(wire).answer.map(&:type))
+    assert_equal(wire, YAML.unsafe_load(YAML.dump(copy)).fetch('message').encode)
+  end
+
+  def test_legacy_svcb_yaml_rejects_malformed_rdata
+    fixture = File.read(File.join(__dir__, 'fixtures/legacy-svcb-https-v1.74.yaml'))
+    malformed = fixture.sub(/^  data:.*$/) { '  data: "\\0"' }
+    refute_equal(fixture, malformed)
+    assert_raises(Dnsruby::DecodeError) { YAML.unsafe_load(malformed) }
+  end
+
+  def test_legacy_svcb_yaml_rejects_empty_internet_class_rdata
+    fixture = File.read(File.join(__dir__, 'fixtures/legacy-svcb-https-v1.74.yaml'))
+    malformed = fixture.sub(/^  data:.*$/) { '  data: ""' }
+    assert_raises(Dnsruby::DecodeError) { YAML.unsafe_load(malformed) }
+  end
+
+  def test_migrated_svcb_yaml_preserves_deep_freeze
+    # Acyclic old generic layout: Psych itself cannot freeze a self-referential
+    # object while it is still being initialized. Cycles are tested separately.
+    data = ['000103737663076578616d706c650000010003026832'].pack('H*')
+    [64, 65].each do |type|
+      fixture = <<~YAML
+        --- !ruby/object:Dnsruby::RR::Generic::Type#{type}_Class1
+        data: !!binary #{[data].pack('m0')}
+        klass: !ruby/object:Dnsruby::Classes
+          code: 1
+          string: IN
+      YAML
+      [false, true].each do |freeze|
+        rr = YAML.unsafe_load(fixture, freeze: freeze)
+        assert_equal(freeze, rr.frozen?)
+        assert_equal(freeze, rr.target.frozen?)
+        assert_equal(freeze, rr.target.labels.frozen?)
+        rr.target.labels.each do |label|
+          assert_equal(freeze, label.frozen?)
+          assert_equal(freeze, label.string.frozen?)
+          assert_equal(freeze, label.downcase.frozen?)
+        end
+        assert_equal(freeze, rr.params.frozen?)
+        assert_equal(freeze, rr.params.fetch(1).frozen?)
+        assert_equal(freeze, rr.type.frozen?)
+        assert_equal('h2', rr.params_to_hash.fetch('alpn'))
+        assert_equal('svc.example.', rr.target.to_s(true))
+      end
+    end
+  end
+
+  def test_named_svcb_yaml_preserves_custom_data_without_legacy_migration
+    rr = Dnsruby::RR.create('example. 60 IN HTTPS 1 . alpn=h2')
+    rr.instance_variable_set(:@data, 'application field')
+    copy = YAML.unsafe_load(YAML.dump(rr))
+    assert_equal('application field', copy.instance_variable_get(:@data))
+    assert_equal(rr.to_s, copy.to_s)
+  end
+
   def assert_subprocess(script)
     # These are standalone load-order tests. Bundler and RUBYOPT preloads can
     # activate Psych before the script starts. Keep the selected Ruby executable,

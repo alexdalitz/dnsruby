@@ -251,10 +251,10 @@ class TestNameserverBootstrap < Minitest::Test
 
   def test_recursive_fallback_accepts_addresses_and_reuses_safe_resolver
     hostname = 'ns.example.test'
-    ['192.0.2.53', '2001:db8::53'].each do |address|
+    { '192.0.2.53' => '192.0.2.53', '2001:db8::53' => '2001:DB8::53' }.each do |address, expected|
       with_lookup({nameserver: [hostname, '192.0.2.1']}, answer_for(hostname),
                   recursive_response: answer_for(hostname, address)) do |state, _|
-        assert_equal(address, Dnsruby::Config.resolve_server(hostname))
+        assert_equal(expected, Dnsruby::Config.resolve_server(hostname))
         lookup = state[:queries].pop(true)
         assert_equal(['192.0.2.1'], lookup[2])
         assert_equal([lookup[0]], state[:recursors].pop(true))
