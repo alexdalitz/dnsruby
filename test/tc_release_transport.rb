@@ -695,6 +695,187 @@ class TestReleaseTransport < Minitest::Test
     RUBY
   end
 
+  def test_udp_close_and_timeout_between_ownership_check_and_write_cancel_the_datagram
+    isolated(<<~'RUBY')
+      SELECTOR.singleton_class.remove_method(:notify_queue_observers)
+      lookup = SELECTOR.method(:query_settings_for_id)
+      [:close, :timeout].each do |cancellation|
+        socket = FrameSocket.new
+        connected, paused = false, false
+        socket.define_singleton_method(:bind) { |*| }
+        socket.define_singleton_method(:connect) { |*| connected = true }
+        UDPSocket.define_singleton_method(:new) { |*| socket }
+        resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1', dnssec: false,
+          udp_size: 512, packet_timeout: 1)
+        entered, release = Queue.new, Queue.new
+        SELECTOR.define_singleton_method(:query_settings_for_id) do |id|
+          current = lookup.call(id)
+          if connected && !paused
+            paused = true
+            entered << true
+            release.pop
+          end
+          current
+        end
+        queue = Queue.new
+        sending = Thread.new { resolver.send_async(query, queue, cancellation) }
+        entered.pop
+        if cancellation == :close
+          resolver.close
+        else
+          deadlines = K.class_variable_get(:@@timeouts)
+          deadlines.keys.each { |id| deadlines[id] = Dnsruby::TransportClock.now - 1 }
+          SELECTOR.process_timeouts
+        end
+        expected = cancellation == :close ? Dnsruby::OtherResolvError : Dnsruby::ResolvTimeout
+        raise 'missing cancellation completion' unless queue.size == 1 && queue.pop.last.is_a?(expected)
+        release << true
+        sending.value
+        drain_errors
+        raise 'cancelled UDP request sent bytes' unless socket.written.empty?
+        raise 'cancelled UDP socket leaked' unless socket.closed?
+        raise 'duplicate cancellation completion' unless queue.empty?
+        raise 'cancelled reservation retained' unless K.class_variable_get(:@@query_hash).empty?
+        raise 'cancelled queue retained' unless K.class_variable_get(:@@queries_by_queue).empty?
+        resolver.close
+      end
+    RUBY
+  end
+
+  def test_congested_udp_write_leaves_selector_and_remains_cancellable
+    isolated(<<~'RUBY')
+      socket = FrameSocket.new
+      socket.define_singleton_method(:bind) { |*| }
+      socket.define_singleton_method(:connect) { |*| }
+      socket.define_singleton_method(:write_nonblock) { |*| raise IO::EAGAINWaitWritable }
+      UDPSocket.define_singleton_method(:new) { |*| socket }
+      entered, release = Queue.new, Queue.new
+      IO.define_singleton_method(:select) do |readers, writers, *|
+        raise 'UDP wait blocked selector' if SELECTOR.selector_thread?
+        raise 'wrong writable socket' unless readers.nil? && writers == [socket]
+        entered << true
+        release.pop
+        [[], [socket], []]
+      end
+      writer = Dnsruby::PacketSender.new(server: '127.0.0.1', dnssec: false)
+      K.class_variable_set(:@@select_thread, Thread.current)
+      request, queue = query, Queue.new
+      task = writer.send_dnsruby(request.encode, request, :congested, queue, false)
+      entered.pop
+      SELECTOR.remove_id(:congested)
+      release << true
+      task.value
+      drain_errors
+      raise 'cancelled congested UDP request sent bytes' unless socket.written.empty?
+      raise 'cancelled congested UDP socket leaked' unless socket.closed?
+      raise 'cancelled congested UDP reported another error' unless queue.empty?
+    RUBY
+  end
+
+  def test_udp_writable_wait_has_a_packet_deadline_and_never_splits_datagrams
+    isolated(<<~'RUBY')
+      socket = FrameSocket.new
+      socket.define_singleton_method(:bind) { |*| }
+      socket.define_singleton_method(:connect) { |*| }
+      socket.define_singleton_method(:write_nonblock) { |*| raise IO::EAGAINWaitWritable }
+      UDPSocket.define_singleton_method(:new) { |*| socket }
+      IO.define_singleton_method(:select) do |readers, writers, _, timeout|
+        raise 'missing packet deadline' unless timeout > 0 && timeout <= 1
+        nil
+      end
+      writer = Dnsruby::PacketSender.new(server: '127.0.0.1', packet_timeout: 1, dnssec: false)
+      queue, request = Queue.new, query
+      writer.send_async(request, queue, :blocked)
+      drain_errors
+      raise 'UDP writable wait did not time out exactly once' unless
+        queue.size == 1 && queue.pop.last.is_a?(Dnsruby::ResolvTimeout)
+      raise 'UDP timeout retained socket or ownership' unless
+        socket.closed? && K.class_variable_get(:@@query_hash).empty?
+
+      partial = FrameSocket.new
+      partial.limit = 1
+      begin
+        writer.write_udp_packet(partial, 'abc', Dnsruby::TransportClock.now + 1, K::SendToken.new, true)
+        raise 'partial datagram accepted'
+      rescue IOError => error
+        raise 'wrong partial datagram error' unless error.message == 'Incomplete UDP datagram write'
+      end
+      raise 'UDP datagram was split across writes' unless partial.written == 'a'
+    RUBY
+  end
+
+  def test_queue_attempt_index_tracks_replacement_registration_and_cancellation
+    isolated(<<~'RUBY')
+      first, second = Queue.new, Queue.new
+      owner, replacement_owner = Object.new, Object.new
+      SELECTOR.add_observer(first, owner)
+      SELECTOR.add_observer(first, owner)
+      SELECTOR.add_observer(second, owner)
+      counts = K.class_variable_get(:@@observer_queue_counts)
+      raise 'duplicate observer registration counted twice' unless counts.length == 1 && counts[owner] == 2
+      SELECTOR.add_observer(first, replacement_owner)
+      raise 'observer replacement lost its counts' unless counts.length == 2 && counts[owner] == 1 && counts[replacement_owner] == 1
+
+      pending = settings(FrameSocket.new, :moved)
+      pending.socket, pending.client_queue = nil, first
+      SELECTOR.reserve_send(pending)
+      replacement = settings(FrameSocket.new, :moved)
+      replacement.socket, replacement.client_queue = nil, second
+      SELECTOR.reserve_send(replacement, pending)
+      index = K.class_variable_get(:@@queries_by_queue)
+      raise 'replacement retained old queue membership' if index.key?(first)
+      raise 'replacement missing new queue membership' unless index[second] == Set[:moved]
+      raise 'stale claim consumed replacement' if SELECTOR.claim_query(pending)
+
+      live = settings(FrameSocket.new, :live)
+      live.client_queue = first
+      SELECTOR.add_to_select(live)
+      queued = settings(FrameSocket.new, :queued)
+      queued.socket, queued.client_queue = nil, first
+      SELECTOR.reserve_send(queued)
+      SELECTOR.cancel_queries_for_queue(first)
+      raise 'queue cancellation retained attempts' if index.key?(first)
+      raise 'queue cancellation removed another query' unless SELECTOR.query_settings_for_id(:moved).equal?(replacement)
+      raise 'queue cancellation removed the observer' unless
+        K.class_variable_get(:@@observers)[first].equal?(replacement_owner) && counts[replacement_owner] == 1
+      raise 'queue cancellation delivered an error' unless first.empty?
+      raise 'queue cancellation left a reusable stream' unless live.socket.closed?
+
+      closed = settings(FrameSocket.new, :moved)
+      closed.client_queue, closed.send_token = second, replacement.send_token
+      closed.is_persistent_socket = false
+      closed.socket.close
+      raise 'closed socket registered' if SELECTOR.register_query_if_current(closed, replacement)
+      raise 'failed registration retained queue membership' unless index.empty?
+      SELECTOR.remove_observer(first, replacement_owner)
+      SELECTOR.remove_observer(second, owner)
+      raise 'completed observers retained counts or ticks' unless counts.empty? && K.class_variable_get(:@@tick_observers).empty?
+    RUBY
+  end
+
+  def test_bulk_cancellation_does_not_scan_global_queries_or_observers
+    isolated(<<~'RUBY')
+      owner = Object.new
+      queues = 2000.times.map { Queue.new }
+      queues.each_with_index do |queue, id|
+        SELECTOR.add_observer(queue, owner)
+        pending = K::QuerySettings.new(nil, nil, false, queue, id, nil, nil, nil,
+          Dnsruby::TransportClock.now + 60, 512, nil)
+        SELECTOR.reserve_send(pending)
+      end
+      queries = K.class_variable_get(:@@query_hash)
+      observers = K.class_variable_get(:@@observers)
+      [queries, observers].each do |table|
+        [:values, :each, :each_value].each do |method|
+          table.define_singleton_method(method) { |*| raise 'global ownership scan during cancellation' }
+        end
+      end
+      queues.each { |queue| SELECTOR.remove_observer(queue, owner) }
+      raise 'bulk cancellation retained state' unless queries.empty? && observers.empty? &&
+        K.class_variable_get(:@@queries_by_queue).empty? && K.class_variable_get(:@@observer_queue_counts).empty?
+    RUBY
+  end
+
   private
 
   def isolated(body)

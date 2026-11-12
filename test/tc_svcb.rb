@@ -731,6 +731,85 @@ class TestSVCB < Minitest::Test
                  svcb('1 . key667="\\034"').rdata_to_string)
   end
 
+  def test_invalid_value_list_escapes_rejected_in_both_constructors
+    # Each character-string decodes to either h2\q or a final h2\.
+    # The second layer permits only an escaped comma or backslash.
+    invalid = ['h2' + '\\' * 2 + 'q', 'h2' + '\\' * 2,
+               'h2\092q', 'h2\092']
+    %w[SVCB HTTPS].each do |type|
+      %w[alpn docpath].each do |key|
+        invalid.each do |value|
+          [value, "\"#{value}\""].each do |presentation|
+            assert_raises(Dnsruby::DecodeError) { svcb("1 . #{key}=#{presentation}", type) }
+            assert_raises(Dnsruby::DecodeError) do
+              RR.create(name: 'example.com.', type: type, priority: 1, target: '.',
+                        params: {key => presentation})
+            end
+          end
+        end
+      end
+    end
+  end
+
+  def test_value_list_escaping_preserves_valid_octets_in_both_constructors
+    # A first-layer \q is valid and becomes q. Doubled second-layer slashes
+    # and escaped commas remain data in an item, for ALPN and DoC paths alike.
+    {
+      'h2\q' => ['h2q'],
+      'part1\,part2' => ['part1', 'part2'],
+      'h2' + '\\' * 2 + ',q' => ['h2,q'],
+      'h2' + '\\' * 4 + 'q' => ['h2\\q'],
+      'h2' + '\\' * 4 => ['h2\\'],
+      'h2\092\092q' => ['h2\\q'],
+    }.each do |value, items|
+      expected = items.map { |item| [item.bytesize].pack('C') + item }.join.b
+      %w[SVCB HTTPS].each do |type|
+        {alpn: 1, docpath: 10}.each do |key, number|
+          from_string = svcb("1 . #{key}=#{value}", type)
+          from_hash = RR.create(name: 'example.com.', ttl: 3600, type: type,
+                                priority: 1, target: '.', params: {key => value})
+          assert_equal(expected, from_string.params[number], value)
+          assert_equal(from_string, from_hash)
+          assert_roundtrip(from_string)
+        end
+      end
+    end
+  end
+
+  def test_mnemonics_forbid_presentation_escapes_but_generic_keys_accept_them
+    # RFC 9460 sections 7.2, 7.3 and 8 forbid even first-layer escapes for
+    # these mnemonics. keyNNNNN still carries escaped raw wire octets.
+    {
+      mandatory: ['al\pn', '\097lpn'],
+      port: ['4\0523'],
+      ipv4hint: ['192.0.2.\049'],
+      ipv6hint: ['2001\058db8::1'],
+    }.each do |key, values|
+      values.each do |value|
+        %w[SVCB HTTPS].each do |type|
+          [value, "\"#{value}\""].each do |presentation|
+            assert_raises(Dnsruby::DecodeError) { svcb("1 . alpn=h2 #{key}=#{presentation}", type) }
+            assert_raises(Dnsruby::DecodeError) do
+              RR.create(name: 'example.com.', type: type, priority: 1, target: '.',
+                        params: {alpn: 'h2', key => presentation})
+            end
+          end
+        end
+      end
+    end
+
+    %w[SVCB HTTPS].each do |type|
+      raw = 'key0=\000\001 alpn=h2 key3=\001\187 key4=\192\000\002\001 ' \
+            'key6=\032\001\013\184\000\000\000\000\000\000\000\000\000\000\000\001'
+      rr = svcb("1 . #{raw}", type)
+      assert_equal('1 . mandatory=alpn alpn=h2 port=443 ipv4hint=192.0.2.1 ipv6hint=2001:db8::1', rr.rdata_to_string)
+      rebuilt = RR.create(name: 'example.com.', ttl: 3600, type: type,
+                          priority: 1, target: '.', params: rr.params_to_hash)
+      assert_equal(rr, rebuilt)
+      assert_roundtrip(rr)
+    end
+  end
+
   # The length prefix is a single octet, so a longer id has no representation.
   def test_oversized_alpn_id_rejected
     assert_raises(Dnsruby::DecodeError) { svcb("1 . alpn=#{'a' * 256}") }

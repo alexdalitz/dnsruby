@@ -19,7 +19,8 @@ block unrelated responses. Public sends remain synchronous in the caller.
 
 **Upgrading to v2?** Read the [upgrade notes](RELEASE_NOTES.md#upgrading-to-v2),
 particularly if you persist generated record classes or customise them. Legacy
-IPv6 string formatting and the raw SVCB/HTTPS record data interfaces are preserved.
+IPv6 string formatting is preserved. Raw SVCB/HTTPS data remains available through
+readers that return snapshots and explicit `data=` / `rdata=` writers.
 
 The following is a (non-exhaustive) list of features :
 

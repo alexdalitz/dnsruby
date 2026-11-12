@@ -17,7 +17,7 @@ class TestScopedIPv6Transport < Minitest::Test
       socket = Minitest::Mock.new(Object.new)
       socket.expect(:bind, 0, ['::', 55000])
       socket.expect(:connect, 0, [server, 5300])
-      socket.expect(:send, bytes.bytesize, [bytes, 0])
+      socket.expect(:write_nonblock, bytes.bytesize, [bytes])
       selector = capture_selector do |settings|
         assert_equal server, settings.dest_server
         assert_equal socket.object_id, settings.socket.object_id

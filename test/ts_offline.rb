@@ -33,6 +33,7 @@ TESTS = %w(
     pipeline_retirement
     pipeline_retry
     resolver_concurrency
+    resolver_validation
     release_transport
     record_regressions
     selector_wakeup

@@ -40,10 +40,10 @@ class TestPipelineRetry < Minitest::Test
       def initialize(kind = :formerr, pipeline: true)
         @klass = Dnsruby::SelectThread
         {
-          mutex: Mutex.new, sockets: Set.new, query_hash: {}, socket_hash: {}, timeouts: {},
+          mutex: Mutex.new, sockets: Set.new, query_hash: {}, queries_by_queue: {}.compare_by_identity, socket_hash: {}, timeouts: {},
           socket_is_persistent: {}, socket_remaining_queries: {}, tcp_buffers: {},
           queued_exceptions: [], queued_responses: [], queued_validation_responses: [],
-          observers: {}, tick_observers: [], select_thread: Thread.current
+          observers: {}, observer_queue_counts: {}.compare_by_identity, tick_observers: [], select_thread: Thread.current
         }.each { |name, value| @klass.class_variable_set("@@#{name}", value) }
         @selector = @klass.send(:allocate)
         @selector.define_singleton_method(:wake_up_select_thread) {}
@@ -378,10 +378,19 @@ class TestPipelineRetry < Minitest::Test
       [:live, :failed, :expired, :replaced].each do |action|
         fixture = RetryFixture.new(:formerr, pipeline: false)
         reached = false
-        fixture.udp.on_send = -> do
-          reached = true
-          fixture.compete(action)
-          raise IOError, 'UDP retry send failed'
+        fixture.udp.on_send = -> { raise IOError, 'UDP retry send failed' }
+        write = fixture.sender.method(:write_udp_packet)
+        fixture.sender.define_singleton_method(:write_udp_packet) do |*args|
+          begin
+            write.call(*args)
+          rescue IOError
+            # A native write cannot call the selector while holding the send
+            # token. Schedule the competing completion after that lock releases
+            # but before PacketSender claims the failed attempt.
+            reached = true
+            fixture.compete(action)
+            raise
+          end
         end
         fixture.check_retry
         raise 'nonpipeline send hook not reached' unless reached

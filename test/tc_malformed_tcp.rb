@@ -34,7 +34,7 @@ class TestMalformedTcp < Minitest::Test
   def setup
     @selector_class = Dnsruby::SelectThread
     @temporary_variables = []
-    { :@@mutex => Mutex.new, :@@query_hash => {}, :@@socket_hash => {},
+    { :@@mutex => Mutex.new, :@@query_hash => {}, :@@queries_by_queue => {}.compare_by_identity, :@@socket_hash => {},
       :@@timeouts => {}, :@@sockets => Set.new, :@@tcp_buffers => {},
       :@@socket_owners => {}, :@@retiring_sockets => Set.new,
       :@@socket_is_persistent => {}, :@@socket_remaining_queries => {}, :@@queued_exceptions => [] }.each do |name, value|
@@ -52,6 +52,7 @@ class TestMalformedTcp < Minitest::Test
     table(:mutex).synchronize do
       @registered.each do |settings|
         table(:query_hash).delete(settings.client_query_id)
+        table(:queries_by_queue).delete(settings.client_queue)
         table(:timeouts).delete(settings.client_query_id)
         [:socket_hash, :tcp_buffers, :socket_is_persistent, :socket_remaining_queries, :socket_owners].each do |name|
           table(name).delete(settings.socket)
@@ -299,9 +300,9 @@ class TestMalformedTcp < Minitest::Test
         settings.client_queue, settings.socket = queue, socket
         settings.endtime = Dnsruby::TransportClock.now + 60
         {
-          mutex: Mutex.new, sockets: Set.new([wakeup]), timeouts: {}, query_hash: {},
+          mutex: Mutex.new, sockets: Set.new([wakeup]), timeouts: {}, query_hash: {}, queries_by_queue: {}.compare_by_identity,
           socket_hash: {}, socket_is_persistent: {}, socket_remaining_queries: {},
-          tcp_buffers: {}, select_thread: Thread.current, observers: {},
+          tcp_buffers: {}, select_thread: Thread.current, observers: {}, observer_queue_counts: {}.compare_by_identity,
           queued_exceptions: [], queued_responses: [], queued_validation_responses: [],
           tick_observers: [], wakeup_sockets: [wakeup, wakeup]
         }.each { |name, value| klass.class_variable_set("@@#{name}", value) }
@@ -427,9 +428,9 @@ class TestMalformedTcp < Minitest::Test
           wakeup = Object.new
           wakeup.define_singleton_method(:closed?) { false }
           {
-            mutex: Mutex.new, sockets: Set.new([wakeup]), timeouts: {}, query_hash: {},
+            mutex: Mutex.new, sockets: Set.new([wakeup]), timeouts: {}, query_hash: {}, queries_by_queue: {}.compare_by_identity,
             socket_hash: {}, socket_is_persistent: {}, socket_remaining_queries: {},
-            tcp_buffers: {}, select_thread: nil, observers: {}, tick_observers: [],
+            tcp_buffers: {}, select_thread: nil, observers: {}, observer_queue_counts: {}.compare_by_identity, tick_observers: [],
             queued_exceptions: [], queued_responses: [], queued_validation_responses: [],
             wakeup_sockets: [wakeup, wakeup]
           }.each { |name, value| klass.class_variable_set("@@#{name}", value) }
@@ -551,7 +552,7 @@ class TestMalformedTcp < Minitest::Test
     assert_selector_subprocess(<<~'RUBY')
       klass = Dnsruby::SelectThread
       {
-        mutex: Mutex.new, query_hash: {}, socket_hash: {}, timeouts: {}, sockets: Set.new,
+        mutex: Mutex.new, query_hash: {}, queries_by_queue: {}.compare_by_identity, socket_hash: {}, timeouts: {}, sockets: Set.new,
         tcp_buffers: {}, socket_is_persistent: {}, socket_remaining_queries: {}, queued_exceptions: []
       }.each { |name, value| klass.class_variable_set("@@#{name}", value) }
       selector = klass.send(:allocate)
@@ -627,6 +628,7 @@ class TestMalformedTcp < Minitest::Test
     settings.dest_port = port
     table(:mutex).synchronize do
       table(:query_hash)[settings.client_query_id] = settings
+      (table(:queries_by_queue)[settings.client_queue] ||= Set.new) << settings.client_query_id
       (table(:socket_hash)[socket] ||= []) << settings.client_query_id
       table(:socket_is_persistent)[socket] = true
     end

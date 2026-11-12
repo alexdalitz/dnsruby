@@ -574,6 +574,24 @@ module Dnsruby
       true
     end
 
+    # A datagram is sent atomically. Order the actual write with cancellation,
+    # as for TCP, without holding the token while waiting for a writable socket.
+    def write_udp_packet(socket, query_bytes, endtime, send_token, wait_for_writable)
+      loop do
+        remaining = endtime - TransportClock.now
+        raise ResolvTimeout, "Query timed out writing UDP packet" if remaining <= 0
+        begin
+          written = send_token.write { socket.write_nonblock(query_bytes) }
+          return false if written == false
+          raise IOError, "Incomplete UDP datagram write" unless written == query_bytes.bytesize
+          return true
+        rescue IO::WaitWritable
+          raise unless wait_for_writable
+          raise ResolvTimeout, "Query timed out writing UDP packet" unless IO.select(nil, [socket], nil, remaining)
+        end
+      end
+    end
+
     def response_query_settings(client_query_id)
       settings = Thread.current[:dnsruby_response_query]
       settings if settings && settings.client_query_id == client_query_id &&
@@ -715,52 +733,62 @@ module Dnsruby
         end
         runnextportloop = false
       end
-      begin
-        if use_tcp
-          completed = write_tcp_frame(socket, query_bytes, endtime, query_settings.send_token)
-          # Cancellation of a partially written frame retires its whole stream;
-          # otherwise another frame could be appended to a corrupt prefix.
-          unless completed == true
-            if pipeline && completed > 0
-              st.fail_tcp_send(query_settings, SocketEofResolvError.new("TCP send cancelled"))
-              @use_counts.delete(socket)
-              @pipeline_socket = nil if @pipeline_socket == socket
-            elsif !pipeline
-              socket.close rescue nil
-            end
-            return
-          end
-        else
-          socket.send(query_bytes, 0)
-          socket.close unless st.register_query_if_current(query_settings, previous_settings)
-        end
-      rescue Exception => e
-        err_msg = "Send failed to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}"
-        err=IOError.new(err_msg)
-        Dnsruby.log.error { "#{err}" }
-        Dnsruby.log.error(e.backtrace)
-        if pipeline
-          error = e.kind_of?(ResolvTimeout) ? e : SocketEofResolvError.new(err_msg)
-          st.fail_tcp_send(query_settings, error)
-          @use_counts.delete(socket)
-          @pipeline_socket = nil if @pipeline_socket == socket
-        elsif e.kind_of?(ResolvTimeout)
-          report_error.call(e)
-        elsif @tcp_pipelining
-          report_error.call(SocketEofResolvError.new(err_msg))
-        else
-          report_error.call(err)
-        end
+      send_packet = -> do
         begin
-          #we let the select_thread close the socket when doing tcp
-          #pipelining
-          socket.close unless @tcp_pipelining && !new_socket
-        rescue Exception
+          if use_tcp
+            completed = write_tcp_frame(socket, query_bytes, endtime, query_settings.send_token)
+            # Cancellation of a partially written frame retires its whole stream;
+            # otherwise another frame could be appended to a corrupt prefix.
+            unless completed == true
+              if pipeline && completed > 0
+                st.fail_tcp_send(query_settings, SocketEofResolvError.new("TCP send cancelled"))
+                @use_counts.delete(socket)
+                @pipeline_socket = nil if @pipeline_socket == socket
+              elsif !pipeline
+                socket.close rescue nil
+              end
+              return
+            end
+          else
+            unless write_udp_packet(socket, query_bytes, endtime, query_settings.send_token, !st.selector_thread?)
+              socket.close
+              return
+            end
+            socket.close unless st.register_query_if_current(query_settings, previous_settings)
+          end
+        rescue IO::WaitWritable
+          # Only a congested UDP send reaches this branch on the selector. Keep
+          # ordinary UDP traffic independent of the pool's blocked TCP writers.
+          return st.defer_send { send_packet.call }
+        rescue Exception => e
+          err_msg = "Send failed to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}"
+          err=IOError.new(err_msg)
+          Dnsruby.log.error { "#{err}" }
+          Dnsruby.log.error(e.backtrace)
+          if pipeline
+            error = e.kind_of?(ResolvTimeout) ? e : SocketEofResolvError.new(err_msg)
+            st.fail_tcp_send(query_settings, error)
+            @use_counts.delete(socket)
+            @pipeline_socket = nil if @pipeline_socket == socket
+          elsif e.kind_of?(ResolvTimeout)
+            report_error.call(e)
+          elsif @tcp_pipelining
+            report_error.call(SocketEofResolvError.new(err_msg))
+          else
+            report_error.call(err)
+          end
+          begin
+            #we let the select_thread close the socket when doing tcp
+            #pipelining
+            socket.close unless @tcp_pipelining && !new_socket
+          rescue Exception
+          end
+          return
         end
-        return
-      end
 
-      Dnsruby.log.debug { "Packet sent to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}" }
+        Dnsruby.log.debug { "Packet sent to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp} : #{query.question()[0].qname}, #{query.question()[0].qtype}" }
+      end
+      send_packet.call
     rescue StandardError => error
       # Errors outside the expected connect/write failures must not disappear in
       # a worker's result queue. Do not consume a replacement protocol attempt.

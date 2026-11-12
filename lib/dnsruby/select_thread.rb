@@ -51,11 +51,13 @@ module Dnsruby
         @@timeouts = Hash.new
         #     @@mutex.synchronize do
         @@query_hash = Hash.new
+        @@queries_by_queue = {}.compare_by_identity
         @@socket_hash = Hash.new
         @@socket_is_persistent = Hash.new
         @@socket_owners = Hash.new
         @@retiring_sockets = Set.new
         @@observers = Hash.new
+        @@observer_queue_counts = {}.compare_by_identity
         @@tcp_buffers=Hash.new
         @@socket_remaining_queries = Hash.new
         @@tick_observers = []
@@ -151,6 +153,7 @@ module Dnsruby
           remove_id_from_mutex_synchronized_block(settings.client_query_id, settings.send_token)
         end
         @@query_hash[settings.client_query_id] = settings
+        (@@queries_by_queue[settings.client_queue] ||= Set.new) << settings.client_query_id
         @@timeouts[settings.client_query_id] = settings.endtime
         check_select_thread_synchronized
       end
@@ -287,6 +290,7 @@ module Dnsruby
         return false
       end
       @@query_hash[id] = settings
+      (@@queries_by_queue[settings.client_queue] ||= Set.new) << id
       (@@socket_hash[settings.socket] ||= []) << id
       if settings.tcp_pipelining_max_queries != :infinite
         @@socket_remaining_queries[settings.socket] ||= settings.tcp_pipelining_max_queries
@@ -650,6 +654,11 @@ module Dnsruby
     def remove_id_from_mutex_synchronized_block(id, preserved_token = nil, response_received = false)
       settings = @@query_hash.delete(id)
       return unless settings
+      ids = @@queries_by_queue[settings.client_queue]
+      if ids
+        ids.delete(id)
+        @@queries_by_queue.delete(settings.client_queue) if ids.empty?
+      end
       settings.send_token.cancel unless settings.send_token.equal?(preserved_token)
       @@timeouts.delete(id)
       socket = settings.socket
@@ -1075,32 +1084,53 @@ module Dnsruby
 
     def add_observer(client_queue, observer)
       @@mutex.synchronize {
-        @@observers[client_queue]=observer
-        check_select_thread_synchronized # Is this really necessary? The client should start the thread by sending a query, really...
-        if (!@@tick_observers.include?observer)
-          @@tick_observers.push(observer)
+        previous = @@observers[client_queue]
+        unless previous.equal?(observer)
+          remove_observer_queue_count(previous) if previous
+          @@observers[client_queue] = observer
+          count = (@@observer_queue_counts[observer] || 0) + 1
+          @@observer_queue_counts[observer] = count
+          @@tick_observers.push(observer) if count == 1
         end
+        check_select_thread_synchronized # Is this really necessary? The client should start the thread by sending a query, really...
       }
     end
+
+    # Stop packet attempts without removing the logical query's observer. A
+    # received response can still need validation and its overall deadline.
+    def cancel_queries_for_queue(client_queue)
+      @@mutex.synchronize { cancel_queries_for_queue_synchronized(client_queue) }
+      wake_up_select_thread
+    end
+
+    def cancel_queries_for_queue_synchronized(client_queue)
+      ids = @@queries_by_queue[client_queue]
+      ids.to_a.each { |id| remove_id_from_mutex_synchronized_block(id) } if ids
+    end
+    private :cancel_queries_for_queue_synchronized
+
+    def remove_observer_queue_count(observer)
+      count = @@observer_queue_counts[observer] - 1
+      if count == 0
+        @@observer_queue_counts.delete(observer)
+        @@tick_observers.delete(observer)
+      else
+        @@observer_queue_counts[observer] = count
+      end
+    end
+    private :remove_observer_queue_count
 
     def remove_observer(client_queue, observer)
       @@mutex.synchronize {
         if (@@observers[client_queue]==observer)
-          #           @@observers.delete(observer)
-          @@observers.delete(client_queue)
+          registered_observer = @@observers.delete(client_queue)
           # Resolver completion/close owns every packet attempt for this queue,
           # including queued sends which have not opened a socket yet.
-          @@query_hash.values.select { |settings| settings.client_queue.equal?(client_queue) }.each do |settings|
-            remove_id_from_mutex_synchronized_block(settings.client_query_id)
-          end
+          cancel_queries_for_queue_synchronized(client_queue)
+          remove_observer_queue_count(registered_observer)
         else
-          if (@@observers[client_queue] == nil)
-          end
           Dnsruby.log.error{"remove_observer called with wrong observer for queue"}
           raise ArgumentError.new("remove_observer called with wrong observer for queue")
-        end
-        if (!@@observers.values.include?observer)
-          @@tick_observers.delete(observer)
         end
       }
     end

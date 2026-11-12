@@ -15,10 +15,10 @@ class TestPipelineRetirement < Minitest::Test
       def initialize
         @klass = Dnsruby::SelectThread
         {
-          mutex: Mutex.new, sockets: Set.new, query_hash: {}, socket_hash: {}, timeouts: {},
+          mutex: Mutex.new, sockets: Set.new, query_hash: {}, queries_by_queue: {}.compare_by_identity, socket_hash: {}, timeouts: {},
           socket_is_persistent: {}, socket_remaining_queries: {}, tcp_buffers: {},
           queued_exceptions: [], queued_responses: [], queued_validation_responses: [],
-          observers: {}, tick_observers: [], select_thread: Thread.current
+          observers: {}, observer_queue_counts: {}.compare_by_identity, tick_observers: [], select_thread: Thread.current
         }.each { |name, value| @klass.class_variable_set("@@#{name}", value) }
         @selector = @klass.send(:allocate)
         @selector.define_singleton_method(:wake_up_select_thread) {}

@@ -48,6 +48,10 @@ module Dnsruby
       # Keys defined to carry no value at all: no-default-alpn and ohttp.
       KEYS_FORBIDDING_VALUE = [2, 8].freeze
 
+      # RFC 9460 sections 7.2, 7.3 and 8 prohibit presentation escapes for
+      # these mnemonics. Numeric keyNNNNN values still use generic octets.
+      KEYS_FORBIDDING_ESCAPES = [0, 3, 4, 6].freeze
+
       # RFC 9460 sec 14.3.2 reserves 65535 as an invalid SvcParamKey.
       INVALID_KEY = 0xffff
 
@@ -115,8 +119,7 @@ module Dnsruby
         if hash[:params]
           @params = {}
           hash[:params].each do |key, value|
-            store_param(key.to_s,
-                        value.nil? ? nil : decode_presentation_value(value.to_s))
+            store_param(key.to_s, value.nil? ? nil : value.to_s)
           end
         end
         validate_svcparams(@priority, @params)
@@ -159,7 +162,7 @@ module Dnsruby
 
         tokens.each do |token|
           key, eq, value = token.partition('=')
-          store_param(key, eq.empty? ? nil : decode_presentation_value(value))
+          store_param(key, eq.empty? ? nil : value)
         end
         validate_svcparams(@priority, @params)
       end
@@ -309,16 +312,22 @@ module Dnsruby
         raise DecodeError.new("SVCB record given a #{given} but no #{missing}; both are mandatory")
       end
 
-      # RFC 9460 sec 2.1 forbids a duplicate key.
+      # Both constructors supply presentation text. Check restrictions before
+      # character-string decoding can erase an otherwise forbidden escape.
       def store_param(key, value)
         num = key_to_num(key)
         if @params.key?(num)
           raise DecodeError.new("duplicate SvcParamKey: #{num_to_key(num)}")
         end
+        generic = key.downcase.start_with?('key')
+        if !generic && KEYS_FORBIDDING_ESCAPES.include?(num) && value&.include?('\\')
+          raise DecodeError.new("SvcParamValue for #{num_to_key(num)} must not contain escape sequences")
+        end
+        value = decode_presentation_value(value) unless value.nil?
         # RFC 9460 sec 2.1: keyNNNNN uses the generic character-string form,
         # even when that number has a known mnemonic. Its decoded octets are
         # already wire format, rather than input for the mnemonic's codec.
-        if key.downcase.start_with?('key')
+        if generic
           wire = value.to_s.b
           validate_param_value(num, wire)
           @params[num] = wire
@@ -454,9 +463,8 @@ module Dnsruby
           result
         end
 
-        # RFC 9460 Appendix A: "Decoding of value-lists happens after
-        # character-string decoding", so the only escapes reaching the three
-        # methods below are the "\," and "\\" that layer leaves behind.
+        # RFC 9460 Appendix A: value-list decoding follows character-string
+        # decoding. Only an escaped comma or backslash is valid at this layer.
 
         def split_value_list(str)
           str = str.b
@@ -465,8 +473,13 @@ module Dnsruby
           i = 0
           while i < str.length
             c = str[i]
-            if c == '\\' && i + 1 < str.length
-              current << str[i + 1]
+            if c == '\\'
+              escaped = str[i + 1]
+              unless escaped == ',' || escaped == '\\'
+                raise DecodeError.new("invalid value-list escape in #{str.inspect}: " \
+                                      'expected an escaped comma or backslash')
+              end
+              current << escaped
               i += 2
             elsif c == ','
               items << current

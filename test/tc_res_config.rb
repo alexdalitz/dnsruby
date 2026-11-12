@@ -15,8 +15,22 @@
 # ++
 
 require_relative 'spec_helper'
+require 'minitest/mock'
+require_relative 'local_dns_server'
 
 class TestResolverConfig < Minitest::Test
+  include LocalDnsServer
+
+  BAD_SERVER = 'invalid-nameserver.test.'.freeze
+
+  def without_external_nameserver_lookup
+    original = Dnsruby::Config.method(:resolve_server)
+    lookup = lambda do |server|
+      raise ArgumentError, 'deliberately unusable nameserver fixture' if server == BAD_SERVER
+      original.call(server)
+    end
+    Dnsruby::Config.stub(:resolve_server, lookup) { yield }
+  end
 
   GoodInput = {
     "port"		  => 54,
@@ -73,7 +87,7 @@ class TestResolverConfig < Minitest::Test
   end
 
   def test_single_resolver
-    [Dnsruby::SingleResolver.new()].each {|res|
+    [Dnsruby::SingleResolver.new('127.0.0.1')].each {|res|
     # [Dnsruby::SingleResolver.new({:nameserver => ["127.0.0.1"]}),
     #   Dnsruby::SingleResolver.new({:nameserver => ["::1"]})].each {|res|
       GoodInput.each do | param, value |
@@ -85,7 +99,7 @@ class TestResolverConfig < Minitest::Test
   end
 
   def test_dns
-    res = Dnsruby::DNS.new
+    res = Dnsruby::DNS.new(nameserver: ['127.0.0.1'])
     LookupInput.each do | param, value |
       res.config.send(param+"=", value)
       assert_equal(res.config.send(param), value,       "setting #param sticks");
@@ -93,32 +107,40 @@ class TestResolverConfig < Minitest::Test
   end
 
   def test_bad_ns
-    begin
-      res = Dnsruby::Resolver.new(:nameserver => ["ns32.domiancontrol.com."])
-      res.query("example.com")
-      assert(false, "Should not query with bad nameserver")
-    rescue Exception => e
-      # OK
+    without_external_nameserver_lookup do
+      resolver = Dnsruby::Resolver.new(nameserver: BAD_SERVER, query_timeout: 0.1, do_caching: false)
+      assert_raises(Dnsruby::ResolvTimeout) { resolver.query('example.test.') }
+    ensure
+      resolver&.close
     end
   end
 
   def test_bad_ns_post_init
-    begin
-      resolver = Dnsruby::Resolver.new(recurse: false, do_caching: false, retry_times: 2)
-      resolver.nameserver = ["ns32.domiancontrol.com."]
-      assert(false, "Should not allow bad nameserver")
-      resolver.query("example.com")
-    rescue ArgumentError
+    resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1')
+    without_external_nameserver_lookup do
+      assert_raises(ArgumentError) { resolver.nameserver = [BAD_SERVER] }
+      assert_equal(['127.0.0.1'], resolver.single_resolvers.map(&:server))
     end
+  ensure
+    resolver&.close
   end
 
   def test_one_good_ns_rest_bad
-    begin
-      resolver = Dnsruby::Resolver.new(recurse: false, do_caching: false, retry_times: 2)
-      resolver.nameserver = ["ns32.domiancontrol.com.", "1.1.1.1"]
-      resolver.query("example.com")
-    rescue ArgumentError
-      assert(false, "Should allow one good nameserver")
+    without_external_nameserver_lookup do
+      with_local_dns_server(:udp, answer: 'example.test. 60 IN A 192.0.2.42') do |resolver|
+        resolver.recurse = false
+        resolver.nameserver = [BAD_SERVER, '127.0.0.1']
+        assert_equal(['127.0.0.1'], resolver.single_resolvers.map(&:server))
+        response = resolver.query('example.test.')
+        assert_equal('192.0.2.42', response.answer.first.address.to_s)
+      end
+    end
+  end
+
+  def test_actual_servfail_is_reported
+    with_local_dns_server(:udp, rcode: Dnsruby::RCode::SERVFAIL) do |resolver|
+      error = assert_raises(Dnsruby::ServFail) { resolver.query('example.test.') }
+      assert_equal('SERVFAIL', error.response.rcode.to_s)
     end
   end
 end

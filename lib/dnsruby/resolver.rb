@@ -906,6 +906,7 @@ module Dnsruby
       #       @mutex=Mutex.new
       @query_list = {}
       @timeouts = {}
+      @validation_queries = {}
     end
     def send_async(msg, client_queue, client_query_id=nil)
       #  This is the whole point of the Resolver class.
@@ -1016,7 +1017,6 @@ module Dnsruby
     #  Send the result back to the client, and close the socket for that query by removing
     #  the query from the select thread.
     def send_result_and_stop_querying(client_queue, client_query_id, select_queue, msg, error) # :nodoc: all
-      stop_querying(client_query_id)
       send_result(client_queue, client_query_id, select_queue, msg, error)
     end
 
@@ -1027,11 +1027,23 @@ module Dnsruby
       @timeouts.delete(client_query_id)
     end
 
+    # Accept one answer for validation, without losing the total query deadline.
+    # The observer remains registered so ticks and this validator can finish the
+    # logical query. Competing attempts, including queued sends, no longer own it.
+    # MUST BE CALLED WITH THE PARENT MUTEX HELD.
+    def begin_validation(client_query_id, query_id, select_queue)
+      @validation_queries[client_query_id] = query_id
+      @timeouts[client_query_id][1].clear
+      SelectThread.instance.cancel_queries_for_queue(select_queue)
+      @query_list[client_query_id][3].clear
+    end
+
     #  MUST BE CALLED IN A SYNCHRONIZED BLOCK!
     #
     #  Sends the result to the client's queue, and removes the queue observer from the select thread
     def send_result(client_queue, client_query_id, select_queue, msg, error) # :nodoc: all
-      stop_querying(client_query_id)  # @TODO@ !
+      stop_querying(client_query_id)
+      @validation_queries.delete(client_query_id)
       #  We might still get some callbacks, which we should ignore
       st = SelectThread.instance
       st.remove_observer(select_queue, self)
@@ -1120,9 +1132,6 @@ module Dnsruby
       #  can leave handleError alone
       #  but need to change handleResponse to stop sending, rather than send_result_and_stop_querying.
       #
-      #  @TODO@ Also, we could really do with a MaxValidationTimeout - if validation not OK within
-      #  this time, then raise Timeout (and stop validation)?
-      #
       #  @TODO@ Also, should there be some facility to stop validator following same chain
       #  concurrently?
       #
@@ -1144,6 +1153,21 @@ module Dnsruby
         # reuses its ID. Only the original logical query owns this queue.
         unless current && current[2].equal?(queue)
           Dnsruby.log.debug{'Ignoring response for completed query'}
+          return
+        end
+        deadline, _retries, no_nameservers = @timeouts[client_query_id]
+        if deadline && deadline <= TransportClock.now
+          reason = no_nameservers ? 'Query timed out - no valid nameservers configured' : 'Query timed out'
+          send_result_and_stop_querying(current[1], client_query_id, queue, nil,
+            ResolvTimeout.new(reason))
+          return
+        end
+        validation_query = @validation_queries[client_query_id]
+        if validation_query
+          # A response already accepted for validation owns completion. Errors
+          # and already-queued answers from competing attempts cannot replace it.
+          return unless event_type == Resolver::EventType::VALIDATED && validation_query == event_id
+        elsif event_type == Resolver::EventType::VALIDATED
           return
         end
         _msg, _client_queue, _select_queue, outstanding = current
@@ -1202,7 +1226,7 @@ module Dnsruby
         #    - if it was an NXDomain, then return that to the client, and stop all new queries (and clean up)
         #         send_result_and_stop_querying(client_queue, client_query_id, select_queue, response, error)
         increment_resolver_priority(resolver) unless response.cached
-        stop_querying(client_query_id)
+        begin_validation(client_query_id, query_id, select_queue)
         #  @TODO@ Does the client want notified at this point?
       elsif error.kind_of?(EncodeError)
         Dnsruby.log.debug{'Encode error - sending to client'}
@@ -1283,7 +1307,7 @@ module Dnsruby
       if s_queue != select_queue
         Dnsruby.log_and_raise("Serious internal error : expected select queue #{s_queue}, got #{select_queue}")
       end
-      stop_querying(client_query_id)
+      begin_validation(client_query_id, query_id, select_queue)
       #  @TODO@ Does the client want notified at this point?
       #         client_queue.push([client_query_id, Resolver::EventType::RECEIVED, msg, nil])
       #       }

@@ -40,6 +40,15 @@ Existing IPv6 string formatting is preserved.
   Ruby 3.0–3.2, avoiding accumulating weak maps and slow finalizer processing.
 * **Safe query-ID reuse.** Callbacks from a completed query cannot affect a new
   query reusing the same client ID, including when a callback overlaps `close`.
+* **DNSSEC completion and deadlines.** The total `query_timeout` remains in force
+  during local validation. Once an answer is accepted for validation, competing
+  nameserver replies cannot replace it. Late validation results are ignored after
+  timeout or close, including when the caller reuses its query ID.
+* **UDP cancellation and bounded write waits.** Closing or timing out an attempt
+  prevents subsequent datagram writes. A congested socket waits outside the
+  cancellation lock and respects the original packet deadline.
+* **Efficient query cleanup.** Completion and cancellation find attempts through
+  their own queue index, avoiding a scan of every outstanding query.
 * **Zone-file parsing fixes.** Preserve quoted and escaped parentheses, comments
   and quotes in record values.
 * **Correct DNS name-length checks.** Names longer than 255 octets on the wire now
@@ -94,6 +103,11 @@ Assign raw bytes with `rdata=` (or `data=`), or supply `rdata:` in `RR.create`'s
 Hash, to update the parsed fields. Returned byte strings are snapshots; use
 these writers to replace the record data. Presentation output uses the
 registered `SVCB` and `HTTPS` mnemonics instead of `TYPE64` and `TYPE65`.
+
+Malformed presentation escapes are rejected. In ALPN and DoC path value lists,
+the second escape layer permits only an escaped comma or backslash. The
+`mandatory`, `port`, `ipv4hint` and `ipv6hint` mnemonics do not permit presentation
+escapes; their numeric `keyNNNNN` forms still accept escaped wire octets.
 
 Decoded records also retain the original binary `@rdata` snapshot for existing
 reflective consumers such as JSONDNS. As with other records' construction-time

@@ -11,11 +11,11 @@ class TestPipelineSend < Minitest::Test
     Dnsruby.log.level = Logger::FATAL
     K = Dnsruby::SelectThread
     {
-      mutex: Mutex.new, query_hash: {}, socket_hash: {}, timeouts: {}, sockets: Set.new,
+      mutex: Mutex.new, query_hash: {}, queries_by_queue: {}.compare_by_identity, socket_hash: {}, timeouts: {}, sockets: Set.new,
       tcp_buffers: {}, socket_is_persistent: {}, socket_remaining_queries: {},
       socket_owners: {}, retiring_sockets: Set.new,
       queued_exceptions: [], queued_responses: [], queued_validation_responses: [],
-      observers: {}, tick_observers: [], select_thread: nil
+      observers: {}, observer_queue_counts: {}.compare_by_identity, tick_observers: [], select_thread: nil
     }.each { |name, value| K.class_variable_set("@@#{name}", value) }
     SELECTOR = K.send(:allocate)
     SELECTOR.define_singleton_method(:check_select_thread_synchronized) {}
