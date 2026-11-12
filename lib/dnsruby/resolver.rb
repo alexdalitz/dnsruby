@@ -1139,12 +1139,14 @@ module Dnsruby
       end
       #       @mutex.synchronize{
       @parent.single_res_mutex.synchronize {
-        if @query_list[client_query_id] == nil
-          #           print "Dead query response - ignoring\n"
-          Dnsruby.log.debug{'Ignoring response for dead query'}
+        current = @query_list[client_query_id]
+        # An observer selected before completion can arrive after the caller
+        # reuses its ID. Only the original logical query owns this queue.
+        unless current && current[2].equal?(queue)
+          Dnsruby.log.debug{'Ignoring response for completed query'}
           return
         end
-        _msg, _client_queue, _select_queue, outstanding = @query_list[client_query_id]
+        _msg, _client_queue, _select_queue, outstanding = current
         if event_type == Resolver::EventType::RECEIVED ||
               event_type == Resolver::EventType::ERROR
           unless outstanding.include?(id)

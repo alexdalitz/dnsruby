@@ -36,6 +36,10 @@ Existing IPv6 string formatting is preserved.
 * **Bounded memory use for unknown records.** Keep at most 256 automatically
   generated record classes in the cache. Classes and records held by your
   application remain usable, and explicit registrations are retained.
+  Replacing registry entries also keeps weak-index bookkeeping bounded on
+  Ruby 3.0–3.2, avoiding accumulating weak maps and slow finalizer processing.
+* **Safe query-ID reuse.** Callbacks from a completed query cannot affect a new
+  query reusing the same client ID, including when a callback overlaps `close`.
 * **Zone-file parsing fixes.** Preserve quoted and escaped parentheses, comments
   and quotes in record values.
 * **Correct DNS name-length checks.** Names longer than 255 octets on the wire now
@@ -90,6 +94,11 @@ Assign raw bytes with `rdata=` (or `data=`), or supply `rdata:` in `RR.create`'s
 Hash, to update the parsed fields. Returned byte strings are snapshots; use
 these writers to replace the record data. Presentation output uses the
 registered `SVCB` and `HTTPS` mnemonics instead of `TYPE64` and `TYPE65`.
+
+Decoded records also retain the original binary `@rdata` snapshot for existing
+reflective consumers such as JSONDNS. As with other records' construction-time
+metadata, that private snapshot does not track later field mutations; use the
+public `rdata` reader for current bytes.
 
 #### IPv6 formatting
 

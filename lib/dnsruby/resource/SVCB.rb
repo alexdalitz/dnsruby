@@ -217,8 +217,13 @@ module Dnsruby
 
       def self.decode_rdata(msg) #:nodoc: all
         # The reading half of the empty record above.
-        return new([nil, nil, {}]) unless msg.has_remaining?
+        unless msg.has_remaining?
+          record = new([nil, nil, {}])
+          record.instance_variable_set(:@rdata, ''.b)
+          return record
+        end
 
+        start = msg.index
         priority, = msg.get_unpack('n')
         target = decode_target_name(msg)
         params = {}
@@ -241,7 +246,12 @@ module Dnsruby
           params[key] = value
         end
         validate_svcparams(priority, params)
-        new([priority, target, params])
+        record = new([priority, target, params])
+        # RR keeps construction-time metadata in @rdata. Preserve the former
+        # generic record's raw String for reflective consumers such as JSONDNS;
+        # the public data/rdata readers still derive current bytes from fields.
+        record.instance_variable_set(:@rdata, msg.data.byteslice(start, msg.index - start).b)
+        record
       end
 
       def validate_decoded_rdata #:nodoc: all

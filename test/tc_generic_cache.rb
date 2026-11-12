@@ -357,6 +357,53 @@ class TestGenericCache < Minitest::Test
     assert_same(replacement, Dnsruby::RR.get_class(61_044, 1))
   end
 
+  def test_older_frozen_class_does_not_retain_its_replacement
+    held, replacement = Thread.new do
+      previous = Dnsruby::RR.get_class(62_220, 1).freeze
+      Dnsruby::ClassHash.delete([62_220, 1])
+      current = Dnsruby::RR.get_class(62_220, 1)
+      Dnsruby::ClassHash.delete([62_220, 1])
+      [previous, WeakRef.new(current)]
+    end.value
+    5.times { GC.start(full_mark: true, immediate_sweep: true) }
+    refute(replacement.weakref_alive?)
+    assert(held.frozen?)
+    assert_nil(Cache.named('Type62220_Class1'))
+
+    current = Dnsruby::RR.get_class(62_220, 1)
+    refute_same(held, current)
+    evict
+    5.times { GC.start(full_mark: true, immediate_sweep: true) }
+    assert_same(current, Generic.const_get('Type62220_Class1'))
+    assert_same(current, Dnsruby::RR.get_class(62_220, 1))
+  end
+
+  def test_repeated_replacement_does_not_retain_obsolete_weak_maps
+    # Ruby 3.0-3.2 WeakMap finalizers can retain an abandoned map while any
+    # indexed object remains alive. A held class plus delete/recreate churn
+    # must not retain a new complete map for every replacement.
+    script = <<~RUBY
+      require 'dnsruby'
+      held = Dnsruby::RR.get_class(62_221, 1).freeze
+      GC.start(full_mark: true, immediate_sweep: true)
+      before = ObjectSpace.each_object(ObjectSpace::WeakMap).count
+      Thread.new do
+        200.times do
+          Dnsruby::ClassHash.delete([62_222, 1])
+          Dnsruby::RR.get_class(62_222, 1)
+        end
+      end.value
+      5.times { GC.start(full_mark: true, immediate_sweep: true) }
+      after = ObjectSpace.each_object(ObjectSpace::WeakMap).count
+      raise "obsolete WeakMaps retained: \#{before} -> \#{after}" if after > before + 2
+      raise 'held class identity changed' unless held.equal?(Dnsruby::RR.get_class(62_221, 1))
+    RUBY
+    stdout, stderr, status = Open3.capture3(
+      RbConfig.ruby, '-I', File.expand_path('../lib', __dir__), '-e', script)
+    assert(status.success?, "#{stdout}\n#{stderr}")
+    assert_empty(stderr)
+  end
+
   def after_native_hash_return(operation, concurrent)
     owner = Thread.current
     fired = false

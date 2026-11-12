@@ -181,7 +181,106 @@ class TestResolverConcurrency < Minitest::Test
     RUBY
   end
 
+  def test_close_and_id_reuse_ignore_an_old_received_response
+    assert_stale_query_event_is_ignored(:RECEIVED)
+  end
+
+  def test_close_and_id_reuse_ignore_an_old_received_error
+    assert_stale_query_event_is_ignored(:RECEIVED, :ServFail)
+  end
+
+  def test_close_and_id_reuse_ignore_an_old_transport_error
+    assert_stale_query_event_is_ignored(:ERROR, :ServFail)
+  end
+
+  def test_close_and_id_reuse_ignore_an_old_validated_response
+    assert_stale_query_event_is_ignored(:VALIDATED)
+  end
+
+  def test_close_and_id_reuse_ignore_an_old_validation_error
+    assert_stale_query_event_is_ignored(:VALIDATED, :ServFail)
+  end
+
   private
+
+  def assert_stale_query_event_is_ignored(event_type, error_type = nil)
+    isolated(<<~RUBY + <<~'RUBY')
+      stale_event_type = Dnsruby::Resolver::EventType::#{event_type}
+      stale_error = #{error_type ? "Dnsruby::#{error_type}.new" : 'nil'}
+    RUBY
+      SELECTOR.singleton_class.remove_method(:notify_queue_observers)
+      Thread.report_on_exception = false
+      options = { nameserver: '127.0.0.1', dnssec: false, do_caching: false,
+        packet_timeout: 60, query_timeout: 60 }
+      resolver = Dnsruby::Resolver.new(options)
+      unrelated = Dnsruby::Resolver.new(options)
+      sends = Queue.new
+      [resolver, unrelated].each do |parent|
+        parent.single_resolvers.first.define_singleton_method(:send_async) do |message, queue, id|
+          sends << [message, queue, id, self]
+        end
+      end
+      queue, keeper_queue, unrelated_queue = Queue.new, Queue.new, Queue.new
+      resolver.send_async(query('old.example.'), queue, :reused)
+      old_message, old_queue, old_id, = sends.pop
+      response = old_message.clone
+      response.header.qr = true
+      response.header.rcode = Dnsruby::RCode::SERVFAIL if stale_error
+      old_queue << [old_id, stale_event_type, response, stale_error]
+
+      engine = resolver.instance_variable_get(:@resolver_ruby)
+      original = engine.method(:handle_queue_event)
+      entered, release = Queue.new, Queue.new
+      engine.define_singleton_method(:handle_queue_event) do |*args|
+        if args.first.equal?(old_queue)
+          entered << true
+          release.pop
+        end
+        original.call(*args)
+      end
+      callback = Thread.new do
+        # Exercise the real observer lookup, then pause the callback before it
+        # can acquire the resolver lock. close cannot retract that lookup.
+        SELECTOR.notify_queue_observers(old_queue, old_id)
+        raise 'stale event completed the replacement query' unless queue.empty?
+        pending = engine.instance_variable_get(:@timeouts)[:reused]
+        raise 'stale event stopped the replacement sends' unless pending && !pending[1].empty?
+
+        # The same selector dispatch must still serve the replacement and a
+        # different Resolver. No sockets or timing-dependent timeout is needed.
+        SELECTOR.send_tick_to_observers
+        until sends.empty?
+          message, select_queue, id, sender = sends.pop
+          answer = message.clone
+          answer.header.qr = true
+          SELECTOR.push_response_to_select(id, select_queue, answer, message, sender)
+        end
+        SELECTOR.send_queued_responses
+      end
+      entered.pop
+      resolver.close
+      raise 'close did not complete the old query once' unless
+        queue.size == 1 && queue.pop.last.is_a?(Dnsruby::OtherResolvError)
+
+      # Keeping another query active defers the replacement to the next tick,
+      # leaving an ordinary pending retry plan with no outstanding attempt.
+      resolver.send_async(query('keeper.example.'), keeper_queue, :keeper)
+      resolver.send_async(query('new.example.'), queue, :reused)
+      unrelated.send_async(query('unrelated.example.'), unrelated_queue, :unrelated)
+      release << true
+      callback.value
+      [[queue, :reused, 'new.example'], [keeper_queue, :keeper, 'keeper.example'],
+        [unrelated_queue, :unrelated, 'unrelated.example']].each do |results, expected_id, name|
+        raise 'query did not complete exactly once' unless results.size == 1
+        id, answer, error = results.pop
+        raise 'wrong query completion' unless id == expected_id && error.nil? &&
+          answer.question.first.qname.to_s == name
+      end
+      raise 'completed queries retained selector ownership' unless K.class_variable_get(:@@query_hash).empty?
+      resolver.close
+      unrelated.close
+    RUBY
+  end
 
   def isolated(body)
     options = ''.frozen? ? ['--enable-frozen-string-literal'] : []

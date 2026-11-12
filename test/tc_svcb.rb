@@ -97,6 +97,45 @@ class TestSVCB < Minitest::Test
     end
   end
 
+  def test_decoded_rdata_preserves_the_former_generic_reflection_snapshot
+    bytes = ['000103537663074578616d706c65000003000201bb02bc000300ff80'].pack('H*')
+    [64, 65].each do |type|
+      rr = RR.new_from_data('example.com.', type, Classes::IN, 60, bytes.bytesize, bytes, 0)
+      # JSONDNS reads @rdata with instance_variable_get and treats Arrays as
+      # printable tuples. Decoded TYPE64/65 must retain their raw String shape.
+      assert_instance_of(String, rr.instance_variable_get('@rdata'))
+      assert_equal(bytes, rr.instance_variable_get(:@rdata))
+      assert_equal(Encoding::BINARY, rr.instance_variable_get(:@rdata).encoding)
+
+      message = Message.new
+      message.add_answer(rr)
+      message.add_answer(RR.create('after.example. IN A 192.0.2.1'))
+      copy = Message.decode(message.encode).answer.first
+      assert_equal(bytes, copy.instance_variable_get(:@rdata), 'snapshot must contain only this RDATA')
+
+      # RR keeps construction-time metadata in @rdata. Its public accessors
+      # remain the source of current bytes after typed fields are mutated.
+      rr.priority = 2
+      rr.params[3].replace([53].pack('n'))
+      assert_equal(bytes, rr.instance_variable_get(:@rdata))
+      refute_equal(bytes, rr.rdata)
+      assert_equal(rr.rdata, rr.clone.instance_variable_get(:@rdata))
+      assert_equal(rr, Marshal.load(Marshal.dump(rr)))
+      assert_equal(bytes, rr.freeze.instance_variable_get(:@rdata))
+    end
+  end
+
+  def test_decoded_empty_update_rdata_preserves_a_binary_snapshot
+    [64, 65].each do |type|
+      [Classes::ANY, Classes::NONE].each do |klass|
+        rr = RR.new_from_data('example.com.', type, klass, 60, 0, ''.b, 0)
+        assert_equal(''.b, rr.instance_variable_get(:@rdata))
+        assert_equal(Encoding::BINARY, rr.instance_variable_get(:@rdata).encoding)
+        assert_equal(rr, rr.clone)
+      end
+    end
+  end
+
   def test_former_generic_direct_constructor_accepts_raw_bytes
     bytes = ['0001000003000201bb'].pack('H*')
     [64, 65].each do |type|

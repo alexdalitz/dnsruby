@@ -1,4 +1,5 @@
 require 'thread'
+require 'weakref'
 
 module Dnsruby
   class RR
@@ -12,13 +13,18 @@ module Dnsruby
       KEYS = Hash.instance_method(:keys)
       HAS_KEY = Hash.instance_method(:key?)
       REMOVE_CONSTANT = Module.instance_method(:remove_const)
-      Entry = Struct.new(:name, :pair, :klass, :registry_key, :version, :automatic)
+      Entry = Struct.new(:name, :pair, :klass, :registry_key, :version, :automatic, :index)
+      NameIndex = Struct.new(:current)
       # The FIFO and its ClassHash entries retain automatic classes. The
       # name index is weak and also resolves caller-held classes after explicit
       # registry deletion. Entry#automatic distinguishes reusable entries from
       # those retained only for constant lookup.
-      # Each automatic class owns its Entry. Its version changes on publication
-      # so cleanup from an older mutation cannot discard a newer publication.
+      # Each automatic class owns its Entry and the name's stable index cell.
+      # The cell refers weakly to the latest Entry, so an older caller-held class
+      # does not retain its replacement. Updating the cell avoids replacing a
+      # WeakMap value (unsafe on Ruby 3.2) or rebuilding maps (whose finalizers
+      # can retain every previous map on older Ruby versions).
+      # Entry versions prevent older mutation cleanup discarding a publication.
       @lock = Mutex.new
       @names = ObjectSpace::WeakMap.new
       @fifo = {}.compare_by_identity
@@ -37,7 +43,7 @@ module Dnsruby
 
         def named(name)
           return nil unless name.ascii_only?
-          @lock.synchronize { @names[-name.encode(Encoding::UTF_8)]&.klass }
+          @lock.synchronize { indexed_entry(-name.encode(Encoding::UTF_8))&.klass }
         end
 
         def find(type, klass)
@@ -87,16 +93,16 @@ module Dnsruby
             return registered if registered
             found = automatic_entry(name)
             return retain(found) if reusable?(found)
-            # Ruby 3.2 WeakMap can lose a replacement when the old value is
-            # collected. Rebuild only when an explicitly removed pair reappears.
-            @names = without(@names, name) if @names.key?(name)
             # A previous explicit factory call may have left a native constant
             # after its registry entry was deleted. Let lookup (including YAML)
             # reach the replacement class instead of that stale binding.
             if GenericConstantInspection::NATIVE_DEFINED.bind(Generic).call(name, false)
               REMOVE_CONSTANT.bind(Generic).call(name)
             end
-            @names[name] = entry
+            index = @names[name]
+            entry.index = index || NameIndex.new
+            entry.index.current = WeakRef.new(entry)
+            @names[name] = entry.index unless index
             retain(entry)
           end
         end
@@ -191,12 +197,22 @@ module Dnsruby
         private
 
         def automatic_entry(name)
-          entry = @names[name]
+          entry = indexed_entry(name)
           entry if entry&.automatic
         end
 
         def automatic_entries
-          @names.values.select(&:automatic)
+          @names.values.filter_map { |index| dereference(index) }.select(&:automatic)
+        end
+
+        def indexed_entry(name)
+          dereference(@names[name])
+        end
+
+        def dereference(index)
+          index&.current&.__getobj__
+        rescue WeakRef::RefError
+          nil
         end
 
         def pair_name(pair)
@@ -204,12 +220,6 @@ module Dnsruby
           # A native slice strips singleton methods, unlike Array#to_a.
           pair = Array.instance_method(:[]).bind(pair).call(0, 3)
           key(*pair) if pair.length == 2 && eligible?(*pair)
-        end
-
-        def without(map, key)
-          copy = ObjectSpace::WeakMap.new
-          map.each_pair { |old_key, value| copy[old_key] = value unless old_key.equal?(key) }
-          copy
         end
 
         def targets?(entry, pair)
