@@ -610,6 +610,68 @@ class TestSVCB < Minitest::Test
     assert_empty(decoded.params)
   end
 
+  def test_other_dns_classes_preserve_opaque_rdata_and_class_identity
+    [64, 65].each do |type|
+      [Classes::CH, Classes::HS, 65_280].each do |klass|
+        ['ff', '000100'].each do |hex|
+          rr = RR.create("example.com. 60 CLASS#{klass} TYPE#{type} \\# #{hex.length / 2} #{hex}")
+          assert_kind_of(RR::Generic, rr)
+          assert_equal(klass, rr.class::ClassValue)
+          assert_same(rr.class, RR.get_class(type, klass))
+          assert_equal(hex, rdata_hex(rr))
+          assert_equal(rr, rr.clone)
+          assert_equal(rr.hash, rr.clone.hash)
+          assert_equal(rr, RR.create(rr.to_s))
+        end
+
+        # An unknown format can also have empty RDATA; the IN constraints
+        # must not be imposed on it during decoding or encoding.
+        empty = RR.new_from_data('example.com.', type, klass, 60, 0, ''.b, 0)
+        assert_kind_of(RR::Generic, empty)
+        assert_equal('', rdata_hex(empty))
+        assert_equal(empty, empty.clone)
+      end
+    end
+  end
+
+  def test_update_pseudo_classes_keep_svcb_and_https_codecs
+    %w[SVCB HTTPS].each do |type|
+      update = Dnsruby::Update.new('example.com.')
+      present = update.present('www.example.com.', type)
+      absent = update.absent('www.example.com.', type)
+      delete_set = update.delete('www.example.com.', type)
+      delete_record = update.delete('www.example.com.', type, '1 . alpn=h2')
+      [present, absent, delete_set].each do |rr|
+        assert_kind_of(RR::SVCB, rr)
+        assert_equal('', rdata_hex(rr))
+      end
+      assert_equal(Classes::ANY, present.klass)
+      assert_equal(Classes::NONE, absent.klass)
+      assert_equal(Classes::ANY, delete_set.klass)
+      assert_equal(Classes::NONE, delete_record.klass)
+      assert_equal('1 . alpn=h2', delete_record.rdata_to_string)
+
+      decoded = Dnsruby::Message.decode(update.encode)
+      original_records = update.answer + update.authority
+      decoded_records = decoded.answer + decoded.authority
+      original_records.zip(decoded_records).each do |rr, copy|
+        assert_same(rr.class, copy.class)
+        assert_equal(rr.klass, copy.klass)
+        assert_equal(rdata_hex(rr), rdata_hex(copy))
+      end
+      assert_equal(update.encode, decoded.encode)
+
+      # Explicit pseudo-class construction must accept the same presentation
+      # format, and keep the requested class on the wire.
+      [Classes::ANY, Classes::NONE].each do |klass|
+        rr = RR.create("example.com. 0 CLASS#{klass} #{type} 1 . alpn=h2")
+        assert_equal(rr, rr.clone)
+        assert_equal(rr, RR.create(rr.to_s))
+        assert_same(rr.class, RR.get_class(type, klass))
+      end
+    end
+  end
+
   # Outside that dynamic-update case an incomplete record is a bug, and a Hash
   # sets the two mandatory fields independently, so half a record is buildable.
   def test_incomplete_record_rejected
@@ -626,7 +688,7 @@ class TestSVCB < Minitest::Test
     end
 
     # An empty record is legal to hold, but only the update classes may encode it.
-    ['example.com. 3600 IN SVCB', 'example.com. 3600 CH SVCB'].each do |str|
+    ['example.com. 3600 IN SVCB', 'example.com. 3600 IN HTTPS'].each do |str|
       rr = RR.create(str)
       assert_raises(Dnsruby::EncodeError, str) { rr.encode_rdata(Dnsruby::MessageEncoder.new) }
     end

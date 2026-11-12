@@ -82,7 +82,7 @@ class TestPipelineSend < Minitest::Test
     end
   RUBY
 
-  def test_valid_response_is_delivered_before_native_write_returns
+  def test_query_is_registered_before_a_fast_native_response
     run_scenario(<<~'RUBY')
       socket = FrameSocket.new
       writer = sender(socket)
@@ -103,8 +103,9 @@ class TestPipelineSend < Minitest::Test
           SELECTOR.send_queued_validation_responses
           delivered << true
         end
-        delivered.pop # The response is processed while the writer is paused.
-        raise 'fast answer was lost before registration' unless queue.length == 2
+        # Native nonblocking writes must not wait for selector callbacks. Check
+        # publication inside the write, then let the reader race its return.
+        raise 'query was not published before write' unless SELECTOR.query_settings_for_id(:immediate)
       end
       writer.send_dnsruby(q.encode, q, :immediate, queue, true)
       reader.join
@@ -171,7 +172,7 @@ class TestPipelineSend < Minitest::Test
       old.is_persistent_socket = false # UDP-to-TCP retry replaces a one-use socket.
       SELECTOR.add_to_select(old)
       worker = writer.send_dnsruby(retry_query.encode, retry_query, :retry, old.client_queue, true)
-      raise 'selector send did not defer' unless worker.is_a?(Thread)
+      raise 'selector send did not defer' unless worker.respond_to?(:value)
       raise 'new writer entered before old frame ended' unless socket.written.bytesize == first.encode.bytesize + 2
       release << true
       sending.value
@@ -406,9 +407,242 @@ class TestPipelineSend < Minitest::Test
         lock.unlock
       end
       drain_errors
-      raise 'missing worker error' unless old.client_queue.length == 1 && old.client_queue.pop.last.is_a?(ThreadError)
+      raise 'missing worker error' unless old.client_queue.length == 1 && old.client_queue.pop.last.is_a?(Dnsruby::ResolvTimeout)
       raise 'failed worker retained query' if SELECTOR.query_settings_for_id(:retry)
       raise 'failed worker wrote' unless socket.written.empty?
+    RUBY
+  end
+
+  def test_fresh_deferred_send_is_cancelled_by_resolver_close_before_writer_or_connect
+    run_scenario(<<~'RUBY')
+      [:writer, :connect].each do |boundary|
+        socket = FrameSocket.new
+        writer = sender(socket)
+        writer.use_tcp = true
+        parent = Dnsruby::Resolver.new(nameserver: '127.0.0.1', use_tcp: true,
+          tcp_pipelining: true, do_caching: false, dnssec: false)
+        parent.single_resolvers = [writer]
+        entered, release = Queue.new, Queue.new
+        lock = Mutex.new
+        writer.instance_variable_set(:@pipeline_mutex, lock)
+        lock.lock if boundary == :writer
+        if boundary == :connect
+          writer.define_singleton_method(:tcp_pipeline_socket) do |_|
+            entered << true
+            release.pop
+            [socket, true]
+          end
+        end
+        task = nil
+        defer = SELECTOR.method(:defer_send)
+        SELECTOR.define_singleton_method(:defer_send) { |*args, &operation| task = defer.call(*args, &operation) }
+        K.class_variable_set(:@@select_thread, Thread.current)
+        queue = Queue.new
+        parent.send_async(query, queue, :closing)
+        entered.pop if boundary == :connect
+        raise 'fresh attempt has no cancellation owner' if K.class_variable_get(:@@query_hash).empty?
+        parent.close
+        result = queue.pop(true)
+        raise 'close not delivered' unless result.last.is_a?(Dnsruby::OtherResolvError)
+        raise 'close retained pending attempt' unless K.class_variable_get(:@@query_hash).empty?
+        lock.unlock if boundary == :writer
+        release << true if boundary == :connect
+        task.value
+        drain_errors
+        raise 'cancelled send wrote bytes' unless socket.written.empty?
+        raise 'close delivered twice' unless queue.empty?
+        raise 'unused connection retained' if boundary == :connect && !socket.closed?
+      end
+    RUBY
+  end
+
+  def test_close_between_registration_and_first_tcp_write_preserves_other_pipeline_queries
+    run_scenario(<<~'RUBY')
+      socket = FrameSocket.new
+      writer = sender(socket)
+      writer.use_tcp = true
+      other = settings(socket, :other, query('other.example.'), writer)
+      SELECTOR.add_to_select(other)
+      parent = Dnsruby::Resolver.new(nameserver: '127.0.0.1', use_tcp: true,
+        tcp_pipelining: true, do_caching: false, dnssec: false)
+      parent.single_resolvers = [writer]
+      register = SELECTOR.method(:register_query_if_current)
+      SELECTOR.define_singleton_method(:register_query_if_current) do |current, previous|
+        result = register.call(current, previous)
+        # Cancel after the atomic registration, before the first native write.
+        # Run outside ResolverRuby's caller-side lock, as a selector send does.
+        parent.close if result
+        result
+      end
+      K.class_variable_set(:@@select_thread, Thread.current)
+      task = nil
+      defer = SELECTOR.method(:defer_send)
+      SELECTOR.define_singleton_method(:defer_send) { |*args, &operation| task = defer.call(*args, &operation) }
+      queue = Queue.new
+      parent.send_async(query, queue, :closing)
+      task.value
+      drain_errors
+      raise 'cancelled registered send wrote bytes' unless socket.written.empty?
+      raise 'other pipeline query was retired' if socket.closed? || !SELECTOR.query_settings_for_id(:other).equal?(other)
+      raise 'wrong close cardinality' unless queue.size == 1 && queue.pop.last.is_a?(Dnsruby::OtherResolvError)
+    RUBY
+  end
+
+  def test_sender_pool_bounds_threads_without_rejecting_bursts
+    run_scenario(<<~'RUBY')
+      entered, release = Queue.new, Queue.new
+      blockers = 4.times.map do
+        SELECTOR.defer_send { entered << Thread.current; release.pop }
+      end
+      workers = 4.times.map { entered.pop }
+      raise 'worker count not bounded' unless workers.uniq.size == 4
+      completed = Queue.new
+      burst = 1000.times.map { SELECTOR.defer_send { completed << Thread.current } }
+      raise 'queued sends escaped the bounded workers' unless completed.empty?
+      4.times { release << true }
+      (blockers + burst).each(&:value)
+      raise 'burst dropped work' unless completed.size == 1000
+      raise 'pool expanded under burst' unless 1000.times.map { completed.pop }.all? { |thread| workers.include?(thread) }
+    RUBY
+  end
+
+  def test_selector_delegates_uncontended_tcp_connect_and_write_waits_in_both_modes
+    run_scenario(<<~'RUBY')
+      [false, true].each do |pipeline|
+        [:connect, :write].each do |phase|
+          socket = FrameSocket.new
+          writer = Dnsruby::PacketSender.new(server: '127.0.0.1', tcp_pipelining: pipeline,
+            packet_timeout: 1, dnssec: false)
+          entered, release = Queue.new, Queue.new
+          connect = -> do
+            if phase == :connect
+              entered << Thread.current
+              release.pop
+            end
+            socket
+          end
+          Socket.define_singleton_method(:tcp) { |*args, **kwargs| connect.call }
+          writer.define_singleton_method(:tcp_pipeline_socket) { |_| [connect.call, true] }
+          if phase == :write
+            first = true
+            native_write = socket.method(:write_nonblock)
+            socket.define_singleton_method(:write_nonblock) do |bytes|
+              if first
+                first = false
+                raise IO::EAGAINWaitWritable
+              end
+              native_write.call(bytes)
+            end
+            IO.define_singleton_method(:select) do |*|
+              entered << Thread.current
+              release.pop
+              [[], [socket], []]
+            end
+          end
+          K.class_variable_set(:@@select_thread, Thread.current)
+          q, queue = query, Queue.new
+          task = writer.send_dnsruby(q.encode, q, :blocked, queue, true)
+          raise 'TCP send was not delegated' unless task.respond_to?(:value)
+          raise 'connect/write still ran on selector' if entered.pop.equal?(Thread.current)
+          unrelated = settings(FrameSocket.new, :unrelated)
+          unrelated.endtime = Time.now - 1
+          SELECTOR.add_to_select(unrelated)
+          SELECTOR.process_timeouts
+          raise 'TCP wait blocked another timeout' unless unrelated.client_queue.size == 1
+          release << true
+          task.value
+          raise 'delegated send lost bytes' unless socket.written == [q.encode.bytesize].pack('n') + q.encode
+          SELECTOR.remove_id(:blocked)
+        end
+      end
+    RUBY
+  end
+
+  def test_retry_reserves_its_fresh_deadline_before_connecting
+    run_scenario(<<~'RUBY')
+      [false, true].each do |pipeline|
+        socket = FrameSocket.new
+        writer = Dnsruby::PacketSender.new(server: '127.0.0.1', tcp_pipelining: pipeline,
+          packet_timeout: 1, dnssec: false)
+        old = settings(FrameSocket.new, :retry, query, writer)
+        old.endtime = Time.now - 1
+        SELECTOR.add_to_select(old)
+        entered, release = Queue.new, Queue.new
+        connect = -> { entered << true; release.pop; socket }
+        Socket.define_singleton_method(:tcp) { |*args, **kwargs| connect.call }
+        writer.define_singleton_method(:tcp_pipeline_socket) { |_| [connect.call, true] }
+        K.class_variable_set(:@@select_thread, Thread.current)
+        Thread.current[:dnsruby_response_query] = old
+        task = writer.send_dnsruby(old.query_bytes, old.query, :retry, old.client_queue, true)
+        Thread.current[:dnsruby_response_query] = nil
+        entered.pop
+        pending = SELECTOR.query_settings_for_id(:retry)
+        raise 'old deadline retained during connect' unless pending && pending.endtime > Time.now
+        SELECTOR.process_timeouts
+        raise 'retry expired against original deadline' unless old.client_queue.empty?
+        release << true
+        task.value
+        raise 'retry was not sent' if socket.written.empty?
+        SELECTOR.remove_id(:retry)
+      end
+    RUBY
+  end
+
+  def test_deferred_sender_fifo_does_not_occupy_other_workers_or_starve_other_senders
+    run_scenario(<<~'RUBY')
+      entered, release, backlog_release, healthy = Queue.new, Queue.new, Queue.new, Queue.new
+      senders = 4.times.map { Object.new }
+      initial = senders.map { |sender| SELECTOR.defer_send(sender) { entered << true; release.pop } }
+      4.times { entered.pop }
+      backlog = senders.map { |sender| SELECTOR.defer_send(sender) { backlog_release.pop } }
+      fifth = SELECTOR.defer_send(Object.new) { healthy << true }
+      4.times { release << true }
+      Timeout.timeout(1) { healthy.pop }
+      4.times { backlog_release << true }
+      (initial + backlog + [fifth]).each(&:value)
+
+      one_sender = Object.new
+      ordered = Queue.new
+      tasks = 1000.times.map { |index| SELECTOR.defer_send(one_sender) { ordered << index } }
+      tasks.each(&:value)
+      raise 'sender requests reordered' unless 1000.times.map { ordered.pop } == (0...1000).to_a
+    RUBY
+  end
+
+  def test_cancellation_after_a_partial_frame_retires_the_corrupt_pipeline
+    run_scenario(<<~'RUBY')
+      socket = FrameSocket.new
+      writer = sender(socket)
+      other = settings(socket, :other, query('other.example.'), writer)
+      SELECTOR.add_to_select(other)
+      entered, release = Queue.new, Queue.new
+      native_write = socket.method(:write_nonblock)
+      calls = 0
+      socket.define_singleton_method(:write_nonblock) do |bytes|
+        calls += 1
+        raise IO::EAGAINWaitWritable if calls == 2
+        native_write.call(bytes.byteslice(0, 2))
+      end
+      IO.define_singleton_method(:select) do |*|
+        entered << true
+        release.pop
+        [[], [socket], []]
+      end
+      queue, owner = Queue.new, Object.new
+      SELECTOR.add_observer(queue, owner)
+      K.class_variable_set(:@@select_thread, Thread.current)
+      q = query
+      task = writer.send_dnsruby(q.encode, q, :cancelled, queue, true)
+      entered.pop
+      SELECTOR.remove_observer(queue, owner)
+      release << true
+      task.value
+      drain_errors
+      raise 'cancelled frame continued writing' unless socket.written.bytesize == 2
+      raise 'corrupt stream reused' unless socket.closed?
+      raise 'other query not failed once' unless other.client_queue.size == 1 && other.client_queue.pop.last.is_a?(Dnsruby::SocketEofResolvError)
+      raise 'cancelled owner received another result' unless queue.empty?
+      assert_clean(socket)
     RUBY
   end
 

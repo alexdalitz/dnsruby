@@ -33,6 +33,8 @@ TESTS = %w(
     pipeline_send
     pipeline_retirement
     pipeline_retry
+    resolver_concurrency
+    selector_wakeup
     message
     misc
     name

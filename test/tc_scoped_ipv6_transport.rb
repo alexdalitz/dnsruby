@@ -18,8 +18,7 @@ class TestScopedIPv6Transport < Minitest::Test
       socket.expect(:bind, 0, ['::', 55000])
       socket.expect(:connect, 0, [server, 5300])
       socket.expect(:send, bytes.bytesize, [bytes, 0])
-      selector = Minitest::Mock.new
-      selector.expect(:add_to_select, nil) do |settings|
+      selector = capture_selector do |settings|
         assert_equal server, settings.dest_server
         assert_equal socket.object_id, settings.socket.object_id
         true
@@ -35,7 +34,6 @@ class TestScopedIPv6Transport < Minitest::Test
         end
       end
       socket.verify
-      selector.verify
     end
   end
 
@@ -47,8 +45,7 @@ class TestScopedIPv6Transport < Minitest::Test
       frame = [bytes.bytesize].pack('n') + bytes
       socket = Minitest::Mock.new(Object.new)
       socket.expect(:write_nonblock, frame.bytesize, [frame])
-      selector = Minitest::Mock.new
-      selector.expect(:add_to_select, nil) do |settings|
+      selector = capture_selector do |settings|
         assert_equal server, settings.dest_server
         assert_equal socket.object_id, settings.socket.object_id
         true
@@ -66,7 +63,6 @@ class TestScopedIPv6Transport < Minitest::Test
         end
       end
       socket.verify
-      selector.verify
     end
   end
 
@@ -169,6 +165,20 @@ class TestScopedIPv6Transport < Minitest::Test
   end
 
   private
+
+  def capture_selector(&registered)
+    current = nil
+    Object.new.tap do |selector|
+      selector.define_singleton_method(:reserve_send) { |settings, _previous| current = settings; true }
+      selector.define_singleton_method(:query_settings_for_id) { |_| current }
+      selector.define_singleton_method(:selector_thread?) { false }
+      selector.define_singleton_method(:register_query_if_current) do |settings, previous|
+        raise 'wrong attempt replaced' unless current.equal?(previous)
+        current = settings
+        registered.call(settings)
+      end
+    end
+  end
 
   def assert_local_roundtrip(transport, count = 1, numeric_scope = false, scoped: true)
     server, udp, tcp = bind_local_servers(transport, numeric_scope, scoped)

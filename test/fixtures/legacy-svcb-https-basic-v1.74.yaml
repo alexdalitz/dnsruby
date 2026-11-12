@@ -1,0 +1,35 @@
+---
+- !ruby/object:Dnsruby::RR::Generic::Type64_Class1
+  rdata: "\0\x01\0"
+  data: "\0\x01\0"
+  name: !ruby/object:Dnsruby::Name
+    labels:
+    - !ruby/object:Dnsruby::Name::Label
+      downcase: example
+      string: example
+      string_length: 7
+    absolute: true
+  ttl: 60
+  type: !ruby/object:Dnsruby::Types
+    code: 64
+    string: TYPE64
+  klass: !ruby/object:Dnsruby::Classes
+    code: 1
+    string: IN
+- !ruby/object:Dnsruby::RR::Generic::Type65_Class1
+  rdata: "\0\x01\0"
+  data: "\0\x01\0"
+  name: !ruby/object:Dnsruby::Name
+    labels:
+    - !ruby/object:Dnsruby::Name::Label
+      downcase: example
+      string: example
+      string_length: 7
+    absolute: true
+  ttl: 60
+  type: !ruby/object:Dnsruby::Types
+    code: 65
+    string: TYPE65
+  klass: !ruby/object:Dnsruby::Classes
+    code: 1
+    string: IN

@@ -49,6 +49,12 @@ class TestPipelineRetry < Minitest::Test
         @selector.define_singleton_method(:wake_up_select_thread) {}
         @selector.define_singleton_method(:check_select_thread_synchronized) {}
         @selector.define_singleton_method(:notify_queue_observers) { |*| }
+        @deferred_sends = []
+        deferred_sends = @deferred_sends
+        defer_send = @selector.method(:defer_send)
+        @selector.define_singleton_method(:defer_send) do |*args, &operation|
+          defer_send.call(*args, &operation).tap { |task| deferred_sends << task }
+        end
         selector = @selector
         @klass.define_singleton_method(:instance) { selector }
         @sender = Dnsruby::PacketSender.new(server: '127.0.0.1', tcp_pipelining: pipeline,
@@ -101,7 +107,12 @@ class TestPipelineRetry < Minitest::Test
         when :live
         when :failed
           @winner_error = Dnsruby::SocketEofResolvError.new('original send failed')
-          @selector.fail_tcp_send(@original, @winner_error)
+          current = @selector.query_settings_for_id(:retry)
+          if current && current.socket.nil?
+            @selector.fail_query_if_current(:retry, current.client_queue, current, @winner_error)
+          else
+            @selector.fail_tcp_send(@original, @winner_error)
+          end
         when :expired
           table(:timeouts)[:retry] = Time.now - 1
           @selector.process_timeouts
@@ -113,7 +124,7 @@ class TestPipelineRetry < Minitest::Test
         end
       end
 
-      def check_retry(action = nil)
+      def check_retry(action = nil, wait: true)
         message = retry_response
         wire = message.encode
         if action
@@ -136,6 +147,7 @@ class TestPipelineRetry < Minitest::Test
         end
         @selector.process_message(message, wire, @original.socket)
         raise 'response context leaked' if Thread.current[:dnsruby_response_query]
+        @deferred_sends.shift.value until !wait || @deferred_sends.empty?
       end
 
       def events(settings = @original)
@@ -257,8 +269,8 @@ class TestPipelineRetry < Minitest::Test
       worker = nil
       fixture.sender.define_singleton_method(:send_dnsruby) { |*args| worker = send_query.call(*args) }
       begin
-        fixture.check_retry
-        raise 'selector retry was not deferred' unless worker.is_a?(Thread)
+        fixture.check_retry(wait: false)
+        raise 'selector retry was not deferred' unless worker.respond_to?(:value)
         fixture.original.endtime = Time.now - 1
         fixture.table(:timeouts)[:retry] = fixture.original.endtime
         lock.unlock

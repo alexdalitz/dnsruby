@@ -500,6 +500,8 @@ class TestMalformedTcp < Minitest::Test
     selector = Object.new
     current = nil
     selector.define_singleton_method(:query_settings_for_id) { |_| current }
+    selector.define_singleton_method(:reserve_send) { |settings, _previous| current = settings; true }
+    selector.define_singleton_method(:selector_thread?) { false }
     selector.define_singleton_method(:register_query_if_current) { |settings, _| current = settings; true }
     selector.define_singleton_method(:fail_tcp_send) do |settings, error|
       errors << [settings.client_query_id, settings.client_queue, error, nil]

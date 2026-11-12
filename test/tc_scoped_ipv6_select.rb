@@ -53,7 +53,10 @@ class TestScopedIPv6Select < Minitest::Test
       settings.client_queue = Queue.new
       sent = Queue.new
       sender = Object.new
-      sender.define_singleton_method(:send_async) { |*args| sent << args }
+      sender.define_singleton_method(:send_async) do |*args|
+        raise 'retry lost original attempt identity' unless Thread.current[:dnsruby_response_query].equal?(settings)
+        sent << args
+      end
       sender.define_singleton_method(:no_tcp) { false }
       settings.single_resolver = sender
       # The header advertises a question but no question bytes follow it.
@@ -66,7 +69,8 @@ class TestScopedIPv6Select < Minitest::Test
           assert_equal([query, settings.client_queue, client_id, true], Timeout.timeout(2) { sent.pop })
         end
       end
-      assert_equal([client_id], removed)
+      assert_empty(removed) # Keep the attempt cancellable until the retry replaces it.
+      assert_nil(Thread.current[:dnsruby_response_query])
     end
   end
 

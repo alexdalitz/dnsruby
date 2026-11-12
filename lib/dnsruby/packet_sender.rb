@@ -470,32 +470,28 @@ module Dnsruby
       response_settings = response_query_settings(client_query_id)
       previous_settings = response_settings ||
         (st.query_settings_for_id(client_query_id) if use_tcp && @tcp_pipelining)
+      pending = SelectThread::QuerySettings.new(query_bytes, query,
+        @ignore_truncation, client_queue, client_query_id, nil, @server, @port,
+        endtime, udp_packet_size, self)
+      pending.send_token = previous_settings.send_token if previous_settings
+      # A protocol retry starts its own packet deadline at dispatch, including
+      # time queued for a worker. Retire the old socket membership atomically.
+      return unless st.reserve_send(pending, previous_settings)
+      previous_settings = pending
       operation = -> do
         send_dnsruby_with_socket(query_bytes, query, client_query_id, client_queue,
-          use_tcp, endtime, previous_settings, !response_settings.nil?)
+          use_tcp, endtime, previous_settings, true)
       end
-      unless use_tcp && @tcp_pipelining
-        return operation.call
-      end
-      # Configuration-only PacketSenders remain marshalable, including objects
-      # stored before this mutex existed. Creation is serialized for first use.
-      pipeline_mutex = PIPELINE_MUTEX_CREATION.synchronize { @pipeline_mutex ||= Mutex.new }
-
-      # Serialize socket allocation and complete frames, but never make the
-      # selector wait for another sender. Response checking and tick callbacks
-      # can themselves send a query while a different thread owns this writer.
-      if pipeline_mutex.try_lock
-        begin
-          operation.call
-        ensure
-          pipeline_mutex.unlock
-        end
-      else
-        wait_for_writer = -> do
+      send_operation = operation
+      if use_tcp && @tcp_pipelining
+        # Configuration-only senders remain Marshal-compatible. Allocate the
+        # writer mutex only on first use, including senders loaded from storage.
+        pipeline_mutex = PIPELINE_MUTEX_CREATION.synchronize { @pipeline_mutex ||= Mutex.new }
+        send_operation = -> do
           locked = false
           begin
             until (locked = pipeline_mutex.try_lock)
-              break if Time.now >= endtime
+              break if Time.now >= endtime || !st.query_settings_for_id(client_query_id).equal?(previous_settings)
               sleep 0.005
             end
             if locked && Time.now < endtime
@@ -508,35 +504,38 @@ module Dnsruby
             pipeline_mutex.unlock if locked
           end
         end
-        if st.selector_thread?
-          begin
-            Thread.new(&wait_for_writer)
-          rescue ThreadError => e
-            st.fail_query_if_current(client_query_id, client_queue, previous_settings, e)
-          end
-        else
-          # Public callers retain the existing synchronous-send contract.
-          wait_for_writer.call
+      end
+      if use_tcp && st.selector_thread?
+        begin
+          st.defer_send(self, &send_operation)
+        rescue ThreadError => error
+          st.fail_query_if_current(client_query_id, client_queue, previous_settings,
+            ResolvTimeout.new("Cannot queue TCP send: #{error.message}"))
         end
+      else
+        # Only the selector delegates I/O. Public caller sends remain synchronous.
+        send_operation.call
       end
     end
 
     # Socket#send may write only a prefix of a TCP frame. Nonblocking writes keep
     # a stalled peer from holding the pipeline writer past the packet deadline.
-    def write_tcp_frame(socket, query_bytes, endtime)
+    def write_tcp_frame(socket, query_bytes, endtime, send_token)
       frame = [query_bytes.bytesize].pack('n') + query_bytes
       offset = 0
       while offset < frame.bytesize
         remaining = endtime - Time.now
         raise ResolvTimeout, "Query timed out writing TCP frame" if remaining <= 0
         begin
-          written = socket.write_nonblock(frame.byteslice(offset, frame.bytesize - offset))
+          written = send_token.write { socket.write_nonblock(frame.byteslice(offset, frame.bytesize - offset)) }
+          return offset if written == false # Cancelled between partial writes.
           raise IOError, "TCP write made no progress" unless written && written > 0
           offset += written
         rescue IO::WaitWritable
           raise ResolvTimeout, "Query timed out writing TCP frame" unless IO.select(nil, [socket], nil, remaining)
         end
       end
+      true
     end
 
     def response_query_settings(client_query_id)
@@ -647,41 +646,44 @@ module Dnsruby
       # A reused pipeline is already readable by the selector. Publish its new
       # query before writing so an immediate answer always has an owner.
       query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
+      query_settings.send_token = previous_settings.send_token
       query_settings.is_persistent_socket = @tcp_pipelining if use_tcp
       query_settings.tcp_pipelining_max_queries = @tcp_pipelining_max_queries if @tcp_pipelining
       begin
-        if response_retry && !pipeline && !st.query_settings_for_id(client_query_id).equal?(previous_settings)
-          socket.close
-          return
-        end
-        if pipeline
+        if use_tcp
           unless st.register_query_if_current(query_settings, previous_settings)
-            # The original attempt can expire during connect. This socket was
-            # never handed to the selector, so release its unused reservation.
-            @use_counts[socket] -= 1 if @use_counts[socket]
+            # Completion can win during connect. Release only this unused socket
+            # reservation; other queries may still own an existing pipeline.
+            @use_counts[socket] -= 1 if pipeline && @use_counts[socket]
             socket.close if new_socket && !socket.closed?
-            if socket.closed?
+            if pipeline && socket.closed?
               @use_counts.delete(socket)
               @pipeline_socket = nil if @pipeline_socket == socket
             end
             return
           end
-          return unless st.query_settings_for_id(client_query_id).equal?(query_settings)
+          previous_settings = query_settings
+        elsif !st.query_settings_for_id(client_query_id).equal?(previous_settings)
+          socket.close
+          return
         end
-        if (use_tcp)
-          write_tcp_frame(socket, query_bytes, endtime)
+        if use_tcp
+          completed = write_tcp_frame(socket, query_bytes, endtime, query_settings.send_token)
+          # Cancellation of a partially written frame retires its whole stream;
+          # otherwise another frame could be appended to a corrupt prefix.
+          unless completed == true
+            if pipeline && completed > 0
+              st.fail_tcp_send(query_settings, SocketEofResolvError.new("TCP send cancelled"))
+              @use_counts.delete(socket)
+              @pipeline_socket = nil if @pipeline_socket == socket
+            elsif !pipeline
+              socket.close rescue nil
+            end
+            return
+          end
         else
           socket.send(query_bytes, 0)
-        end
-
-        #  The select thread will now wait for the response and send that or a
-        #  timeout back to the client_queue.
-        unless pipeline
-          if response_retry
-            socket.close unless st.register_query_if_current(query_settings, previous_settings)
-          else
-            st.add_to_select(query_settings)
-          end
+          socket.close unless st.register_query_if_current(query_settings, previous_settings)
         end
       rescue Exception => e
         err_msg = "Send failed to #{@server}:#{@port} from #{src_address}:#{src_port}, use_tcp=#{use_tcp}, exception : #{e}"

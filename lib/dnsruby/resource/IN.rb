@@ -59,8 +59,6 @@ module Dnsruby
       Types::GPOS => GPOS,
       Types::NXT => NXT,
       Types::CAA => CAA,
-      Types::SVCB => SVCB,
-      Types::HTTPS => HTTPS,
     } #:nodoc: all
 
     #  module IN contains ARPA Internet specific RRs
@@ -75,6 +73,25 @@ module Dnsruby
         ClassHash[[s::TypeValue, ClassValue]] = c
         self.const_set(s.name.sub(/.*::/, ''), c)
       }
+
+      # RFC 9460 defines these formats only for class IN. Other ordinary
+      # classes must retain their opaque RDATA through the generic fallback.
+      class SVCB < RR::SVCB
+        ClassHash[[TypeValue = Types::SVCB, ClassValue = ClassValue]] = self #:nodoc: all
+      end
+
+      class HTTPS < RR::HTTPS
+        ClassHash[[TypeValue = Types::HTTPS, ClassValue = ClassValue]] = self #:nodoc: all
+      end
+
+      # RFC 2136 uses ANY/NONE as UPDATE markers, not as an RDATA format.
+      # Keep the IN codec (including empty deletes/prerequisites), with the
+      # actual class stored on the record, just as Update#delete does.
+      [SVCB, HTTPS].each do |record_class|
+        [Classes::ANY, Classes::NONE].each do |update_class|
+          ClassHash[[record_class::TypeValue, update_class]] = record_class
+        end
+      end
 
       #  RFC 1035, Section 3.4.2 (deprecated)
       class WKS < RR

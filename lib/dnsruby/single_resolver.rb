@@ -20,8 +20,8 @@ module Dnsruby
   #  This class has been deprecated.
   #  This implementation exists for legacy clients. New code should use the Dnsruby::Resolver class.
   #  The SingleResolver class targets a single resolver, and controls the sending of a single
-  #  packet with a packet timeout. It performs no retries. Only two threads are used - the client
-  #  thread and a select thread (which is reused across all queries).
+  #  packet with a packet timeout. It performs no retries. Responses share one
+  #  select thread; TCP sends initiated by that thread use a shared worker pool.
   # 
   # == Methods
   # 

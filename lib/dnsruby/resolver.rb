@@ -68,9 +68,18 @@ module Dnsruby
   #  *  Dnsruby::Resolver#send_async(msg, response_queue, query_id)
   #
   #  == Event Loop
-  #  Dnsruby runs a pure Ruby event loop to handle I/O in a single thread.
+  #  Dnsruby runs a shared pure Ruby select loop for responses and timeouts.
+  #  TCP sends initiated by the selector run in a shared worker pool.
   #  Support for EventMachine has been deprecated.
   class Resolver
+    CONFIGURATION_MUTEX_CREATION = Mutex.new
+    private_constant :CONFIGURATION_MUTEX_CREATION
+
+    def configuration_mutex
+      CONFIGURATION_MUTEX_CREATION.synchronize { @configuration_mutex ||= Mutex.new }
+    end
+    private :configuration_mutex
+
     DefaultQueryTimeout = 0
     DefaultPacketTimeout = 5
     DefaultRetryTimes = 1
@@ -136,10 +145,13 @@ module Dnsruby
     #  The array of SingleResolvers used for sending query messages
     #     attr_accessor :single_resolvers # :nodoc:
     def single_resolvers=(s) # :nodoc:
-      @configured = true
-      #       @single_res_mutex.synchronize {
-      @single_resolvers = s
-      #       }
+      configuration_mutex.synchronize do
+        @single_res_mutex.synchronize do
+          @single_resolvers = s
+          @configuration_error = nil
+          @configured = true
+        end
+      end
     end
     def single_resolvers # :nodoc:
       unless @configured
@@ -389,22 +401,16 @@ module Dnsruby
     #    end
     #
     def send_async(msg, client_queue, client_query_id = nil)
-      unless @configured
+      begin
         add_config_nameservers
+      rescue ArgumentError => error
+        # Constructor options historically tolerate an unusable nameserver and
+        # queries then report an asynchronous timeout. Keep that completion path
+        # for every waiter on the same failed initialization.
+        raise unless error.equal?(@configuration_error) && @single_resolvers.empty?
       end
-      #       @single_res_mutex.synchronize {
-      unless @resolver_ruby # @TODO@ Synchronize this?
-        @resolver_ruby = ResolverRuby.new(self)
-      end
-      #       }
-      client_query_id = @resolver_ruby.send_async(msg, client_queue, client_query_id)
-      if @single_resolvers.length == 0
-        Thread.start {
-          sleep(@query_timeout == 0 ? 1 : @query_timeout)
-          client_queue.push([client_query_id, nil, ResolvTimeout.new('Query timed out - no valid nameservers configured')])
-        }
-      end
-      client_query_id
+      engine = @single_res_mutex.synchronize { @resolver_ruby ||= ResolverRuby.new(self) }
+      engine.send_async(msg, client_queue, client_query_id)
     end
 
     #  Close the Resolver. Unfinished queries are terminated with OtherResolvError.
@@ -478,54 +484,69 @@ module Dnsruby
     end
 
     def add_config_nameservers # :nodoc: all
-      unless @configured
-        @config.get_ready
-      end
-      @configured = true
-        #  Add the Config nameservers
-      threads = []
-      @config.nameserver.each do |ns|
-        threads << Thread.new do
-          PacketSender.new({
-              server:             ns,
-              port:               @port,
-              dnssec:             @dnssec,
-              use_tcp:            @use_tcp,
-              no_tcp:             @no_tcp,
-              tcp_pipelining:     @tcp_pipelining,
-              tcp_pipelining_max_queries: @tcp_pipelining_max_queries,
-              packet_timeout:     @packet_timeout,
-              tsig:               @tsig,
-              ignore_truncation:  @ignore_truncation,
-              src_address:        @src_address,
-              src_address6:       @src_address6,
-              src_port:           @src_port,
-              recurse:            @recurse,
-              udp_size:           @udp_size,
-              ignore_config_resolv_errors: true})
+      configuration_mutex.synchronize do
+        if @configured
+          raise @configuration_error if @configuration_error
+          return
         end
-      end
-
-      new_resolvers = threads.map(&:value).compact
-      new_resolvers = new_resolvers.select do |resolver|
-        !resolver.nil? && !resolver.server.nil?
-      end
-      # if new_resolvers.empty?
-      #   raise ArgumentError.new("No valid nameservers found in config")
-      # end
-      @single_res_mutex.synchronize { @single_resolvers.concat(new_resolvers) }
-      if @single_resolvers.nil? || @single_resolvers.empty?
-        raise ArgumentError.new("No valid nameservers found")
+        @config.get_ready
+        configure_nameservers
       end
     end
 
-    def set_config_nameserver(n)
-      #  @TODO@ Should we allow NS RRSet here? If so, then .sort_by {rand}
-      @config.get_ready unless @configured
-      @configured = true
+    # Serialize configuration separately from query state. Constructing a sender
+    # can resolve a hostname through this same selector, whose callbacks need
+    # @single_res_mutex. Only publishing the finished list takes that mutex.
+    def configure_nameservers(replace = false)
+      @configuration_error = nil
+      begin
+        threads = []
+        @config.nameserver.each do |ns|
+          threads << Thread.new do
+            PacketSender.new({
+                server:             ns,
+                port:               @port,
+                dnssec:             @dnssec,
+                use_tcp:            @use_tcp,
+                no_tcp:             @no_tcp,
+                tcp_pipelining:     @tcp_pipelining,
+                tcp_pipelining_max_queries: @tcp_pipelining_max_queries,
+                packet_timeout:     @packet_timeout,
+                tsig:               @tsig,
+                ignore_truncation:  @ignore_truncation,
+                src_address:        @src_address,
+                src_address6:       @src_address6,
+                src_port:           @src_port,
+                recurse:            @recurse,
+                udp_size:           @udp_size,
+                ignore_config_resolv_errors: true})
+          end
+        end
 
-      @config.nameserver = n.kind_of?(String) ? [n] : n
-      add_config_nameservers
+        new_resolvers = threads.map(&:value).compact
+        new_resolvers = new_resolvers.select do |resolver|
+          !resolver.nil? && !resolver.server.nil?
+        end
+        @single_res_mutex.synchronize do
+          complete = replace ? new_resolvers : @single_resolvers + new_resolvers
+          raise ArgumentError, "No valid nameservers found" if complete.empty?
+          @single_resolvers = complete
+        end
+      rescue Exception => error
+        @configuration_error = error if @single_resolvers.empty?
+        raise
+      ensure
+        @configured = true
+      end
+    end
+    private :configure_nameservers
+
+    def set_config_nameserver(n)
+      configuration_mutex.synchronize do
+        @config.get_ready unless @configured
+        @config.nameserver = n.kind_of?(String) ? [n] : n
+        configure_nameservers(true)
+      end
     end
 
     def reset_attributes # :nodoc: all
@@ -561,6 +582,7 @@ module Dnsruby
         @single_resolvers=[]
       }
       @configured = false
+      @configuration_error = nil
     end
 
     def update # :nodoc: all
@@ -579,11 +601,16 @@ module Dnsruby
     #     end
 
     def add_server(server)# :nodoc:
-      @configured = true
-      res = PacketSender.new(server)
-      Dnsruby.log_and_raise("Can't create server #{server}", ArgumentError) unless res
-      update_internal_res(res)
-      @single_res_mutex.synchronize { @single_resolvers.push(res) }
+      configuration_mutex.synchronize do
+        res = PacketSender.new(server)
+        Dnsruby.log_and_raise("Can't create server #{server}", ArgumentError) unless res
+        update_internal_res(res)
+        @single_res_mutex.synchronize do
+          @single_resolvers.push(res)
+          @configuration_error = nil
+          @configured = true
+        end
+      end
     end
 
     def update_internal_res(res)
@@ -600,10 +627,7 @@ module Dnsruby
     end
 
     def nameserver=(n)
-      @configured = true
-      @single_res_mutex.synchronize { @single_resolvers=[] }
       set_config_nameserver(n)
-      add_config_nameservers
     end
 
     #  --
@@ -920,6 +944,7 @@ module Dnsruby
       end
 
       tick_needed = false
+      st = SelectThread.instance
       #  add to our data structures
       #       @mutex.synchronize{
       @parent.single_res_mutex.synchronize {
@@ -937,13 +962,21 @@ module Dnsruby
         if @parent.query_timeout == 0
           query_timeout = Time.now + 31536000 # a year from now
         end
-        @timeouts[client_query_id] = [query_timeout, generate_timeouts]
+        retries = generate_timeouts
+        # An explicitly empty nameserver list uses the ordinary query deadline
+        # and completion path. No independent timer can publish a second result.
+        no_nameservers = @parent.single_resolvers.empty?
+        if no_nameservers && @parent.query_timeout == 0
+          query_timeout = Time.now + 1
+        end
+        @timeouts[client_query_id] = [query_timeout, retries, no_nameservers]
+        # Publish the observer together with its logical query. close must never
+        # see a query whose selector ownership has not yet been registered.
+        st.add_observer(q, self)
       }
 
       #  Now do querying stuff using SingleResolver
       #  All this will be handled by the tick method (if we have 0 as the first timeout)
-      st = SelectThread.instance
-      st.add_observer(q, self)
       tick if tick_needed
       client_query_id
     end
@@ -1013,11 +1046,12 @@ module Dnsruby
         time_now = Time.now
         @timeouts.keys.each do |client_query_id|
           msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
-          query_timeout, timeouts = @timeouts[client_query_id]
+          query_timeout, timeouts, no_nameservers = @timeouts[client_query_id]
           if query_timeout < Time.now
-            #  Time the query out
+            #  Time the query out through the same exactly-once completion path.
+            reason = no_nameservers ? 'Query timed out - no valid nameservers configured' : 'Query timed out'
             send_result_and_stop_querying(client_queue, client_query_id, select_queue, nil,
-                ResolvTimeout.new('Query timed out'))
+                ResolvTimeout.new(reason))
             next
           end
           timeouts_done = []

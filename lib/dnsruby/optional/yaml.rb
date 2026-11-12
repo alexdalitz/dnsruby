@@ -17,12 +17,16 @@ module Dnsruby
         if @data.empty? && ![Classes::ANY, Classes::NONE].include?(@klass)
           raise DecodeError, 'Legacy SVCB/HTTPS YAML has empty RDATA outside an UPDATE delete'
         end
-        decoded = self.class.decode_rdata(MessageDecoder.new(@data.b))
+        data = @data
+        decoded = self.class.decode_rdata(MessageDecoder.new(data.b))
         @priority, @target, @params = decoded.priority, decoded.target, decoded.params
         @type = Types.new(self.class::TypeValue)
+        # Generic's old storage is no longer part of this record. Keeping it
+        # would make RR equality/hash differ from a freshly decoded SVCB/HTTPS.
+        remove_instance_variable(:@data)
         # Psych's freeze:true has already frozen the stored scalar, but these
         # decoded fields were created after its visitor traversed the YAML map.
-        if @data.frozen?
+        if data.frozen?
           if @target
             @target.labels.each do |label|
               label.string.freeze

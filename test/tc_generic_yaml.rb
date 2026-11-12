@@ -45,6 +45,7 @@ class TestGenericYaml < Minitest::Test
       assert_equal({ 1 => "\x02h2".b }, rr.params)
       assert_equal('1 . alpn=h2', rr.rdata_to_string)
       assert_equal(index.zero? ? 'SVCB' : 'HTTPS', rr.type.to_s)
+      refute(rr.instance_variable_defined?(:@data))
       client = rr.instance_variable_get(:@client)
       assert_same(rr, client.fetch('self'))
       assert_same(rr.class, client.fetch('class'))
@@ -59,6 +60,91 @@ class TestGenericYaml < Minitest::Test
     assert_equal([Dnsruby::Types::SVCB, Dnsruby::Types::HTTPS],
                  Dnsruby::Message.decode(wire).answer.map(&:type))
     assert_equal(wire, YAML.unsafe_load(YAML.dump(copy)).fetch('message').encode)
+  end
+
+  def test_migrated_svcb_records_equal_fresh_records_and_deduplicate
+    # Saved by 1.74.0 without application fields, which RR equality also
+    # compares. This checks that obsolete Generic storage is removed.
+    fixture = File.read(File.join(__dir__, 'fixtures/legacy-svcb-https-basic-v1.74.yaml'))
+    YAML.unsafe_load(fixture).each do |rr|
+      fresh = rr.clone
+      assert_equal(fresh, rr)
+      assert_equal(fresh.hash, rr.hash)
+      refute(rr.instance_variable_defined?(:@data))
+      message = Dnsruby::Message.new
+      message.add_answer(rr)
+      message.add_answer(fresh)
+      assert_equal(1, message.answer.length)
+      set = Dnsruby::RRSet.new
+      set.add(rr, false)
+      set.delete(fresh)
+      assert_equal(0, set.length)
+    end
+  end
+
+  def test_non_in_svcb_yaml_retains_generic_data_and_aliases
+    [64, 65].each do |type|
+      [3, 4, 65_280].each do |klass|
+        # The old TYPE64/65 paths must resolve to the opaque class, even
+        # when the data cannot be decoded as the IN record's RDATA.
+        fixture = <<~YAML
+          --- &record !ruby/object:Dnsruby::RR::Generic::Type#{type}_Class#{klass}
+          data: &data !!binary /w==
+          klass: !ruby/object:Dnsruby::Classes
+            code: #{klass}
+            string: CLASS#{klass}
+          client:
+            self: *record
+            data: *data
+        YAML
+        rr = YAML.unsafe_load(fixture)
+        assert_kind_of(Dnsruby::RR::Generic, rr)
+        assert_same(rr.class, Dnsruby::RR.get_class(type, klass))
+        assert_equal("\xff".b, rr.data)
+        client = rr.instance_variable_get(:@client)
+        assert_same(rr, client.fetch('self'))
+        assert_same(rr.data, client.fetch('data'))
+        refute(rr.respond_to?(:priority))
+        copy = YAML.unsafe_load(YAML.dump(rr))
+        assert_same(rr.class, copy.class)
+        assert_equal(rr.data, copy.data)
+      end
+    end
+  end
+
+  def test_legacy_update_svcb_yaml_migrates_empty_and_populated_rdata
+    [64, 65].each do |type|
+      [Dnsruby::Classes::ANY, Dnsruby::Classes::NONE].each do |klass|
+        ['', '000100'].each do |hex|
+          data = [hex].pack('H*')
+          fixture = <<~YAML
+            --- !ruby/object:Dnsruby::RR::Generic::Type#{type}_Class#{klass}
+            data: &data !!binary #{[data].pack('m0')}
+            klass: !ruby/object:Dnsruby::Classes
+              code: #{klass}
+              string: CLASS#{klass}
+            client_data: *data
+          YAML
+          [false, true].each do |freeze|
+            rr = YAML.unsafe_load(fixture, freeze: freeze)
+            assert_kind_of(Dnsruby::RR::SVCB, rr)
+            assert_same(rr.class, Dnsruby::RR.get_class(type, klass))
+            assert_equal(klass, rr.klass)
+            refute(rr.instance_variable_defined?(:@data))
+            assert_equal(data, rr.instance_variable_get(:@client_data))
+            assert_equal(freeze, rr.instance_variable_get(:@client_data).frozen?)
+            encoded = Dnsruby::MessageEncoder.new
+            rr.encode_rdata(encoded)
+            assert_equal(hex, encoded.to_s.unpack1('H*'))
+            # Re-saving uses the normal named class, so it must not try to
+            # migrate again or consume the application's saved old buffer.
+            copy = YAML.unsafe_load(YAML.dump(rr))
+            assert_same(rr.class, copy.class)
+            assert_equal(rr.instance_variable_get(:@client_data), copy.instance_variable_get(:@client_data))
+          end
+        end
+      end
+    end
   end
 
   def test_legacy_svcb_yaml_rejects_malformed_rdata

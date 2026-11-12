@@ -94,7 +94,7 @@ module Dnsruby
     class QuerySettings
       attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue,
         :client_query_id, :socket, :dest_server, :dest_port, :endtime, :udp_packet_size,
-        :single_resolver, :is_persistent_socket, :tcp_pipelining_max_queries
+        :single_resolver, :is_persistent_socket, :tcp_pipelining_max_queries, :send_token
       #  new(query_bytes, query, ignore_truncation, client_queue, client_query_id,
       #      socket, dest_server, dest_port, endtime, , udp_packet_size, single_resolver)
       def initialize(*args)
@@ -111,8 +111,117 @@ module Dnsruby
         @single_resolver = args[10]
         @is_persistent_socket = false
         @tcp_pipelining_max_queries = nil
+        @send_token = SendToken.new
       end
     end
+
+    # Cancellation and each nonblocking write are ordered without holding the
+    # selector mutex during I/O. Waiting for a connect or a writable socket never
+    # holds this lock, so closing a Resolver remains responsive.
+    class SendToken
+      def initialize
+        @mutex = Mutex.new
+        @cancelled = false
+      end
+
+      def cancel
+        @mutex.synchronize { @cancelled = true }
+      end
+
+      def write
+        @mutex.synchronize do
+          return false if @cancelled
+          yield
+        end
+      end
+    end
+
+    # Register ownership before work leaves the selector, including attempts
+    # which have not acquired a socket yet. Nil is never a live attempt token.
+    def reserve_send(settings, previous_settings = nil)
+      @@mutex.synchronize do
+        return false unless @@query_hash[settings.client_query_id].equal?(previous_settings)
+        if previous_settings
+          remove_id_from_mutex_synchronized_block(settings.client_query_id, settings.send_token)
+        end
+        @@query_hash[settings.client_query_id] = settings
+        @@timeouts[settings.client_query_id] = settings.endtime
+        check_select_thread_synchronized
+      end
+      wake_up_select_thread
+      true
+    end
+
+    class SendTask
+      def initialize(&operation)
+        @operation = operation
+        @result = Queue.new
+      end
+
+      def run
+        @result << [@operation.call, nil]
+      rescue Exception => error
+        @result << [nil, error]
+      end
+
+      def value
+        result, error = @result.pop
+        raise error if error
+        result
+      end
+    end
+
+    # A finite pool keeps slow connects/writes off the selector without creating
+    # an unbounded number of threads. Already-owned attempts can queue without
+    # introducing a new admission limit; each retains its original deadline.
+    def defer_send(sender = nil, &operation)
+      task = SendTask.new(&operation)
+      @@mutex.synchronize do
+        unless @send_queue && @send_workers.any?(&:alive?)
+          queue = Queue.new
+          workers = []
+          begin
+            4.times { workers << Thread.new { while (work = queue.pop); work.run; end } }
+          rescue ThreadError
+            workers.length.times { queue << nil }
+            raise
+          end
+          @send_queue = queue
+          @send_workers = workers
+          @send_groups = {}
+        end
+        if sender
+          group = @send_groups[sender]
+          if group
+            group << task
+          else
+            @send_groups[sender] = [task]
+            # One worker owns each sender's FIFO. Other tasks for the same
+            # pipeline do not occupy workers just to wait for its writer lock.
+            @send_queue << SendTask.new { run_send_group(sender) }
+          end
+        else
+          @send_queue << task
+        end
+      end
+      task
+    end
+
+    def run_send_group(sender)
+      task = @@mutex.synchronize { @send_groups[sender].shift }
+      task.run
+      @@mutex.synchronize do
+        if @send_groups[sender].empty?
+          @send_groups.delete(sender)
+        else
+          # Give another sender a turn without allowing two workers to send on
+          # this sender concurrently. A continuously busy pipeline cannot starve
+          # a different server's connection behind its entire backlog.
+          @send_queue << SendTask.new { run_send_group(sender) }
+        end
+      end
+    end
+    private :run_send_group
 
     def tcp?(socket)
       type = socket.getsockopt(Socket::SOL_SOCKET, Socket::SO_TYPE)
@@ -157,7 +266,7 @@ module Dnsruby
     # socket membership, so stale EOF/timeout work cannot consume the retry.
     def add_query_from_mutex_synchronized_block(settings)
       id = settings.client_query_id
-      remove_id_from_mutex_synchronized_block(id) if @@query_hash[id]
+      remove_id_from_mutex_synchronized_block(id, settings.send_token) if @@query_hash[id]
       if settings.socket.closed?
         @@queued_exceptions << [id, settings.client_queue,
           SocketEofResolvError.new("TCP socket closed before all answers received"), nil]
@@ -221,11 +330,12 @@ module Dnsruby
     end
 
     def wake_up_select_thread
-      begin
-        @@wakeup_sockets[0].send("wakeup!", 0)
-      rescue Exception
-        #          do nothing
-      end
+      # One unread byte is sufficient: a full socket already guarantees that
+      # select will wake. Never let notification block a producer or the selector
+      # itself (cache hits and protocol retries also produce notifications).
+      @@wakeup_sockets[0].write_nonblock(".")
+    rescue IO::WaitWritable, IOError, SystemCallError
+      nil
     end
 
     def check_select_thread_synchronized
@@ -287,13 +397,11 @@ module Dnsruby
         end
         if ready && ready.include?(@@wakeup_sockets[1])
           ready.delete(@@wakeup_sockets[1])
-          wakeup_msg = "loop"
           begin
-            while wakeup_msg && wakeup_msg.length > 0
-              wakeup_msg = @@wakeup_sockets[1].recv_nonblock(20)
-            end
-          rescue
-            #  do nothing
+            # Bound draining so continuously arriving notifications cannot starve
+            # responses and timeouts. Any remainder wakes the next select.
+            @@wakeup_sockets[1].recv_nonblock(4096)
+          rescue IO::WaitReadable, IOError, SystemCallError
           end
         end
         if (ready == nil)
@@ -465,10 +573,13 @@ module Dnsruby
     end
 
     # THIS MUST BE CALLED FROM INSIDE A @@mutex SYNCHRONISED BLOCK!
-    def remove_id_from_mutex_synchronized_block(id)
-      socket = @@query_hash[id].socket
+    def remove_id_from_mutex_synchronized_block(id, preserved_token = nil)
+      settings = @@query_hash.delete(id)
+      return unless settings
+      settings.send_token.cancel unless settings.send_token.equal?(preserved_token)
       @@timeouts.delete(id)
-      @@query_hash.delete(id)
+      socket = settings.socket
+      return unless socket # A queued send may not have acquired a socket yet.
       (@@socket_hash[socket] || []).delete(id)
 
       decrement_remaining_queries(socket) if persistent?(socket)
@@ -639,16 +750,19 @@ module Dnsruby
           settings = @@mutex.synchronize do
             current = @@query_hash[client_id]
             if current && current.socket == socket && !current.ignore_truncation && !current.single_resolver.no_tcp
-              remove_id_from_mutex_synchronized_block(client_id)
               current
             end
           end
         end
         if settings
           Dnsruby.log.error{"Decode error (from #{answerip})! Header shows truncation, so trying again over TCP"}
-          Thread.new {
+          previous_context = Thread.current[:dnsruby_response_query]
+          begin
+            Thread.current[:dnsruby_response_query] = settings
             settings.single_resolver.send_async(settings.query, settings.client_queue, client_id, true)
-          }
+          ensure
+            Thread.current[:dnsruby_response_query] = previous_context
+          end
         else
           send_exception_to_client(e, socket, client_id)
         end
@@ -880,6 +994,11 @@ module Dnsruby
         if (@@observers[client_queue]==observer)
           #           @@observers.delete(observer)
           @@observers.delete(client_queue)
+          # Resolver completion/close owns every packet attempt for this queue,
+          # including queued sends which have not opened a socket yet.
+          @@query_hash.values.select { |settings| settings.client_queue.equal?(client_queue) }.each do |settings|
+            remove_id_from_mutex_synchronized_block(settings.client_query_id)
+          end
         else
           if (@@observers[client_queue] == nil)
           end
@@ -907,7 +1026,7 @@ module Dnsruby
       #  If any observers are known then send them a tick
       tick_observers=nil
       @@mutex.synchronize {
-        tick_observers = @@tick_observers
+        tick_observers = @@tick_observers.dup
       }
       tick_observers.each do |observer|
         observer.tick
