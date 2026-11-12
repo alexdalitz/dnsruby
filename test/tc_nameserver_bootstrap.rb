@@ -87,6 +87,39 @@ class TestNameserverBootstrap < Minitest::Test
     end
   end
 
+  def test_overlong_nameserver_from_file_does_not_hide_a_valid_server_or_override
+    previous_limit = Dnsruby::Name::Label.class_variable_get(:@@max_length)
+    Dnsruby::Name::Label.set_max_length(Dnsruby::Name::Label::MaxLabelLength)
+    invalid = ('a' * 64) + '.example.'
+    with_resolv_conf("nameserver #{invalid}\nnameserver 127.0.0.1\n") do |path|
+      defaults = Dnsruby::Config.parse_resolv_conf(path)
+      Dnsruby::Config.stub(:default_config_hash, defaults) do
+        config = Dnsruby::Config.new
+        config.get_ready
+        assert_equal(['127.0.0.1'], config.nameserver)
+        resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.2')
+        assert_equal(['127.0.0.2'], resolver.config.nameserver)
+        assert_equal(['127.0.0.2'], resolver.single_resolvers.map(&:server))
+        assert_raises(Dnsruby::ResolvError) do
+          Dnsruby::Config.new.set_config_info(nameserver: [invalid])
+        end
+      end
+    end
+  ensure
+    Dnsruby::Name::Label.set_max_length(previous_limit)
+  end
+
+  def test_failed_nameserver_replacement_preserves_config_and_active_senders
+    resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1')
+    original = resolver.single_resolvers.first
+    assert_raises(ArgumentError) { resolver.nameserver = [] }
+    assert_equal(['127.0.0.1'], resolver.config.nameserver)
+    assert_equal([original], resolver.single_resolvers)
+    resolver.nameserver = '127.0.0.2'
+    assert_equal(['127.0.0.2'], resolver.config.nameserver)
+    assert_equal(['127.0.0.2'], resolver.single_resolvers.map(&:server))
+  end
+
   def test_invalid_default_nameserver_fails_without_recursive_initialization
     with_resolv_conf("nameserver 8.8.8.8,\n") do |path|
       defaults = -> { Dnsruby::Config.parse_resolv_conf(path) }

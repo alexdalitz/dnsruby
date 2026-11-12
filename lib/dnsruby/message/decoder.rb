@@ -173,6 +173,7 @@ class MessageDecoder #:nodoc: all
     record.ttl = ttl
     record.type = type
     record.klass = klass
+    record.validate_decoded_rdata
     record
   end
 end

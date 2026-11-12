@@ -25,10 +25,14 @@ class MessageEncoder #:nodoc: all
   def put_length16
     length_index = @data.length
     @data << "\0\0"
-    data_start = @data.length
+    data_start = @data.bytesize
     yield
-    data_end = @data.length
-    @data[length_index, 2] = [data_end - data_start].pack("n")
+    data_end = @data.bytesize
+    length = data_end - data_start
+    if length > 0xffff
+      raise EncodeError.new("Length-prefixed data exceeds 65535 octets: #{length}")
+    end
+    @data[length_index, 2] = [length].pack("n")
   end
 
   def put_string(d)

@@ -40,7 +40,7 @@ DNSSEC NSEC3 support.'
 
   s.add_development_dependency 'rake', '>= 13.0.6'
   s.add_development_dependency 'minitest', '~> 5.25'
-  # The optional rake soak harness still uses test/localdns.rb and NIO.
+  # Retained for the legacy localdns/test_dnsserver helpers; rake soak uses stdlib.
   s.add_development_dependency 'rubydns', '>= 2.0.2'
   s.add_development_dependency 'nio4r', '>= 2.5.8'
   s.add_development_dependency 'minitest-display', '>= 0.3.1'

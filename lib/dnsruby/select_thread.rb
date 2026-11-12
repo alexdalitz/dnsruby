@@ -52,6 +52,8 @@ module Dnsruby
         @@query_hash = Hash.new
         @@socket_hash = Hash.new
         @@socket_is_persistent = Hash.new
+        @@socket_owners = Hash.new
+        @@retiring_sockets = Set.new
         @@observers = Hash.new
         @@tcp_buffers=Hash.new
         @@socket_remaining_queries = Hash.new
@@ -94,7 +96,8 @@ module Dnsruby
     class QuerySettings
       attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue,
         :client_query_id, :socket, :dest_server, :dest_port, :endtime, :udp_packet_size,
-        :single_resolver, :is_persistent_socket, :tcp_pipelining_max_queries, :send_token
+        :single_resolver, :is_persistent_socket, :tcp_pipelining_max_queries, :send_token,
+        :retire_connection
       #  new(query_bytes, query, ignore_truncation, client_queue, client_query_id,
       #      socket, dest_server, dest_port, endtime, , udp_packet_size, single_resolver)
       def initialize(*args)
@@ -112,6 +115,7 @@ module Dnsruby
         @is_persistent_socket = false
         @tcp_pipelining_max_queries = nil
         @send_token = SendToken.new
+        @retire_connection = false
       end
     end
 
@@ -142,6 +146,7 @@ module Dnsruby
       @@mutex.synchronize do
         return false unless @@query_hash[settings.client_query_id].equal?(previous_settings)
         if previous_settings
+          settings.retire_connection = previous_settings.retire_connection
           remove_id_from_mutex_synchronized_block(settings.client_query_id, settings.send_token)
         end
         @@query_hash[settings.client_query_id] = settings
@@ -255,6 +260,7 @@ module Dnsruby
     def register_query_if_current(query_settings, previous_settings)
       registered = @@mutex.synchronize do
         return false unless @@query_hash[query_settings.client_query_id].equal?(previous_settings)
+        query_settings.retire_connection = previous_settings.retire_connection if previous_settings
         check_select_thread_synchronized
         add_query_from_mutex_synchronized_block(query_settings)
       end
@@ -280,7 +286,56 @@ module Dnsruby
       @@timeouts[id] = settings.endtime
       @@sockets << settings.socket
       @@socket_is_persistent[settings.socket] = settings.is_persistent_socket
+      (@@socket_owners ||= {})[settings.socket] = settings.single_resolver
+      (@@retiring_sockets ||= Set.new) << settings.socket if settings.retire_connection
       true
+    end
+
+    # Explicit close retires streams owned by this sender, including idle and
+    # rolled-over pipelines. Other logical queries sharing a sender may finish,
+    # but future sends must choose a fresh connection.
+    def retire_sender(sender)
+      @@mutex.synchronize do
+        # A connect can be in progress without a socket in our read set yet.
+        # Carry retirement through reservation replacements so its eventual
+        # registration drains and closes, while later fresh sends can reuse.
+        @@query_hash.each_value do |settings|
+          settings.retire_connection = true if settings.single_resolver.equal?(sender)
+        end
+        (@@socket_owners ||= {}).select { |_, owner| owner.equal?(sender) }.each_key do |socket|
+          mark_socket_for_retirement(socket)
+        end
+      end
+      wake_up_select_thread
+    end
+
+    def retire_socket(socket)
+      @@mutex.synchronize { mark_socket_for_retirement(socket) }
+      wake_up_select_thread
+    end
+
+    def mark_socket_for_retirement(socket)
+      (@@retiring_sockets ||= Set.new) << socket
+      if (@@socket_hash[socket] || []).empty?
+        socket.close rescue nil
+        retire_socket_from_mutex_synchronized_block(socket)
+      end
+    end
+    private :mark_socket_for_retirement
+
+    def query_id_in_use?(socket, header_id)
+      @@mutex.synchronize do
+        (@@socket_hash[socket] || []).any? do |id|
+          settings = @@query_hash[id]
+          settings && settings.query.header.id == header_id
+        end
+      end
+    end
+
+    def reusable_socket?(socket)
+      @@mutex.synchronize do
+        !socket.closed? && !(@@retiring_sockets ||= Set.new).include?(socket)
+      end
     end
 
     # A partial TCP frame makes the whole connection unusable. Atomically claim
@@ -462,6 +517,8 @@ module Dnsruby
       @@tcp_buffers.delete(socket)
       @@socket_remaining_queries.delete(socket)
       @@socket_is_persistent.delete(socket)
+      (@@socket_owners ||= {}).delete(socket)
+      (@@retiring_sockets ||= Set.new).delete(socket)
       ids.map do |client_id|
         [SocketEofResolvError.new("TCP socket closed before all answers received"), socket, client_id]
       end
@@ -520,6 +577,17 @@ module Dnsruby
         next unless settings && settings.socket == socket
         query_header_id = settings.query.header.id
         if (query_header_id == msg.header.id)
+          # IDs can collide on a pipeline. Select the matching question before
+          # query-specific TSIG checks or retries, which may consume the attempt.
+          # Preserve raw/update responses and questionless FORMERR handling.
+          query = settings.query
+          unless query.send_raw || query.kind_of?(Update) || msg.question.empty?
+            next unless msg.question.length == query.question.length &&
+              msg.question.zip(query.question).all? do |answer, request|
+                answer.qname.labels == request.qname.labels &&
+                  answer.qtype == request.qtype && answer.qclass == request.qclass
+              end
+          end
           #  process the response
           client_queue = settings.client_queue
           res = settings.single_resolver
@@ -584,12 +652,16 @@ module Dnsruby
 
       decrement_remaining_queries(socket) if persistent?(socket)
 
-      if !persistent?(socket) || max_attained?(socket)
+      retiring = (@@retiring_sockets ||= Set.new).include?(socket) &&
+        (@@socket_hash[socket] || []).empty?
+      if !persistent?(socket) || max_attained?(socket) || retiring
         @@sockets.delete(socket)
         @@socket_hash.delete(socket)
         @@socket_remaining_queries.delete(socket)
         @@socket_is_persistent.delete(socket)
         @@tcp_buffers.delete(socket)
+        (@@socket_owners ||= {}).delete(socket)
+        @@retiring_sockets.delete(socket)
         Dnsruby.log.debug("Closing socket #{socket}")
         socket.close rescue nil
       end

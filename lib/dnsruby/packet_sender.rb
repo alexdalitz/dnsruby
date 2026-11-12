@@ -263,8 +263,29 @@ module Dnsruby
     end
 
     def close
-      #  @TODO@ What about closing?
-      #  Any queries to complete? Sockets to close?
+      # Idle streams close immediately; streams still serving another Resolver
+      # drain before closing. Do not wait for a writer blocked in connect.
+      @selector.retire_sender(self) if @selector
+    end
+
+    # Reserve ownership while Resolver still holds its query lock, then perform
+    # the synchronous public send after releasing that lock. close/timeout can
+    # cancel this reservation even before send_async has started.
+    def prepare_send_async(message, queue, id) #:nodoc:
+      selector = @selector = SelectThread.instance
+      pending = SelectThread::QuerySettings.new(nil, message, @ignore_truncation,
+        queue, id, nil, @server, @port, Time.now + @packet_timeout, udp_packet_size, self)
+      return unless selector.reserve_send(pending)
+      -> do
+        next unless selector.query_settings_for_id(id).equal?(pending)
+        previous_context = Thread.current[:dnsruby_response_query]
+        begin
+          Thread.current[:dnsruby_response_query] = pending
+          send_async(message, queue, id)
+        ensure
+          Thread.current[:dnsruby_response_query] = previous_context
+        end
+      end
     end
 
     # Asynchronously send a Message to the server. The send can be done using just
@@ -419,7 +440,8 @@ module Dnsruby
         begin
           max = @tcp_pipelining_max_queries
           use_count = @use_counts[@pipeline_socket]
-          if use_count && max != :infinite && use_count >= max
+          if !SelectThread.instance.reusable_socket?(@pipeline_socket) ||
+              (use_count && max != :infinite && use_count >= max)
              #we can't reuse the socket since max is reached
             @use_counts.delete(@pipeline_socket)
             @pipeline_socket = nil
@@ -430,6 +452,7 @@ module Dnsruby
         rescue Errno::EISCONN
           #already connected, do nothing and reuse!
         rescue IOError, Errno::ECONNRESET #close by remote host, reconnect
+          @use_counts.delete(@pipeline_socket)
           @pipeline_socket = nil
           Dnsruby.log.debug("Connection closed - recreating socket")
         end
@@ -465,9 +488,12 @@ module Dnsruby
 
     #  This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
     def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp) #:nodoc: all
-      endtime = Time.now + @packet_timeout
-      st = SelectThread.instance
+      st = @selector = SelectThread.instance
       response_settings = response_query_settings(client_query_id)
+      # A Resolver reservation already started this attempt's packet deadline.
+      # A protocol retry (which has bytes) receives a fresh packet deadline.
+      endtime = response_settings && response_settings.query_bytes.nil? ?
+        response_settings.endtime : Time.now + @packet_timeout
       previous_settings = response_settings ||
         (st.query_settings_for_id(client_query_id) if use_tcp && @tcp_pipelining)
       pending = SelectThread::QuerySettings.new(query_bytes, query,
@@ -507,7 +533,7 @@ module Dnsruby
       end
       if use_tcp && st.selector_thread?
         begin
-          st.defer_send(self, &send_operation)
+          st.defer_send(@tcp_pipelining ? self : nil, &send_operation)
         rescue ThreadError => error
           st.fail_query_if_current(client_query_id, client_queue, previous_settings,
             ResolvTimeout.new("Cannot queue TCP send: #{error.message}"))
@@ -548,7 +574,9 @@ module Dnsruby
         use_tcp, endtime, previous_settings, response_retry)
       #  First send the query (synchronously)
       st = SelectThread.instance
-      pipeline = use_tcp && @tcp_pipelining
+      # A pre-close reservation which has not acquired a connection gets its
+      # own one-use socket. It must not retire a fresh post-close pipeline.
+      pipeline = use_tcp && @tcp_pipelining && !previous_settings.retire_connection
       guarded = pipeline || response_retry
       # A timeout or another retry can win while this operation waits for the
       # pipeline writer. Never resurrect that earlier attempt.
@@ -577,8 +605,16 @@ module Dnsruby
           src_port = get_next_src_port
           if (use_tcp)
             begin
-              if (@tcp_pipelining)
+              if pipeline
                 begin
+                  # RFC 7766 requires unique outstanding IDs on a connection.
+                  # Moving a collision to a fresh stream preserves caller IDs,
+                  # including raw messages and bytes covered by TSIG.
+                  if @pipeline_socket && st.query_id_in_use?(@pipeline_socket, query.header.id)
+                    st.retire_socket(@pipeline_socket)
+                    @use_counts.delete(@pipeline_socket)
+                    @pipeline_socket = nil
+                  end
                   @pipeline_connect_timeout = endtime - Time.now
                   socket, new_socket = tcp_pipeline_socket(src_port)
                 ensure
@@ -647,8 +683,8 @@ module Dnsruby
       # query before writing so an immediate answer always has an owner.
       query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
       query_settings.send_token = previous_settings.send_token
-      query_settings.is_persistent_socket = @tcp_pipelining if use_tcp
-      query_settings.tcp_pipelining_max_queries = @tcp_pipelining_max_queries if @tcp_pipelining
+      query_settings.is_persistent_socket = pipeline
+      query_settings.tcp_pipelining_max_queries = @tcp_pipelining_max_queries if pipeline
       begin
         if use_tcp
           unless st.register_query_if_current(query_settings, previous_settings)

@@ -13,6 +13,7 @@ class TestPipelineSend < Minitest::Test
     {
       mutex: Mutex.new, query_hash: {}, socket_hash: {}, timeouts: {}, sockets: Set.new,
       tcp_buffers: {}, socket_is_persistent: {}, socket_remaining_queries: {},
+      socket_owners: {}, retiring_sockets: Set.new,
       queued_exceptions: [], queued_responses: [], queued_validation_responses: [],
       observers: {}, tick_observers: [], select_thread: nil
     }.each { |name, value| K.class_variable_set("@@#{name}", value) }
@@ -75,10 +76,11 @@ class TestPipelineSend < Minitest::Test
       SELECTOR.send_queued_exceptions
     end
     def assert_clean(socket)
-      [:socket_hash, :tcp_buffers, :socket_is_persistent, :socket_remaining_queries].each do |name|
+      [:socket_hash, :tcp_buffers, :socket_is_persistent, :socket_remaining_queries, :socket_owners].each do |name|
         raise "retained #{name}" if K.class_variable_get("@@#{name}").key?(socket)
       end
       raise 'retained socket' if K.class_variable_get(:@@sockets).include?(socket)
+      raise 'retained retirement' if K.class_variable_get(:@@retiring_sockets).include?(socket)
     end
   RUBY
 

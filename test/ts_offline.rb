@@ -34,6 +34,8 @@ TESTS = %w(
     pipeline_retirement
     pipeline_retry
     resolver_concurrency
+    release_transport
+    record_regressions
     selector_wakeup
     message
     misc

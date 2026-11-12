@@ -1,57 +1,31 @@
-# --
-# Copyright 2007 Nominet UK
-# 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# 
-#     http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ++
+# frozen_string_literal: true
 
 require_relative 'spec_helper'
+require_relative 'soak_server'
 
-# require_relative 'tc_single_resolver'
-require_relative 'tc_soak_base'
-require_relative 'test_dnsserver'
-require_relative 'localdns'
-
-
-# This class tries to soak test the Dnsruby library.
-# It can't do this very well, owing to the small number of sockets allowed to be open simultaneously.
-# @TODO@ Future versions of dnsruby will allow random streaming over a fixed number of (cycling) random sockets,
-# so this test can be beefed up considerably at that point.
-
+# Defaults preserve the historical workload: 81,512 queries in eight cases.
+# Increase the counts for a longer run. SOAK_TIMEOUT bounds each complete case.
 class TestSingleResolverSoak < Minitest::Test
-
-  IP   = SimpleTCPPipeliningUDPServer::IP
-  PORT = SimpleTCPPipeliningUDPServer::PORT
-
-  def initialize(arg)
-    super(arg)
-  end
-
-  def teardown
-    Celluloid.shutdown
-  end
-
-  SINGLE_RESOLVER_QUERY_TIMES = 63
+  SINGLE_RESOLVER_QUERY_TIMES = Integer(ENV.fetch('SOAK_ASYNC_ROUNDS', '63'))
+  THREAD_COUNT = Integer(ENV.fetch('SOAK_THREADS', RUBY_PLATFORM.include?('java') ? '50' : '250'))
+  ROUNDS = Integer(ENV.fetch('SOAK_ROUNDS', '40'))
+  CASE_TIMEOUT = Float(ENV.fetch('SOAK_TIMEOUT', '120'))
 
   def setup
-    # Instantiate a local dns server
-    pipe = IO.popen("./test/localdns.rb")
-    @dnspid = pipe.pid
-    sleep 1
+    @resolvers = []
+    @workers = []
+    @queues = []
+    raise ArgumentError, 'Soak counts and timeout must be positive' unless
+      [SINGLE_RESOLVER_QUERY_TIMES, THREAD_COUNT, ROUNDS, CASE_TIMEOUT].all?(&:positive?)
+    @server = SoakServer.new
   end
 
   def teardown
-    Process.kill("KILL", @dnspid)
-    sleep 1
+    @workers.each { |worker| worker.kill if worker.alive? }
+    @workers.each(&:join)
+    @resolvers.each(&:close)
+    @server&.stop
+    @queues.each { |queue| assert(queue.empty?, 'Unexpected extra/duplicate completion') }
   end
 
   def test_many_asynchronous_queries_one_single_resolver
@@ -79,178 +53,126 @@ class TestSingleResolverSoak < Minitest::Test
   end
 
   def run_many_asynch_queries_test_single_res(num_resolvers, tcp = false, pipelining = false)
-    q = Queue.new
-    timeout_count = 0
-    resolvers = Array.new(num_resolvers) do
-      Dnsruby::SingleResolver.new(server:                     IP,
-                                  port:                       PORT,
-                                  do_caching:                 false,
-                                  do_validation:              false,
-                                  tcp_pipelining:             pipelining,
-                                  packet_timeout:             10,
-                                  tcp_pipelining_max_queries: 5,
-                                  use_tcp:                    tcp)
+    queue = tracked_queue
+    resolvers = Array.new(num_resolvers) { create_resolver(tcp, pipelining) }
+    count = SINGLE_RESOLVER_QUERY_TIMES * SoakServer::TYPES.length
+    timed_case(count) do
+      count.times { |id| resolvers[id % num_resolvers].send_async(request_for(id), queue, id) }
+      receive_all(queue, count)
     end
-    start = Time.now
-
-    #  @todo@ On windows, MAX_FILES is 256. This means that we have to limit
-    #  this test while we're not using single sockets.
-    #  We run four queries per iteration, so we're limited to 64 runs.
-    messages = TestSoakBase::Rrs.map do |data|
-      message = Dnsruby::Message.new(data[:name], data[:type])
-      message.do_validation = false
-      message.do_caching    = false
-      message
-    end
-
-    query_count = SINGLE_RESOLVER_QUERY_TIMES * messages.count
-
-    receive_thread = Thread.new do
-      query_count.times do
-        _id, ret, error = q.pop
-        if error.is_a?(Dnsruby::ResolvTimeout)
-          timeout_count+=1
-        elsif ret.class != Dnsruby::Message
-          p "ERROR RETURNED : #{error}"
-        end
-      end
-    end
-
-    resolver_cycler = resolvers.cycle
-
-    SINGLE_RESOLVER_QUERY_TIMES.times do |i|
-      rr_count = 0
-      messages.each do | message |
-        rr_count += 1
-        resolver_cycler.next.send_async(message, q, rr_count + i * messages.count)
-        #         p "Sent #{i}, #{rr_count}, Queue #{q}"
-      end
-    end
-
-    receive_thread.join
-
-    time_taken = Time.now - start
-    puts "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
-    assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
 
   def test_many_threads_on_one_single_resolver_synchronous
-    #  Test multi-threaded behaviour
-    #  Check the header IDs to make sure they're all different
-    threads = Array.new
-
-    res = create_default_single_resolver
-    ids = []
-    mutex = Mutex.new
-    timeout_count = 0
-    query_count = 0
-    res.packet_timeout=4
-    start=Time.now
-    #  Windows limits us to 256 sockets
-    num_times=250
-    if (/java/ =~ RUBY_PLATFORM)
-      #  JRuby threads are native threads, so let's not go too mad!
-      num_times=50
-    end
-    num_times.times do |i|
-      threads[i] = Thread.new{
-        40.times do |j|
-          TestSoakBase::Rrs.each do |data|
-            mutex.synchronize { query_count += 1 }
-            packet=nil
-            begin
-              packet = res.query(data[:name], data[:type])
-            rescue Dnsruby::ResolvTimeout
-              mutex.synchronize { timeout_count += 1 }
-              next
-            end
-            assert(packet)
-            ids.push(packet.header.id)
-            assert_equal(packet.question[0].qclass,    'IN',             'Class correct'           )
-          end
-        end
-      }
-    end
-    threads.each do |thread|
-      thread.join
-    end
-    stop=Time.now
-    time_taken=stop-start
-    puts "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
-    #     check_ids(ids) # only do this if we expect all different IDs - e.g. if we stream over a single socket
-    assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
-  end
-
-  def check_ids(ids)
-    ids.sort!
-    count = 0
-    ids.each do |id|
-      count+=1
-      if (count < ids.length-1)
-        assert(ids[count+1] != id, "Two identical header ids used!")
-      end
+    resolver = create_resolver
+    run_threaded_queries do |id, _queue|
+      [id, resolver.query(query_name(id), query_type(id)), nil]
     end
   end
 
   def test_many_threads_on_many_single_resolvers
-    #  Test multi-threaded behaviour
-    #  @todo@ Check the header IDs to make sure they're all different
-    threads = Array.new
-    mutex = Mutex.new
-    timeout_count = 0
-    query_count = 0
-    start=Time.now
-    num_times=250
-    if (/java/ =~ RUBY_PLATFORM)
-      #  JRuby threads are native threads, so let's not go too mad!
-      num_times=50
+    resolvers = Array.new(THREAD_COUNT) { create_resolver }
+    run_threaded_queries do |id, queue|
+      resolver = resolvers[id / (ROUNDS * SoakServer::TYPES.length)]
+      resolver.send_async(request_for(id), queue, id)
+      completion = queue.pop
+      raise "Wrong completion ID: expected #{id}, got #{completion[0].inspect}" unless completion[0] == id
+      completion
     end
-    num_times.times do |i|
-      threads[i] = Thread.new{
-        res = create_default_single_resolver
-        40.times do |j|
-          TestSoakBase::Rrs.each do |data|
-            mutex.synchronize do
-              query_count+=1
-            end
-            q = Queue.new
-
-            message = Dnsruby::Message.new(data[:name], data[:type])
-            message.do_validation = false
-            message.do_caching    = false
-
-            res.send_async(message, q, [i,j])
-
-            id, packet, error = q.pop
-            if (error.class == Dnsruby::ResolvTimeout)
-              mutex.synchronize {
-                timeout_count+=1
-              }
-              next
-            elsif (packet.class!=Dnsruby::Message)
-              puts "ERROR! #{error}"
-            end
-
-            assert(packet)
-            assert_equal(packet.question[0].qclass,    'IN',             'Class correct'           )
-          end
-        end
-      }
-    end
-    # NOTE: For methods on the objects taking no params, we can use this shorthand.
-    threads.each(&:join)
-
-    time_taken = Time.now - start
-    puts "Query count : #{query_count}, #{timeout_count} timed out. #{time_taken} time taken"
-    assert(timeout_count < query_count * 0.1, "#{timeout_count} of #{query_count} timed out!")
   end
 
-  def create_default_single_resolver
-    Dnsruby::SingleResolver.new(server:         IP,
-                                port:           PORT,
-                                do_caching:     false,
-                                do_validation:  false,
-                                packet_timeout: 10)
+  private
 
+  def tracked_queue
+    queue = Queue.new
+    @queues << queue
+    queue
+  end
+
+  def create_resolver(tcp = false, pipelining = false)
+    resolver = Dnsruby::SingleResolver.new(server: SoakServer::IP,
+      port: @server.port, do_caching: false, do_validation: false,
+      dnssec: false, use_tcp: tcp, packet_timeout: 10,
+      tcp_pipelining: pipelining, tcp_pipelining_max_queries: 5)
+    assert_equal(pipelining, resolver.single_resolvers.first.tcp_pipelining)
+    @resolvers << resolver
+    resolver
+  end
+
+  def query_name(id)
+    "q#{id}.soak.test."
+  end
+
+  def query_type(id)
+    SoakServer::TYPES[id % SoakServer::TYPES.length]
+  end
+
+  def request_for(id)
+    request = Dnsruby::Message.new(query_name(id), query_type(id))
+    request.do_caching = false
+    request.do_validation = false
+    request
+  end
+
+  def timed_case(count)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    Timeout.timeout(CASE_TIMEOUT) { yield }
+    @server.check!
+    puts "Verified #{count} responses in #{(Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(3)}s"
+  rescue Timeout::Error
+    @server.check!
+    flunk "Soak case exceeded #{CASE_TIMEOUT}s; a query or worker did not complete"
+  end
+
+  def run_threaded_queries
+    per_thread = ROUNDS * SoakServer::TYPES.length
+    completions = tracked_queue
+    queues = Array.new(THREAD_COUNT) { tracked_queue }
+    timed_case(THREAD_COUNT * per_thread) do
+      THREAD_COUNT.times do |worker_id|
+        @workers << Thread.new do
+          Thread.current.abort_on_exception = false
+          Thread.current.report_on_exception = false
+          begin
+            per_thread.times do |iteration|
+              id = worker_id * per_thread + iteration
+              completions << yield(id, queues[worker_id])
+            end
+          rescue StandardError => error
+            completions << [nil, nil, error]
+          end
+        end
+      end
+      receive_all(completions, THREAD_COUNT * per_thread)
+      @workers.each(&:join)
+    end
+  end
+
+  def receive_all(queue, count)
+    seen = {}
+    count.times do
+      id, response, error = queue.pop
+      assert_nil(error, "Query #{id.inspect}: #{error.class}: #{error}")
+      assert(id.is_a?(Integer) && id >= 0 && id < count, "Unexpected query ID #{id.inspect}")
+      refute(seen.key?(id), "Duplicate completion #{id}")
+      seen[id] = true
+      assert_instance_of(Dnsruby::Message, response)
+      assert_equal('NOERROR', response.rcode.to_s)
+      assert_equal(1, response.question.length)
+      question = response.question.first
+      assert_equal([query_name(id), query_type(id), 'IN'],
+        [question.qname.to_s(true), question.qtype.to_s, question.qclass.to_s])
+      assert_equal(1, response.answer.length)
+      answer = response.answer.first
+      assert_equal([query_name(id), query_type(id), 'IN'],
+        [answer.name.to_s(true), answer.type.to_s, answer.klass.to_s])
+      case query_type(id)
+      when 'A' then assert_equal(SoakServer::ADDRESS, answer.address.to_s)
+      when 'MX' then assert_equal([10, SoakServer::EXCHANGE], [answer.preference, answer.exchange.to_s(true)])
+      when 'CNAME' then assert_equal(SoakServer::ALIAS, answer.domainname.to_s(true))
+      when 'TXT' then assert_equal([SoakServer::TEXT], answer.strings)
+      end
+    end
+    assert_equal(count, seen.length)
+    assert(queue.empty?, 'Extra/duplicate completion after the expected count')
   end
 end

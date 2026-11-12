@@ -36,6 +36,7 @@ class TestMalformedTcp < Minitest::Test
     @temporary_variables = []
     { :@@mutex => Mutex.new, :@@query_hash => {}, :@@socket_hash => {},
       :@@timeouts => {}, :@@sockets => Set.new, :@@tcp_buffers => {},
+      :@@socket_owners => {}, :@@retiring_sockets => Set.new,
       :@@socket_is_persistent => {}, :@@socket_remaining_queries => {}, :@@queued_exceptions => [] }.each do |name, value|
       next if @selector_class.class_variable_defined?(name)
       @selector_class.class_variable_set(name, value)
@@ -52,9 +53,10 @@ class TestMalformedTcp < Minitest::Test
       @registered.each do |settings|
         table(:query_hash).delete(settings.client_query_id)
         table(:timeouts).delete(settings.client_query_id)
-        [:socket_hash, :tcp_buffers, :socket_is_persistent, :socket_remaining_queries].each do |name|
+        [:socket_hash, :tcp_buffers, :socket_is_persistent, :socket_remaining_queries, :socket_owners].each do |name|
           table(name).delete(settings.socket)
         end
+        table(:retiring_sockets).delete(settings.socket)
       end
     end
     @temporary_variables.each { |name| @selector_class.remove_class_variable(name) }
@@ -137,6 +139,32 @@ class TestMalformedTcp < Minitest::Test
     assert(delivered.all? { |args| args[3].nil? })
     assert_equal([], table(:socket_hash)[socket])
     refute(socket.closed)
+  end
+
+  def test_reverse_order_duplicate_ids_match_question_before_tsig_checks
+    socket = SocketBuffer.new
+    first = register(socket, 12_358)
+    second = register(socket, 12_358)
+    second.query = Dnsruby::Message.new('second.example.')
+    second.query.header.id = 12_358
+    [first, second].each do |settings|
+      settings.single_resolver = Dnsruby::PacketSender.allocate
+      settings.single_resolver.define_singleton_method(:check_tsig) do |request, response, _|
+        raise 'TSIG checked against the wrong query' unless request.question.first.qname == response.question.first.qname
+        :okay
+      end
+    end
+    delivered = []
+    @selector.stub(:push_to_client, ->(*args) { delivered << args }) do
+      [second, first].each do |settings|
+        response = settings.query.clone
+        response.header.qr = true
+        @selector.send_response_to_client(response, response.encode, socket)
+      end
+    end
+    assert_equal([second.client_query_id, first.client_query_id], delivered.map(&:first))
+    assert(delivered.all? { |args| args[3].nil? })
+    assert_equal([], table(:socket_hash)[socket])
   end
 
   def test_matching_ids_on_other_sockets_do_not_supply_tcp_peer_metadata

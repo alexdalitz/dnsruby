@@ -147,6 +147,7 @@ module Dnsruby
     def single_resolvers=(s) # :nodoc:
       configuration_mutex.synchronize do
         @single_res_mutex.synchronize do
+          (@single_resolvers - s).compact.each(&:close)
           @single_resolvers = s
           @configuration_error = nil
           @configured = true
@@ -415,7 +416,11 @@ module Dnsruby
 
     #  Close the Resolver. Unfinished queries are terminated with OtherResolvError.
     def close
-      @resolver_ruby.close if @resolver_ruby
+      if @resolver_ruby
+        @resolver_ruby.close
+      else
+        @single_res_mutex.synchronize { @single_resolvers.compact.each(&:close) }
+      end
     end
 
     #  Create a new Resolver object. If no parameters are passed in, then the default
@@ -497,11 +502,11 @@ module Dnsruby
     # Serialize configuration separately from query state. Constructing a sender
     # can resolve a hostname through this same selector, whose callbacks need
     # @single_res_mutex. Only publishing the finished list takes that mutex.
-    def configure_nameservers(replace = false)
+    def configure_nameservers(replace = false, nameservers = @config.nameserver)
       @configuration_error = nil
       begin
         threads = []
-        @config.nameserver.each do |ns|
+        nameservers.each do |ns|
           threads << Thread.new do
             PacketSender.new({
                 server:             ns,
@@ -530,6 +535,8 @@ module Dnsruby
         @single_res_mutex.synchronize do
           complete = replace ? new_resolvers : @single_resolvers + new_resolvers
           raise ArgumentError, "No valid nameservers found" if complete.empty?
+          @config.nameserver = nameservers if replace
+          (@single_resolvers - complete).compact.each(&:close)
           @single_resolvers = complete
         end
       rescue Exception => error
@@ -544,8 +551,9 @@ module Dnsruby
     def set_config_nameserver(n)
       configuration_mutex.synchronize do
         @config.get_ready unless @configured
-        @config.nameserver = n.kind_of?(String) ? [n] : n
-        configure_nameservers(true)
+        nameservers = n.kind_of?(String) ? [n] : n
+        @config.check_ns(nameservers)
+        configure_nameservers(true, nameservers)
       end
     end
 
@@ -999,6 +1007,7 @@ module Dnsruby
           send_result_and_stop_querying(client_queue, client_query_id, q, nil,
               OtherResolvError.new('Resolver closing!'))
         end
+        @parent.single_resolvers.compact.each(&:close)
       }
     end
 
@@ -1042,6 +1051,7 @@ module Dnsruby
       #  Handle the tick
       #  Do we have any retries due to be sent yet?
       #       @mutex.synchronize{
+      sends = []
       @parent.single_res_mutex.synchronize {
         time_now = Time.now
         @timeouts.keys.each do |client_query_id|
@@ -1069,7 +1079,8 @@ module Dnsruby
               #  Pick a new QID here @TODO@ !!!
               #               msg.header.id = rand(65535);
               #               print "New query : #{new_msg}\n"
-              res.send_async(msg, select_queue, id)
+              operation = res.prepare_send_async(msg, select_queue, id)
+              sends << operation if operation
             else
               break
             end
@@ -1077,6 +1088,7 @@ module Dnsruby
           timeouts_done.each { |t| timeouts.delete(t) }
         end
       }
+      sends.each(&:call)
     end
 
     #  This method is called by the SelectThread (in the select thread) when the queue has a new item on it.
@@ -1225,7 +1237,7 @@ module Dnsruby
       TheLog.debug("Incrementing resolver priority for #{res.server}\n")
       #       @parent.single_res_mutex.synchronize {
       index = @parent.single_resolvers.index(res)
-      if index > 0
+      if index && index > 0
         @parent.single_resolvers.delete(res)
         @parent.single_resolvers.insert(index-1,res)
       end
@@ -1237,7 +1249,7 @@ module Dnsruby
       TheLog.debug("Decrementing resolver priority for #{res.server}\n")
       #       @parent.single_res_mutex.synchronize {
       index = @parent.single_resolvers.index(res)
-      if index < @parent.single_resolvers.length
+      if index && index < @parent.single_resolvers.length - 1
         @parent.single_resolvers.delete(res)
         @parent.single_resolvers.insert(index+1,res)
       end
@@ -1248,8 +1260,9 @@ module Dnsruby
     def demote_resolver(res)
       TheLog.debug("Demoting resolver priority for #{res.server} to bottom\n")
       #       @parent.single_res_mutex.synchronize {
-      @parent.single_resolvers.delete(res)
-      @parent.single_resolvers.push(res)
+      if @parent.single_resolvers.delete(res)
+        @parent.single_resolvers.push(res)
+      end
       #       }
     end
 

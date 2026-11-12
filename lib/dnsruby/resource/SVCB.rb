@@ -124,14 +124,34 @@ module Dnsruby
                                 "TargetName, got #{@priority.inspect} and #{@target.inspect}")
         end
 
+        # params is publicly mutable, so construction-time checks alone are
+        # insufficient. Validate before pack('n') can truncate a wire length.
+        params = (@params || {}).to_a
+        length = 3 + @target.to_a.sum { |label| 1 + label.string.bytesize }
+        begin
+          params.each do |num, value|
+            unless num.is_a?(Integer) && (0...INVALID_KEY).cover?(num) && value.is_a?(String)
+              raise DecodeError.new('SvcParams must map valid numeric keys to wire-format strings')
+            end
+            validate_param_value(num, value)
+            length += 4 + value.bytesize
+          end
+          validate_svcparams(@priority, @params || {})
+        rescue DecodeError => e
+          raise EncodeError.new(e.message)
+        end
+        if length > 0xffff
+          raise EncodeError.new("SVCB RDATA exceeds 65535 octets: #{length}")
+        end
+
         msg.put_pack('n', @priority)
         # RFC 9460 sec 2.2: the TargetName MUST NOT be compressed. RFC 6840 sec
         # 5.1: nor downcased for DNSSEC, SVCB post-dating RFC 4034.
         msg.put_name(@target, true, false)
-        sorted_params.each do |num, value|
+        params.sort_by(&:first).each do |num, value|
           msg.put_pack('n', num)
           msg.put_pack('n', value.bytesize)
-          msg.put_bytes(value)
+          msg.put_bytes(value.b)
         end
       end
 
@@ -140,7 +160,7 @@ module Dnsruby
         return new([nil, nil, {}]) unless msg.has_remaining?
 
         priority, = msg.get_unpack('n')
-        target = msg.get_name
+        target = decode_target_name(msg)
         params = {}
         last_key = nil
         while msg.has_remaining?
@@ -163,6 +183,38 @@ module Dnsruby
         validate_svcparams(priority, params)
         new([priority, target, params])
       end
+
+      def validate_decoded_rdata #:nodoc: all
+        if @priority.nil? && ![Classes::ANY, Classes::NONE].include?(klass)
+          raise DecodeError.new('Empty SVCB RDATA is only valid for ANY/NONE UPDATE markers')
+        end
+      end
+
+      # RFC 9460 requires an uncompressed, complete TargetName. The generic
+      # name decoder also supports pointers and tolerates end-of-buffer, so
+      # read this field explicitly rather than synthesizing a missing root.
+      def self.decode_target_name(msg) #:nodoc: all
+        labels = []
+        loop do
+          raise DecodeError.new('SVCB TargetName is truncated') unless msg.has_remaining?
+          length, = msg.get_unpack('C')
+          raise DecodeError.new('SVCB TargetName is truncated') if length.nil?
+          break if length.zero?
+          if length > 63
+            raise DecodeError.new('SVCB TargetName must contain uncompressed labels')
+          end
+          msg.assert_buffer_position_valid(msg.index + length)
+          bytes = msg.get_bytes(length)
+          if bytes.nil? || bytes.bytesize != length
+            raise DecodeError.new('SVCB TargetName label is truncated')
+          end
+          labels << Name::Label.new(bytes)
+        end
+        Name.new(labels)
+      rescue ResolvError => e
+        raise DecodeError.new(e.message)
+      end
+      private_class_method :decode_target_name
 
       # Returns the SvcParams as a Hash mapping the mnemonic (or "keyNNNNN") to
       # its presentation-format value, nil for a value-less key.
@@ -439,6 +491,9 @@ module Dnsruby
           end
 
           size = bytes.bytesize
+          if size > 0xffff
+            raise DecodeError.new("SvcParamValue for #{num_to_key(num)} exceeds 65535 octets: #{size}")
+          end
           expected =
             case num
             when 0 # mandatory

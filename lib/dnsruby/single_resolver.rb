@@ -63,6 +63,8 @@ module Dnsruby
       @udp_size = Resolver::DefaultUDPSize
       @dnssec = Resolver::DefaultDnssec
       @use_tcp = false
+      @tcp_pipelining = false
+      @tcp_pipelining_max_queries = :infinite
       @no_tcp = false
       @tsig = nil
       @ignore_truncation = false
@@ -116,6 +118,7 @@ module Dnsruby
 
       isr = PacketSender.new({:server=>@server, :port=>@port, :dnssec=>@dnssec,
           :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
+          :tcp_pipelining=>@tcp_pipelining, :tcp_pipelining_max_queries=>@tcp_pipelining_max_queries,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
           :src_address=>@src_address, :src_address6=>@src_address6, :src_port=>@src_port,
           :recurse=>@recurse, :udp_size=>@udp_size})
@@ -132,11 +135,13 @@ module Dnsruby
       @server = Config.resolve_server(s).to_s
       isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
           :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
+          :tcp_pipelining=>@tcp_pipelining, :tcp_pipelining_max_queries=>@tcp_pipelining_max_queries,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
           :src_address=>@src_address, :src_address6=>@src_address6, :src_port=>@src_port,
           :recurse=>@recurse, :udp_size=>@udp_size})
 
       @single_res_mutex.synchronize {
+        @single_resolvers.compact.each(&:close)
         @single_resolvers = [isr]
       }
     end

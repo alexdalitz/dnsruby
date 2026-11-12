@@ -134,7 +134,7 @@ module Dnsruby
               begin
                 check_ns([server])
                 true
-              rescue ArgumentError => error
+              rescue ArgumentError, ResolvError => error
                 Dnsruby.log.warn { "Ignoring invalid nameserver #{server.inspect}: #{error.message}" }
                 false
               end

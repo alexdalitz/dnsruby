@@ -82,12 +82,22 @@ module Dnsruby
     #  Process the next line of the file
     #  Returns a string representing the normalised line.
     def process_line(line, do_prefix_hack = false)
-      @in_quoted_section = false if !@continued_line
+      if !@continued_line
+        @in_quoted_section = false
+        @single_quoted_start = Presentation.single_quoted_start(line,
+          owner_omitted: line.start_with?(' ', "\t"))
+      end
+      previous_quote = @in_quoted_section
       line, @group_depth, @in_quoted_section =
-        Presentation.scan(line, @group_depth, @in_quoted_section)
+        Presentation.scan(line, @group_depth, @in_quoted_section,
+          single_quoted_from: @continued_line && @single_quoted_start ? 0 : @single_quoted_start)
 
       if @continued_line
-        line = @continued_line.rstrip + "\n" + line
+        # The scanner keeps literal newlines inside quotes and turns layout
+        # newlines into spaces. Do not strip trailing quoted data. Callers of
+        # process_line may also supply lines without a terminating newline.
+        separator = previous_quote ? (@continued_line.end_with?("\n") ? '' : "\n") : ' '
+        line = @continued_line + separator + line
       end
       if @group_depth.positive?
         @continued_line = line
@@ -200,7 +210,9 @@ module Dnsruby
     def normalise_line(line, do_prefix_hack = false)
       # process_line has already checked continuation balance. Direct callers
       # historically accepted unmatched grouping, just like RR.create.
-      line, = Presentation.scan(line, allow_unbalanced: true)
+      single_quoted_start = Presentation.single_quoted_start(line,
+        owner_omitted: line.start_with?(' ', "\t"))
+      line, = Presentation.scan(line, allow_unbalanced: true, single_quoted_from: single_quoted_start)
 
       #  Note that a freestanding "@" is used to denote the current origin - we can simply replace that straight away
       #  Note that no domain name may be specified in the RR - in that case, last_name should be used. How do we tell? Tab or space at start of line.
@@ -211,8 +223,13 @@ module Dnsruby
       #  (alpn="h2,h3"), so remember which to put the text back as it came.
       #  A parenthesis separates too, and the strip below may remove it first.
       stored_line_was_separate = true
-      if (line.index('"') != nil)
-          quote_index = line.index('"')
+      quote_index = line.index('"')
+      if single_quoted_start
+        rdata_start = Presentation.single_quoted_start(line,
+          owner_omitted: line.start_with?(' ', "\t"))
+        quote_index = [quote_index, line.index(/(?<=[\s(])'/, rdata_start)].compact.min
+      end
+      if quote_index
           stored_line_was_separate = (quote_index == 0) || !(/[\s()]/ =~ line[quote_index - 1]).nil?
           stored_line = line[quote_index, line.length];
           line = line [0, quote_index]
@@ -290,7 +307,11 @@ module Dnsruby
 
       #  Now see if the clas is included. If not, then we should default to the last class used.
       begin
-        klass = Classes.new(split[2])
+        class_text = split[2]
+        if /\ACLASS\d+\z/.match?(class_text)
+          class_text = Classes.classesbyval(Classes.classesbyname(class_text))
+        end
+        klass = Classes.new(class_text)
         @last_explicit_class = klass
       rescue ArgumentError
         #  Wasn't a CLASS
@@ -305,7 +326,11 @@ module Dnsruby
       end
 
       #  Add the type so we can load the zone one RRSet at a time.
-      type = Types.new(split[3].strip)
+      type_text = split[3].strip
+      if /\ATYPE\d+\z/.match?(type_text)
+        type_text = Types.typesbyval(Types.typesbyname(type_text))
+      end
+      type = Types.new(type_text)
       is_soa = (type == Types::SOA)
       type_was = type
       if (type == Types.RRSIG)
@@ -387,7 +412,7 @@ module Dnsruby
       #  origin; the root (".") is absolute, so the absolute? guard skips it.
       if ([Types::SVCB, Types::HTTPS].include?type_was)
         parsed_rr = Dnsruby::RR.create(line)
-        if (parsed_rr.target && !parsed_rr.target.absolute?)
+        if parsed_rr.is_a?(RR::SVCB) && parsed_rr.target && !parsed_rr.target.absolute?
           parsed_rr.target = Name.create(parsed_rr.target.to_s + "." + @origin.to_s)
         end
         line = parsed_rr.to_s

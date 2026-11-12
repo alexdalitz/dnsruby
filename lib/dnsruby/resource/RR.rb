@@ -182,7 +182,8 @@ class RR
     # A standalone RR string has historically accepted unmatched grouping
     # parentheses. Preserve that permissiveness while recognizing literal
     # parentheses correctly; ZoneReader still needs balanced continuations.
-    rrstring, = Presentation.scan(rrstring, allow_unbalanced: true)
+    rrstring, = Presentation.scan(rrstring, allow_unbalanced: true,
+      single_quoted_from: Presentation.single_quoted_start(rrstring))
 
     matches = (/#{@@RR_REGEX}/xo).match(rrstring)
     unless matches
@@ -195,7 +196,9 @@ class RR
     rrtype  = matches[4] || ''
     rdata   = matches[5] || ''
 
-    rdata.gsub!(/\s+$/o, '') if rdata
+    # Only remove trailing record layout. `$` also matches before an embedded
+    # newline and would delete spaces that belong to a quoted TXT value.
+    rdata.sub!(/\s+\z/o, '') if rdata
 
     #  RFC3597 tweaks
     #  This converts to known class and type if specified as TYPE###
@@ -261,7 +264,13 @@ class RR
     record.ttl = ttl
     record.type = rrtype
     record.klass = Classes.new(rrclass)
+    record.validate_decoded_rdata
     record
+  end
+
+  # Some formats depend on the actual RR class, which is assigned after the
+  # format-specific decoder runs (notably ANY/NONE UPDATE markers).
+  def validate_decoded_rdata #:nodoc: all
   end
 
   # Return an array of all the currently implemented RR types

@@ -20,6 +20,14 @@ class TestEscapedChars < Minitest::Test
 
   include Dnsruby
 
+  def setup
+    @original_label_limit = Name::Label.class_variable_get(:@@max_length)
+  end
+
+  def teardown
+    Name::Label.set_max_length(@original_label_limit)
+  end
+
   def test_one
     Name::Label.set_max_length(150)
     # 

@@ -13,8 +13,9 @@ Dnsruby presents an enhanced API for DNS. It is based on Ruby's core
 resolv.rb Resolv API, but has been much extended to provide a
 complete DNS implementation.
 
-Dnsruby runs a single I/O thread to handle all concurrent
-queries. It is therefore suitable for high volume DNS applications.
+Dnsruby uses one selector thread for responses and timeouts. TCP sends started
+by that thread use a bounded worker pool, so a slow connect or write does not
+block unrelated responses. Public sends remain synchronous in the caller.
 
 **Upgrading to v2?** Read the [upgrade notes](RELEASE_NOTES.md#upgrading-to-v2),
 particularly if you persist generated record classes or customise them. Legacy
@@ -75,10 +76,27 @@ at runtime:
 bundle exec rake test
 ```
 
-The separate `rake soak` target uses the legacy manual harness in
-`test/localdns.rb` and `test/test_dnsserver.rb`, which still needs the RubyDNS
-and NIO development dependencies. It is not included in the standard suites;
-the normal TCP pipelining tests use their own local server.
+The separate soak target starts its own UDP/TCP server on an ephemeral loopback
+port, using Ruby's standard-library DNS codec. It needs no public DNS access,
+privileged port, or separately running server, and is not part of the standard
+suites. After `bundle install`, run a small smoke workload first:
+
+```sh
+SOAK_THREADS=4 SOAK_ROUNDS=3 SOAK_ASYNC_ROUNDS=3 SOAK_TIMEOUT=30 bundle exec rake soak
+```
+
+For the default workload (81,512 queries across eight cases), allow enough file
+descriptors and give each case a longer deadline on a busy laptop:
+
+```sh
+ulimit -n 4096
+SOAK_TIMEOUT=300 bundle exec rake soak
+```
+
+Increase `SOAK_ROUNDS` and `SOAK_ASYNC_ROUNDS` for longer runs. The tests reject
+errors, wrong responses and duplicate completions; they do not measure heap or
+descriptor growth during a multi-day run. The old RubyDNS/NIO helper files remain
+available but are not used by this harness.
 
 Usage Help
 ----------
