@@ -364,9 +364,11 @@ module Dnsruby
         client_query_id = Time.now + rand(10000) # is this safe?!
       end
       response_settings = response_query_settings(client_query_id)
+      disable_edns = args[4] || (response_settings && response_settings.disable_edns)
 
       begin
-        query_packet = make_query_packet(msg, use_tcp)
+        query_packet = make_query_packet(msg, use_tcp, disable_edns)
+        check_message_size(query_packet)
       rescue EncodeError => err
         Dnsruby.log.error { "#{err}" }
         st = SelectThread.instance
@@ -418,7 +420,7 @@ module Dnsruby
         Dnsruby.log.debug { "Query packet length exceeds max UDP packet size - using TCP" }
         use_tcp = true
       end
-      send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp)
+      send_dnsruby(query_packet, msg, client_query_id, client_queue, use_tcp, disable_edns)
       return client_query_id
       #       end
     end
@@ -433,7 +435,11 @@ module Dnsruby
     #  pipeline socket or a new connected socket if the current one was closed by the server
     def tcp_pipeline_socket(src_port)
       Dnsruby.log.debug("Using tcp_pipeline_socket")
-      sockaddr = Socket.sockaddr_in(@port, @server)
+      # A live connection retains its endpoint and source binding. Compare the
+      # configured source-port pool, not each randomly selected candidate port.
+      configuration = [@server.dup, @port, (@ipv6 ? @src_address6 : @src_address).dup,
+        @src_port.dup, @ipv6]
+      sockaddr = Socket.sockaddr_in(configuration[1], configuration[0])
 
       reuse_pipeline_socket = -> do
         begin
@@ -441,9 +447,10 @@ module Dnsruby
           use_count = @use_counts[@pipeline_socket]
           if !SelectThread.instance.reusable_socket?(@pipeline_socket) ||
               max != @tcp_pipelining_max_queries ||
+              @pipeline_socket_configuration != configuration ||
               (use_count && max != :infinite && use_count >= max)
-            # Capacity belongs to a connection, not a mutable resolver setting.
-            # Outstanding peers keep the old capacity and drain before closing.
+            # Capacity and endpoint belong to a connection. Outstanding peers
+            # keep their old stream and drain before it closes.
             SelectThread.instance.retire_socket(@pipeline_socket)
             @use_counts.delete(@pipeline_socket)
             @pipeline_socket = nil
@@ -462,10 +469,11 @@ module Dnsruby
 
       create_pipeline_socket = -> do
         @tcp_pipeline_local_port = src_port
-        src_address = @ipv6 ? @src_address6 : @src_address
+        src_address = configuration[2]
         begin
           @pipeline_socket_max_queries = @tcp_pipelining_max_queries
-          @pipeline_socket = Socket.tcp(@server, @port, src_address, src_port,
+          @pipeline_socket_configuration = configuration
+          @pipeline_socket = Socket.tcp(configuration[0], configuration[1], src_address, src_port,
             connect_timeout: @pipeline_connect_timeout || @packet_timeout)
           Dnsruby.log.debug("Creating socket #{src_address}:#{src_port}")
           @use_counts[@pipeline_socket] = 0
@@ -490,9 +498,19 @@ module Dnsruby
     end
 
     #  This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
-    def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp) #:nodoc: all
+    def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp, disable_edns = false) #:nodoc: all
       st = @selector = SelectThread.instance
       response_settings = response_query_settings(client_query_id)
+      begin
+        check_message_size(query_bytes)
+      rescue EncodeError => error
+        if response_settings
+          st.fail_query_if_current(client_query_id, client_queue, response_settings, error)
+        else
+          st.push_exception_to_select(client_query_id, client_queue, error, nil)
+        end
+        return
+      end
       # A Resolver reservation already started this attempt's packet deadline.
       # A protocol retry (which has bytes) receives a fresh packet deadline.
       endtime = response_settings && response_settings.query_bytes.nil? ?
@@ -503,6 +521,7 @@ module Dnsruby
         @ignore_truncation, client_queue, client_query_id, nil, @server, @port,
         endtime, udp_packet_size, self)
       pending.send_token = previous_settings.send_token if previous_settings
+      pending.disable_edns = disable_edns || (previous_settings && previous_settings.disable_edns)
       # A protocol retry starts its own packet deadline at dispatch, including
       # time queued for a worker. Retire the old socket membership atomically.
       return unless st.reserve_send(pending, previous_settings)
@@ -554,9 +573,17 @@ module Dnsruby
       end
     end
 
+    def check_message_size(query_bytes)
+      if query_bytes.bytesize > 65_535
+        raise EncodeError, "DNS message exceeds the 65535-byte wire limit (#{query_bytes.bytesize} bytes)"
+      end
+    end
+    private :check_message_size
+
     # Socket#send may write only a prefix of a TCP frame. Nonblocking writes keep
     # a stalled peer from holding the pipeline writer past the packet deadline.
     def write_tcp_frame(socket, query_bytes, endtime, send_token)
+      check_message_size(query_bytes)
       frame = [query_bytes.bytesize].pack('n') + query_bytes
       offset = 0
       while offset < frame.bytesize
@@ -704,6 +731,7 @@ module Dnsruby
         # query before writing so an immediate answer always has an owner.
         query_settings = SelectThread::QuerySettings.new(query_bytes, query, @ignore_truncation, client_queue, client_query_id, socket, @server, @port, endtime, udp_packet_size, self)
         query_settings.send_token = previous_settings.send_token
+        query_settings.disable_edns = previous_settings.disable_edns
         query_settings.is_persistent_socket = pipeline
         query_settings.tcp_pipelining_max_queries = (@pipeline_socket_max_queries || @tcp_pipelining_max_queries) if pipeline
         if use_tcp
@@ -878,7 +906,7 @@ module Dnsruby
           return sig_value
         end
         if ((response.header.get_header_rcode == RCode.FORMERR) &&
-            (query.header.arcount == 0))
+            !query.get_opt)
           # Raise an error
           return true
         end
@@ -901,11 +929,21 @@ module Dnsruby
         #  IF WE GET FORMERR BACK HERE (and we have EDNS0 on) THEN
         #  TRY AGAIN WITH NO OPT RECORDS! (rfc2671 section 5.3)
         if ((response.header.get_header_rcode == RCode.FORMERR) &&
-            (query.header.arcount > 0))
-          #  try resending the message with no OPT record
-          query.remove_additional
-          query.send_raw = true
-          send_async(query, client_queue, client_query_id, false)
+            query.get_opt)
+          # EDNS negotiation belongs to this attempt, not to the caller's raw
+          # mode or Message (which may also be in use by another nameserver).
+          retry_query = query.dup
+          retry_query.header = query.header.dup
+          retry_query.remove_additional
+          query.additional.each do |rr|
+            retry_query.add_additional(rr) unless rr.type == Types.OPT || rr.type == Types.TSIG
+          end
+          if query.tsig
+            return TsigError.new unless query.tsig.key
+            retry_query.tsigstate = :Unsigned
+            retry_query.set_tsig(query.tsig.dup)
+          end
+          send_async(retry_query, client_queue, client_query_id, false, true)
           return false
         end
         if (response.header.tc && !tcp && !@ignore_truncation)
@@ -958,16 +996,16 @@ module Dnsruby
     end
 
     #  Prepare the packet for sending
-    def make_query_packet(packet, use_tcp = @use_tcp) #:nodoc: all
+    def make_query_packet(packet, use_tcp = @use_tcp, disable_edns = false) #:nodoc: all
       if (!packet.send_raw) # Don't mess with this packet!
         if (packet.header.opcode == OpCode.QUERY || @recurse)
           packet.header.rd=@recurse
         end
 
         #  Only do this if the packet has not been prepared already!
-        if (@dnssec)
+        if @dnssec && !disable_edns
           prepare_for_dnssec(packet)
-        elsif ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
+        elsif !disable_edns && (udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp
           #       if ((udp_packet_size > Resolver::DefaultUDPSize) && !use_tcp)
           #  @TODO@ What if an existing OPT RR is not big enough? Should we replace it?
           add_opt_rr(packet)
@@ -975,7 +1013,9 @@ module Dnsruby
       end
 
       if (@tsig && !packet.signed?)
-        @tsig.apply(packet)
+        # Message#encode owns signing and its recursion guard. Applying a key
+        # here could sign twice when a retry already carries a message key.
+        packet.set_tsig(@tsig)
       end
       return packet.encode
     end

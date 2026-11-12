@@ -133,7 +133,7 @@ module Dnsruby
         @config.get_ready
       end
       @server = Config.resolve_server(s).to_s
-      isr = PacketSender.new({:server=>@server, :dnssec=>@dnssec,
+      isr = PacketSender.new({:server=>@server, :port=>@port, :dnssec=>@dnssec,
           :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
           :tcp_pipelining=>@tcp_pipelining, :tcp_pipelining_max_queries=>@tcp_pipelining_max_queries,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,

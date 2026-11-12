@@ -130,10 +130,10 @@ class TestPipelineRetry < Minitest::Test
         if action
           fixture = self
           if @kind == :formerr
-            remove = @original.query.method(:remove_additional)
-            @original.query.define_singleton_method(:remove_additional) do
-              remove.call
+            send_retry = @sender.method(:send_async)
+            @sender.define_singleton_method(:send_async) do |*args|
               fixture.compete(action)
+              send_retry.call(*args)
             end
           else
             # This getter is reached in the native truncation branch immediately
@@ -320,7 +320,7 @@ class TestPipelineRetry < Minitest::Test
             if failure == :encode
               raise Dnsruby::EncodeError, 'retry encoding failed'
             else
-              'x' * 65_536
+              'x' * 65_535
             end
           end
           fixture.check_retry

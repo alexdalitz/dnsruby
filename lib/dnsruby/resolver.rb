@@ -926,14 +926,14 @@ module Dnsruby
       unless client_queue.kind_of?(Queue)
         Dnsruby.log_and_raise('Wrong type for client_queue in Resolver# send_async')
         #  @TODO@ Handle different queue tuples - push this to generic send_error method
-        client_queue.push([client_query_id, ArgumentError.new('Wrong type of client_queue passed to Dnsruby::Resolver# send_async - should have been Queue, was #{client_queue.class}')])
+        client_queue.push([client_query_id, nil, ArgumentError.new('Wrong type of client_queue passed to Dnsruby::Resolver# send_async - should have been Queue, was #{client_queue.class}')])
         return
       end
 
       unless msg.kind_of?Message
         Dnsruby.log.error{'Wrong type for msg in Resolver# send_async'}
         #  @TODO@ Handle different queue tuples - push this to generic send_error method
-        client_queue.push([client_query_id, ArgumentError.new("Wrong type of msg passed to Dnsruby::Resolver# send_async - should have been Message, was #{msg.class}")])
+        client_queue.push([client_query_id, nil, ArgumentError.new("Wrong type of msg passed to Dnsruby::Resolver# send_async - should have been Message, was #{msg.class}")])
         return
       end
 
@@ -945,10 +945,12 @@ module Dnsruby
       end
 
       begin
-        msg.encode
+        if msg.encode.bytesize > 65_535
+          raise EncodeError, 'DNS message exceeds the 65535-byte wire limit'
+        end
       rescue EncodeError => err
         Dnsruby.log.error { "Can't encode " + msg.to_s + " : #{err}" }
-        client_queue.push([client_query_id, err])
+        client_queue.push([client_query_id, nil, err])
         return
       end
 
@@ -961,7 +963,7 @@ module Dnsruby
         if @query_list.has_key?(client_query_id)
           Dnsruby.log.error("Duplicate query id requested (#{client_query_id}")
           #  @TODO@ Handle different queue tuples - push this to generic send_error method
-          client_queue.push([client_query_id, ArgumentError.new('Client query ID already in use')])
+          client_queue.push([client_query_id, nil, ArgumentError.new('Client query ID already in use')])
           return
         end
         outstanding = []

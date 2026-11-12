@@ -100,7 +100,7 @@ module Dnsruby
       attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue,
         :client_query_id, :socket, :dest_server, :dest_port, :endtime, :udp_packet_size,
         :single_resolver, :is_persistent_socket, :tcp_pipelining_max_queries, :send_token,
-        :retire_connection
+        :retire_connection, :disable_edns
       #  new(query_bytes, query, ignore_truncation, client_queue, client_query_id,
       #      socket, dest_server, dest_port, endtime, , udp_packet_size, single_resolver)
       def initialize(*args)
@@ -119,6 +119,7 @@ module Dnsruby
         @tcp_pipelining_max_queries = nil
         @send_token = SendToken.new
         @retire_connection = false
+        @disable_edns = false
       end
     end
 

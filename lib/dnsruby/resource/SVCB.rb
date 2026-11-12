@@ -114,7 +114,7 @@ module Dnsruby
         end
         self.data = hash.fetch(:data) { hash[:rdata] } if hash.key?(:data) || hash.key?(:rdata)
         self.priority = hash[:priority] if hash[:priority]
-        @target = Name.create(hash[:target]) if hash[:target]
+        @target = self.class.create_target_name(hash[:target]) if hash[:target]
         @params ||= {}
         if hash[:params]
           @params = {}
@@ -158,7 +158,7 @@ module Dnsruby
         # Name.create(nil) would raise ArgumentError, not DecodeError.
         raise DecodeError.new('SVCB record expects a TargetName after the SvcPriority') if target.nil?
 
-        @target = Name.create(target)
+        @target = self.class.create_target_name(target)
 
         tokens.each do |token|
           key, eq, value = token.partition('=')
@@ -255,6 +255,19 @@ module Dnsruby
         # the public data/rdata readers still derive current bytes from fields.
         record.instance_variable_set(:@rdata, msg.data.byteslice(start, msg.index - start).b)
         record
+      end
+
+      def self.create_target_name(value) #:nodoc: all
+        # IDNA conversion case-folds ASCII, but RFC 3597 sec 7 requires the
+        # original octets in SVCB/HTTPS canonical RDATA. DNS presentation
+        # strings (including escaped wire octets) are already ASCII; parse
+        # them directly. Retain Name.create's IDNA handling for Unicode input
+        # and its copying behavior for an existing Name.
+        if value.is_a?(String) && value.ascii_only?
+          Name.new(Name.split_escaped(value), value.end_with?('.'))
+        else
+          Name.create(value)
+        end
       end
 
       def validate_decoded_rdata #:nodoc: all

@@ -413,7 +413,8 @@ module Dnsruby
       if ([Types::SVCB, Types::HTTPS].include?type_was)
         parsed_rr = Dnsruby::RR.create(line)
         if parsed_rr.is_a?(RR::SVCB) && parsed_rr.target && !parsed_rr.target.absolute?
-          parsed_rr.target = Name.create(parsed_rr.target.to_s + "." + @origin.to_s)
+          origin = RR::SVCB.create_target_name(@origin.to_s)
+          parsed_rr.target = Name.new(parsed_rr.target.labels + origin.labels, true)
         end
         line = parsed_rr.to_s
       end

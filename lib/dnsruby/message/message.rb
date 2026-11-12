@@ -541,8 +541,11 @@ module Dnsruby
     def encode(canonical=false)
       if @tsigkey && (@tsigstate == :Unsigned) && !@signing
         @signing = true
-        sign!
-        @signing = false
+        begin
+          sign!
+        ensure
+          @signing = false
+        end
       end
 
       return MessageEncoder.new { |msg|

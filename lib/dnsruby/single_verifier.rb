@@ -27,6 +27,8 @@ module Dnsruby
       DLV = 2
     end
     def initialize(vtype)
+      @trust_mutex = Mutex.new
+      @trust_generation = 0
       @verifier_type = vtype
       @added_dlv_key = false
       #  The DNSKEY RRs for the signed root (when it exists)
@@ -124,34 +126,39 @@ module Dnsruby
     end
     #  Add the
     def add_trust_anchor_with_expiration(k, expiration)
-      if (k.type == Types.DNSKEY)
-        #         k.flags = k.flags | RR::IN::DNSKEY::SEP_KEY
-        @trust_anchors.add_key_with_expiration(k, expiration)
-        #         print "Adding trust anchor for #{k.name}\n"
-        TheLog.info("Adding trust anchor for #{k.name}")
-      elsif ((k.type == Types.DS) || ((k.type == Types.DLV) && (@verifier_type == VerifierType::DLV)))
-        @configured_ds_store.push(k)
+      @trust_mutex.synchronize do
+        if (k.type == Types.DNSKEY)
+          @trust_anchors.add_key_with_expiration(k, expiration)
+          TheLog.info("Adding trust anchor for #{k.name}")
+        elsif ((k.type == Types.DS) || ((k.type == Types.DLV) && (@verifier_type == VerifierType::DLV)))
+          @configured_ds_store.push(k)
+        end
       end
     end
 
     def remove_trust_anchor(t)
-      removed = if (t.type == Types.DNSKEY)
-        @trust_anchors.delete(t)
-      else
-        @configured_ds_store.delete(t)
+      @trust_mutex.synchronize do
+        removed = if (t.type == Types.DNSKEY)
+          @trust_anchors.delete(t)
+        else
+          @configured_ds_store.delete(t)
+        end
+        # Cached keys and in-flight discoveries may depend on this anchor.
+        clear_learned_keys if removed
+        removed
       end
-      #  Cached keys may have been authenticated by this anchor.
-      clear_learned_keys if removed
-      removed
     end
     #  Remove configured anchors and any keys learned from them.
     def clear_trust_anchors
-      @trust_anchors = KeyCache.new
-      clear_trusted_keys
+      @trust_mutex.synchronize do
+        @trust_anchors = KeyCache.new
+        @configured_ds_store = []
+        clear_learned_keys
+      end
     end
 
     def trust_anchors
-      return @trust_anchors.keys + @configured_ds_store
+      @trust_mutex.synchronize { @trust_anchors.keys + @configured_ds_store }
     end
 
     #  Check that the RRSet and RRSIG record are compatible
@@ -188,20 +195,24 @@ module Dnsruby
     #  Add the specified keys to the trusted key cache.
     #  k can be a KeyCache, or an RRSet of DNSKEYs.
     def add_trusted_key(k)
-      @trusted_keys.add(k)
+      publish_trust { @trusted_keys.add(k) }
     end
 
     def add_root_ds(ds)
-      @configured_ds_store.push(ds)
+      @trust_mutex.synchronize { @configured_ds_store.push(ds) }
     end
 
     #  Clear learned trust and configured DS/DLV anchors, retaining DNSKEY anchors.
     def clear_trusted_keys
-      clear_learned_keys
-      @configured_ds_store = []
+      @trust_mutex.synchronize do
+        clear_learned_keys
+        @configured_ds_store = []
+      end
     end
 
+    # Caller holds @trust_mutex, also used by every learned-trust publication.
     def clear_learned_keys
+      @trust_generation += 1
       @trusted_keys = KeyCache.new
       @res = nil
       @discovered_ds_store = []
@@ -209,14 +220,33 @@ module Dnsruby
     private :clear_learned_keys
 
     def trusted_keys
-      discovered_ds = []
-      @discovered_ds_store.each {|rrset|
-        rrset.rrs.each {|rr|
-          discovered_ds.push(rr)
-        }
-      }
-      return @trusted_keys.keys + @configured_ds_store + discovered_ds
+      @trust_mutex.synchronize do
+        @trusted_keys.keys + @configured_ds_store + @discovered_ds_store.flat_map(&:rrs)
+      end
     end
+
+    # Nested verification and network discovery share the generation in which
+    # the outer operation started. No trust lock is held during either work.
+    def with_trust_generation
+      operations = Thread.current[:dnsruby_trust_generations] ||= {}
+      return yield if operations.key?(self)
+      operations[self] = @trust_mutex.synchronize { @trust_generation }
+      begin
+        yield
+      ensure
+        operations.delete(self)
+        Thread.current[:dnsruby_trust_generations] = nil if operations.empty?
+      end
+    end
+
+    def publish_trust
+      generation = Thread.current[:dnsruby_trust_generations]&.fetch(self, nil)
+      @trust_mutex.synchronize do
+        return false if generation && generation != @trust_generation
+        yield
+      end
+    end
+    private :with_trust_generation, :publish_trust
 
     #  Check that the key fits a signed DS record key details
     #  If so, then add the key to the trusted keys
@@ -237,7 +267,7 @@ module Dnsruby
         ds_rrset.rrs.each { |ds|
           if ((ds.type === Types.DS) || ((ds.type == Types.DLV) && (@verifier_type == VerifierType::DLV)))
             if (ds.check_key(key))
-              @trusted_keys.add_key_with_expiration(key, expiration)
+              publish_trust { @trusted_keys.add_key_with_expiration(key, expiration) }
               found = true
             end
           end
@@ -616,7 +646,7 @@ module Dnsruby
           #  If it is, then we should add it to the trusted_keys and remove the
           #  DS from the discovered_ds_store
           if (!found)
-            @discovered_ds_store.push(ds_rrset)
+            publish_trust { @discovered_ds_store.push(ds_rrset) }
           end
           #             end
           return true
@@ -636,7 +666,7 @@ module Dnsruby
           #           print "Adding keys : "
           #           key_rrset.rrs.each {|rr| print "#{rr.key_tag}, "}
           #           print "\n"
-          @trusted_keys.add(key_rrset) # rr)
+          add_trusted_key(key_rrset)
           verified = true
         end
         check_ds_stores(key_rrset)
@@ -645,35 +675,30 @@ module Dnsruby
     end
 
     def check_ds_stores(key_rrset) # :nodoc:
-      #  See if the keys match any of the to_be_trusted_keys
-      key_rrset.rrs.each do |key|
-        @configured_ds_store.each do |ds|
-          if (ds.check_key(key))
-            @trusted_keys.add_key_with_expiration(key, key_rrset.sigs()[0].expiration)
-          end
-        end
-        @discovered_ds_store.each do |tbtk|
-          #  Check that the RRSet is still valid!!
-          #  Should we get it out of the main cache?
-          if ((tbtk.sigs()[0].expiration < Time.now.to_i))
-            @discovered_ds_store.delete(tbtk)
-          else
-            tbtk.rrs.each {|ds|
-              if (ds.check_key(key))
-                @trusted_keys.add_key_with_expiration(key, tbtk.sigs()[0].expiration)
-                @discovered_ds_store.delete(tbtk)
-              end
-            }
-          end
-        end
-        #             end
+      configured, discovered = @trust_mutex.synchronize do
+        [@configured_ds_store.dup, @discovered_ds_store.dup]
       end
-
+      key_rrset.rrs.each do |key|
+        configured.each do |ds|
+          if ds.check_key(key)
+            publish_trust { @trusted_keys.add_key_with_expiration(key, key_rrset.sigs[0].expiration) }
+          end
+        end
+        discovered.each do |rrset|
+          if rrset.sigs[0].expiration < Time.now.to_i
+            publish_trust { @discovered_ds_store.delete(rrset) }
+          elsif rrset.rrs.any? { |ds| ds.check_key(key) }
+            publish_trust do
+              @trusted_keys.add_key_with_expiration(key, rrset.sigs[0].expiration)
+              @discovered_ds_store.delete(rrset)
+            end
+          end
+        end
+      end
     end
 
     def get_keys_to_check # :nodoc:
-      keys_to_check = @trust_anchors.keys + @trusted_keys.keys
-      return keys_to_check
+      @trust_mutex.synchronize { @trust_anchors.keys + @trusted_keys.keys }
     end
 
     #  Find the first matching DNSKEY and RRSIG record in the two sets.
@@ -738,7 +763,7 @@ module Dnsruby
           rrset.rrs.each do |key|
             keys.rrs.each do |ds|
               if (ds.check_key(key))
-                @trusted_keys.add_key_with_expiration(key, rrset.sigs()[0].expiration)
+                publish_trust { @trusted_keys.add_key_with_expiration(key, rrset.sigs()[0].expiration) }
               end
             end
           end
@@ -951,9 +976,12 @@ module Dnsruby
       name = "." if name == ""
       n = Name.create(name)
       root = Name.create(".")
+      anchors = @trust_mutex.synchronize do
+        @trust_anchors.keys + @trusted_keys.keys + @configured_ds_store + @discovered_ds_store
+      end
       while (true) # n != root)
         #  Try the trusted keys first, then the DS set
-        (@trust_anchors.keys + @trusted_keys.keys + @configured_ds_store + @discovered_ds_store).each {|key|
+        anchors.each {|key|
           return key if key.name.canonical == n.canonical
         }
         break if (n.to_s == root.to_s)
@@ -1396,6 +1424,22 @@ module Dnsruby
       end
       return error
     end
+
+    # These entry points can authenticate or carry trust across a nested call.
+    # The outermost call owns the generation until all nested work finishes.
+    module TrustOperation
+      [:verify, :verify_rrset, :verify_key_rrset, :verify_ds_rrset,
+       :check_ds, :check_ds_stores, :get_dlv_key, :query_dlv_for,
+       :get_zone_key_from_dlv_rrset, :find_closest_dlv_anchor_for,
+       :follow_chain, :get_anchor_for, :validate, :validate_no_rrsigs,
+       :try_to_follow_from_anchor].each do |operation|
+        define_method(operation) do |*args, &block|
+          with_trust_generation { super(*args, &block) }
+        end
+      end
+    end
+    prepend TrustOperation
+    private_constant :TrustOperation
 
   end
 end
