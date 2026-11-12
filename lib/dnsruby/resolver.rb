@@ -966,16 +966,16 @@ module Dnsruby
         outstanding = []
         @query_list[client_query_id]=[msg, client_queue, q, outstanding]
 
-        query_timeout = Time.now + @parent.query_timeout
+        query_timeout = TransportClock.now + @parent.query_timeout
         if @parent.query_timeout == 0
-          query_timeout = Time.now + 31536000 # a year from now
+          query_timeout = TransportClock.now + 31536000 # a year from now
         end
         retries = generate_timeouts
         # An explicitly empty nameserver list uses the ordinary query deadline
         # and completion path. No independent timer can publish a second result.
         no_nameservers = @parent.single_resolvers.empty?
         if no_nameservers && @parent.query_timeout == 0
-          query_timeout = Time.now + 1
+          query_timeout = TransportClock.now + 1
         end
         @timeouts[client_query_id] = [query_timeout, retries, no_nameservers]
         # Publish the observer together with its logical query. close must never
@@ -994,8 +994,8 @@ module Dnsruby
       #  These are created at the same time in case the parameters change during the life of the query.
       #
       #  These should be absolute, rather than relative
-      #  The first value should be Time.now[
-      @parent.generate_timeouts(Time.now)
+      #  All retry and query deadlines use the same monotonic clock.
+      @parent.generate_timeouts(TransportClock.now)
     end
 
     #  Close the Resolver. Unfinished queries are terminated with OtherResolvError.
@@ -1053,11 +1053,11 @@ module Dnsruby
       #       @mutex.synchronize{
       sends = []
       @parent.single_res_mutex.synchronize {
-        time_now = Time.now
+        time_now = TransportClock.now
         @timeouts.keys.each do |client_query_id|
           msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
           query_timeout, timeouts, no_nameservers = @timeouts[client_query_id]
-          if query_timeout < Time.now
+          if query_timeout < time_now
             #  Time the query out through the same exactly-once completion path.
             reason = no_nameservers ? 'Query timed out - no valid nameservers configured' : 'Query timed out'
             send_result_and_stop_querying(client_queue, client_query_id, select_queue, nil,
@@ -1079,7 +1079,11 @@ module Dnsruby
               #  Pick a new QID here @TODO@ !!!
               #               msg.header.id = rand(65535);
               #               print "New query : #{new_msg}\n"
-              operation = res.prepare_send_async(msg, select_queue, id)
+              # A query keeps its original retry plan after reconfiguration.
+              # Removed senders may retry, but must not create idle reusable
+              # sockets that this Resolver can no longer reach through close.
+              retired = !@parent.single_resolvers.include?(res)
+              operation = res.prepare_send_async(msg, select_queue, id, retired)
               sends << operation if operation
             else
               break

@@ -182,4 +182,44 @@ class TestRecordRegressions < Minitest::Test
       encoder.put_length16 { encoder.put_bytes('é' * 32_768) }
     end
   end
+
+  def test_length16_cannot_extend_a_physical_or_nested_buffer
+    decoder = MessageDecoder.new([5].pack('n') + 'abc')
+    assert_raises(DecodeError) { decoder.get_length16 { flunk('decoded outside physical buffer') } }
+    assert_equal('abc', decoder.get_bytes, 'failed boundary check must restore the enclosing limit')
+
+    # The inner length exceeds its containing item, but not the whole packet.
+    decoder = MessageDecoder.new([4, 5].pack('nn') + 'ab' + 'trailer')
+    decoder.get_length16 do
+      assert_raises(DecodeError) { decoder.get_length16 { flunk('decoded outside nested buffer') } }
+      assert_equal('ab', decoder.get_bytes)
+    end
+    assert_equal('trailer', decoder.get_bytes)
+  end
+
+  def test_length16_restores_enclosing_limit_when_the_parser_raises
+    decoder = MessageDecoder.new([4, 2].pack('nn') + 'ab' + 'trailer')
+    decoder.get_length16 do
+      assert_raises(DecodeError) do
+        decoder.get_length16 { raise DecodeError, 'malformed nested value' }
+      end
+      assert_equal('ab', decoder.get_bytes)
+    end
+    assert_equal('trailer', decoder.get_bytes)
+  end
+
+  def test_truncated_svcb_and_https_preserve_partial_header_at_every_byte
+    bytes = ['0001000003000201bb'].pack('H*')
+    [64, 65].each do |type|
+      header = [123, 0x8200, 0, 1, 0, 0].pack('n6')
+      complete = header + wire_rr(type, Classes::IN, bytes)
+      bytes.bytesize.times do |length|
+        truncated = complete.byteslice(0, complete.bytesize - bytes.bytesize + length)
+        error = assert_raises(DecodeError, "TYPE#{type} with #{length} RDATA bytes") { Message.decode(truncated) }
+        assert(error.partial_message.header.tc)
+        assert_equal(123, error.partial_message.header.id)
+      end
+      assert_equal(bytes, Message.decode(complete).answer.first.rdata)
+    end
+  end
 end

@@ -23,6 +23,7 @@ end
 require 'set'
 require 'singleton'
 require 'dnsruby/validator_thread.rb'
+require 'dnsruby/transport_clock'
 module Dnsruby
   class SelectThread #:nodoc: all
     class SelectWakeup < RuntimeError; end
@@ -37,7 +38,7 @@ module Dnsruby
     # 
     #  But how do we find the response queue for a particular query?
     #  Hash of client_id->[query, client_queue, socket]
-    #  and socket->[client_id]
+    #  and socket->[client_ids], including multiple queries per TCP pipeline.
     # 
     #  @todo@ should we implement some of cancel function?
 
@@ -260,6 +261,13 @@ module Dnsruby
     def register_query_if_current(query_settings, previous_settings)
       registered = @@mutex.synchronize do
         return false unless @@query_hash[query_settings.client_query_id].equal?(previous_settings)
+        # Selection happens outside this mutex. A timeout or close may retire
+        # that stream before admission, so leave the reservation untouched and
+        # let the sender choose a new connection under the original deadline.
+        if query_settings.is_persistent_socket &&
+            (query_settings.socket.closed? || (@@retiring_sockets ||= Set.new).include?(query_settings.socket))
+          return :retry_connection
+        end
         query_settings.retire_connection = previous_settings.retire_connection if previous_settings
         check_select_thread_synchronized
         add_query_from_mutex_synchronized_block(query_settings)
@@ -376,10 +384,10 @@ module Dnsruby
       push_response_to_select(settings.client_query_id, settings.client_queue, msg, query, resolver)
     end
 
-    def claim_query(settings)
+    def claim_query(settings, response_received = false)
       @@mutex.synchronize do
         return false unless @@query_hash[settings.client_query_id].equal?(settings)
-        remove_id_from_mutex_synchronized_block(settings.client_query_id)
+        remove_id_from_mutex_synchronized_block(settings.client_query_id, nil, response_received)
         true
       end
     end
@@ -412,11 +420,11 @@ module Dnsruby
 
     def do_select
       unused_loop_count = 0
-      last_tick_time = Time.now - 10
+      last_tick_time = TransportClock.now - 10
       while true do
-        if (last_tick_time < (Time.now - 0.5))
+        if (last_tick_time < (TransportClock.now - 0.5))
           send_tick_to_observers # ONLY NEED TO SEND THIS TWICE A SECOND - NOT EVERY SELECT!!!
-          last_tick_time = Time.now
+          last_tick_time = TransportClock.now
         end
         send_queued_exceptions
         send_queued_responses
@@ -424,8 +432,7 @@ module Dnsruby
         timeout = tick_time = 0.1 # We provide a timer service to various Dnsruby classes
         sockets, timeouts, has_observer = @@mutex.synchronize { [@@sockets.to_a, @@timeouts.values, !@@observers.empty?] }
         if (timeouts.length > 0)
-          timeouts.sort!
-          timeout = timeouts[0] - Time.now
+          timeout = timeouts.min - TransportClock.now
           if (timeout <= 0)
             process_timeouts
             timeout = 0
@@ -565,8 +572,7 @@ module Dnsruby
     end
 
     def send_response_to_client(msg, bytes, socket)
-      #  Figure out which client_ids we were expecting on this socket, then see if any header ids match up
-      #  @TODO@ Can get rid of this, as we only have one query per socket.
+      # Match the header ID against queries outstanding on this connection.
       client_ids=[]
       @@mutex.synchronize{
         client_ids = (@@socket_hash[socket] || []).dup
@@ -611,7 +617,7 @@ module Dnsruby
           if ret
             # A writer failure or a retry can replace/remove settings while
             # check_response runs. Only one path may claim this attempt.
-            return unless claim_query(settings)
+            return unless claim_query(settings, true)
             exception = msg.get_exception
             if (ret.kind_of?TsigError)
               exception = ret
@@ -641,7 +647,7 @@ module Dnsruby
     end
 
     # THIS MUST BE CALLED FROM INSIDE A @@mutex SYNCHRONISED BLOCK!
-    def remove_id_from_mutex_synchronized_block(id, preserved_token = nil)
+    def remove_id_from_mutex_synchronized_block(id, preserved_token = nil, response_received = false)
       settings = @@query_hash.delete(id)
       return unless settings
       settings.send_token.cancel unless settings.send_token.equal?(preserved_token)
@@ -650,11 +656,18 @@ module Dnsruby
       return unless socket # A queued send may not have acquired a socket yet.
       (@@socket_hash[socket] || []).delete(id)
 
-      decrement_remaining_queries(socket) if persistent?(socket)
+      if persistent?(socket)
+        decrement_remaining_queries(socket)
+        # An unanswered query can still produce a late reply, or leave an
+        # incomplete frame in the reader. Drain existing peers, but never admit
+        # another query on this stream after its ownership has been cancelled.
+        (@@retiring_sockets ||= Set.new) << socket unless response_received
+      end
 
       retiring = (@@retiring_sockets ||= Set.new).include?(socket) &&
         (@@socket_hash[socket] || []).empty?
-      if !persistent?(socket) || max_attained?(socket) || retiring
+      if !persistent?(socket) || retiring ||
+          (max_attained?(socket) && (@@socket_hash[socket] || []).empty?)
         @@sockets.delete(socket)
         @@socket_hash.delete(socket)
         @@socket_remaining_queries.delete(socket)
@@ -685,7 +698,7 @@ module Dnsruby
       timeouts = @@mutex.synchronize do
         @@timeouts.map { |id, timeout| [@@query_hash[id], timeout] }
       end
-      time_now = Time.now
+      time_now = TransportClock.now
       timeouts.each do |settings, timeout|
         if timeout < time_now && settings && claim_query(settings)
           settings.client_queue.push([settings.client_query_id, Resolver::EventType::ERROR,
@@ -727,8 +740,17 @@ module Dnsruby
             return false
           end
           buf << input if input
-        rescue
-          #  Oh well - better luck next time!
+        rescue IO::WaitReadable, Errno::EINTR
+          return false
+        rescue IOError, SystemCallError => error
+          # A reset or fatal read failure cannot become readable again. Retire
+          # every owner once, without invoking resolver callbacks under our lock.
+          exceptions = @@mutex.synchronize do
+            socket.close rescue nil
+            retire_socket_from_mutex_synchronized_block(socket)
+          end
+          exceptions.each { |exception| send_exception_to_client(*exception) }
+          Dnsruby.log.debug { "TCP read failed: #{error.class}: #{error.message}" }
           return false
         end
       end

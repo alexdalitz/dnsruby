@@ -44,11 +44,14 @@ class MessageDecoder #:nodoc: all
   # This will be the length of the next item to parse in the binary string.
   # Returns the object returned from that block.
   #
-  # When this method returns, @index will point to the byte after the
-  # 16-bit length field.
+  # When this method returns, @index will point just after the parsed item.
   def get_length16
-    len, = self.get_unpack('n')
     save_limit = @limit
+    len, = self.get_unpack('n')
+    # A nested length may narrow its enclosing buffer, never extend it. In
+    # particular, truncated UDP RDATA must raise DecodeError before a typed
+    # decoder reads beyond the physical packet and raises an unrelated error.
+    assert_buffer_position_valid(@index + len)
     @limit = @index + len
     parsed_data = yield(len)
     if @index < @limit
@@ -56,8 +59,9 @@ class MessageDecoder #:nodoc: all
       raise DecodeError.new(message)
     end
     assert_buffer_position_valid(@index)
-    @limit = save_limit
     parsed_data
+  ensure
+    @limit = save_limit
   end
 
   # Returns the specified number of bytes from the binary string.

@@ -70,33 +70,26 @@ Marshal behaviour. Do not register arbitrary types received from the network:
 doing so would restore unbounded memory use. Explicit `ClassHash` registrations
 also remain persistent.
 
-#### YAML and existing caches
+#### Existing caches
 
-To save or load automatically generated records, their classes, or messages
-containing them, enable the optional adapter before loading YAML:
-
-```ruby
-require 'dnsruby/optional/yaml'
-```
-
-Existing generated-class YAML names remain supported with the adapter. Stored
-generic SVCB/HTTPS records are converted to the new record classes while
-preserving containing objects and shared references. Malformed stored SVCB/HTTPS
-data raises `Dnsruby::DecodeError`.
-
-Safe loading still needs the appropriate permitted classes and aliases. For old
-SVCB/HTTPS tags, include the legacy class names, such as
-`'Dnsruby::RR::Generic::Type64_Class1'`, in `permitted_classes`. The adapter does
-not relax Psych's restrictions. Ordinary named records do not need it.
-
-Custom data classes nested inside generated record classes are unsupported; use
-a stable application namespace or explicitly register the record type first.
-If you freeze `Psych::ClassLoader`, load the adapter before freezing it.
+YAML persistence of automatically generated record classes and migration of
+stored generic SVCB/HTTPS records are not supported. Ordinary named records are
+unaffected.
 
 The AXFR demo keeps its Marshal cache format. Transfers containing unsupported
 generated records are displayed with a warning and leave any existing cache
 unchanged. Unreadable legacy caches are refetched; use `-f` to force a fresh
 transfer when needed.
+
+#### SVCB and HTTPS record data
+
+Types 64 and 65 now return parsed SVCB and HTTPS records. Existing `data` and
+`rdata` readers still return the raw binary RDATA, and `rdlength` reports its
+byte length. The bytes reflect changes to `priority`, `target`, or `params`.
+Assign raw bytes with `rdata=` (or `data=`), or supply `rdata:` in `RR.create`'s
+Hash, to update the parsed fields. Returned byte strings are snapshots; use
+these writers to replace the record data. Presentation output uses the
+registered `SVCB` and `HTTPS` mnemonics instead of `TYPE64` and `TYPE65`.
 
 #### IPv6 formatting
 

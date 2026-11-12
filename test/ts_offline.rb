@@ -24,7 +24,6 @@ TESTS = %w(
     escapedchars
     gpos
     generic_cache
-    generic_yaml
     hash
     header
     ipseckey
@@ -63,6 +62,7 @@ TESTS = %w(
     rrset
     rrsig
     svcb
+    svcb_transport
     tcp_pipelining
     tkey
     update

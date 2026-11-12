@@ -67,7 +67,7 @@ class TestPipelineSend < Minitest::Test
     end
     def settings(socket, id, q = query, resolver = sender(socket), max = :infinite)
       s = K::QuerySettings.new(q.encode, q, false, Queue.new, id, socket,
-        '127.0.0.1', 53, Time.now + 1, 512, resolver)
+        '127.0.0.1', 53, Dnsruby::TransportClock.now + 1, 512, resolver)
       s.is_persistent_socket = true
       s.tcp_pipelining_max_queries = max
       s
@@ -198,7 +198,7 @@ class TestPipelineSend < Minitest::Test
         SELECTOR.add_to_select(old)
         worker = writer.send_dnsruby(old.query_bytes, old.query, kind, old.client_queue, true)
         if kind == :expired
-          old.endtime = Time.now - 1
+          old.endtime = Dnsruby::TransportClock.now - 1
           K.class_variable_get(:@@timeouts)[kind] = old.endtime
           SELECTOR.process_timeouts
         else
@@ -250,11 +250,13 @@ class TestPipelineSend < Minitest::Test
     RUBY
   end
 
-  def test_closed_registration_does_not_attempt_a_write_or_report_twice
+  def test_closed_nonpipeline_registration_does_not_attempt_a_write_or_report_twice
     run_scenario(<<~'RUBY')
       socket = FrameSocket.new
       socket.close
       writer = sender(socket)
+      writer.tcp_pipelining = false
+      Socket.define_singleton_method(:tcp) { |*args, **kwargs| socket }
       q, queue = query, Queue.new
       writer.send_dnsruby(q.encode, q, :closed, queue, true)
       drain_errors
@@ -275,7 +277,7 @@ class TestPipelineSend < Minitest::Test
         other = settings(socket, :other, query('other.example.'), writer)
         SELECTOR.add_to_select(other) unless new_socket
         writer.define_singleton_method(:tcp_pipeline_socket) do |_|
-          old.endtime = Time.now - 1
+          old.endtime = Dnsruby::TransportClock.now - 1
           K.class_variable_get(:@@timeouts)[:retry] = old.endtime
           SELECTOR.process_timeouts # The original attempt completes during connect.
           @use_counts[socket] = 1
@@ -374,8 +376,8 @@ class TestPipelineSend < Minitest::Test
           client_queue, select_queue = Queue.new, Queue.new
           attempt = [writer, q, :client, 0]
           engine.instance_variable_get(:@query_list)[:client] = [q, client_queue, select_queue, []]
-          scheduled = {Time.now + 60 => [writer, 1]}
-          engine.instance_variable_get(:@timeouts)[:client] = [Time.now + 120, scheduled]
+          scheduled = {Dnsruby::TransportClock.now + 60 => [writer, 1]}
+          engine.instance_variable_get(:@timeouts)[:client] = [Dnsruby::TransportClock.now + 120, scheduled]
           SELECTOR.add_observer(select_queue, engine)
           engine.handle_error_response(select_queue, attempt, error, nil)
           raise 'remaining retry removed' unless scheduled.size == 1
@@ -547,7 +549,7 @@ class TestPipelineSend < Minitest::Test
           raise 'TCP send was not delegated' unless task.respond_to?(:value)
           raise 'connect/write still ran on selector' if entered.pop.equal?(Thread.current)
           unrelated = settings(FrameSocket.new, :unrelated)
-          unrelated.endtime = Time.now - 1
+          unrelated.endtime = Dnsruby::TransportClock.now - 1
           SELECTOR.add_to_select(unrelated)
           SELECTOR.process_timeouts
           raise 'TCP wait blocked another timeout' unless unrelated.client_queue.size == 1
@@ -567,7 +569,7 @@ class TestPipelineSend < Minitest::Test
         writer = Dnsruby::PacketSender.new(server: '127.0.0.1', tcp_pipelining: pipeline,
           packet_timeout: 1, dnssec: false)
         old = settings(FrameSocket.new, :retry, query, writer)
-        old.endtime = Time.now - 1
+        old.endtime = Dnsruby::TransportClock.now - 1
         SELECTOR.add_to_select(old)
         entered, release = Queue.new, Queue.new
         connect = -> { entered << true; release.pop; socket }
@@ -579,7 +581,7 @@ class TestPipelineSend < Minitest::Test
         Thread.current[:dnsruby_response_query] = nil
         entered.pop
         pending = SELECTOR.query_settings_for_id(:retry)
-        raise 'old deadline retained during connect' unless pending && pending.endtime > Time.now
+        raise 'old deadline retained during connect' unless pending && pending.endtime > Dnsruby::TransportClock.now
         SELECTOR.process_timeouts
         raise 'retry expired against original deadline' unless old.client_queue.empty?
         release << true

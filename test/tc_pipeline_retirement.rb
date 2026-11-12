@@ -40,7 +40,7 @@ class TestPipelineRetirement < Minitest::Test
         socket
       end
 
-      def settings(socket, id: :query, persistent: true, endtime: Time.now + 60, register: true)
+      def settings(socket, id: :query, persistent: true, endtime: Dnsruby::TransportClock.now + 60, register: true)
         query = Dnsruby::Message.new('retirement.example.')
         query.do_validation = query.do_caching = false
         settings = @klass::QuerySettings.new(query.encode, query, false, Queue.new, id,
@@ -313,17 +313,17 @@ class TestPipelineRetirement < Minitest::Test
     assert_isolated(<<~'RUBY')
       fixture = RetirementFixture.new
       selector = fixture.selector
-      expired = Time.now - 1
+      deadline = Dnsruby::TransportClock.now - 1
+      expired = Object.new
       original = fixture.settings(fixture.socket, endtime: expired)
       replacement = fixture.settings(fixture.socket, register: false)
-      compare = expired.method(:<)
       replaced = false
       expired.define_singleton_method(:<) do |other|
         # process_timeouts has copied its work and released the selector mutex.
         # Another sender replaces this ID before the expired entry is claimed.
         selector.add_to_select(replacement)
         replaced = true
-        compare.call(other)
+        deadline < other
       end
       selector.process_timeouts
       raise 'timeout snapshot hook not reached' unless replaced
@@ -332,7 +332,7 @@ class TestPipelineRetirement < Minitest::Test
       raise 'replacement registration was consumed' unless selector.query_settings_for_id(:query).equal?(replacement)
       raise 'replacement deadline was removed' unless fixture.table(:timeouts)[:query] == replacement.endtime
       # The replacement can still expire on its own deadline.
-      fixture.table(:timeouts)[:query] = Time.now - 1
+      fixture.table(:timeouts)[:query] = Dnsruby::TransportClock.now - 1
       selector.process_timeouts
       events = fixture.events(replacement)
       raise 'replacement did not receive one timeout' unless events.length == 1 &&

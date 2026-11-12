@@ -67,11 +67,53 @@ module Dnsruby
       # SvcParamValue in wire format. See #params_to_hash for a readable view.
       attr_accessor :params
 
+      # TYPE64/TYPE65 were formerly generic records. Preserve their raw RDATA
+      # interface alongside the parsed fields, computing bytes on demand so
+      # changes to the target or publicly mutable params cannot leave a cache
+      # out of date.
+      def data
+        MessageEncoder.new { |encoder| encode_rdata(encoder) }.to_s
+      end
+      alias rdata data
+
+      # Parse before assigning, so an invalid replacement leaves the record
+      # unchanged. Raw RDATA is always interpreted as octets, not UTF-8 text.
+      def data=(bytes)
+        raise DecodeError, 'SVCB RDATA must be a binary String' unless bytes.is_a?(String)
+        raise DecodeError, 'SVCB RDATA exceeds 65535 octets' if bytes.bytesize > 0xffff
+
+        parsed = self.class.decode_rdata(MessageDecoder.new(bytes.b))
+        parsed.klass = klass if klass
+        parsed.validate_decoded_rdata
+        @priority, @target, @params = parsed.priority, parsed.target, parsed.params
+      end
+      alias rdata= data=
+
+      def rdlength
+        data.bytesize
+      end
+
+      # RR's default comparator uses the construction-time @rdata ivar, which
+      # can be presentation text or a tuple. Compare the same current bytes
+      # that callers receive from #rdata, regardless of construction path.
+      def <=>(other)
+        if @name.canonical == other.name.canonical && @type.code == other.type.code
+          rdata <=> other.rdata
+        else
+          super
+        end
+      end
+
       def from_hash(hash) #:nodoc: all
+        if hash.key?(:data) && hash.key?(:rdata) && hash[:data] != hash[:rdata]
+          raise DecodeError, 'SVCB data and rdata must agree when both are supplied'
+        end
+        self.data = hash.fetch(:data) { hash[:rdata] } if hash.key?(:data) || hash.key?(:rdata)
         self.priority = hash[:priority] if hash[:priority]
         @target = Name.create(hash[:target]) if hash[:target]
-        @params = {}
+        @params ||= {}
         if hash[:params]
+          @params = {}
           hash[:params].each do |key, value|
             store_param(key.to_s,
                         value.nil? ? nil : decode_presentation_value(value.to_s))
@@ -82,10 +124,28 @@ module Dnsruby
       end
 
       def from_data(data) #:nodoc: all
-        @priority, @target, @params = data
+        # Generic constructors accepted a one-element Array of raw bytes.
+        # Retain that form alongside the parsed tuple used by this codec.
+        if data.length == 1 && data.first.is_a?(String)
+          self.data = data.first
+        else
+          @priority, @target, @params = data
+        end
       end
 
       def from_string(input) #:nodoc: all
+        # Generic.new historically accepted raw bytes. Every complete SVCB
+        # TargetName has a NUL terminator, so try its wire form when present.
+        # A presentation value can itself contain NUL; retain the normal text
+        # parser if the string is not also a complete, valid wire record.
+        if input && input.include?("\0")
+          begin
+            self.data = input
+            return
+          rescue DecodeError
+            # Not wire-format RDATA; parse the presentation form below.
+          end
+        end
         @params = {}
         return if input.nil? || input.strip.empty?
 

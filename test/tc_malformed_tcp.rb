@@ -297,7 +297,7 @@ class TestMalformedTcp < Minitest::Test
         settings = Dnsruby::SelectThread::QuerySettings.new
         settings.query, settings.client_query_id = query, :late
         settings.client_queue, settings.socket = queue, socket
-        settings.endtime = Time.now + 60
+        settings.endtime = Dnsruby::TransportClock.now + 60
         {
           mutex: Mutex.new, sockets: Set.new([wakeup]), timeouts: {}, query_hash: {},
           socket_hash: {}, socket_is_persistent: {}, socket_remaining_queries: {},
@@ -472,7 +472,7 @@ class TestMalformedTcp < Minitest::Test
               closed_socket = Object.new
               closed_socket.define_singleton_method(:closed?) { true }
               settings = klass::QuerySettings.new(query.encode, query, false, queue, :late,
-                closed_socket, '127.0.0.1', 53, Time.now + 60, 512, nil)
+                closed_socket, '127.0.0.1', 53, Dnsruby::TransportClock.now + 60, 512, nil)
               selector.add_to_select(settings)
             end
             expected_types = case kind
@@ -567,7 +567,7 @@ class TestMalformedTcp < Minitest::Test
         settings.query = Dnsruby::Message.new("#{id}.example.")
         settings.client_query_id = [Object.new, settings.query]
         settings.client_queue, settings.socket = Queue.new, socket
-        settings.endtime = Time.now + 60
+        settings.endtime = Dnsruby::TransportClock.now + 60
         settings.is_persistent_socket = true
         settings.tcp_pipelining_max_queries = :infinite
         settings

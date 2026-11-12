@@ -81,7 +81,7 @@ class TestPipelineRetry < Minitest::Test
         query.do_validation = query.do_caching = false
         query.header.rd = true
         @klass::QuerySettings.new(query.encode, query, false, Queue.new, id, socket,
-          '127.0.0.1', 53, Time.now + 60, 512, sender)
+          '127.0.0.1', 53, Dnsruby::TransportClock.now + 60, 512, sender)
       end
 
       def response(settings = @original)
@@ -114,7 +114,7 @@ class TestPipelineRetry < Minitest::Test
             @selector.fail_tcp_send(@original, @winner_error)
           end
         when :expired
-          table(:timeouts)[:retry] = Time.now - 1
+          table(:timeouts)[:retry] = Dnsruby::TransportClock.now - 1
           @selector.process_timeouts
         when :replaced
           @replacement = settings(RetrySocket.new(true), :retry)
@@ -231,7 +231,7 @@ class TestPipelineRetry < Minitest::Test
           crossed = false
           cross_old_deadline = -> do
             crossed = true
-            fixture.original.endtime = Time.now - 1
+            fixture.original.endtime = Dnsruby::TransportClock.now - 1
             fixture.table(:timeouts)[:retry] = fixture.original.endtime
             # No timeout has claimed this attempt: its response is already
             # being processed, and its protocol retry has its own deadline.
@@ -249,7 +249,7 @@ class TestPipelineRetry < Minitest::Test
           raise 'connection boundary not exercised' unless crossed
           current = fixture.selector.query_settings_for_id(:retry)
           raise 'live protocol retry discarded' unless current && !current.equal?(fixture.original)
-          raise 'retry inherited old deadline' unless current.endtime > Time.now
+          raise 'retry inherited old deadline' unless current.endtime > Dnsruby::TransportClock.now
           raise 'premature retry event' unless fixture.events.empty?
           transport = kind == :formerr ? fixture.udp : fixture.tcp
           raise 'retry was not sent' if transport.writes.empty?
@@ -271,13 +271,13 @@ class TestPipelineRetry < Minitest::Test
       begin
         fixture.check_retry(wait: false)
         raise 'selector retry was not deferred' unless worker.respond_to?(:value)
-        fixture.original.endtime = Time.now - 1
+        fixture.original.endtime = Dnsruby::TransportClock.now - 1
         fixture.table(:timeouts)[:retry] = fixture.original.endtime
         lock.unlock
         worker.value
         current = fixture.selector.query_settings_for_id(:retry)
         raise 'unclaimed retry discarded after writer wait' unless current && !current.equal?(fixture.original)
-        raise 'deferred retry inherited old deadline' unless current.endtime > Time.now
+        raise 'deferred retry inherited old deadline' unless current.endtime > Dnsruby::TransportClock.now
         raise 'premature retry event' unless fixture.events.empty?
         raise 'deferred retry not sent' if fixture.tcp.writes.empty?
         fixture.assert_success(current, fixture.response(current))

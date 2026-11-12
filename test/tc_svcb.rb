@@ -14,7 +14,7 @@ class TestSVCB < Minitest::Test
 
   # Builds an RR from the RDATA half of its presentation format.
   def svcb(rdata, type = 'SVCB')
-    RR.create("example.com. 3600 IN #{type} #{rdata}")
+    RR.create("example.com. 3600 IN #{Types.new(type)} #{rdata}")
   end
 
   # Builds an RR from its RDATA in wire-format hex.
@@ -48,6 +48,122 @@ class TestSVCB < Minitest::Test
     assert_equal('HTTPS', Types.new(65).string)
     assert(RR::IN::HTTPS < RR::SVCB)
     assert_equal(RR::IN::HTTPS, svcb('1 .', 'HTTPS').class)
+  end
+
+  def test_former_generic_raw_data_interface_is_independent_of_construction
+    bytes = ['0001000003000201bb'].pack('H*')
+    [64, 65].each do |type|
+      records = [
+        RR.create("example.com. 3600 IN TYPE#{type} \\# 9 #{bytes.unpack1('H*')}"),
+        RR.create(name: 'example.com.', ttl: 3600, type: type, rdata: bytes),
+        RR.create(name: 'example.com.', ttl: 3600, type: type, data: bytes),
+        RR.create(name: 'example.com.', ttl: 3600, type: type, priority: 1, target: '.', params: {port: 443}),
+        svcb('1 . port=443', type),
+      ]
+      records.each do |rr|
+        assert_equal(bytes, rr.data)
+        assert_equal(bytes, rr.rdata)
+        assert_equal(Encoding::BINARY, rr.rdata.encoding)
+        assert_equal(9, rr.rdlength)
+        assert_equal(1, rr.priority)
+        assert_equal('443', rr.params_to_hash['port'])
+        assert_equal(records.first, rr)
+        assert_equal(records.first.hash, rr.hash)
+        assert_equal(0, records.first <=> rr)
+        assert_equal(0, rr <=> records.first)
+        assert_roundtrip(rr)
+      end
+      # Public callers flatten arbitrary answer.rdata values, including TYPE65.
+      assert_equal([bytes], records.first(1).map(&:rdata).flatten.map(&:to_s).sort)
+    end
+  end
+
+  def test_raw_rdata_assignment_updates_typed_fields_and_is_atomic_on_error
+    [64, 65].each do |type|
+      rr = svcb('1 . port=443', type)
+      replacement = ['000200000300020035'].pack('H*')
+      [:rdata=, :data=].each do |writer|
+        rr.public_send(writer, replacement)
+        assert_equal(2, rr.priority)
+        assert_equal('53', rr.params_to_hash['port'])
+        assert_equal(replacement, rr.rdata)
+        assert_equal(replacement, [rdata_hex(rr)].pack('H*'))
+        [nil, [], '', replacement.byteslice(0, 4), ['000100000300030035'].pack('H*'), 'x' * 65_536].each do |invalid|
+          assert_raises(DecodeError) { rr.public_send(writer, invalid) }
+          assert_equal(replacement, rr.rdata, 'invalid assignment must leave the complete record intact')
+        end
+      end
+      assert_roundtrip(rr)
+    end
+  end
+
+  def test_former_generic_direct_constructor_accepts_raw_bytes
+    bytes = ['0001000003000201bb'].pack('H*')
+    [64, 65].each do |type|
+      rr = RR.get_class(type, Classes::IN).new(bytes)
+      assert_equal(bytes, rr.data)
+      assert_equal(bytes, rr.rdata)
+      assert_equal(9, rr.rdlength)
+      assert_equal(1, rr.priority)
+      assert_equal('443', rr.params_to_hash['port'])
+    end
+    # A NUL inside a presentation value must still reach the text parser.
+    rr = svcb("1 . key667=one\0two")
+    assert_equal("one\0two", rr.params[667])
+  end
+
+  def test_former_generic_array_constructor_accepts_raw_bytes
+    bytes = ['0001000003000201bb'].pack('H*')
+    [64, 65].each do |type|
+      record_class = RR.get_class(type, Classes::IN)
+      raw_record = record_class.new([bytes])
+      typed_record = record_class.new([1, Name.create('.'), {3 => [443].pack('n')}])
+      [raw_record, typed_record].each do |rr|
+        assert_equal(bytes, rr.data)
+        assert_equal(bytes, rr.rdata)
+        assert_equal(bytes, [rdata_hex(rr)].pack('H*'))
+        assert_equal(bytes.bytesize, rr.rdlength)
+        assert_equal(1, rr.priority)
+        assert_equal('.', rr.target.to_s(true))
+        assert_equal('443', rr.params_to_hash['port'])
+        rr.name = 'example.com.'
+        rr.ttl = 60
+        rr.type = Types.new(type)
+        rr.klass = Classes::IN
+        assert_roundtrip(rr)
+      end
+    end
+  end
+
+  def test_raw_rdata_tracks_publicly_mutable_typed_fields
+    rr = svcb('1 . port=443')
+    rr.priority = 2
+    rr.target = Name.create('svc.example.')
+    rr.params[3].replace([8443].pack('n'))
+    rr.params[667] = 'abc'.b
+    expected = svcb('2 svc.example. port=8443 key667=abc')
+    assert_equal(expected.rdata, rr.rdata)
+    assert_equal([rdata_hex(rr)].pack('H*'), rr.data)
+    assert_equal(rr.data.bytesize, rr.rdlength)
+    assert_equal(expected, rr)
+    assert_equal(0, rr <=> expected)
+    rr.params.delete(667)
+    assert_equal(svcb('2 svc.example. port=8443').rdata, rr.rdata)
+  end
+
+  def test_raw_hash_fields_allow_typed_overrides_and_reject_conflicts
+    bytes = ['0001000003000201bb'].pack('H*')
+    rr = RR.create(name: 'example.com.', type: 65, rdata: bytes, priority: 2, params: {port: 53})
+    assert_equal(svcb('2 . port=53', 65), rr)
+    assert_raises(DecodeError) do
+      RR.create(name: 'example.com.', type: 65, rdata: bytes, data: bytes + 'x')
+    end
+    [Classes::ANY, Classes::NONE].each do |klass|
+      rr = RR.create(name: 'example.com.', type: 65, klass: klass, rdata: ''.b)
+      assert_equal('', rr.data)
+      assert_equal(0, rr.rdlength)
+      assert_roundtrip(rr)
+    end
   end
 
   def test_basic_parse

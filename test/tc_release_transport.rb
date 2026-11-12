@@ -277,7 +277,7 @@ class TestReleaseTransport < Minitest::Test
       writer.define_singleton_method(:send_async) { |*| }
       queue = Queue.new
       resolver.send_async(query, queue, :timeout)
-      K.class_variable_get(:@@timeouts).transform_values! { Time.now - 1 }
+      K.class_variable_get(:@@timeouts).transform_values! { Dnsruby::TransportClock.now - 1 }
       SELECTOR.process_timeouts
       raise 'packet timeout was not delivered' unless queue.size == 1 && queue.pop.last.is_a?(Dnsruby::ResolvTimeout)
       raise 'last sender moved beyond end of list' unless resolver.single_resolvers == [writer]
@@ -308,7 +308,7 @@ class TestReleaseTransport < Minitest::Test
           SELECTOR.send_queued_responses
           SELECTOR.send_queued_validation_responses
         when :timeout
-          K.class_variable_get(:@@timeouts)[pending.client_query_id] = Time.now - 1
+          K.class_variable_get(:@@timeouts)[pending.client_query_id] = Dnsruby::TransportClock.now - 1
           SELECTOR.process_timeouts
         when :error
           SELECTOR.fail_query_if_current(pending.client_query_id, pending.client_queue, pending,
@@ -322,6 +322,376 @@ class TestReleaseTransport < Minitest::Test
         raise "#{outcome}: config changed" unless resolver.config.nameserver == ['127.0.0.2']
         resolver.close
       end
+    RUBY
+  end
+
+  def test_timed_out_stream_cannot_accept_new_queries_and_existing_peers_drain
+    isolated(<<~'RUBY')
+      socket = FrameSocket.new
+      writer = sender(socket)
+      expired = settings(socket, :expired, query('expired.example.'), writer)
+      peer = settings(socket, :peer, query('peer.example.'), writer)
+      expired.query.header.id, peer.query.header.id = 7, 8
+      [expired, peer].each { |item| SELECTOR.add_to_select(item) }
+      # Both a partial prefix and a partial body must remain owned by this
+      # retiring stream until its already outstanding queries finish.
+      K.class_variable_get(:@@tcp_buffers)[socket] = [+"\0", 2, true]
+      K.class_variable_get(:@@timeouts)[:expired] = Dnsruby::TransportClock.now - 1
+      SELECTOR.process_timeouts
+      raise 'timeout missing' unless expired.client_queue.size == 1 &&
+        expired.client_queue.pop.last.is_a?(Dnsruby::ResolvTimeout)
+      raise 'timeout killed unrelated peer' if socket.closed?
+      raise 'timed-out stream reusable' if SELECTOR.reusable_socket?(socket)
+      raise 'peer ownership lost' unless SELECTOR.query_settings_for_id(:peer).equal?(peer)
+      # Once the late frame has been consumed, a valid peer response can finish.
+      K.class_variable_get(:@@tcp_buffers).delete(socket)
+      response = peer.query.clone
+      response.header.qr = true
+      SELECTOR.process_message(response, response.encode, socket)
+      SELECTOR.send_queued_validation_responses
+      raise 'peer response lost' unless peer.client_queue.size == 2 &&
+        2.times.all? { peer.client_queue.pop.last.nil? }
+      raise 'drained stream stayed open' unless socket.closed?
+      assert_clean(socket)
+    RUBY
+  end
+
+  def test_retirement_between_socket_selection_and_registration_retries_admission
+    isolated(<<~'RUBY')
+      [true, false].each do |keep_peer|
+        sockets = []
+        Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+          FrameSocket.new.tap do |socket|
+            socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
+            sockets << socket
+          end
+        end
+        writer = Dnsruby::PacketSender.new(server: '127.0.0.1', use_tcp: true,
+          tcp_pipelining: true, dnssec: false, packet_timeout: 5)
+        requests = 3.times.map { |i| query("admission#{i}.example.").tap { |q| q.header.id = i } }
+        queues = 3.times.map { Queue.new }
+        writer.send_async(requests[0], queues[0], 0)
+        writer.send_async(requests[1], queues[1], 1) if keep_peer
+        old = sockets.first
+        selected, release = Queue.new, Queue.new
+        choose = writer.method(:tcp_pipeline_socket)
+        writer.define_singleton_method(:tcp_pipeline_socket) do |port|
+          result = choose.call(port)
+          if result.first.equal?(old)
+            selected << true
+            release.pop
+          end
+          result
+        end
+        sending = Thread.new { writer.send_async(requests[2], queues[2], 2) }
+        selected.pop
+        pending = SELECTOR.query_settings_for_id(2)
+        original_deadline = pending.endtime
+        old_size = old.written.bytesize
+        K.class_variable_get(:@@tcp_buffers)[old] = [+'partial', 1000, false]
+        K.class_variable_get(:@@timeouts)[0] = Dnsruby::TransportClock.now - 1
+        SELECTOR.process_timeouts
+        raise 'incorrect old stream lifetime' unless old.closed? == !keep_peer
+        release << true
+        sending.value
+        current = SELECTOR.query_settings_for_id(2)
+        raise 'registration used retired or closed stream' unless sockets.size == 2 &&
+          current.socket.equal?(sockets.last) && old.written.bytesize == old_size
+        raise 'admission retry replaced ownership or deadline' unless
+          current.send_token.equal?(pending.send_token) && current.endtime == original_deadline
+        raise 'admission retry delivered a premature error' unless queues[2].empty?
+        raise 'retirement lost existing peer' if keep_peer && !SELECTOR.query_settings_for_id(1)
+        [2, (1 if keep_peer)].compact.each do |id|
+          item = SELECTOR.query_settings_for_id(id)
+          response = requests[id].clone
+          response.header.qr = true
+          SELECTOR.process_message(response, response.encode, item.socket)
+        end
+        SELECTOR.send_queued_validation_responses
+        raise 'fresh query did not complete' unless queues[2].size == 2 &&
+          2.times.all? { queues[2].pop.last.nil? }
+        writer.close
+        sockets.each { |socket| raise 'socket retained' unless socket.closed?; assert_clean(socket) }
+      end
+    RUBY
+  end
+
+  def test_timeout_without_partial_bytes_rotates_before_reusing_a_header_id
+    isolated(<<~'RUBY')
+      sockets = []
+      Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+        FrameSocket.new.tap do |socket|
+          socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
+          sockets << socket
+        end
+      end
+      writer = Dnsruby::PacketSender.new(server: '127.0.0.1', use_tcp: true,
+        tcp_pipelining: true, dnssec: false)
+      request = query
+      request.header.id = 123
+      writer.send_async(request, Queue.new, :old)
+      K.class_variable_get(:@@timeouts)[:old] = Dnsruby::TransportClock.now - 1
+      SELECTOR.process_timeouts
+      writer.send_async(request, Queue.new, :new)
+      raise 'late reply could reach reused ID' unless sockets.size == 2 && sockets.first.closed?
+      SELECTOR.remove_id(:new)
+      writer.close
+      sockets.each { |socket| assert_clean(socket) }
+    RUBY
+  end
+
+  def test_removed_sender_retries_use_connections_that_close_after_the_answer
+    isolated(<<~'RUBY')
+      SELECTOR.singleton_class.remove_method(:notify_queue_observers)
+      sockets = []
+      Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+        FrameSocket.new.tap do |socket|
+          socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
+          sockets << socket
+        end
+      end
+      resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1', use_tcp: true,
+        tcp_pipelining: true, dnssec: false, retry_times: 2, retry_delay: 10)
+      queue, request = Queue.new, query
+      resolver.send_async(request, queue, :retry)
+      old_writer = resolver.single_resolvers.first
+      resolver.nameserver = '127.0.0.2'
+      original = K.class_variable_get(:@@query_hash).values.first
+      K.class_variable_get(:@@timeouts)[original.client_query_id] = Dnsruby::TransportClock.now - 1
+      SELECTOR.process_timeouts
+      engine = resolver.instance_variable_get(:@resolver_ruby)
+      retry_plan = engine.instance_variable_get(:@timeouts)[:retry][1]
+      entry = retry_plan.values.first
+      raise 'original retry plan replaced' unless entry.first.equal?(old_writer)
+      retry_plan.clear
+      retry_plan[Dnsruby::TransportClock.now - 1] = entry
+      engine.tick
+      raise 'retry did not make a new connection' unless sockets.size == 2
+      response = request.clone
+      response.header.qr = true
+      SELECTOR.process_message(response, response.encode, sockets.last)
+      SELECTOR.send_queued_validation_responses
+      raise 'retry response lost' unless queue.size == 1 && queue.pop.last.nil?
+      raise 'old retry left an idle socket' unless sockets.all?(&:closed?)
+      resolver.close
+      sockets.each { |socket| assert_clean(socket) }
+    RUBY
+  end
+
+  def test_pipeline_capacity_changes_rotate_connections_and_preserve_every_peer
+    isolated(<<~'RUBY')
+      [[2, 3], [3, 2], [:infinite, 2], [2, :infinite], [3, 1]].each do |before, after|
+        sockets = []
+        Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+          FrameSocket.new.tap do |socket|
+            socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
+            sockets << socket
+          end
+        end
+        writer = Dnsruby::PacketSender.new(server: '127.0.0.1', use_tcp: true,
+          tcp_pipelining: true, tcp_pipelining_max_queries: before, dnssec: false)
+        requests = 3.times.map { |i| query("capacity#{i}.example.").tap { |q| q.header.id = i } }
+        queues = 3.times.map { Queue.new }
+        writer.send_async(requests[0], queues[0], 0)
+        original = sockets.first
+        writer.tcp_pipelining_max_queries = after
+        [1, 2].each { |i| writer.send_async(requests[i], queues[i], i) }
+        raise 'old connection reused after capacity change' unless sockets.size >= 2 &&
+          !SELECTOR.reusable_socket?(original) && !original.closed?
+        # Out-of-order responses also exercise draining the retired generation.
+        [2, 0, 1].each do |id|
+          current = SELECTOR.query_settings_for_id(id)
+          response = requests[id].clone
+          response.header.qr = true
+          SELECTOR.process_message(response, response.encode, current.socket)
+        end
+        SELECTOR.send_queued_validation_responses
+        raise 'capacity change lost a response' unless queues.all? do |queue|
+          queue.size == 2 && 2.times.all? { queue.pop.last.nil? }
+        end
+        writer.close
+        sockets.each { |socket| raise 'socket open' unless socket.closed?; assert_clean(socket) }
+      end
+    RUBY
+  end
+
+  def test_tcp_read_waits_only_for_transient_errors_and_retires_fatal_errors
+    isolated(<<~'RUBY')
+      [IO::EAGAINWaitReadable, Errno::EINTR, Errno::ECONNRESET, IOError].each do |kind|
+        socket = FrameSocket.new
+        requests = 2.times.map { |i| settings(socket, i) }
+        requests.each { |item| SELECTOR.add_to_select(item) }
+        socket.define_singleton_method(:recv_nonblock) { |_| raise kind, 'injected read failure' }
+        raise 'unexpected bytes' unless SELECTOR.tcp_read(socket) == false
+        if [IO::EAGAINWaitReadable, Errno::EINTR].include?(kind)
+          raise 'transient read failed owners' if socket.closed? || requests.any? { |s| !s.client_queue.empty? }
+          requests.each { |item| SELECTOR.remove_id(item.client_query_id) }
+        else
+          raise 'fatal read left stream open' unless socket.closed?
+          requests.each do |item|
+            raise 'fatal read did not fail each owner once' unless item.client_queue.size == 1 &&
+              item.client_queue.pop.last.is_a?(Dnsruby::SocketEofResolvError)
+          end
+          assert_clean(socket)
+        end
+      end
+    RUBY
+  end
+
+  def test_random_source_port_collision_retries_before_registering_a_socket
+    isolated(<<~'RUBY')
+      [true, false].each do |pipeline|
+        calls = 0
+        socket = FrameSocket.new
+        Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+          calls += 1
+          raise Errno::EADDRINUSE if calls == 1
+          socket
+        end
+        writer = Dnsruby::PacketSender.new(server: '127.0.0.1', use_tcp: true,
+          tcp_pipelining: pipeline, dnssec: false)
+        writer.define_singleton_method(:get_next_src_port) { 40000 + calls }
+        queue, request = Queue.new, query
+        writer.send_async(request, queue, :collision)
+        raise 'source port collision did not retry' unless calls == 2
+        raise 'retry did not send the complete frame' unless
+          socket.written == [request.encode.bytesize].pack('n') + request.encode
+        drain_errors
+        raise 'source port collision delivered an error' unless queue.empty?
+        SELECTOR.remove_id(:collision)
+        writer.close
+        assert_clean(socket)
+      end
+    RUBY
+  end
+
+  def test_random_udp_source_port_collision_retries_with_a_new_socket
+    isolated(<<~'RUBY')
+      sockets = []
+      UDPSocket.define_singleton_method(:new) do |*|
+        FrameSocket.new.tap do |socket|
+          first = sockets.empty?
+          socket.define_singleton_method(:bind) { |*| raise Errno::EADDRINUSE if first }
+          socket.define_singleton_method(:connect) { |*| }
+          sockets << socket
+        end
+      end
+      writer = Dnsruby::PacketSender.new(server: '127.0.0.1', dnssec: false)
+      writer.define_singleton_method(:get_next_src_port) { 40000 + sockets.size }
+      queue, request = Queue.new, query
+      writer.send_async(request, queue, :collision)
+      raise 'failed UDP bind was not closed and retried' unless
+        sockets.size == 2 && sockets.first.closed? && sockets.first.written.empty?
+      raise 'UDP retry did not send the query' unless sockets.last.written == request.encode
+      drain_errors
+      raise 'UDP source port collision delivered an error' unless queue.empty?
+      SELECTOR.remove_id(:collision)
+      writer.close
+      sockets.each { |socket| assert_clean(socket) }
+    RUBY
+  end
+
+  def test_connect_timeouts_preserve_scheduled_retries_for_both_tcp_modes
+    isolated(<<~'RUBY')
+      SELECTOR.singleton_class.remove_method(:notify_queue_observers)
+      [true, false].each do |pipeline|
+        calls = 0
+        Socket.define_singleton_method(:tcp) { |*args, **kwargs| calls += 1; raise Errno::ETIMEDOUT }
+        resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1', use_tcp: true,
+          tcp_pipelining: pipeline, dnssec: false, retry_times: 2, retry_delay: 10)
+        queue = Queue.new
+        resolver.send_async(query, queue, :connect)
+        drain_errors
+        engine = resolver.instance_variable_get(:@resolver_ruby)
+        plan = engine.instance_variable_get(:@timeouts)[:connect][1]
+        raise 'connect timeout discarded scheduled retry' if plan.empty?
+        entry = plan.values.first
+        plan.clear
+        plan[Dnsruby::TransportClock.now - 1] = entry
+        engine.tick
+        drain_errors
+        raise 'connect timeout did not retry' unless calls == 2
+        raise 'wrong final connect error' unless queue.size == 1 && queue.pop.last.is_a?(Dnsruby::ResolvTimeout)
+        resolver.close
+      end
+    RUBY
+  end
+
+  def test_worker_exceptions_reach_owner_without_reading_task_value
+    isolated(<<~'RUBY')
+      writer = sender(FrameSocket.new)
+      failure = RuntimeError.new('unexpected worker failure')
+      writer.define_singleton_method(:send_dnsruby_with_socket) { |*| raise failure }
+      K.class_variable_set(:@@select_thread, Thread.current)
+      queue = Queue.new
+      writer.send_dnsruby(query.encode, query, :worker, queue, true)
+      Timeout.timeout(1) do
+        Thread.pass while SELECTOR.query_settings_for_id(:worker)
+      end
+      drain_errors
+      raise 'worker error was swallowed' unless queue.size == 1 && queue.pop.last.equal?(failure)
+      raise 'worker error retained deadline' if K.class_variable_get(:@@timeouts).key?(:worker)
+    RUBY
+  end
+
+  def test_worker_failure_after_connect_releases_an_unregistered_socket
+    isolated(<<~'RUBY')
+      socket = FrameSocket.new
+      Socket.define_singleton_method(:tcp) { |*args, **kwargs| socket }
+      writer = Dnsruby::PacketSender.new(server: '127.0.0.1', use_tcp: true, dnssec: false)
+      failure = RuntimeError.new('unexpected registration failure')
+      construct = K::QuerySettings.method(:new)
+      K::QuerySettings.define_singleton_method(:new) do |*args|
+        raise failure if args[5] # A connected socket, after the initial reservation.
+        construct.call(*args)
+      end
+      K.class_variable_set(:@@select_thread, Thread.current)
+      queue = Queue.new
+      writer.send_dnsruby(query.encode, query, :worker, queue, true)
+      Timeout.timeout(1) do
+        Thread.pass until socket.closed?
+      end
+      drain_errors
+      raise 'worker error was swallowed' unless queue.size == 1 && queue.pop.last.equal?(failure)
+      raise 'worker retained ownership' if SELECTOR.query_settings_for_id(:worker)
+      assert_clean(socket)
+    RUBY
+  end
+
+  def test_wall_clock_jumps_do_not_change_query_packet_retry_or_write_deadlines
+    isolated(<<~'RUBY')
+      SELECTOR.singleton_class.remove_method(:notify_queue_observers)
+      clock = 1000.0
+      Dnsruby::TransportClock.define_singleton_method(:now) { clock }
+      original_time = Time.method(:now)
+      socket = FrameSocket.new
+      writer = sender(socket)
+      writer.use_tcp = true
+      resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1', use_tcp: true,
+        dnssec: false, packet_timeout: 5, query_timeout: 10, retry_times: 2, retry_delay: 3)
+      resolver.single_resolvers = [writer]
+      queue = Queue.new
+      resolver.send_async(query, queue, :clock)
+      # Initial retry keys precede tick only after monotonic time advances.
+      clock += 0.1
+      engine = resolver.instance_variable_get(:@resolver_ruby)
+      engine.tick
+      pending = K.class_variable_get(:@@query_hash).values.first
+      raise 'packet deadline used wall time' unless pending.endtime < 1010
+      engine_deadline, retries = engine.instance_variable_get(:@timeouts)[:clock]
+      raise 'query or retry deadline used wall time' unless engine_deadline == 1010 && retries.keys.all? { |t| t < 1010 }
+      [-86400, 86400].each do |jump|
+        Time.define_singleton_method(:now) { original_time.call + jump }
+        SELECTOR.process_timeouts
+        raise 'wall jump expired query' unless queue.empty?
+        extra = FrameSocket.new
+        writer.write_tcp_frame(extra, 'abc', clock + 1, K::SendToken.new)
+        raise 'wall jump prevented write' unless extra.written == "\0\3abc".b
+      end
+      clock = 1011
+      engine.tick
+      raise 'monotonic query deadline ignored' unless queue.size == 1 && queue.pop.last.is_a?(Dnsruby::ResolvTimeout)
+      resolver.close
     RUBY
   end
 
