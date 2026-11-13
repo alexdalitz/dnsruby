@@ -184,9 +184,15 @@ class RR
     # quotes, escapes, comments, parentheses or line breaks.
     if /[\\'"();\r\n]/.match?(rrstring)
       rrstring, = Presentation.scan(rrstring, allow_unbalanced: true,
-        single_quoted_from: Presentation.single_quoted_start(rrstring))
+        single_quoted_from: rrstring.include?("'") ? Presentation.single_quoted_start(rrstring) : nil)
     end
+    new_from_normalised_string(rrstring)
+  end
 
+  # ZoneReader already handles comments, grouping and quoted continuations.
+  # Keep this internal path separate from the public string constructors so
+  # normalized records need not run through the lexical scanner again.
+  def RR.new_from_normalised_string(rrstring) #:nodoc: all
     matches = (/#{@@RR_REGEX}/xo).match(rrstring)
     unless matches
       raise "#{rrstring} did not match RR pattern. Please report this to the author!"
@@ -222,40 +228,25 @@ class RR
       rrtype = 'ANY'
     end
 
-    test_length = ->(hexdump, rdlength) do
-      if hexdump.length != rdlength * 2
-        raise "#{rdata} is inconsistent; length should be #{rdlength * 2} but is #{hexdump.length}."
+    if /\A\s*\\#/.match?(rdata)
+      # RFC 3597 section 5 permits zero octets with no hexadecimal field.
+      # Validate before packing: pack('H*') alone also accepts non-hex input.
+      generic = /\A\s*\\#\s+(\d+)(?:\s+([0-9a-fA-F\s]*))?\z/.match(rdata)
+      raise DecodeError, 'Expected RFC3597 representation of RDATA' unless generic
+      rdlength = generic[1].to_i
+      hexdump = (generic[2] || '').gsub(/\s+/, '')
+      if rdlength > 0xffff || hexdump.length != rdlength * 2
+        raise DecodeError, "#{rdata} is inconsistent with its RDATA length #{rdlength}."
       end
-    end
-
-    pack_rdata = ->(regex) do
-      rdata =~ regex
-      matches = regex.match(rdata)
-      rdlength = matches[1].to_i
-      hexdump  = matches[2].gsub(/\s*/, '')
-
-      test_length.(hexdump, rdlength)
-      packed_rdata = [hexdump].pack('H*')
-
-      [packed_rdata, rdlength]
-    end
-
-    if implemented_rrs.include?(rrtype) && rdata !~/^\s*\\#/o
+      return new_from_data(name, rrtype, rrclass, ttl, rdlength, [hexdump].pack('H*'), 0)
+    elsif implemented_rrs.include?(rrtype)
       return _get_subclass(name, rrtype, rrclass, ttl, rdata)
-    elsif implemented_rrs.include?(rrtype)   # A known RR type starting with \#
-      packed_rdata, rdlength = pack_rdata.(/\\#\s+(\d+)\s+(.*)$/o)
-      return new_from_data(name, rrtype, rrclass, ttl, rdlength, packed_rdata, 0) # rdata.length() - rdlength);
-    elsif rdata =~ /\s*\\#\s+\d+\s+/o
-      regex = /\\#\s+(\d+)\s+(.*)$/o
-      # We are now dealing with the truly unknown.
-      raise 'Expected RFC3597 representation of RDATA' unless rdata =~ regex
-      packed_rdata, rdlength = pack_rdata.(regex)
-      return new_from_data(name, rrtype, rrclass, ttl, rdlength, packed_rdata, 0) # rdata.length() - rdlength);
     else
       # God knows how to handle these...
       return _get_subclass(name, rrtype, rrclass, ttl, '')
     end
   end
+  private_class_method :new_from_normalised_string
 
   def RR.new_from_data(*args) #:nodoc: all
     name, rrtype, rrclass, ttl, rdlength, data, offset = args

@@ -53,12 +53,17 @@ module Dnsruby
         @@timeouts = Hash.new
         @@query_hash = Hash.new
         @@queries_by_queue = {}.compare_by_identity
+        @@queries_by_sender = {}.compare_by_identity
         @@socket_hash = Hash.new
         @@socket_is_persistent = Hash.new
         @@socket_owners = Hash.new
+        @@sockets_by_sender = {}.compare_by_identity
         @@retiring_sockets = Set.new
         @@observers = Hash.new
         @@observer_queue_counts = {}.compare_by_identity
+        @@observed_queues = ObjectSpace::WeakMap.new
+        @@validation_pid = Process.pid
+        @@validations = []
         @@tcp_buffers=Hash.new
         @@socket_remaining_queries = Hash.new
         @@tick_observers = []
@@ -188,6 +193,7 @@ module Dnsruby
         end
         @@query_hash[settings.client_query_id] = settings
         (@@queries_by_queue[settings.client_queue] ||= Set.new) << settings.client_query_id
+        ((@@queries_by_sender ||= {}.compare_by_identity)[settings.single_resolver] ||= Set.new) << settings.client_query_id
         @@timeouts[settings.client_query_id] = settings.endtime
         check_select_thread_synchronized
       end
@@ -325,6 +331,7 @@ module Dnsruby
       end
       @@query_hash[id] = settings
       (@@queries_by_queue[settings.client_queue] ||= Set.new) << id
+      ((@@queries_by_sender ||= {}.compare_by_identity)[settings.single_resolver] ||= Set.new) << id
       membership = @@socket_hash[settings.socket]
       unless membership.is_a?(SocketQueries)
         indexed = SocketQueries.new
@@ -338,7 +345,14 @@ module Dnsruby
       @@timeouts[id] = settings.endtime
       @@sockets << settings.socket
       @@socket_is_persistent[settings.socket] = settings.is_persistent_socket
+      previous_owner = (@@socket_owners ||= {})[settings.socket]
+      if previous_owner && !previous_owner.equal?(settings.single_resolver) &&
+          (previous_sockets = (@@sockets_by_sender ||= {}.compare_by_identity)[previous_owner])
+        previous_sockets.delete(settings.socket)
+        @@sockets_by_sender.delete(previous_owner) if previous_sockets.empty?
+      end
       (@@socket_owners ||= {})[settings.socket] = settings.single_resolver
+      ((@@sockets_by_sender ||= {}.compare_by_identity)[settings.single_resolver] ||= Set.new) << settings.socket
       (@@retiring_sockets ||= Set.new) << settings.socket if settings.retire_connection
       true
     end
@@ -348,14 +362,19 @@ module Dnsruby
     # but future sends must choose a fresh connection.
     def retire_sender(sender)
       @@mutex.synchronize do
+        refresh_validation_process
         # A connect can be in progress without a socket in our read set yet.
         # Carry retirement through reservation replacements so its eventual
         # registration drains and closes, while later fresh sends can reuse.
-        @@query_hash.each_value do |settings|
-          settings.retire_connection = true if settings.single_resolver.equal?(sender)
+        ((@@queries_by_sender ||= {}.compare_by_identity)[sender] || []).each do |id|
+          settings = @@query_hash[id]
+          settings.retire_connection = true if settings
         end
-        (@@socket_owners ||= {}).select { |_, owner| owner.equal?(sender) }.each_key do |socket|
+        ((@@sockets_by_sender ||= {}.compare_by_identity)[sender] || []).to_a.each do |socket|
           mark_socket_for_retirement(socket)
+        end
+        @@validations.each do |_queue, owner, control|
+          control.cancel if owner.equal?(sender)
         end
       end
       wake_up_select_thread
@@ -537,7 +556,7 @@ module Dnsruby
             non_persistent_sockets.each do |socket|
               if socket != @@wakeup_sockets[1]
                 socket.close rescue nil
-                @@sockets.delete(socket)
+                retire_socket_from_mutex_synchronized_block(socket)
               end
             end
 
@@ -574,7 +593,11 @@ module Dnsruby
       @@tcp_buffers.delete(socket)
       @@socket_remaining_queries.delete(socket)
       @@socket_is_persistent.delete(socket)
-      (@@socket_owners ||= {}).delete(socket)
+      owner = (@@socket_owners ||= {}).delete(socket)
+      if (sockets = (@@sockets_by_sender ||= {}.compare_by_identity)[owner])
+        sockets.delete(socket)
+        @@sockets_by_sender.delete(owner) if sockets.empty?
+      end
       (@@retiring_sockets ||= Set.new).delete(socket)
       ids.map do |client_id|
         [SocketEofResolvError.new("TCP socket closed before all answers received"), socket, client_id]
@@ -704,6 +727,10 @@ module Dnsruby
         ids.delete(id)
         @@queries_by_queue.delete(settings.client_queue) if ids.empty?
       end
+      if (sender_ids = (@@queries_by_sender ||= {}.compare_by_identity)[settings.single_resolver])
+        sender_ids.delete(id)
+        @@queries_by_sender.delete(settings.single_resolver) if sender_ids.empty?
+      end
       settings.send_token.cancel unless settings.send_token.equal?(preserved_token)
       @@timeouts.delete(id)
       socket = settings.socket
@@ -722,15 +749,9 @@ module Dnsruby
         (@@socket_hash[socket] || []).empty?
       if !persistent?(socket) || retiring ||
           (max_attained?(socket) && (@@socket_hash[socket] || []).empty?)
-        @@sockets.delete(socket)
-        @@socket_hash.delete(socket)
-        @@socket_remaining_queries.delete(socket)
-        @@socket_is_persistent.delete(socket)
-        @@tcp_buffers.delete(socket)
-        (@@socket_owners ||= {}).delete(socket)
-        @@retiring_sockets.delete(socket)
         Dnsruby.log.debug("Closing socket #{socket}")
         socket.close rescue nil
+        retire_socket_from_mutex_synchronized_block(socket)
       end
     end
 
@@ -903,6 +924,17 @@ module Dnsruby
           end
           return unless matches_header
         end
+        # No undecodable packet can authenticate its TSIG. Discard it before
+        # either failing the transaction or acting on an untrusted TC bit, just
+        # as check_response discards unsigned or incorrectly signed replies.
+        unauthenticated = @@mutex.synchronize do
+          current = @@query_hash[client_id]
+          if current && current.socket == socket && current.query.tsig && !current.query.send_raw
+            current.authentication_error ||= TsigError.new('Cannot authenticate malformed response')
+            true
+          end
+        end
+        return if unauthenticated
         # Truncation permits a UDP-to-TCP fallback, never another TCP attempt.
         # Repeating malformed TCP replies must not renew the packet deadline.
         settings = nil
@@ -1126,6 +1158,7 @@ module Dnsruby
 
     def add_observer(client_queue, observer)
       @@mutex.synchronize {
+        (@@observed_queues ||= ObjectSpace::WeakMap.new)[client_queue] = true
         previous = @@observers[client_queue]
         unless previous.equal?(observer)
           remove_observer_queue_count(previous) if previous
@@ -1137,6 +1170,62 @@ module Dnsruby
         check_select_thread_synchronized # Is this really necessary? The client should start the thread by sending a query, really...
       }
     end
+
+    # Take the observer snapshot before acquiring its Resolver lock: Resolver
+    # completion acquires these locks in the opposite direction.
+    def validation_deadline(client_queue, client_query_id)
+      observer = @@mutex.synchronize { @@observers[client_queue] }
+      observer.validation_deadline(client_queue, client_query_id) if observer.respond_to?(:validation_deadline)
+    end
+
+    def register_validation(client_queue, sender, control)
+      @@mutex.synchronize do
+        refresh_validation_process
+        # A response may have been accepted just before close or its total
+        # deadline. Remember prior observers weakly so rejected registrations
+        # cannot keep completed client queues alive.
+        if client_queue.closed? ||
+            ((@@observed_queues ||= ObjectSpace::WeakMap.new)[client_queue] && !@@observers[client_queue])
+          control.cancel
+          return false
+        end
+        # The validation pool is small and bounded. Keep one registration list
+        # rather than maintaining separate indexes for queues and senders.
+        unless @@validations.any? { |queue, owner, token|
+            queue.equal?(client_queue) && owner.equal?(sender) && token.equal?(control) }
+          @@validations << [client_queue, sender, control]
+        end
+        true
+      end
+    end
+
+    def unregister_validation(client_queue, sender, control)
+      @@mutex.synchronize do
+        refresh_validation_process
+        @@validations.delete_if do |queue, owner, token|
+          queue.equal?(client_queue) && owner.equal?(sender) && token.equal?(control)
+        end
+      end
+    end
+
+    # Caller holds @@mutex. Parent workers do not survive fork, so they cannot
+    # unregister their inherited entries in the child. Refresh before adding a
+    # child registration, independently of the validation worker pool restart.
+    def refresh_validation_process
+      pid = Process.pid
+      return if defined?(@@validation_pid) && @@validation_pid == pid
+      @@validation_pid = pid
+      @@validations = []
+    end
+    private :refresh_validation_process
+
+    def cancel_validations_for_queue_synchronized(client_queue)
+      refresh_validation_process
+      @@validations.each do |queue, _sender, control|
+        control.cancel if queue.equal?(client_queue)
+      end
+    end
+    private :cancel_validations_for_queue_synchronized
 
     # Stop packet attempts without removing the logical query's observer. A
     # received response can still need validation and its overall deadline.
@@ -1169,6 +1258,7 @@ module Dnsruby
           # Resolver completion/close owns every packet attempt for this queue,
           # including queued sends which have not opened a socket yet.
           cancel_queries_for_queue_synchronized(client_queue)
+          cancel_validations_for_queue_synchronized(client_queue)
           remove_observer_queue_count(registered_observer)
         else
           Dnsruby.log.error{"remove_observer called with wrong observer for queue"}
@@ -1199,6 +1289,7 @@ module Dnsruby
       # pending. Cancel those queries so other clients can keep running.
       @@mutex.synchronize do
         cancel_queries_for_queue_synchronized(client_queue)
+        cancel_validations_for_queue_synchronized(client_queue)
         observer = @@observers.delete(client_queue)
         remove_observer_queue_count(observer) if observer
       end

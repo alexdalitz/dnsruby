@@ -15,6 +15,7 @@
 # ++
 require 'digest/sha2'
 require 'dnsruby/key_cache'
+require 'dnsruby/validation_budget'
 require 'dnsruby/single_verifier'
 module Dnsruby
 
@@ -41,6 +42,23 @@ module Dnsruby
   #  Several validators are provided, with each maintaining its own cache of trusted keys.
   #  If validators are added or removed, the caches of the other validators are not affected.
   class Dnssec
+    # Limits apply to one complete validation, including trust-chain discovery.
+    # A limit is a VerifyError; it never downgrades a signed answer to insecure.
+    @validation_limits = ValidationBudget::DEFAULT_LIMITS
+    def self.validation_limits
+      @validation_limits
+    end
+
+    def self.validation_limits=(limits)
+      unknown = limits.keys - ValidationBudget::DEFAULT_LIMITS.keys
+      raise ArgumentError, "Unknown DNSSEC validation limits: #{unknown.join(', ')}" unless unknown.empty?
+      merged = ValidationBudget::DEFAULT_LIMITS.merge(limits)
+      merged.each do |key, value|
+        valid = key == :timeout ? value.is_a?(Numeric) && value.finite? && value > 0 : value.is_a?(Integer) && value > 0
+        raise ArgumentError, "Invalid DNSSEC validation limit #{key}" unless valid
+      end
+      @validation_limits = merged.freeze
+    end
     #  A class to cache trusted keys
 
 
@@ -184,10 +202,14 @@ module Dnsruby
     def self.validate(msg)
       query = Message.new()
       query.header.cd=true
-      return self.validate_with_query(query, msg)
+      validate_with_query(query, msg)
     end
 
     def self.validate_with_query(query, msg)
+      ValidationBudget.with { validate_with_query_internal(query, msg) }
+    end
+
+    private_class_method def self.validate_with_query_internal(query, msg)
       if (!msg)
         return false
       end
@@ -262,6 +284,12 @@ module Dnsruby
     end
 
     def self.try_validation(last_level, last_error, last_error_level, proc, msg, query)   # :nodoc:
+      ValidationBudget.with do
+        try_validation_internal(last_level, last_error, last_error_level, proc, msg, query)
+      end
+    end
+
+    private_class_method def self.try_validation_internal(last_level, last_error, last_error_level, proc, msg, query)
       begin
         proc.call(msg, query)
         last_level = Message::SecurityLevel.new([msg.security_level.code, last_level.code].max)
@@ -275,18 +303,22 @@ module Dnsruby
     end
 
     def self.validate_with_anchors(msg, query)
-      return @@anchor_verifier.validate(msg, query)
+      @@anchor_verifier.validate(msg, query)
     end
 
     def self.validate_with_root(msg, query)
-      return @@root_verifier.validate(msg, query)
+      @@root_verifier.validate(msg, query)
     end
 
     def self.validate_with_dlv(msg, query)
-      return @@dlv_verifier.validate(msg, query)
+      @@dlv_verifier.validate(msg, query)
     end
 
     def self.verify(msg, keys=nil)
+      ValidationBudget.with { verify_internal(msg, keys) }
+    end
+
+    private_class_method def self.verify_internal(msg, keys)
       begin
         return true if @@anchor_verifier.verify(msg, keys)
       rescue VerifyError
@@ -312,9 +344,9 @@ module Dnsruby
 
 
     def self.verify_rrset(rrset, keys = nil)
-      return ((@@anchor_verifier.verify_rrset(rrset, keys) ||
-            @@root_verifier.verify_rrset(rrset, keys) ||
-            @@dlv_verifier.verify_rrset(rrset, keys)))
+      @@anchor_verifier.verify_rrset(rrset, keys) ||
+        @@root_verifier.verify_rrset(rrset, keys) ||
+        @@dlv_verifier.verify_rrset(rrset, keys)
     end
   end
 end

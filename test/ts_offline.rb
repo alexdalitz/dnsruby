@@ -21,6 +21,7 @@ Dnsruby.log.level = Logger::FATAL
 # We'll prepend 'tc_' and append '.rb' to these:
 TESTS = %w(
     dnskey
+    cache_keys
     escapedchars
     edns_retry_regressions
     gpos
@@ -36,6 +37,8 @@ TESTS = %w(
     resolver_concurrency
     resolver_validation
     release_transport
+    release_review_transport
+    release_review_transport_native
     review_transport_fixes
     review_followup_transport
     review_transport_native
@@ -59,6 +62,7 @@ TESTS = %w(
     packet_unique_push
     ptrin
     question
+    query_control
     res_config
     res_file
     res_opt
@@ -105,6 +109,7 @@ if have_open_ssl?
   require_relative 'tc_dnssec_trust_anchors.rb'
   require_relative 'tc_dnssec_trust_races.rb'
   require_relative 'tc_key_cache_identity.rb'
+  require_relative 'tc_dnssec_budget.rb'
 else
   puts "-----------------------------------------------------------------------"
   puts "OpenSSL SHA256 unavailable - skipping DS and DNSSEC trust-anchor tests"

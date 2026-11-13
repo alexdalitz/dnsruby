@@ -25,11 +25,22 @@ module Dnsruby
       if class_token && (Classes.to_code(class_token) || /\ACLASS\d+\z/i.match?(class_token))
         fields.shift
       end
-      fields.first.last if %w[TXT SPF TYPE16 TYPE99].include?(fields.first&.first&.upcase)
+      type_token = fields.first&.first
+      type_code = Types.to_code(type_token) if type_token
+      if !type_code && (numeric = /\ATYPE(\d+)\z/i.match(type_token.to_s))
+        type_code = numeric[1].to_i
+      end
+      fields.first.last if [Types::TXT, Types::SPF].include?(type_code)
     end
 
     def self.scan(text, depth = 0, quoted = false, allow_unbalanced: false,
                   single_quoted_from: nil)
+      # Most zone records have no lexical syntax to interpret. Preserve the
+      # current continuation depth and only fold physical line endings.
+      if !quoted && !/[\\'"();]/.match?(text)
+        return [text.tr("\r\n", '  '), depth, false]
+      end
+
       result = +''
       escaped = false
       comment = false

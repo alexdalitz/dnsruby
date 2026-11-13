@@ -268,7 +268,7 @@ class KeyCacheIdentityTest < Minitest::Test
     Time.stub(:now, @now) { assert(@verifier.verify(records)) }
     Time.stub(:now, @now + 2) do
       assert_equal([@b], @verifier.trust_anchors) # Naturally expire and prune A.
-      refute_empty(@verifier.trusted_keys)
+      assert_empty(@verifier.trusted_keys)
       assert_nil(@verifier.remove_trust_anchor(@a))
       assert_equal([@b], @verifier.trust_anchors)
       assert_empty(@verifier.trusted_keys)

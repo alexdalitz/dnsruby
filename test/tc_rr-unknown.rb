@@ -99,4 +99,23 @@ dd ee c0 11 00 02 00 01  00 00 03 84 00 05 02 6e
 	'Packet read from a packet dumped by bind...'
     )
   end
+
+  def test_empty_rdata_round_trips_through_rfc3597_presentation
+    %w[IN CH CLASS65000].each do |klass|
+      rr = RR.create("empty.example. 300 #{klass} TYPE65001 \\# 0")
+      assert_equal('', rr.data)
+      assert_equal(rr, RR.create(rr.to_s))
+      assert_equal(rr, rr.clone)
+    end
+  end
+
+  def test_malformed_generic_presentation_raises_decode_error
+    ['\\#', '\\# -1', '\\# 1', '\\# 0 ff', '\\# 1 zz', '\\# 1 f', '\\# 65536'].each do |rdata|
+      %w[TYPE65001 TYPE64 A].each do |type|
+        assert_raises(DecodeError, "#{type} #{rdata}") do
+          RR.create("example. 300 IN #{type} #{rdata}")
+        end
+      end
+    end
+  end
 end

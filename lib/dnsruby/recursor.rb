@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ++
+require 'dnsruby/query_control'
+
 module Dnsruby
   # Dnsruby::Recursor - Perform recursive dns lookups
   # 
@@ -249,29 +251,38 @@ module Dnsruby
             #  Probably best to limit the number of outstanding queries - extremely bursty behaviour otherwise
             #  What happens if we select only name
             q = Queue.new
-            hints.keys.each {|server|
-              #  Query for the server address and add it to hints.
-              ['A', 'AAAA'].each {|type|
-                msg = Message.new
-                msg.do_caching = @do_caching
-                msg.header.rd = false
-                msg.do_validation = false
-                msg.add_question(server, type, 'IN')
-                if (@dnssec)
-                  msg.header.cd = true # We do our own validation by default
-                end
-                resolver.send_async(msg, q)
-              }
-            }
-            (hints.length * 2).times {
-              _id, result, _error = q.pop
-              if (result)
-                result.answer.each {|rr|
-                  TheLog.debug(";; NS address: " + rr.inspect+"\n")
-                  add_to_hints(hints, rr)
+            control = QueryControl.current
+            query_ids = []
+            begin
+              hints.keys.each {|server|
+                #  Query for the server address and add it to hints.
+                ['A', 'AAAA'].each {|type|
+                  msg = Message.new
+                  msg.do_caching = @do_caching
+                  msg.header.rd = false
+                  msg.do_validation = false
+                  msg.add_question(server, type, 'IN')
+                  if (@dnssec)
+                    msg.header.cd = true # We do our own validation by default
+                  end
+                  control&.check!
+                  query_ids << resolver.send_async(msg, q)
                 }
+              }
+              (hints.length * 2).times {
+                _id, result, _error = control ? control.pop(q) : q.pop
+                if (result)
+                  result.answer.each {|rr|
+                    TheLog.debug(";; NS address: " + rr.inspect+"\n")
+                    add_to_hints(hints, rr)
+                  }
+                end
+              }
+            ensure
+              if control && (engine = resolver.instance_variable_get(:@resolver_ruby))
+                query_ids.each { |id| engine.cancel_query(id, q) }
               end
-            }
+            end
           else
             packet.additional.each do |rr|
               TheLog.debug(";; ADDITIONAL: "+rr.inspect+"\n")
@@ -449,6 +460,7 @@ module Dnsruby
       end
 
       while (true)
+        QueryControl.current&.check!
         #         print "Checking for known zone : #{name}\n"
         zone = nil
         @@mutex.synchronize{
@@ -472,6 +484,7 @@ module Dnsruby
       done = false
       known_authorities, known_zone = nil
       while (!done)
+        QueryControl.current&.check!
         known_zone = get_closest_known_zone_for(name)
         #         print "GOT KNOWN ZONE : #{known_zone}\n"
         @@mutex.synchronize {
@@ -493,6 +506,7 @@ module Dnsruby
     end
 
     def _dorecursion(name, type, klass, known_zone, known_authorities, depth, no_validation) # :nodoc:
+      QueryControl.current&.check!
 
       if ( depth > 255 )
         TheLog.debug(";; _dorecursion() Recursion too deep, aborting...\n")

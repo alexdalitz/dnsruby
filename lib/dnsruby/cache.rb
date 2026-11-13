@@ -108,7 +108,10 @@ module Dnsruby
         end
       end
       def to_s
-        return "#{qname.inspect.downcase} #{qclass} #{qtype}"
+        # Numeric presentation spellings (TYPE1, TYPE0001, CLASS1, ...) are
+        # aliases of the same wire values, including when a decoded answer
+        # uses the registered mnemonics instead of the query's spelling.
+        return "#{qname.inspect.downcase} #{qclass.code} #{qtype.code}"
       end
     end
     class CacheData # :nodoc: all

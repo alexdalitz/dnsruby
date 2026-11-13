@@ -15,67 +15,136 @@
 # ++
 
 module Dnsruby
-  #  Takes care of the validation for the SelectThread. If queries need to be
-  #  made in order to validate the response, then a separate thread is fired up
-  #  to do this.
+  # Runs local DNSSEC validation outside SelectThread, using a bounded pool.
+  # Nested trust discovery shares the original validation budget.
   class ValidatorThread # :nodoc: all
-    #     include Singleton
+    WORKER_COUNT = 4
+    QUEUE_CAPACITY = 64
+    @worker_mutex = Mutex.new
+
+    # Chain discovery performs synchronous queries, so validation must run away
+    # from the selector. Bound both threads and queued responses under load.
+    def self.enqueue(validator)
+      rejected = []
+      accepted = @worker_mutex.synchronize do
+        # Threads do not survive fork. Parent work belongs to the parent, while
+        # the child's first admission must start its own pool.
+        if @worker_pid != Process.pid
+          @worker_pid = Process.pid
+          @work_queue = SizedQueue.new(QUEUE_CAPACITY)
+          @workers = []
+        end
+        @workers.select!(&:alive?)
+        begin
+          (WORKER_COUNT - @workers.length).times do
+            queue = @work_queue
+            @workers << Thread.new do
+              loop do
+                work = queue.pop
+                begin
+                  work.do_validate
+                rescue StandardError => error
+                  Dnsruby.log.error { "DNSSEC validation worker: #{error}" }
+                end
+              end
+            end
+          end
+        rescue ThreadError
+          # A partial pool remains usable and is replenished on later admission.
+          # If no worker could start, fail queued work rather than strand it.
+        end
+        if @workers.empty?
+          begin
+            loop { rejected << @work_queue.pop(true) }
+          rescue ThreadError
+          end
+          false
+        else
+          begin
+            @work_queue.push(validator, true)
+            true
+          rescue ThreadError
+            false
+          end
+        end
+      end
+      rejected.each(&:reject_capacity)
+      accepted
+    end
+
     def initialize(*args)
       @client_id, @client_queue, @response, @error, @query, @st, @res = args
-      #  Create the validation thread, and a queue to receive validation requests
-      #  Actually, need to have a thread per validator, as they make recursive calls.
-      #       @@mutex = Mutex.new
-      #       @@validation_queue = Queue.new
-      #       @@validator_thread = Thread.new{
-      #         do_validate
-      #       }
+      @registered = false
+      prepare_budget if should_validate
     end
+
+    def prepare_budget
+      return @budget if @budget
+      deadline = @st.validation_deadline(@client_queue, @client_id) if @st.respond_to?(:validation_deadline)
+      @budget = ValidationBudget.new(deadline: deadline)
+    end
+    private :prepare_budget
+
+    def register
+      return true if @registered
+      prepare_budget
+      return false unless @st.register_validation(@client_queue, @res, @budget.control)
+      @registered = true
+    end
+    private :register
+
     def run
-      #  ONLY START THE NEW THREAD IF VALIDATION NEED OCCUR!!
-      if (should_validate)
-        Thread.new{
-          do_validate
-        }
+      if should_validate
+        return unless register
+        unless self.class.enqueue(self)
+          reject_capacity
+        end
       else
         do_validate
       end
     end
 
-
-    #     def add_to_queue(item)
-    #       print "ADding to validator queue\n"
-    # #      @@mutex.synchronize{
-    #         @@validation_queue.push(item)
-    # #      }
-    #     end
     def do_validate
-      #       while (true)
-      #         item = nil
-      #         print "Waiting to pop validation item\n"
-      # #        @@mutex.synchronize{
-      #           item = @@validation_queue.pop
-      # #        }
-      #       print "Popped validation request\n"
-      #         client_id, client_queue, response, err, query, st, res = item
-      validated_ok = validate(@query, @response, @res)
-
-      validated_ok = false if (@error && !(NXDomain === @error))
-
-      cache_if_valid(@query, @response)
-
-      #  Now send the response back to the client...
-      #       print "#{Time.now} : Got result for #{@query.question()[0].qname}, #{@query.question()[0].qtype}\n"
-      if (validated_ok)
-        @st.push_validation_response_to_select(@client_id, @client_queue, @response, nil, @query, @res)
+      needs_validation = should_validate
+      return if needs_validation && !register
+      validated_ok = if needs_validation
+        ValidationBudget.with(@budget) { validate(@query, @response, @res) }
       else
-        @st.push_validation_response_to_select(@client_id, @client_queue, @response,
-          @response.security_error, @query, @res)
+        validate(@query, @response, @res)
       end
-
-
-      #       end
+      validated_ok = false if @error && !@error.is_a?(NXDomain)
+      @budget.check! if needs_validation
+      cache_if_valid(@query, @response) if validated_ok
+      @st.push_validation_response_to_select(@client_id, @client_queue, @response,
+        validated_ok ? nil : @response.security_error, @query, @res)
+    rescue StandardError => error
+      # Resolver observers ignore late completions; direct PacketSender callers
+      # still need a terminal error after cancellation or their sender closing.
+      error = VerifyError.new("DNSSEC validation failed: #{error.message}") unless error.is_a?(VerifyError)
+      finish_error(error)
+    ensure
+      unregister
     end
 
+    def finish_error(error)
+      @response.security_error = error
+      @response.security_level = Message::SecurityLevel.BOGUS
+      @st.push_validation_response_to_select(@client_id, @client_queue, @response,
+        error, @query, @res)
+    end
+    private :finish_error
+
+    def unregister
+      @st.unregister_validation(@client_queue, @res, @budget.control) if @registered
+      @registered = false
+    end
+    private :unregister
+
+    def reject_capacity
+      finish_error(ValidationLimitError.new('DNSSEC validation capacity exceeded'))
+    ensure
+      unregister
+    end
 
     def should_validate
       return ValidatorThread.requires_validation?(@query, @response, @error, @res)
@@ -95,26 +164,18 @@ module Dnsruby
     end
 
     def validate(query, response, res)
-      if (should_validate)
+      return true unless should_validate
+      ValidationBudget.with do
         begin
-          #  So, we really need to be able to take the response out of the select thread, along
-          #  with the responsibility for sending the answer to the client.
-          #  Should we have a validator thread? Or a thread per validation?
-          #  Then, select thread gets response. It performs basic checks here.
-          #  After basic checks, the select-thread punts the response (along with queues, etc.)
-          #  to the validator thread.
-          #  The validator validates it (or just releases it with no validation), and then
-          #  sends the request to the client via the client queue.
           Dnssec.validate_with_query(query,response)
-          return true
+          true
         rescue VerifyError => e
           response.security_error = e
           response.security_level = Message::SecurityLevel.BOGUS
           #  Response security_level should already be set
-          return false
+          false
         end
       end
-      return true
     end
 
     def cache_if_valid(query, response)

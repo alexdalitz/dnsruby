@@ -84,8 +84,9 @@ module Dnsruby
     def process_line(line, do_prefix_hack = false)
       if !@continued_line
         @in_quoted_section = false
-        @single_quoted_start = Presentation.single_quoted_start(line,
-          owner_omitted: line.start_with?(' ', "\t"))
+        @single_quoted_start = if /['(]/.match?(line)
+          Presentation.single_quoted_start(line, owner_omitted: line.start_with?(' ', "\t"))
+        end
       end
       previous_quote = @in_quoted_section
       line, @group_depth, @in_quoted_section =
@@ -118,13 +119,16 @@ module Dnsruby
       end
       line += "\n"
 
-      #  If SOA, then replace "3h" etc. with expanded seconds
-      #       begin
-      return normalise_line(line, do_prefix_hack)
-      #       rescue Exception => e
-      #         print "ERROR parsing line #{@line_num} : #{line}\n"
-      #         return "\n", Types::ANY
-      #       end
+      # Preserve the public normalization hook for subclasses and prepends.
+      # Only unchanged input has already been scanned. Overrides may replace
+      # or mutate the String before calling super, introducing new syntax.
+      previous_scanned_line = @scanned_line
+      begin
+        @scanned_line = [line, line.dup]
+        normalise_line(line, do_prefix_hack)
+      ensure
+        @scanned_line = previous_scanned_line
+      end
     end
 
     def strip_comments(line)
@@ -208,11 +212,18 @@ module Dnsruby
     #  Take a line from the input zone file, and return the normalised form
     #  do_prefix_hack should always be false
     def normalise_line(line, do_prefix_hack = false)
-      # process_line has already checked continuation balance. Direct callers
-      # historically accepted unmatched grouping, just like RR.create.
-      single_quoted_start = Presentation.single_quoted_start(line,
-        owner_omitted: line.start_with?(' ', "\t"))
-      line, = Presentation.scan(line, allow_unbalanced: true, single_quoted_from: single_quoted_start)
+      # Direct callers historically accepted unmatched grouping, just like
+      # RR.create. process_line has already scanned and checked its input.
+      unless @scanned_line && line.equal?(@scanned_line[0]) && line == @scanned_line[1]
+        single_quoted_start = if line.include?("'")
+          Presentation.single_quoted_start(line, owner_omitted: line.start_with?(' ', "\t"))
+        end
+        line, = Presentation.scan(line, allow_unbalanced: true, single_quoted_from: single_quoted_start)
+      end
+      normalise_scanned_line(line, do_prefix_hack)
+    end
+
+    def normalise_scanned_line(line, do_prefix_hack = false)
 
       #  Note that a freestanding "@" is used to denote the current origin - we can simply replace that straight away
       #  Note that no domain name may be specified in the RR - in that case, last_name should be used. How do we tell? Tab or space at start of line.
@@ -224,9 +235,8 @@ module Dnsruby
       #  A parenthesis separates too, and the strip below may remove it first.
       stored_line_was_separate = true
       quote_index = line.index('"')
-      if single_quoted_start
-        rdata_start = Presentation.single_quoted_start(line,
-          owner_omitted: line.start_with?(' ', "\t"))
+      if line.include?("'") && (rdata_start = Presentation.single_quoted_start(line,
+          owner_omitted: line.start_with?(' ', "\t")))
         quote_index = [quote_index, line.index(/(?<=[\s(])'/, rdata_start)].compact.min
       end
       if quote_index
@@ -353,7 +363,7 @@ module Dnsruby
         end
         line = replace_soa_ttl_fields(line)
         if (!@last_explicit_ttl)
-          soa_rr = Dnsruby::RR.create(line)
+          soa_rr = Dnsruby::RR.send(:new_from_normalised_string, line)
           @last_explicit_ttl = soa_rr.minimum
         end
       end
@@ -380,7 +390,7 @@ module Dnsruby
       #  Other RRs have several names. These should be parsed by Dnsruby,
       #    and the names adjusted there.
       if ([Types::MINFO, Types::PX, Types::RP].include?type_was)
-        parsed_rr = Dnsruby::RR.create(line)
+        parsed_rr = Dnsruby::RR.send(:new_from_normalised_string, line)
         case parsed_rr.type
         when Types::MINFO
           if (!parsed_rr.rmailbx.absolute?)
@@ -411,7 +421,7 @@ module Dnsruby
       #  it. Parse the record and qualify a relative TargetName against the
       #  origin; the root (".") is absolute, so the absolute? guard skips it.
       if ([Types::SVCB, Types::HTTPS].include?type_was)
-        parsed_rr = Dnsruby::RR.create(line)
+        parsed_rr = Dnsruby::RR.send(:new_from_normalised_string, line)
         if parsed_rr.is_a?(RR::SVCB) && parsed_rr.target && !parsed_rr.target.absolute?
           origin = RR::SVCB.create_target_name(@origin.to_s)
           parsed_rr.target = Name.new(parsed_rr.target.labels + origin.labels, true)
@@ -423,6 +433,7 @@ module Dnsruby
       end
       return line+"\n"
     end
+    private :normalise_scanned_line
 
     #  Get the TTL in seconds from the m, h, d, w format
     def get_ttl(ttl_text_in)

@@ -871,7 +871,7 @@ class TestSVCB < Minitest::Test
   def test_other_dns_classes_preserve_opaque_rdata_and_class_identity
     [64, 65].each do |type|
       [Classes::CH, Classes::HS, 65_280].each do |klass|
-        ['ff', '000100'].each do |hex|
+        ['', 'ff', '000100'].each do |hex|
           rr = RR.create("example.com. 60 CLASS#{klass} TYPE#{type} \\# #{hex.length / 2} #{hex}")
           assert_kind_of(RR::Generic, rr)
           assert_equal(klass, rr.class::ClassValue)
@@ -889,6 +889,19 @@ class TestSVCB < Minitest::Test
         assert_equal('', rdata_hex(empty))
         assert_equal(empty, empty.clone)
       end
+    end
+  end
+
+  def test_empty_generic_presentation_for_update_markers
+    [64, 65].each do |type|
+      %w[ANY NONE].each do |klass|
+        rr = RR.create("example.com. 0 #{klass} TYPE#{type} \\# 0")
+        assert_kind_of(RR::SVCB, rr)
+        assert_equal(Classes.new(klass), rr.klass)
+        assert_equal('', rdata_hex(rr))
+        assert_roundtrip(rr)
+      end
+      assert_raises(DecodeError) { RR.create("example.com. 0 IN TYPE#{type} \\# 0") }
     end
   end
 

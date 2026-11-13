@@ -138,7 +138,12 @@ module Dnsruby
         n = Name.create(name)
         out = n.canonical
         begin
-          (iterations + 1).times { out = NSEC3.h(out + salt, hash_alg) }
+          budget = ValidationBudget.current
+          budget&.check!(iterations + 1)
+          (iterations + 1).times do |iteration|
+            budget&.check! if iteration % 64 == 0
+            out = NSEC3.h(out + salt, hash_alg)
+          end
           return Base32.encode32hex(out).downcase
         rescue ArgumentError
           TheLog.error("Unknown hash algorithm #{hash_alg} used for NSEC3 hash")

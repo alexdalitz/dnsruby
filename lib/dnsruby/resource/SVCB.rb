@@ -262,8 +262,12 @@ module Dnsruby
         # strings (including escaped wire octets) are already ASCII; parse
         # them directly. Retain Name.create's IDNA handling for Unicode input
         # and its copying behavior for an existing Name.
-        if value.is_a?(String) && value.ascii_only?
-          Name.new(Name.split_escaped(value), value.end_with?('.'))
+        if value.is_a?(String)
+          value = Name.punycode(value) unless value.ascii_only?
+          # Only an unescaped final dot denotes the root. A literal dot in
+          # the last label (foo\.) still needs the zone origin appended.
+          absolute = /(?<!\\)(?:\\\\)*\.\z/.match?(value)
+          Name.new(Name.split_escaped(value), absolute)
         else
           Name.create(value)
         end

@@ -79,10 +79,39 @@ this option for compatibility, although
 [RFC 8945 section 6](https://www.rfc-editor.org/rfc/rfc8945.html#section-6)
 prohibits MD5 use. SHA-256 is recommended, and there is no automatic fallback
 to MD5.
+A lost reply or an unauthenticated error is not a safe reason to retry with MD5.
 
 Selecting MD5 logs a warning once per process. To see it, set
 `Dnsruby.log.level = Logger::WARN` before configuring TSIG; the default log
 level is FATAL.
+
+DNSSEC validation limits
+------------------------
+
+DNSSEC replies can contain enough keys and signatures to make validation very
+expensive. Dnsruby limits the work it will do for one answer, including any
+queries needed to follow the chain of trust. The defaults are 64 signature
+verification attempts, 100,000 work units (including key/signature comparisons
+and NSEC3 hashes), and five seconds. Validation stops sooner if the query times
+out or you close the resolver.
+
+Hitting a limit raises `Dnsruby::ValidationLimitError`, which is a `VerifyError`.
+The answer fails validation; it isn't accepted as an insecure answer. If your
+application needs to validate unusually large amounts of trusted data, you can
+change the limits before starting queries:
+
+```ruby
+Dnsruby::Dnssec.validation_limits = {
+  max_signature_verifications: 128, max_work: 200_000, timeout: 10.0
+}
+```
+
+Any settings you leave out use their defaults, and all limits must be positive.
+For asynchronous validation, up to four workers can run at once, with another
+64 responses waiting. Further responses fail with `ValidationLimitError`.
+
+Cancellation is checked between operations and while waiting on the network.
+An OpenSSL operation already in progress is allowed to finish first.
 
 Dependencies
 ------------

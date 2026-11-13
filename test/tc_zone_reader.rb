@@ -152,6 +152,25 @@ ZONEDATA
     assert_equal('8443', https_svc.params_to_hash['port'])
   end
 
+  def test_zone_svcb_https_escaped_final_dots_do_not_make_targets_absolute
+    %w[SVCB HTTPS].each do |type|
+      {
+        'foo\\.' => ['foo.', 'example'],
+        'foo\\046' => ['foo.', 'example'],
+        'foo\\\\.' => ['foo\\'],
+        'foo\\..' => ['foo.'],
+        '.' => [],
+        'foo.' => ['foo']
+      }.each do |target, labels|
+        text = "owner 300 IN #{type} 1 #{target}\n"
+        record = ZoneReader.new('example.').process_io(StringIO.new(text)).first
+        assert_equal(labels, record.target.labels.map(&:string), "#{type} #{target}")
+        assert(record.target.absolute?)
+        assert_equal(record, record.clone)
+      end
+    end
+  end
+
   # A HTTPS record spread across several lines with parentheses is valid zone
   # format and must be parsed as a single record.
   MULTILINE_ZONE = <<~ZONEDATA

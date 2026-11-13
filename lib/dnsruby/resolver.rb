@@ -257,9 +257,15 @@ module Dnsruby
     def send_message(message)
       Dnsruby.log.debug{'Resolver : sending message'}
       q = Queue.new
-      send_async(message, q)
+      control = QueryControl.current
+      control&.check!
+      query_id = send_async(message, q)
 
-      _id, result, error = q.pop
+      begin
+        _id, result, error = control ? control.pop(q) : q.pop
+      ensure
+        @resolver_ruby.cancel_query(query_id, q) if control && @resolver_ruby
+      end
 
       if error
         error.response = result if error.is_a?(ResolvError)
@@ -1022,6 +1028,20 @@ module Dnsruby
       }
     end
 
+    # Cancel only the nested discovery query owned by this synchronous waiter;
+    # never close a shared resolver or disturb unrelated callers.
+    def cancel_query(client_query_id, client_queue)
+      @parent.single_res_mutex.synchronize do
+        current = @query_list[client_query_id]
+        if current && current[1].equal?(client_queue)
+          stop_querying(client_query_id)
+          @validation_queries.delete(client_query_id)
+          SelectThread.instance.remove_observer(current[2], self)
+          @query_list.delete(client_query_id)
+        end
+      end
+    end
+
     #  MUST BE CALLED IN A SYNCHRONIZED BLOCK!
     #
     #  Send the result back to the client, and close the socket for that query by removing
@@ -1046,6 +1066,18 @@ module Dnsruby
       @timeouts[client_query_id][1].clear
       SelectThread.instance.cancel_queries_for_queue(select_queue)
       @query_list[client_query_id][3].clear
+    end
+
+    # Called outside the selector lock. A completed or replaced transaction
+    # cannot start validation, and validation keeps the original query deadline.
+    def validation_deadline(select_queue, query_id)
+      client_query_id = query_id[2]
+      @parent.single_res_mutex.synchronize do
+        current = @query_list[client_query_id]
+        if current && current[2].equal?(select_queue) && @validation_queries[client_query_id] == query_id
+          @timeouts[client_query_id][0]
+        end
+      end
     end
 
     #  MUST BE CALLED IN A SYNCHRONIZED BLOCK!
@@ -1224,7 +1256,20 @@ module Dnsruby
       #  Check what sort of error it was :
       resolver, _msg, client_query_id, _retry_count = query_id
       _msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
-      if error.kind_of?(ResolvTimeout)
+      if error.kind_of?(SocketEofResolvError) && _msg.header.opcode != OpCode.QUERY
+        # An UPDATE or other operation may already have taken effect. An
+        # ambiguous EOF ends the whole logical query, including other servers'
+        # scheduled and outstanding attempts; do not replay it elsewhere.
+        send_result_and_stop_querying(client_queue, client_query_id, select_queue, response, error)
+        return
+      end
+      retryable_eof = error.kind_of?(SocketEofResolvError)
+      if error.kind_of?(ResolvTimeout) || retryable_eof
+        # A server can close a TCP connection before answering (RFC 7766
+        # section 6.2.4). Keep the finite retry plan and original total deadline,
+        # just as for a lost UDP packet; reconnecting must not add new retries.
+        # An UPDATE may already have changed the server and must not be replayed
+        # merely because its reply was lost.
         #    - if it was a timeout, then check which number it was, and how many retries are expected on that server
         #        - if it was the last retry, on the last server, then return a timeout to the client (and clean up)
         #        - otherwise, continue

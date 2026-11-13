@@ -38,8 +38,8 @@ module Dnsruby
       #  If the root is unsigned, then these must be initialised with at least
       #  one trusted key by the client application, if verification is to be performed.
       @trust_anchors = KeyCache.new
-      # Remember configured identities until explicit removal, even if the
-      # expiring key cache has already discarded the corresponding anchor.
+      # Track configured expiration independently of KeyCache pruning so an
+      # expired anchor invalidates learned trust and in-flight publication.
       @configured_dnskey_identities = {}
 
       @dlv_registries = []
@@ -96,6 +96,10 @@ module Dnsruby
       end
     end
     def get_dlv_key(ksk) # :nodoc:
+      with_validation { get_dlv_key_internal(ksk) }
+    end
+
+    private def get_dlv_key_internal(ksk)
       #  Using the KSK, get the ZSK for the DLV registry
       if (!@res && (@verifier_type == VerifierType::DLV))
         @res = get_dlv_resolver
@@ -132,7 +136,8 @@ module Dnsruby
       @trust_mutex.synchronize do
         if (k.type == Types.DNSKEY)
           @trust_anchors.add_key_with_expiration(k, expiration)
-          @configured_dnskey_identities[KeyCache.key_identity(k)] = true
+          identity = KeyCache.key_identity(k)
+          @configured_dnskey_identities[identity] = [@configured_dnskey_identities[identity] || expiration, expiration].max
           TheLog.info("Adding trust anchor for #{k.name}")
         elsif ((k.type == Types.DS) || ((k.type == Types.DLV) && (@verifier_type == VerifierType::DLV)))
           @configured_ds_store.push(k)
@@ -165,8 +170,24 @@ module Dnsruby
     end
 
     def trust_anchors
-      @trust_mutex.synchronize { @trust_anchors.keys + @configured_ds_store }
+      @trust_mutex.synchronize do
+        expire_trust_anchors
+        @trust_anchors.keys + @configured_ds_store
+      end
     end
+
+    # Caller holds @trust_mutex. As with explicit removal, cached descendants
+    # cannot outlive a configured DNSKEY anchor. Other configured anchors remain
+    # available and can establish fresh trust without retaining stale descendants.
+    def expire_trust_anchors
+      now = Time.now.to_i
+      expired = @configured_dnskey_identities.any? { |_identity, expiration| expiration < now }
+      return unless expired
+      @configured_dnskey_identities.delete_if { |_identity, expiration| expiration < now }
+      @trust_anchors.remove_expired_keys
+      clear_learned_keys
+    end
+    private :expire_trust_anchors
 
     #  Check that the RRSet and RRSIG record are compatible
     def check_rr_data(rrset, sigrec)#:nodoc: all
@@ -205,6 +226,7 @@ module Dnsruby
     def valid_signatures(rrset)
       error = nil
       signatures = rrset.sigs.select do |sigrec|
+        ValidationBudget.current&.check!(1)
         begin
           check_rr_data(rrset, sigrec)
           true
@@ -247,16 +269,27 @@ module Dnsruby
 
     def trusted_keys
       @trust_mutex.synchronize do
+        expire_trust_anchors
         @trusted_keys.keys + @configured_ds_store + @discovered_ds_store.flat_map(&:rrs)
       end
     end
+
+    # Public verification and discovery methods enter here explicitly. Nested
+    # calls retain both the operation's limits and this verifier's trust generation.
+    def with_validation
+      ValidationBudget.with { with_trust_generation { yield } }
+    end
+    private :with_validation
 
     # Nested verification and network discovery share the generation in which
     # the outer operation started. No trust lock is held during either work.
     def with_trust_generation
       operations = Thread.current[:dnsruby_trust_generations] ||= {}
       return yield if operations.key?(self)
-      operations[self] = @trust_mutex.synchronize { @trust_generation }
+      operations[self] = @trust_mutex.synchronize do
+        expire_trust_anchors
+        @trust_generation
+      end
       begin
         yield
       ensure
@@ -268,6 +301,8 @@ module Dnsruby
     def publish_trust
       generation = Thread.current[:dnsruby_trust_generations]&.fetch(self, nil)
       @trust_mutex.synchronize do
+        expire_trust_anchors
+        ValidationBudget.current&.check!
         return false if generation && generation != @trust_generation
         yield
       end
@@ -277,6 +312,10 @@ module Dnsruby
     #  Check that the key fits a signed DS record key details
     #  If so, then add the key to the trusted keys
     def check_ds(key, ds_rrset)#:nodoc: all
+      with_validation { check_ds_internal(key, ds_rrset) }
+    end
+
+    private def check_ds_internal(key, ds_rrset)
       expiration = 0
       found = false
       ds_rrset.sigs.each { |sig|
@@ -292,7 +331,8 @@ module Dnsruby
       if (expiration > 0)
         ds_rrset.rrs.each { |ds|
           if ((ds.type === Types.DS) || ((ds.type == Types.DLV) && (@verifier_type == VerifierType::DLV)))
-            if (ds.check_key(key))
+            ValidationBudget.current&.check!(1)
+            if ds.check_key(key)
               publish_trust { @trusted_keys.add_key_with_expiration(key, expiration) }
               found = true
             end
@@ -316,6 +356,10 @@ module Dnsruby
     # 
     #  Returns true if the message verifies OK, and false otherwise.
     def verify(msg, keys = nil)
+      with_validation { verify_internal(msg, keys) }
+    end
+
+    private def verify_internal(msg, keys)
       if (msg.kind_of?RRSet)
         if (msg.type == Types.DNSKEY)
           return verify_key_rrset(msg, keys)
@@ -642,6 +686,10 @@ module Dnsruby
     end
 
     def verify_ds_rrset(ds_rrset, keys = nil, msg = nil) # :nodoc:
+      with_validation { verify_ds_rrset_internal(ds_rrset, keys, msg) }
+    end
+
+    private def verify_ds_rrset_internal(ds_rrset, keys, msg)
       #       print "verify_ds_rrset #{ds_rrset}\n"
       if (ds_rrset && ds_rrset.num_sigs > 0)
         if (verify_rrset(ds_rrset, keys))
@@ -684,6 +732,10 @@ module Dnsruby
     end
 
     def verify_key_rrset(key_rrset, keys = nil) # :nodoc:
+      with_validation { verify_key_rrset_internal(key_rrset, keys) }
+    end
+
+    private def verify_key_rrset_internal(key_rrset, keys)
       #       print "verify_key_rrset\n"
       verified = false
       if (key_rrset && key_rrset.num_sigs > 0)
@@ -701,6 +753,10 @@ module Dnsruby
     end
 
     def check_ds_stores(key_rrset, signatures = nil) # :nodoc:
+      with_validation { check_ds_stores_internal(key_rrset, signatures) }
+    end
+
+    private def check_ds_stores_internal(key_rrset, signatures)
       signatures ||= valid_signatures(key_rrset)
       return if signatures.empty?
       key_expiration = signatures.first.expiration
@@ -709,6 +765,7 @@ module Dnsruby
       end
       key_rrset.rrs.each do |key|
         configured.each do |ds|
+          ValidationBudget.current&.check!(1)
           if ds.check_key(key)
             publish_trust { @trusted_keys.add_key_with_expiration(key, key_expiration) }
           end
@@ -716,7 +773,7 @@ module Dnsruby
         discovered.each do |rrset|
           if rrset.sigs[0].expiration < Time.now.to_i
             publish_trust { @discovered_ds_store.delete(rrset) }
-          elsif rrset.rrs.any? { |ds| ds.check_key(key) }
+          elsif rrset.rrs.any? { |ds| ValidationBudget.current&.check!(1); ds.check_key(key) }
             publish_trust do
               @trusted_keys.add_key_with_expiration(key, rrset.sigs[0].expiration)
               @discovered_ds_store.delete(rrset)
@@ -727,7 +784,10 @@ module Dnsruby
     end
 
     def get_keys_to_check # :nodoc:
-      @trust_mutex.synchronize { @trust_anchors.keys + @trusted_keys.keys }
+      @trust_mutex.synchronize do
+        expire_trust_anchors
+        @trust_anchors.keys + @trusted_keys.keys
+      end
     end
 
     #  Find the first matching DNSKEY and RRSIG record in the two sets.
@@ -755,6 +815,7 @@ module Dnsruby
         end
 
         sigrecs.each {|sig|
+          ValidationBudget.current&.check!(1)
           if key.key_tag == sig.key_tag && key.algorithm == sig.algorithm &&
               key.name.canonical == sig.signers_name.canonical && key.klass == sig.klass
             yield key, sig
@@ -769,6 +830,10 @@ module Dnsruby
     # 
     #  Returns true if the RRSet verified, false otherwise.
     def verify_rrset(rrset, keys = nil)
+      with_validation { verify_rrset_internal(rrset, keys) }
+    end
+
+    private def verify_rrset_internal(rrset, keys)
       #       print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
 #      print "ABOUT TO VERIFY WITH #{keys == nil ? '0' : keys.length} keys\n"
 #      if (keys != nil)
@@ -794,7 +859,8 @@ module Dnsruby
         if (keys && !(Array === keys) && ((keys.type == Types.DS) || ((keys.type == Types.DLV) && (@verifier_type == VerifierType::DLV))))
           rrset.rrs.each do |key|
             keys.rrs.each do |ds|
-              if (ds.check_key(key))
+              ValidationBudget.current&.check!(1)
+              if ds.check_key(key)
                 publish_trust { @trusted_keys.add_key_with_expiration(key, sigrecs.first.expiration) }
               end
             end
@@ -808,9 +874,11 @@ module Dnsruby
       end
 
       error = VerifyError.new("Signing key not found")
+      canonical_data = {}
       each_matching_key(keys, sigrecs) do |keyrec, sigrec|
         begin
-          return verify_rrset_with_key(rrset, keyrec, sigrec)
+          ValidationBudget.current&.signature!
+          return verify_rrset_with_key(rrset, keyrec, sigrec, canonical_data)
         rescue VerifyError => e
           error = e
         rescue OpenSSL::OpenSSLError => e
@@ -822,7 +890,7 @@ module Dnsruby
       raise error
     end
 
-    def verify_rrset_with_key(rrset, keyrec, sigrec)
+    def verify_rrset_with_key(rrset, keyrec, sigrec, canonical_data = {})
       #  RFC 4034
       # 3.1.8.1.  Signature Calculation
 
@@ -835,26 +903,12 @@ module Dnsruby
 
 #      print "VERIFY KEY FOUND - doing verification\n"
 
-      # Any DNS names in the RDATA field of each RR MUST be in
-      # canonical form; and
-      # The RRset MUST be sorted in canonical order.
-      rrset = rrset.sort_canonical
-
-      sig_data = sigrec.sig_data
-
-      # RR(i) = owner | type | class | TTL | RDATA length | RDATA
-      rrset.each do |rec|
-        old_ttl = rec.ttl
-        rec.ttl = sigrec.original_ttl
-        data = MessageEncoder.new { |msg|
-          msg.put_rr(rec, true)
-        }.to_s # @TODO@ worry about wildcards here?
-        rec.ttl = old_ttl
-        if (RUBY_VERSION >= "1.9")
-          data.force_encoding(Encoding::BINARY)
-        end
-        sig_data += data
-      end
+      # Canonical RDATA is independent of the signature. The RR wire body only
+      # varies with Original TTL and wildcard label count (RFC 4034 section 3.1.8).
+      # Keep it local to this verification so mutable caller records are never
+      # cached across calls, and do not temporarily mutate their TTLs.
+      sig_data = sigrec.sig_data + canonical_rrset_data(rrset, sigrec, canonical_data)
+      ValidationBudget.current&.check!(sig_data.bytesize / 64 + 1)
 
       #  Now calculate the signature
       verified = false
@@ -900,6 +954,7 @@ module Dnsruby
       if (!verified)
         raise VerifyError.new("Signature failed to cryptographically verify")
       end
+      ValidationBudget.current&.check!
       #  Sort out the TTLs - set it to the minimum valid ttl
       expiration_diff = (sigrec.expiration.to_i - Time.now.to_i).abs
       rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl,
@@ -909,7 +964,37 @@ module Dnsruby
     end
     private :verify_rrset_with_key
 
+    def canonical_rrset_data(rrset, signature, cache)
+      identity = [signature.original_ttl, signature.labels]
+      return cache[identity] if cache.key?(identity)
+      name = rrset.name
+      if signature.labels < 0 || signature.labels > name.labels.length
+        raise VerifyError, 'Invalid RRSIG label count'
+      elsif signature.labels < name.labels.length
+        name = Name.new([Name::Label.new('*')] + name.labels.last(signature.labels), true)
+      end
+      rdatas = cache[:rdatas] ||= rrset.rrs.map do |record|
+        ValidationBudget.current&.check!(1)
+        data = MessageEncoder.new { |encoder| record.encode_rdata(encoder, true) }.to_s
+        ValidationBudget.current&.check!(data.bytesize / 64 + 1)
+        data
+      end.uniq.sort
+      prefix = MessageEncoder.new do |encoder|
+        encoder.put_name(name, true)
+        encoder.put_pack('nnN', rrset.type.code, rrset.klass.code, signature.original_ttl)
+      end.to_s
+      cache[identity] = rdatas.map do |data|
+        ValidationBudget.current&.check!(1)
+        prefix + [data.bytesize].pack('n') + data
+      end.join
+    end
+    private :canonical_rrset_data
+
     def find_closest_dlv_anchor_for(name) # :nodoc:
+      with_validation { find_closest_dlv_anchor_for_internal(name) }
+    end
+
+    private def find_closest_dlv_anchor_for_internal(name)
       #  To find the closest anchor, query DLV.isc.org for [a.b.c.d], then [a.b.c], [a.b], etc.
       #  once closest anchor found, simply run follow_chain from that anchor
 
@@ -932,6 +1017,10 @@ module Dnsruby
     end
 
     def get_zone_key_from_dlv_rrset(dlv_rrset, name) # :nodoc:
+      with_validation { get_zone_key_from_dlv_rrset_internal(dlv_rrset, name) }
+    end
+
+    private def get_zone_key_from_dlv_rrset_internal(dlv_rrset, name)
       #  We want to return the key for the zone i.e. DS/DNSKEY for .se, NOT DLV for se.dlv.isc.org
       #  So, we have the DLv record. Now use it to add the zone's DNSKEYs to the trusted key set.
       res = get_nameservers_for(name)
@@ -974,6 +1063,10 @@ module Dnsruby
     end
 
     def query_dlv_for(name) # :nodoc:
+      with_validation { query_dlv_for_internal(name) }
+    end
+
+    private def query_dlv_for_internal(name)
       #  See if there is a record for name in dlv.isc.org
       if (!@res && (@verifier_type == VerifierType::DLV))
         @res = get_dlv_resolver
@@ -1021,6 +1114,7 @@ module Dnsruby
       n = Name.create(name)
       root = Name.create(".")
       anchors = @trust_mutex.synchronize do
+        expire_trust_anchors
         @trust_anchors.keys + @trusted_keys.keys + @configured_ds_store + @discovered_ds_store
       end
       while (true) # n != root)
@@ -1041,6 +1135,10 @@ module Dnsruby
     #  that authority and remove any keys with the pre-revoked key_tag.
 
     def follow_chain(anchor, name) # :nodoc:
+      with_validation { follow_chain_internal(anchor, name) }
+    end
+
+    private def follow_chain_internal(anchor, name)
       #  Follow the chain from the anchor to name, returning the appropriate
       #  key at the end, or false.
       # 
@@ -1057,6 +1155,7 @@ module Dnsruby
       res = Dnssec.default_resolver
       #       while ((next_step != name) || (next_key.type != Types.DNSKEY))
       while (true)
+        ValidationBudget.current&.check!(1)
         #         print "In loop for parent=#{parent}, next step = #{next_step}\n"
         dont_move_on = false
         if (next_key.type != Types.DNSKEY)
@@ -1083,6 +1182,10 @@ module Dnsruby
     end
 
     def get_anchor_for(child, parent, current_anchor, parent_res = nil) # :nodoc:
+      with_validation { get_anchor_for_internal(child, parent, current_anchor, parent_res) }
+    end
+
+    private def get_anchor_for_internal(child, parent, current_anchor, parent_res)
       #       print "Trying to discover anchor for #{child} from #{parent}\n"
       TheLog.debug("Trying to discover anchor for #{child} from #{parent} using #{current_anchor}, #{parent_res}")
       #  We wish to return a DNSKEY which the caller can use to verify name
@@ -1323,6 +1426,10 @@ module Dnsruby
     end
 
     def validate_no_rrsigs(msg) # :nodoc:
+      with_validation { validate_no_rrsigs_internal(msg) }
+    end
+
+    private def validate_no_rrsigs_internal(msg)
       #       print "Validating unsigned response\n"
       #  WHAT IF THERE ARE NO RRSIGS IN MSG?
       #  Then we need to check that we do not expect any RRSIGs
@@ -1368,6 +1475,10 @@ module Dnsruby
     end
 
     def validate(msg, query)
+      with_validation { validate_internal(msg, query) }
+    end
+
+    private def validate_internal(msg, query)
       if (msg.rrsets('RRSIG').length == 0)
         return validate_no_rrsigs(msg)
       end
@@ -1430,6 +1541,10 @@ module Dnsruby
     end
 
     def try_to_follow_from_anchor(closest_anchor, msg, qname) # :nodoc:
+      with_validation { try_to_follow_from_anchor_internal(closest_anchor, msg, qname) }
+    end
+
+    private def try_to_follow_from_anchor_internal(closest_anchor, msg, qname)
       error = nil
       if (closest_anchor)
         #  Then try to descend to the level we're interested in
@@ -1468,22 +1583,6 @@ module Dnsruby
       end
       return error
     end
-
-    # These entry points can authenticate or carry trust across a nested call.
-    # The outermost call owns the generation until all nested work finishes.
-    module TrustOperation
-      [:verify, :verify_rrset, :verify_key_rrset, :verify_ds_rrset,
-       :check_ds, :check_ds_stores, :get_dlv_key, :query_dlv_for,
-       :get_zone_key_from_dlv_rrset, :find_closest_dlv_anchor_for,
-       :follow_chain, :get_anchor_for, :validate, :validate_no_rrsigs,
-       :try_to_follow_from_anchor].each do |operation|
-        define_method(operation) do |*args, &block|
-          with_trust_generation { super(*args, &block) }
-        end
-      end
-    end
-    prepend TrustOperation
-    private_constant :TrustOperation
 
   end
 end

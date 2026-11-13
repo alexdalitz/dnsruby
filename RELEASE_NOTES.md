@@ -40,6 +40,16 @@ compatibility notes below for the changes from 1.74.0.
   coexist, and validation tries each matching key even if another is malformed
   or unusable.
   [#225](https://github.com/alexdalitz/dnsruby/issues/225).
+* **DNSSEC work limits.** Validation reuses canonical RR data when checking
+  matching signatures. Dnsruby also limits how much work it will do for one
+  answer, including any queries needed to follow the chain of trust. The
+  defaults are 64 signature attempts, 100,000 work units and five seconds.
+  If the original query times out or you close the resolver, unfinished
+  validation and any nested discovery queries are cancelled. Up to four workers
+  can validate responses at once, with another 64 responses waiting. Hitting a
+  limit raises `ValidationLimitError` (a `VerifyError`); the answer fails
+  validation rather than being accepted as insecure. See the
+  [README](README.md#dnssec-validation-limits) for configuration.
 * **Memory use for unknown records.** The cache holds at most 256 automatically
   generated record classes. Classes still held by an application remain usable,
   and explicit registrations are retained. Replacing registered classes no
@@ -106,6 +116,7 @@ compatibility notes below for the changes from 1.74.0.
   compatibility, although RFC 8945 section 6 prohibits its use. SHA-1 remains
   supported as required by the RFC; SHA-256 is recommended. Dnsruby does not
   fall back to another algorithm automatically.
+  A lost reply or an unauthenticated error is not a safe reason to retry with MD5.
 * **Generated record classes.** Unknown type/class pairs use a bounded cache.
   Records and classes held by an application remain usable, but automatic
   `ClassHash` entries can be evicted and generated classes are no longer
