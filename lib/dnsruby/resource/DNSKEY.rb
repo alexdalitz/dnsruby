@@ -322,18 +322,17 @@ module Dnsruby
       end
 
       def rsa_key
-        exponentLength = @key[0]
-        if (exponentLength.class == String)
-          exponentLength = exponentLength.getbyte(0) # Ruby 1.9
-        end
+        exponentLength = @key.getbyte(0)
         pos = 1
         if (exponentLength == 0)
-          key1 = @key[1]
-          if (key1.class == String) # Ruby 1.9
-            key1 = key1.getbyte(0)
+          if @key.bytesize < 3
+            raise OpenSSL::PKey::PKeyError, "Truncated RSA DNSKEY exponent length"
           end
-          exponentLength = (key1<<8) + key1
+          exponentLength = @key.byteslice(1, 2).unpack1('n')
           pos += 2
+        end
+        if !exponentLength || exponentLength == 0 || @key.bytesize <= pos + exponentLength
+          raise OpenSSL::PKey::PKeyError, "Truncated RSA DNSKEY exponent or modulus"
         end
         exponent = RR::get_num(@key[pos, exponentLength])
         pos += exponentLength
@@ -351,8 +350,10 @@ module Dnsruby
       end
 
       def dsa_key
-        t = @key[0]
-        t = t.getbyte(0) if t.class == String
+        t = @key.getbyte(0)
+        if !t || t > 8 || @key.bytesize != 21 + 3 * (t * 8 + 64)
+          raise OpenSSL::PKey::PKeyError, "Invalid DSA DNSKEY length"
+        end
         pgy_len = t * 8 + 64
         pos = 1
         q = RR::get_num(@key[pos, 20])

@@ -164,6 +164,7 @@ class TestTcp < Minitest::Test
       received_query = s[0]
       socket.connect(s[1][2], s[1][1])
       ans = HackMessage.decode(received_query)
+      ans.header.qr = true
       ans.wipe_additional
       100.times {|i|
         ans.add_additional(Dnsruby::RR.create("example.com 3600 IN A 1.2.3.#{i}"))
@@ -184,6 +185,7 @@ class TestTcp < Minitest::Test
       end
       packet = t.recvfrom(len)[0]
       tcpPacket = HackMessage.decode(packet)
+      tcpPacket.header.qr = true
             tcpPacket.wipe_additional
       110.times {|i|
       tcpPacket.add_additional(Dnsruby::RR.create("example.com 3600 IN A 1.2.3.#{i}"))

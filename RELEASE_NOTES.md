@@ -21,6 +21,9 @@ Existing IPv6 string formatting is preserved.
   report an error promptly, and stalled writes respect the packet timeout.
   Malformed replies no longer interrupt unrelated queries or cause endless TCP
   retries. UDP-to-TCP fallback respects `no_tcp` and `ignore_truncation`.
+  Retrying without EDNS preserves the current transport, including explicit TCP.
+  Ordinary queries reject packets with a query header, mismatched opcode or ID;
+  explicit `send_raw` retains its existing behavior.
   [#155](https://github.com/alexdalitz/dnsruby/issues/155).
 * **Nameserver configuration fixes.** Hostname nameservers no longer cause
   recursive configuration hangs. IPv6 link-local nameservers accept interface
@@ -32,6 +35,9 @@ Existing IPv6 string formatting is preserved.
   revoked KSK-2010 key (19036), and restore the current anchors on `Dnssec.reset`.
   `Dnssec.clear_trusted_keys` clears learned keys and DS/DLV anchors while retaining
   configured DNSKEY anchors. Removing a local anchor discards keys learned from it.
+  Distinct DNSKEYs with the same key tag coexist, and validation tries all matching
+  keys. A malformed key or unusable signature does not hide another valid
+  candidate. Removing an expired configured anchor also invalidates learned trust.
   [#225](https://github.com/alexdalitz/dnsruby/issues/225).
 * **Bounded memory use for unknown records.** Keep at most 256 automatically
   generated record classes in the cache. Classes and records held by your
@@ -46,11 +52,20 @@ Existing IPv6 string formatting is preserved.
   timeout or close, including when the caller reuses its query ID.
 * **UDP cancellation and bounded write waits.** Closing or timing out an attempt
   prevents subsequent datagram writes. A congested socket waits outside the
-  cancellation lock and respects the original packet deadline.
+  cancellation lock and respects the original packet deadline. Waiting UDP and
+  TCP writers check cancellation at least every 50 ms while they are scheduled,
+  releasing worker capacity without waiting for the original timeout.
+* **Cache class and authentication isolation.** Cache lookups include the question
+  class. TSIG queries require a fresh authenticated exchange, and their replies
+  do not enter the shared unsigned response cache.
 * **Efficient query cleanup.** Completion and cancellation find attempts through
   their own queue index, avoiding a scan of every outstanding query.
 * **Zone-file parsing fixes.** Preserve quoted and escaped parentheses, comments
   and quotes in record values.
+* **Unknown-code performance.** Ordinary record parsing uses an indexed class
+  lookup, independent of previously received numeric class names. New numeric
+  type and class mappings avoid rebuilding their reverse indexes, and generated
+  record-class lookups allocate fewer temporary method objects.
 * **Correct DNS name-length checks.** Names longer than 255 octets on the wire now
   raise `ResolvError`, including some 256- and 257-octet names previously accepted.
   [PR #223](https://github.com/alexdalitz/dnsruby/pull/223).

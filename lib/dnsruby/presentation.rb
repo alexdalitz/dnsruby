@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Dnsruby
   # Shared lexical handling for RR strings and zone-file continuation lines.
   # Character-string escapes remain intact for the record-specific parser.
@@ -17,7 +19,10 @@ module Dnsruby
       end
       fields.shift unless owner_omitted
       fields.shift if fields.first&.first&.match?(/\A\d/)
-      if fields.first&.first&.match?(/\A(?:#{Classes.regexp}|CLASS\d+)\z/i)
+      # Numeric classes learned from received records must not make parsing
+      # unrelated records rebuild an ever-growing regular expression.
+      class_token = fields.first&.first
+      if class_token && (Classes.to_code(class_token) || /\ACLASS\d+\z/i.match?(class_token))
         fields.shift
       end
       fields.first.last if %w[TXT SPF TYPE16 TYPE99].include?(fields.first&.first&.upcase)

@@ -97,7 +97,9 @@ class TestRrOpt < Minitest::Test
       received_query = s[0]
       socket.connect(s[1][2], s[1][1])
       q.push(Message.decode(received_query))
-      socket.send(received_query,0)
+      response = Message.decode(received_query)
+      response.header.qr = true
+      socket.send(response.encode,0)
     }
 
     #  Now send query
@@ -168,12 +170,13 @@ class TestRrOpt < Minitest::Test
         received_query = s[0]
         m = Message.decode(received_query)
         q.push(m)
+        m.header.qr = true
         if (m.header.arcount > 0)
           #  send back FORMERR
           m.header.rcode = RCode.FORMERR
           socket.send(m.encode,0,s[1][2], s[1][1])
         else
-          socket.send(received_query,0,s[1][2], s[1][1]) # @TODO@ FORMERR if edns
+          socket.send(m.encode,0,s[1][2], s[1][1])
         end
       }
 

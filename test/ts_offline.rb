@@ -37,6 +37,11 @@ TESTS = %w(
     resolver_validation
     release_transport
     review_transport_fixes
+    review_transport_native
+    review_packet_contracts
+    cancelled_send_capacity
+    review_code_mapper
+    review_presentation
     record_regressions
     selector_wakeup
     message
@@ -96,6 +101,7 @@ if have_open_ssl?
   require_relative 'tc_svcb_signed_target.rb'
   require_relative 'tc_dnssec_trust_anchors.rb'
   require_relative 'tc_dnssec_trust_races.rb'
+  require_relative 'tc_key_cache_identity.rb'
 else
   puts "-----------------------------------------------------------------------"
   puts "OpenSSL SHA256 unavailable - skipping DS and DNSSEC trust-anchor tests"

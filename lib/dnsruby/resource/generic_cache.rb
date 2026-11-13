@@ -50,7 +50,7 @@ module Dnsruby
           return nil unless eligible?(type, klass)
           pair = [type, klass]
           @lock.synchronize do
-            registered = READ.bind(ClassHash).call(pair, nil)
+            registered = READ.bind_call(ClassHash, pair, nil)
             return registered if registered
             found = automatic_entry(key(type, klass))
             retain(found) if reusable?(found)
@@ -89,15 +89,15 @@ module Dnsruby
           # alive even when a client freezes the class itself.
           generated.instance_variable_set(:@generic_cache_entry, entry)
           @lock.synchronize do
-            registered = READ.bind(ClassHash).call(entry.pair, nil)
+            registered = READ.bind_call(ClassHash, entry.pair, nil)
             return registered if registered
             found = automatic_entry(name)
             return retain(found) if reusable?(found)
             # A previous explicit factory call may have left a native constant
             # after its registry entry was deleted. Let lookup (including YAML)
             # reach the replacement class instead of that stale binding.
-            if GenericConstantInspection::NATIVE_DEFINED.bind(Generic).call(name, false)
-              REMOVE_CONSTANT.bind(Generic).call(name)
+            if GenericConstantInspection::NATIVE_DEFINED.bind_call(Generic, name, false)
+              REMOVE_CONSTANT.bind_call(Generic, name)
             end
             index = @names[name]
             entry.index = index || NameIndex.new
@@ -113,25 +113,25 @@ module Dnsruby
         def registry_pair(pair)
           return pair if ClassHash.compare_by_identity?
           native_method = Object.instance_method(:method)
-          if Array === pair && native_method.bind(pair).call(:hash).owner == Array && native_method.bind(pair).call(:eql?).owner == Array
+          if Array === pair && native_method.bind_call(pair, :hash).owner == Array && native_method.bind_call(pair, :eql?).owner == Array
             return pair
           end
-          copy = Hash.instance_method(:dup).bind(ClassHash).call
-          keys = KEYS.bind(copy).call
+          copy = Hash.instance_method(:dup).bind_call(ClassHash)
+          keys = KEYS.bind_call(copy)
           index = 0
-          Hash.instance_method(:transform_values!).bind(copy).call do |_|
+          Hash.instance_method(:transform_values!).bind_call(copy) do |_|
             stored = keys[index]
             index += 1
             stored
           end
           missing = Object.new
-          stored = READ.bind(copy).call(pair, missing)
+          stored = READ.bind_call(copy, pair, missing)
           return stored unless stored.equal?(missing)
           # A live entry may already have left the FIFO. An explicit deletion
           # still invalidates that entry when the custom key addresses its pair.
           entries = @lock.synchronize { automatic_entries }
           weak = entries.to_h { |entry| [entry.pair, entry.pair] }
-          READ.bind(weak).call(pair, pair)
+          READ.bind_call(weak, pair, pair)
         end
 
         # Native Hash mutations run outside the lock. Their cleanup must not
@@ -160,7 +160,7 @@ module Dnsruby
             entries.each do |entry|
               next if pairs && !pairs.any? { |pair| targets?(entry, pair) }
               unchanged = snapshot.key?(entry) && snapshot[entry] == entry.version
-              unchanged &&= !READ.bind(ClassHash).call(registry_key(entry), nil).equal?(entry.klass) if removed_only
+              unchanged &&= !READ.bind_call(ClassHash, registry_key(entry), nil).equal?(entry.klass) if removed_only
               discard(entry) if unchanged || stale?(entry)
             end
           end
@@ -176,14 +176,14 @@ module Dnsruby
             end
             # FIFO eviction may have run after the explicit write but before its
             # cleanup. Preserve a successfully assigned automatic class.
-            if previous && previous.automatic && !@fifo.key?(previous) && !moved?(previous) && !READ.bind(ClassHash).call(registry_key(previous), nil)
+            if previous && previous.automatic && !@fifo.key?(previous) && !moved?(previous) && !READ.bind_call(ClassHash, registry_key(previous), nil)
               actual = identity ? pair : previous.pair.dup
-              WRITE.bind(ClassHash).call(actual, value)
+              WRITE.bind_call(ClassHash, actual, value)
             end
             entries = identity ? @fifo.keys.select { |entry| entry.registry_key.equal?(pair) } : [automatic_entry(name)].compact
             entries.each do |entry|
               next unless targets?(entry, pair)
-              discard(entry) if READ.bind(ClassHash).call(registry_key(entry), nil).equal?(value)
+              discard(entry) if READ.bind_call(ClassHash, registry_key(entry), nil).equal?(value)
             end
           end
         end
@@ -218,14 +218,14 @@ module Dnsruby
         def pair_name(pair)
           return unless Array === pair
           # A native slice strips singleton methods, unlike Array#to_a.
-          pair = Array.instance_method(:[]).bind(pair).call(0, 3)
+          pair = Array.instance_method(:[]).bind_call(pair, 0, 3)
           key(*pair) if pair.length == 2 && eligible?(*pair)
         end
 
         def targets?(entry, pair)
           return entry.registry_key.equal?(pair) if ClassHash.compare_by_identity?
           return false unless pair_name(pair) == entry.name
-          keys = KEYS.bind(ClassHash).call
+          keys = KEYS.bind_call(ClassHash)
           pair.equal?(entry.registry_key) || !keys.any? { |item| item.equal?(pair) } || !keys.any? { |item| item.equal?(entry.registry_key) }
         end
 
@@ -244,7 +244,7 @@ module Dnsruby
         end
 
         def stale?(entry)
-          @fifo.key?(entry) && !READ.bind(ClassHash).call(registry_key(entry), nil).equal?(entry.klass)
+          @fifo.key?(entry) && !READ.bind_call(ClassHash, registry_key(entry), nil).equal?(entry.klass)
         end
 
         def discard(entry)
@@ -257,13 +257,13 @@ module Dnsruby
           inserted = pair.dup
           actual = inserted
           unless ClassHash.compare_by_identity?
-            registered = READ.bind(ClassHash).call(pair, nil)
+            registered = READ.bind_call(ClassHash, pair, nil)
             return registered if registered
-            if HAS_KEY.bind(ClassHash).call(pair)
-              actual = KEYS.bind(ClassHash).call.find { |item| pair.eql?(item) } || actual
+            if HAS_KEY.bind_call(ClassHash, pair)
+              actual = KEYS.bind_call(ClassHash).find { |item| pair.eql?(item) } || actual
             end
           end
-          WRITE.bind(ClassHash).call(inserted, entry.klass)
+          WRITE.bind_call(ClassHash, inserted, entry.klass)
           entry.registry_key = actual
           entry.version = (@version += 1)
           @fifo[entry] = true
@@ -271,8 +271,8 @@ module Dnsruby
             old, = @fifo.shift
             if moved?(old)
               discard(old)
-            elsif READ.bind(ClassHash).call(registry_key(old), nil).equal?(old.klass)
-              DELETE.bind(ClassHash).call(registry_key(old))
+            elsif READ.bind_call(ClassHash, registry_key(old), nil).equal?(old.klass)
+              DELETE.bind_call(ClassHash, registry_key(old))
             end
           end
           entry.klass

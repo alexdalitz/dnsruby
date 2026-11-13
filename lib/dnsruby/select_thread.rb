@@ -39,17 +39,18 @@ module Dnsruby
     #  But how do we find the response queue for a particular query?
     #  Hash of client_id->[query, client_queue, socket]
     #  and socket->[client_ids], including multiple queries per TCP pipeline.
-    # 
-    #  @todo@ should we implement some of cancel function?
+    #
+    # @@mutex owns the attempt, queue and socket indexes. Cancellation may take
+    # a SendToken lock while holding @@mutex; a token-protected write must not
+    # acquire @@mutex. The selector never waits for a pipeline writer mutex.
+    # Blocking I/O and client callbacks run outside @@mutex.
 
     def initialize
       @@mutex = Mutex.new
       @@mutex.synchronize {
         @@in_select=false
-        #         @@notifier,@@notified=IO.pipe
         @@sockets = Set.new
         @@timeouts = Hash.new
-        #     @@mutex.synchronize do
         @@query_hash = Hash.new
         @@queries_by_queue = {}.compare_by_identity
         @@socket_hash = Hash.new
@@ -69,12 +70,8 @@ module Dnsruby
 
         #  Suppress reverse lookups
         BasicSocket.do_not_reverse_lookup = true
-        #     end
         #  Now start the select thread
         @@select_thread = Thread.new { do_select }
-
-        #         # Start the validator thread
-        #         @@validator = ValidatorThread.instance
       }
     end
 
@@ -508,7 +505,6 @@ module Dnsruby
             end
           end
         end
-        #               }
       end
     end
 
@@ -547,7 +543,6 @@ module Dnsruby
       queries.keys.select { |client_query_id| client_query_id[1].header.id == id }
     end
 
-    #         @@query_hash[query_settings.client_query_id]=query_settings
     def process_ready(ready)
       persistent_sockets, nonpersistent_sockets = @@mutex.synchronize { ready.partition { |socket| persistent?(socket) } }
 
@@ -847,6 +842,19 @@ module Dnsruby
           Dnsruby.log.error{"Decode error from #{answerip} but can't determine packet id"}
           return
         end
+        # Decoding may fail after a complete header. Such a packet must match
+        # the response direction and opcode before it can retry or fail its
+        # owner, just as a successfully decoded response must. Use wire bytes:
+        # an incomplete decoded Message can still contain a default header.
+        if buf.bytesize >= 12
+          flags = buf.unpack('n2').last
+          matches_header = @@mutex.synchronize do
+            current = @@query_hash[client_id]
+            current && current.socket == socket && (current.query.send_raw ||
+              ((flags & 0x8000) != 0 && ((flags >> 11) & 15) == current.query.header.opcode.code))
+          end
+          return unless matches_header
+        end
         # Truncation permits a UDP-to-TCP fallback, never another TCP attempt.
         # Repeating malformed TCP replies must not renew the packet deadline.
         settings = nil
@@ -1065,21 +1073,15 @@ module Dnsruby
     end
 
     def push_to_client(client_id, client_queue, msg, err, query, res)
-      #  @TODO@ Really need to let the client know that we have received a valid response!
-      #  Can do that by calling notify_observers here, but with an identifier which
-      #  defines the response to be a "Response received - validating. Please stop sending"
-      #  type of response.
+      # Notify the resolver before validation so it stops competing attempts
+      # while retaining the logical query's total deadline.
       client_queue.push([client_id, Resolver::EventType::RECEIVED, msg, err])
       notify_queue_observers(client_queue, client_id)
 
       if (!err || (err.instance_of?(NXDomain)))
-        # 
-        #  This method now needs to push the response to the validator,
-        #  which will then take responsibility for delivering it to the client.
-        #  The validator will need access to the queue observers -
+        # The validator owns delivery of the validation result.
         validator = ValidatorThread.new(client_id, client_queue, msg, err, query ,self, res)
         validator.run
-        #       @@validator.add_to_queue([client_id, client_queue, msg, err, query, self, res])
       end
     end
 

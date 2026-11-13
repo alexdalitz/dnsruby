@@ -30,6 +30,9 @@ module Dnsruby
 
     def PacketSender.cache(query, response)
       return if response.cached
+      # TSIG authentication belongs to this transaction. Verification removes
+      # the response's TSIG record, so its absence does not make it cacheable.
+      return if query.tsig || query.signed? || response.signed?
       #  ONLY cache the response if it is not an update response
       question = query.question()[0]
       if (query.do_caching && (query.class != Update) &&
@@ -380,13 +383,13 @@ module Dnsruby
         return
       end
 
-      if (msg.do_caching && (msg.class != Update))
+      if (msg.do_caching && (msg.class != Update) && !@tsig && !msg.tsig && !msg.signed?)
         #  Check the cache!!
         cachedanswer = nil
         if (msg.header.rd)
-          cachedanswer = @@recursive_cache.find(msg.question()[0].qname, msg.question()[0].type)
+          cachedanswer = @@recursive_cache.find(msg.question()[0].qname, msg.question()[0].type, msg.question()[0].qclass)
         else
-          cachedanswer = @@authoritative_cache.find(msg.question()[0].qname, msg.question()[0].type)
+          cachedanswer = @@authoritative_cache.find(msg.question()[0].qname, msg.question()[0].type, msg.question()[0].qclass)
         end
         if (cachedanswer)
           TheLog.debug("Sending cached answer to client\n")
@@ -588,14 +591,19 @@ module Dnsruby
       offset = 0
       while offset < frame.bytesize
         remaining = endtime - TransportClock.now
-        raise ResolvTimeout, "Query timed out writing TCP frame" if remaining <= 0
         begin
-          written = send_token.write { socket.write_nonblock(frame.byteslice(offset, frame.bytesize - offset)) }
+          written = send_token.write do
+            raise ResolvTimeout, "Query timed out writing TCP frame" if remaining <= 0
+            socket.write_nonblock(frame.byteslice(offset, frame.bytesize - offset))
+          end
           return offset if written == false # Cancelled between partial writes.
           raise IOError, "TCP write made no progress" unless written && written > 0
           offset += written
         rescue IO::WaitWritable
-          raise ResolvTimeout, "Query timed out writing TCP frame" unless IO.select(nil, [socket], nil, remaining)
+          # A canceled pipeline may still have peers and remain open. Bound the
+          # wait so cancellation releases the worker even if it never becomes
+          # writable; the next iteration retires any incomplete frame.
+          IO.select(nil, [socket], nil, [remaining, 0.05].min)
         end
       end
       true
@@ -606,15 +614,17 @@ module Dnsruby
     def write_udp_packet(socket, query_bytes, endtime, send_token, wait_for_writable)
       loop do
         remaining = endtime - TransportClock.now
-        raise ResolvTimeout, "Query timed out writing UDP packet" if remaining <= 0
         begin
-          written = send_token.write { socket.write_nonblock(query_bytes) }
+          written = send_token.write do
+            raise ResolvTimeout, "Query timed out writing UDP packet" if remaining <= 0
+            socket.write_nonblock(query_bytes)
+          end
           return false if written == false
           raise IOError, "Incomplete UDP datagram write" unless written == query_bytes.bytesize
           return true
         rescue IO::WaitWritable
           raise unless wait_for_writable
-          raise ResolvTimeout, "Query timed out writing UDP packet" unless IO.select(nil, [socket], nil, remaining)
+          IO.select(nil, [socket], nil, [remaining, 0.05].min)
         end
       end
     end
@@ -900,6 +910,12 @@ module Dnsruby
     def check_response(response, response_bytes, query, client_queue, client_query_id, tcp)
       #  @TODO@ Should send_raw avoid this?
       if (!query.send_raw)
+        # Reject unrelated packet headers before TSIG verification mutates the
+        # response or an error/truncation triggers another transport attempt.
+        unless response.header.qr && response.header.opcode == query.header.opcode &&
+            response.header.id == query.header.id
+          return false
+        end
         sig_value = check_tsig(query, response, response_bytes)
         if (sig_value != :okay)
           #  Should send error back up to Resolver here, and then NOT QUERY AGAIN!!!
@@ -943,7 +959,7 @@ module Dnsruby
             retry_query.tsigstate = :Unsigned
             retry_query.set_tsig(query.tsig.dup)
           end
-          send_async(retry_query, client_queue, client_query_id, false, true)
+          send_async(retry_query, client_queue, client_query_id, tcp, true)
           return false
         end
         if (response.header.tc && !tcp && !@ignore_truncation)

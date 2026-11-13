@@ -19,9 +19,16 @@ module Dnsruby
     #  Cache includes expiration time for keys
     #  Cache removes expired records
     def initialize(keys = nil)
-      #  Store key tag against [expiry, key]
+      # Store DNSKEY identity against [expiry, key]. A 16-bit key tag can collide.
       @keys = {}
       add(keys)
+    end
+
+    # TTL and cached OpenSSL objects are not part of a DNSKEY's identity.
+    # Copy mutable fields so later changes cannot corrupt the hash index.
+    def self.key_identity(key)
+      [key.name.canonical.freeze, key.klass.code, key.type.code,
+       key.flags, key.protocol, key.algorithm.code, key.key.dup.freeze].freeze
     end
     def add_key_with_expiration(k, expiration)
       priv_add_key(k, expiration)
@@ -32,10 +39,8 @@ module Dnsruby
       elsif (k.instance_of?RRSet)
         add_rrset(k)
       elsif (k.kind_of?KeyCache)
-        kaes = k.keys_and_expirations
-        kaes.keys.each { |keykey|
-          #             priv_add_key(keykey, kaes[keykey])
-          priv_add_key(keykey[1], keykey[0])
+        k.keys_and_expirations.each { |expiration, key|
+          priv_add_key(key, expiration)
         }
       else
         raise ArgumentError.new("Expected an RRSet or KeyCache! Got #{k.class}")
@@ -50,7 +55,7 @@ module Dnsruby
       #  and the longest expiration time - not easy!
       #  for now, we simply accept all signed keys
       k.sigs.each { |sig|
-        if (sig.type_covered = Types.DNSKEY)
+        if (sig.type_covered == Types.DNSKEY)
           if (sig.inception <= Time.now.to_i)
             #  Check sig.expiration, sig.algorithm
             if (sig.expiration > Time.now.to_i)
@@ -64,10 +69,9 @@ module Dnsruby
 
     def priv_add_key(k, exp)
       #  Check that the key does not already exist with a longer expiration!
-      if (@keys[k] == nil)
-        @keys[k.key_tag] = [exp,k]
-      elsif ((@keys[k])[0] < exp)
-        @keys[k.key_tag] = [exp,k]
+      identity = self.class.key_identity(k)
+      if !@keys[identity] || @keys[identity][0] < exp
+        @keys[identity] = [exp, k]
       end
     end
 
@@ -77,16 +81,8 @@ module Dnsruby
       @keys.values.each {|v| yield v[1]}
     end
     def delete(key)
-      cached = @keys[key.key_tag]
-      #  A key tag alone does not uniquely identify a DNSKEY.
-      return nil unless cached
-      candidate = cached[1]
-      #  Compare DNS data, excluding TTL and cached OpenSSL public key objects.
-      return nil unless candidate.name.canonical == key.name.canonical &&
-        candidate.klass == key.klass && candidate.type == key.type &&
-        candidate.flags == key.flags && candidate.protocol == key.protocol &&
-        candidate.algorithm == key.algorithm && candidate.key == key.key
-      @keys.delete(key.key_tag)[1]
+      cached = @keys.delete(self.class.key_identity(key))
+      cached && cached[1]
     end
     def keys
       #  Only offer currently-valid keys here
@@ -98,7 +94,7 @@ module Dnsruby
     end
     def keys_and_expirations
       remove_expired_keys
-      return keys.values
+      @keys.values.map(&:dup)
     end
     def remove_expired_keys
       @keys.delete_if {|k,v|

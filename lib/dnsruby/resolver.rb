@@ -35,13 +35,10 @@ module Dnsruby
   #
   #  Note also that these timeouts are distinct from the SingleResolver's packet_timeout
   #
-  #  Timeouts apply to the initial query and response. If DNSSEC validation is to
-  #  be performed, then additional queries may be required (these are performed automatically
-  #  by Dnsruby). Each additional query will be performed with its own timeouts.
-  #  So, even with a query_timeout of 5 seconds, a response which required extensive
-  #  validation may take several times that long.
-  #  (Future versions of Dnsruby may expose finer-grained events for client tracking of
-  #  responses and validation)
+  #  The total query_timeout includes local DNSSEC validation. Validation may
+  #  require additional queries, each with its own packet timeout, but the caller
+  #  still receives a timeout when the original total deadline expires. Late
+  #  validation results cannot complete the query a second time.
   #
   #  == Methods
   #
@@ -563,9 +560,8 @@ module Dnsruby
       #  Attributes
 
       #  do_validation tells the Resolver whether to try to validate the response
-      #  with DNSSEC. This should work for NSEC-signed domains, but NSEC3
-      #  validation is not currently supported. This attribute now defaults to
-      #  false. Please let me know if you require NSEC3 validation.
+      #  with DNSSEC, including NSEC and NSEC3 proofs. Local validation defaults
+      #  to false and is separate from requesting DNSSEC records.
       @do_validation = false
       @query_timeout = DefaultQueryTimeout
       @retry_delay = DefaultRetryDelay

@@ -37,7 +37,7 @@ class TestPipelineRetry < Minitest::Test
     class RetryFixture
       attr_reader :selector, :sender, :original, :udp, :tcp, :replacement, :winner_error
 
-      def initialize(kind = :formerr, pipeline: true)
+      def initialize(kind = :formerr, pipeline: true, initial_tcp: kind == :formerr)
         @klass = Dnsruby::SelectThread
         {
           mutex: Mutex.new, sockets: Set.new, query_hash: {}, queries_by_queue: {}.compare_by_identity, socket_hash: {}, timeouts: {},
@@ -65,8 +65,8 @@ class TestPipelineRetry < Minitest::Test
         Socket.define_singleton_method(:tcp) { |*args, **options| tcp }
         @sender.define_singleton_method(:tcp_pipeline_socket) { |_| [tcp, false] }
         @kind = kind
-        @original = settings(RetrySocket.new(kind == :formerr), :retry, @sender)
-        @original.is_persistent_socket = pipeline && kind == :formerr
+        @original = settings(RetrySocket.new(initial_tcp), :retry, @sender)
+        @original.is_persistent_socket = pipeline && initial_tcp
         @original.query.add_additional(Dnsruby::RR::OPT.new(4096)) if kind == :formerr
         @selector.add_to_select(@original)
         Thread.current[:dnsruby_response_query] = nil
@@ -206,16 +206,12 @@ class TestPipelineRetry < Minitest::Test
           raise "#{kind}: retry missing" unless current && !current.equal?(fixture.original)
           raise 'retry changed the client queue' unless current.client_queue.equal?(fixture.original.client_queue)
           raise 'premature retry delivery' unless fixture.events.empty?
-          if kind == :formerr
-            raise 'FORMERR did not retry over UDP' unless current.socket.equal?(fixture.udp) && fixture.udp.writes.length == 1
-            sent = Dnsruby::Message.decode(fixture.udp.writes.first)
-            raise 'FORMERR retry retained EDNS' unless sent.header.arcount == 0
-          else
-            raise 'truncated UDP did not retry over TCP' unless current.socket.equal?(fixture.tcp) && !fixture.tcp.writes.empty?
-            frame = fixture.tcp.writes.join
-            raise 'invalid retry frame' unless frame.unpack1('n') == frame.bytesize - 2
-            sent = Dnsruby::Message.decode(frame.byteslice(2..))
-          end
+          raise "#{kind}: retry did not use TCP" unless current.socket.equal?(fixture.tcp) && !fixture.tcp.writes.empty?
+          raise 'TCP FORMERR changed transport' unless fixture.udp.writes.empty?
+          frame = fixture.tcp.writes.join
+          raise 'invalid retry frame' unless frame.unpack1('n') == frame.bytesize - 2
+          sent = Dnsruby::Message.decode(frame.byteslice(2..))
+          raise 'FORMERR retry retained EDNS' if kind == :formerr && sent.header.arcount != 0
           raise 'retry changed DNS transaction ID' unless sent.header.id == fixture.original.query.header.id
           fixture.assert_success(current, fixture.response(current))
         end
@@ -251,8 +247,7 @@ class TestPipelineRetry < Minitest::Test
           raise 'live protocol retry discarded' unless current && !current.equal?(fixture.original)
           raise 'retry inherited old deadline' unless current.endtime > Dnsruby::TransportClock.now
           raise 'premature retry event' unless fixture.events.empty?
-          transport = kind == :formerr ? fixture.udp : fixture.tcp
-          raise 'retry was not sent' if transport.writes.empty?
+          raise 'retry was not sent over TCP' if fixture.tcp.writes.empty?
           fixture.assert_success(current, fixture.response(current))
         end
       end
@@ -376,7 +371,7 @@ class TestPipelineRetry < Minitest::Test
   def test_nonpipeline_retry_write_error_does_not_report_after_another_completion
     assert_isolated(<<~'RUBY')
       [:live, :failed, :expired, :replaced].each do |action|
-        fixture = RetryFixture.new(:formerr, pipeline: false)
+        fixture = RetryFixture.new(:formerr, pipeline: false, initial_tcp: false)
         reached = false
         fixture.udp.on_send = -> { raise IOError, 'UDP retry send failed' }
         write = fixture.sender.method(:write_udp_packet)

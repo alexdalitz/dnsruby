@@ -38,6 +38,9 @@ module Dnsruby
       #  If the root is unsigned, then these must be initialised with at least
       #  one trusted key by the client application, if verification is to be performed.
       @trust_anchors = KeyCache.new
+      # Remember configured identities until explicit removal, even if the
+      # expiring key cache has already discarded the corresponding anchor.
+      @configured_dnskey_identities = {}
 
       @dlv_registries = []
 
@@ -129,6 +132,7 @@ module Dnsruby
       @trust_mutex.synchronize do
         if (k.type == Types.DNSKEY)
           @trust_anchors.add_key_with_expiration(k, expiration)
+          @configured_dnskey_identities[KeyCache.key_identity(k)] = true
           TheLog.info("Adding trust anchor for #{k.name}")
         elsif ((k.type == Types.DS) || ((k.type == Types.DLV) && (@verifier_type == VerifierType::DLV)))
           @configured_ds_store.push(k)
@@ -138,13 +142,15 @@ module Dnsruby
 
     def remove_trust_anchor(t)
       @trust_mutex.synchronize do
+        configured = false
         removed = if (t.type == Types.DNSKEY)
+          configured = @configured_dnskey_identities.delete(KeyCache.key_identity(t))
           @trust_anchors.delete(t)
         else
           @configured_ds_store.delete(t)
         end
         # Cached keys and in-flight discoveries may depend on this anchor.
-        clear_learned_keys if removed
+        clear_learned_keys if removed || configured
         removed
       end
     end
@@ -152,6 +158,7 @@ module Dnsruby
     def clear_trust_anchors
       @trust_mutex.synchronize do
         @trust_anchors = KeyCache.new
+        @configured_dnskey_identities = {}
         @configured_ds_store = []
         clear_learned_keys
       end
@@ -191,6 +198,25 @@ module Dnsruby
         raise VerifyError.new("Signature record not in validity period")
       end
     end
+
+    # A bad or expired signature must not hide another usable signature.
+    # Filter before considering DS stores so invalid signature metadata cannot
+    # determine the expiration of a newly discovered key.
+    def valid_signatures(rrset)
+      error = nil
+      signatures = rrset.sigs.select do |sigrec|
+        begin
+          check_rr_data(rrset, sigrec)
+          true
+        rescue VerifyError => e
+          error = e
+          false
+        end
+      end
+      raise error if signatures.empty? && error
+      signatures
+    end
+    private :valid_signatures
 
     #  Add the specified keys to the trusted key cache.
     #  k can be a KeyCache, or an RRSet of DNSKEYs.
@@ -674,14 +700,17 @@ module Dnsruby
       return verified
     end
 
-    def check_ds_stores(key_rrset) # :nodoc:
+    def check_ds_stores(key_rrset, signatures = nil) # :nodoc:
+      signatures ||= valid_signatures(key_rrset)
+      return if signatures.empty?
+      key_expiration = signatures.first.expiration
       configured, discovered = @trust_mutex.synchronize do
         [@configured_ds_store.dup, @discovered_ds_store.dup]
       end
       key_rrset.rrs.each do |key|
         configured.each do |ds|
           if ds.check_key(key)
-            publish_trust { @trusted_keys.add_key_with_expiration(key, key_rrset.sigs[0].expiration) }
+            publish_trust { @trusted_keys.add_key_with_expiration(key, key_expiration) }
           end
         end
         discovered.each do |rrset|
@@ -703,9 +732,14 @@ module Dnsruby
 
     #  Find the first matching DNSKEY and RRSIG record in the two sets.
     def get_matching_key(keys, sigrecs)#:nodoc: all
-      #  There can be multiple signatures in the RRSet - which one should we choose?
+      each_matching_key(keys, sigrecs) { |key, sig| return key, sig }
+      return nil, nil
+    end
+
+    # A key tag is only a hint: every candidate must be cryptographically tried.
+    def each_matching_key(keys, sigrecs)
       if ((keys == nil) || (sigrecs == nil))
-        return nil, nil
+        return
       end
       if ((RR::DNSKEY === keys) || (RR::DS === keys) ||
             ((RR::DLV === keys) && (@verifier_type == VerifierType::DLV)))
@@ -721,15 +755,14 @@ module Dnsruby
         end
 
         sigrecs.each {|sig|
-#          print "Looking at #{sig.key_tag} on sig, #{key.key_tag} on key\n"
-          if ((key.key_tag == sig.key_tag) && (key.algorithm == sig.algorithm))
-#                                    print "Found key #{key.key_tag}\n"
-            return key, sig
+          if key.key_tag == sig.key_tag && key.algorithm == sig.algorithm &&
+              key.name.canonical == sig.signers_name.canonical && key.klass == sig.klass
+            yield key, sig
           end
         }
       }
-      return nil, nil
     end
+    private :each_matching_key
 
     #  Verify the signature of an rrset encoded with the specified KeyCache
     #  or RRSet. If no signature is included, false is returned.
@@ -750,39 +783,43 @@ module Dnsruby
       if (rrset.num_sigs == 0)
         raise VerifyError.new("No signatures in the RRSet : #{rrset.name}, #{rrset.type}")
       end
-      sigrecs.each do |sigrec|
-        check_rr_data(rrset, sigrec)
-      end
+      sigrecs = valid_signatures(rrset)
       raise ArgumentError.new("Expecting DNSKEY, DLV, DS, RRSet, Array or nil for keys : got #{keys.class} instead") if
       (keys && (![Array, RR::IN::DNSKEY, RR::IN::DLV, RR::IN::DS].include?keys.class) && (keys.class != RRSet))
 
-      keyrec = nil
-      sigrec = nil
       if (rrset.type == Types.DNSKEY)
         if (keys && !(Array === keys) && ((keys.type == Types.DS) || ((keys.type == Types.DLV) && (@verifier_type == VerifierType::DLV))))
           rrset.rrs.each do |key|
             keys.rrs.each do |ds|
               if (ds.check_key(key))
-                publish_trust { @trusted_keys.add_key_with_expiration(key, rrset.sigs()[0].expiration) }
+                publish_trust { @trusted_keys.add_key_with_expiration(key, sigrecs.first.expiration) }
               end
             end
           end
         else
-          check_ds_stores(rrset)
+          check_ds_stores(rrset, sigrecs)
         end
       end
       if ((keys.nil?) || ((keys.class != Array) && ((keys.type == Types.DS) || ((keys.type == Types.DLV) && (@verifier_type == VerifierType::DLV)))))
-        keyrec, sigrec = get_matching_key(get_keys_to_check, sigrecs)
-      else
-        keyrec, sigrec = get_matching_key(keys, sigrecs)
+        keys = get_keys_to_check
       end
 
-      #       return false if !keyrec
-      if (!keyrec)
-        #         print "Couldn't find signing key! #{rrset.name}, #{rrset.type},\n "
-        raise VerifyError.new("Signing key not found")
+      error = VerifyError.new("Signing key not found")
+      each_matching_key(keys, sigrecs) do |keyrec, sigrec|
+        begin
+          return verify_rrset_with_key(rrset, keyrec, sigrec)
+        rescue VerifyError => e
+          error = e
+        rescue OpenSSL::OpenSSLError => e
+          # Wire-decoded DNSKEYs may only be parsed by OpenSSL at this point.
+          # A malformed colliding candidate must not mask a valid signing key.
+          error = VerifyError.new("Signature failed to cryptographically verify: #{e.message}")
+        end
       end
+      raise error
+    end
 
+    def verify_rrset_with_key(rrset, keyrec, sigrec)
       #  RFC 4034
       # 3.1.8.1.  Signature Calculation
 
@@ -827,18 +864,21 @@ module Dnsruby
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA512.new, sigrec.signature, sig_data)
       elsif [Algorithms.DSA,
           Algorithms.DSA_NSEC3_SHA1].include?(sigrec.algorithm)
-        #  we are ignoring T for now
-        #  t = sigrec.signature[0]
-        #  t = t.getbyte(0) if t.class == String
+        if sigrec.signature.bytesize != 41 || sigrec.signature.getbyte(0) != keyrec.key.getbyte(0)
+          raise VerifyError, "Invalid DSA signature length or T value"
+        end
         r = RR::get_num(sigrec.signature[1, 20])
         s = RR::get_num(sigrec.signature[21, 20])
         r_asn1 = OpenSSL::ASN1::Integer.new(r)
         s_asn1 = OpenSSL::ASN1::Integer.new(s)
 
         asn1 = OpenSSL::ASN1::Sequence.new([r_asn1, s_asn1]).to_der
-        verified = keyrec.public_key.verify(OpenSSL::Digest::DSS1.new, asn1, sig_data)
+        verified = keyrec.public_key.verify(OpenSSL::Digest::SHA1.new, asn1, sig_data)
       elsif [Algorithms.ECDSAP256SHA256, Algorithms.ECDSAP384SHA384].include?(sigrec.algorithm)
         byte_size = (keyrec.public_key.group.degree + 7) / 8
+        if sigrec.signature.bytesize != 2 * byte_size
+          raise VerifyError, "Invalid ECDSA signature length"
+        end
         sig_bytes = sigrec.signature[0..(byte_size - 1)]
         sig_char = sigrec.signature[byte_size..-1] || ''
         asn1 = OpenSSL::ASN1::Sequence.new([sig_bytes, sig_char].map { |int| OpenSSL::ASN1::Integer.new(OpenSSL::BN.new(int, 2)) }).to_der
@@ -851,7 +891,7 @@ module Dnsruby
 
         verified = keyrec.public_key.dsa_verify_asn1(digest_obj.digest(sig_data), asn1)
       else
-        raise RuntimeError.new("Algorithm #{sigrec.algorithm.code} unsupported by Dnsruby")
+        raise VerifyError.new("Algorithm #{sigrec.algorithm.code} unsupported by Dnsruby")
       end
 
       if (!verified)
@@ -864,6 +904,7 @@ module Dnsruby
       #             print "VERIFIED OK\n"
       return true
     end
+    private :verify_rrset_with_key
 
     def find_closest_dlv_anchor_for(name) # :nodoc:
       #  To find the closest anchor, query DLV.isc.org for [a.b.c.d], then [a.b.c], [a.b], etc.

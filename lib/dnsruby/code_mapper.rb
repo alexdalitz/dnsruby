@@ -27,6 +27,9 @@ module Dnsruby
     include Comparable
 
     @@arrays = {}
+    # Serialize native numeric inserts without holding a lock across
+    # application-defined string/hash methods.
+    @@lock = Mutex.new
 
     attr_accessor :string, :code
     alias to_code code
@@ -35,12 +38,13 @@ module Dnsruby
     alias to_s string
 
     class Arrays
-      attr_accessor :strings, :stringsdown, :values, :maxcode
+      attr_accessor :strings, :stringsdown, :values, :maxcode, :incremental
       def initialize
         @strings = {}
         @stringsdown = {}
         @values = {}
         @maxcode = 0
+        @incremental = true
       end
     end
 
@@ -54,10 +58,11 @@ module Dnsruby
     def CodeMapper.update
 
       @@arrays[self] = Arrays.new
-
       constants = self.constants - CodeMapper.constants
       constants.each do |i|
-        @@arrays[self].strings.store(i.to_s, const_get(i))
+        code = const_get(i)
+        @@arrays[self].incremental &&= code.instance_of?(Integer)
+        @@arrays[self].strings.store(i.to_s, code)
       end
       @@arrays[self].maxcode = constants.length
       @@arrays[self].values = @@arrays[self].strings.invert
@@ -70,10 +75,32 @@ module Dnsruby
     #  Add new a code to the CodeMapper
     def CodeMapper.add_pair(string, code)
       array = @@arrays[self]
-      array.strings.store(string, code)
-      array.values=array.strings.invert
+      native = string.instance_of?(String) && code.instance_of?(Integer)
+      # Use native frozen? semantics even if the caller overrides the method.
+      key = Object.instance_method(:frozen?).bind_call(string) ? string : String.new(string).freeze if native
+      handled = @@lock.synchronize do
+        array.incremental &&= native
+        if array.incremental && !array.strings.key?(string) && !array.values.key?(code)
+          # Hash stores a frozen copy of mutable String keys. Keep that same
+          # immutable name in the reverse index without inverting the table.
+          array.strings.store(key, code)
+          array.values.store(code, key)
+          true
+        elsif array.incremental
+          # Aliases and reassignment follow Hash#invert's insertion order.
+          array.strings.store(string, code)
+          array.values = array.strings.invert
+          true
+        end
+      end
+      unless handled
+        # Keep custom keys/values on the original path: inversion rehashes
+        # mutable values, and hash/eql? callbacks must run outside the lock.
+        array.strings.store(string, code)
+        array.values = array.strings.invert
+      end
       array.stringsdown.store(string.downcase, code)
-      array.maxcode+=1
+      @@lock.synchronize { array.maxcode += 1 }
     end
 
     def unknown_string(arg) #:nodoc: all
