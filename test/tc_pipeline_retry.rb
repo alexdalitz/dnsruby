@@ -62,7 +62,7 @@ class TestPipelineRetry < Minitest::Test
         @udp, @tcp = RetrySocket.new(false), RetrySocket.new(true)
         udp, tcp = @udp, @tcp
         UDPSocket.define_singleton_method(:new) { |*| udp }
-        Socket.define_singleton_method(:tcp) { |*args, **options| tcp }
+        Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **options| tcp }
         @sender.define_singleton_method(:tcp_pipeline_socket) { |_| [tcp, false] }
         @kind = kind
         @original = settings(RetrySocket.new(initial_tcp), :retry, @sender)
@@ -233,7 +233,7 @@ class TestPipelineRetry < Minitest::Test
             # being processed, and its protocol retry has its own deadline.
           end
           fixture.udp.define_singleton_method(:connect) { |*| cross_old_deadline.call }
-          Socket.define_singleton_method(:tcp) do |*args, **options|
+          Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **options|
             cross_old_deadline.call
             fixture.tcp
           end

@@ -50,6 +50,26 @@ class RrsigTest < Minitest::Test
     assert(rr.type_covered == Dnsruby::Types.TYPE731)
   end
 
+  def test_type_covered_rejects_out_of_range_before_mapping_or_wire_truncation
+    table = Dnsruby::CodeMapper.class_variable_get(:@@arrays).fetch(Dnsruby::Types)
+    before = [table.strings.dup, table.stringsdown.dup, table.values.dup, table.maxcode]
+    [65_536, 65_538, 2**128].each do |code|
+      text = "x. 60 IN RRSIG TYPE#{code} 8 1 60 20300101000000 20200101000000 12345 x. AA=="
+      assert_raises(Dnsruby::DecodeError) { Dnsruby::RR.create(text) }
+      assert_raises(ArgumentError) { Dnsruby::ZoneReader.new('x.').process_line(text) }
+    end
+    assert_equal(before, [table.strings, table.stringsdown, table.values, table.maxcode])
+    record = Dnsruby::RR.create(INPUT)
+    [-1, 65_536].each do |code|
+      assert_raises(Dnsruby::DecodeError) { record.type_covered = code }
+      assert_equal(Dnsruby::Types.A, record.type_covered)
+    end
+    record.type_covered = 'TYPE65535'
+    message = Dnsruby::Message.new
+    message.add_answer(record)
+    assert_equal(65_535, Dnsruby::Message.decode(message.encode).answer.first.type_covered.code)
+  end
+
   def test_string_with_comments
     r = Dnsruby::RR.create("tjeb.nl.		 3600		 IN		 RRSIG		 NSEC3PARAM 7 2 3600 20090630164649 20090602164649 53177 tjeb.nl. Fw70WQMviRFGyeze3MUpfafaAcWIvHRpnq4ZK3lxexrR1p+rLxK5C4qVKU71XYrPYR7XEBxgUG1oyKNOhFOVyx31EjC462dz7Vxn6UDpD1LIwNnD28+oHfS9AFzGKcn4zUZqT+8IvOO1jiS9c3Y8WAkOloN9AwGIIKWU8zAp1n4= ;{id = 53177}")
     assert_equal("Fw70WQMviRFGyeze3MUpfafaAcWIvHRpnq4ZK3lxexrR1p+rLxK5C4qVKU71XYrPYR7XEBxgUG1oyKNOhFOVyx31EjC462dz7Vxn6UDpD1LIwNnD28+oHfS9AFzGKcn4zUZqT+8IvOO1jiS9c3Y8WAkOloN9AwGIIKWU8zAp1n4=", ([r.signature].pack("m*")).gsub(/\n/,"").chomp)

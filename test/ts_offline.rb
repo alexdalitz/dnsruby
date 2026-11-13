@@ -37,6 +37,7 @@ TESTS = %w(
     resolver_validation
     release_transport
     review_transport_fixes
+    review_followup_transport
     review_transport_native
     review_packet_contracts
     cancelled_send_capacity
@@ -73,6 +74,8 @@ TESTS = %w(
     svcb_transport
     tcp_pipelining
     tkey
+    tsig_api
+    tsig_rfc8945
     update
     zone_reader
 )

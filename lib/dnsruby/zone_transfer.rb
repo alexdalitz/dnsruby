@@ -39,11 +39,15 @@ module Dnsruby
     # Sets the TSIG to sign the zone transfer with.
     # Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
     # Pass in nil to stop tsig signing.
+    # Defaults to hmac-sha256; the algorithm must match the server's key.
+    # You can select hmac-md5 for legacy servers, which logs a warning.
     # * res.tsig=(tsig_rr)
     # * res.tsig=(key_name, key)
     # * res.tsig=nil # Don't sign the transfer
     def tsig=(*args)
       @tsig = Resolver.get_tsig(args)
+      @tsig_configured_time = @tsig&.time_signed
+      @last_tsig_time = nil
     end
 
 
@@ -346,9 +350,18 @@ module Dnsruby
 
 
     def send_message(socket, msg) #:nodoc: all
+      msg.tsig.warn_if_legacy_algorithm if msg.tsig
       if (@tsig)
-        @tsig.apply(msg)
+        # Keep the last query's TSIG available to callers. Generate a fresh
+        # timestamp for each transfer or retry unless the caller set one.
+        if @last_tsig_time.nil? || @tsig.time_signed != @last_tsig_time
+          @tsig_configured_time = @tsig.time_signed
+        end
+        signing_key = @tsig.dup
+        signing_key.time_signed = @tsig_configured_time
+        signing_key.apply(msg)
         @tsig = msg.tsig
+        @last_tsig_time = @tsig.time_signed
       end
       query_packet = msg.encode
       lenmsg = [query_packet.length].pack('n')

@@ -17,10 +17,9 @@ Dnsruby uses one selector thread for responses and timeouts. TCP sends started
 by that thread use a bounded worker pool, so a slow connect or write does not
 block unrelated responses. Public sends remain synchronous in the caller.
 
-**Upgrading to v2?** Read the [upgrade notes](RELEASE_NOTES.md#upgrading-to-v2),
-particularly if you persist generated record classes or customise them. Legacy
-IPv6 string formatting is preserved. Raw SVCB/HTTPS data remains available through
-readers that return snapshots and explicit `data=` / `rdata=` writers.
+See the [compatibility notes](RELEASE_NOTES.md#compatibility-with-1740) when
+upgrading from 1.74.0, including the change to the default
+[TSIG algorithm](#updating-tsig-keys).
 
 The following is a (non-exhaustive) list of features :
 
@@ -36,6 +35,54 @@ The following is a (non-exhaustive) list of features :
 - (Signed) Dynamic updates supported
 
 - DNSSEC validation supported
+
+Updating TSIG keys
+------------------
+
+TSIG now uses HMAC-SHA256 by default. The key name, algorithm and secret need
+to match the DNS server's configuration. If your server uses MD5, you can
+update both sides to SHA-256 or select MD5 explicitly.
+
+With BIND, you can generate a SHA-256 key using
+[tsig-keygen](https://bind9.readthedocs.io/en/stable/manpages.html#tsig-keygen-tsig-key-generation-tool):
+
+```sh
+tsig-keygen -a hmac-sha256 dnsruby-key.example.
+```
+
+Install the key on the server, give it the required update or transfer
+permissions, and reload the configuration. If a script generates your keys,
+update that too. Then use the same name and base64 secret in the application:
+
+```ruby
+resolver.tsig = 'dnsruby-key.example.', secret, 'hmac-sha256'
+```
+
+For a key set on a message:
+
+```ruby
+message.set_tsig(name: 'dnsruby-key.example.', key: secret,
+                 algorithm: 'hmac-sha256')
+```
+
+These explicit SHA-256 settings also work in 1.74.0, so you can make the change
+before upgrading. Keep the generated secret private.
+
+To continue using an existing MD5 key, select it explicitly:
+
+```ruby
+resolver.tsig = key_name, secret, 'hmac-md5'
+```
+
+For a message, use `algorithm: 'hmac-md5'` in the `set_tsig` hash. Dnsruby keeps
+this option for compatibility, although
+[RFC 8945 section 6](https://www.rfc-editor.org/rfc/rfc8945.html#section-6)
+prohibits MD5 use. SHA-256 is recommended, and there is no automatic fallback
+to MD5.
+
+Selecting MD5 logs a warning once per process. To see it, set
+`Dnsruby.log.level = Logger::WARN` before configuring TSIG; the default log
+level is FATAL.
 
 Dependencies
 ------------

@@ -179,11 +179,13 @@ class RR
   #
   #
   def RR.new_from_string(rrstring)
-    # A standalone RR string has historically accepted unmatched grouping
-    # parentheses. Preserve that permissiveness while recognizing literal
-    # parentheses correctly; ZoneReader still needs balanced continuations.
-    rrstring, = Presentation.scan(rrstring, allow_unbalanced: true,
-      single_quoted_from: Presentation.single_quoted_start(rrstring))
+    # Standalone records allow unmatched parentheses, as in 1.74.0; ZoneReader
+    # requires balanced continuations. Skip the scanner for records without
+    # quotes, escapes, comments, parentheses or line breaks.
+    if /[\\'"();\r\n]/.match?(rrstring)
+      rrstring, = Presentation.scan(rrstring, allow_unbalanced: true,
+        single_quoted_from: Presentation.single_quoted_start(rrstring))
+    end
 
     matches = (/#{@@RR_REGEX}/xo).match(rrstring)
     unless matches

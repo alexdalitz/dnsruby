@@ -80,8 +80,8 @@ class TestReviewCodeMapper < Minitest::Test
   end
 
   def test_mutable_custom_code_is_rehashed_on_subsequent_insert
-    # Historically add_pair accepts values other than integers. Hash#invert
-    # rehashes them after mutation; the numeric optimization must not lose that.
+    # add_pair accepts values other than integers. Mutable keys must be
+    # rehashed on insertion, matching Hash#invert.
     code = ['before']
     @mapper.add_pair('custom', code)
     code.replace(['after'])
@@ -161,5 +161,109 @@ class TestReviewCodeMapper < Minitest::Test
     6.times { |worker| assert_equal(1079, @mapper.to_code("NAME#{worker}-79")) }
   ensure
     threads&.each { |thread| thread.kill if thread.alive? }
+  end
+
+  def test_dns_type_and_class_construction_rejects_out_of_range_without_interning
+    [[Dnsruby::Types, 'TYPE'], [Dnsruby::Classes, 'CLASS']].each do |mapper, prefix|
+      table = Dnsruby::CodeMapper.class_variable_get(:@@arrays).fetch(mapper)
+      before = [table.strings.dup, table.stringsdown.dup, table.values.dup, table.maxcode]
+      [-1, 65_536, 65_538, 2**128].each do |code|
+        assert_raises(ArgumentError) { mapper.new(code) }
+        assert_raises(ArgumentError) { mapper.new("#{prefix}#{code}") }
+      end
+      100.times { |i| assert_raises(ArgumentError) { mapper.new("#{prefix}#{65_536 + i}") } }
+      ['', 'suffix', '.0', "\nignored"].each do |suffix|
+        # An empty suffix tests the bare TYPE or CLASS prefix.
+        text = suffix.empty? ? prefix : "#{prefix}123#{suffix}"
+        assert_raises(ArgumentError) { mapper.new(text) }
+      end
+      assert_equal(before, [table.strings, table.stringsdown, table.values, table.maxcode])
+    end
+  end
+
+  def test_dns_numeric_spelling_variants_do_not_grow_mapping_tables
+    [[Dnsruby::Types, 'TYPE'], [Dnsruby::Classes, 'CLASS']].each do |mapper, prefix|
+      code = 65_050
+      assert_equal(code, mapper.new(code).code)
+      table = Dnsruby::CodeMapper.class_variable_get(:@@arrays).fetch(mapper)
+      before = [table.strings.dup, table.stringsdown.dup, table.values.dup, table.maxcode]
+      100.times do |zeroes|
+        text = "#{prefix.downcase}#{'0' * zeroes}#{code}"
+        mapped = mapper.new(text)
+        expected = zeroes.zero? ? "#{prefix}#{code}" : text
+        assert_equal(code, mapped.code)
+        assert_equal(expected, mapped.to_s)
+        assert_equal(expected, mapper.new(mapped).to_s)
+      end
+      assert_equal(before, [table.strings, table.stringsdown, table.values, table.maxcode])
+      [0, 65_535].each { |boundary| assert_equal(boundary, mapper.new(boundary).code) }
+    end
+    assert_equal('TYPE0001', Dnsruby::Types.new('TYPE0001').to_s)
+    assert_equal('CLASS0001', Dnsruby::Classes.new('CLASS0001').to_s)
+    assert_equal('A', Dnsruby::Types.new(1).to_s)
+    assert_equal('IN', Dnsruby::Classes.new(1).to_s)
+  end
+
+  def test_dns_code_helpers_validate_range_and_numeric_strings
+    [[Dnsruby::Types, 'TYPE', :typesbyname, :typesbyval],
+     [Dnsruby::Classes, 'CLASS', :classesbyname, :classesbyval]].each do |mapper, prefix, byname, byval|
+      assert_equal(1, mapper.public_send(byname, "#{prefix}0001"))
+      assert_equal(mapper.to_string(1), mapper.public_send(byval, ' 0001 '))
+      [-1, 65_536, 2**128].each do |code|
+        assert_raises(ArgumentError) { mapper.public_send(byval, code) }
+        assert_raises(ArgumentError) { mapper.public_send(byval, code.to_s) }
+        assert_raises(ArgumentError) { mapper.public_send(byname, "#{prefix}#{code}") }
+      end
+    end
+    error = assert_raises(ArgumentError) { Dnsruby::RR.create('x. IN TYPE65536 \\# 0') }
+    assert_match(/0\.\.65535/, error.message)
+    error = assert_raises(ArgumentError) { Dnsruby::RR.create('x. CLASS65536 TYPE65000 \\# 0') }
+    assert_match(/0\.\.65535/, error.message)
+  end
+
+  def test_copying_a_mutated_dns_mapper_still_validates_the_wire_range
+    [Dnsruby::Types, Dnsruby::Classes].each do |mapper|
+      value = mapper.new(1)
+      value.code = 65_536
+      assert_raises(ArgumentError) { mapper.new(value) }
+    end
+    # Custom CodeMapper subclasses can accept values outside the DNS
+    # type/class range.
+    @mapper.add_pair('LARGE', 2**32)
+    @mapper.add_pair('NEGATIVE', -1)
+    assert_equal(2**32, @mapper.new('LARGE').code)
+    assert_equal(-1, @mapper.new('NEGATIVE').code)
+  end
+
+  def test_dns_mappers_preserve_explicit_application_aliases
+    arrays = Dnsruby::CodeMapper.class_variable_get(:@@arrays)
+    [[Dnsruby::Types, 'TYPE'], [Dnsruby::Classes, 'CLASS']].each do |mapper, prefix|
+      original = arrays.fetch(mapper)
+      replacement = Dnsruby::CodeMapper::Arrays.new
+      %i[strings stringsdown values].each do |field|
+        replacement.public_send("#{field}=", original.public_send(field).dup)
+      end
+      replacement.maxcode = original.maxcode
+      replacement.incremental = original.incremental
+      arrays[mapper] = replacement
+      begin
+        existing = mapper.new(1)
+        mapper.add_pair('PREFERRED-ONE-ALIAS', 1)
+        assert_equal('PREFERRED-ONE-ALIAS', mapper.new(existing).to_s)
+        numeric_spelling = mapper.new("#{prefix}0001")
+        assert_equal("#{prefix}0001", mapper.new(numeric_spelling).to_s)
+        mapper.add_pair("#{prefix}0001", 1)
+        mapper.add_pair('LATEST-ONE-ALIAS', 1)
+        assert_equal('LATEST-ONE-ALIAS', mapper.new(numeric_spelling).to_s)
+        mapper.add_pair('APPLICATION-ALIAS', 65_052)
+        assert_equal(65_052, mapper.new('application_alias').code)
+        assert_equal("#{prefix}065052", mapper.new("#{prefix}065052").to_s)
+        assert_equal(65_052, mapper.to_code('APPLICATION-ALIAS'))
+        assert_equal('APPLICATION-ALIAS', mapper.new(65_052).to_s)
+        assert_nil(mapper.to_code("#{prefix}065052"), 'automatic spelling must not replace the explicit alias')
+      ensure
+        arrays[mapper] = original
+      end
+    end
   end
 end

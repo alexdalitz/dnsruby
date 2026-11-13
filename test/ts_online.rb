@@ -115,7 +115,7 @@ if (server_up)
   have_openssl = false
   begin
     require "openssl"
-    OpenSSL::HMAC.digest(OpenSSL::Digest::MD5.new, "key", "data")
+    OpenSSL::HMAC.digest('SHA256', "key", "data")
     key = OpenSSL::PKey::RSA.new
     key.e = 111
 

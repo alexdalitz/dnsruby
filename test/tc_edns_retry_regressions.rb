@@ -140,7 +140,7 @@ class EdnsRetryRegressionsTest < Minitest::Test
       refute(retry_query.send_raw)
 
       unsigned = response(retry_query)
-      assert_instance_of(Dnsruby::TsigNotSignedResponseError, check(sender, unsigned, retry_query))
+      assert_equal(false, check(sender, unsigned, retry_query), 'unsigned reply must leave the retry pending')
       signed = response(retry_query)
       key.apply(signed, decoded)
       signed = Dnsruby::Message.decode(signed.encode)
@@ -176,6 +176,40 @@ class EdnsRetryRegressionsTest < Minitest::Test
     reply = Dnsruby::Message.decode(reply.encode)
     assert_equal(true, check(sender, reply, query))
     assert(reply.verified?)
+  end
+
+  def test_formerr_downgrade_requires_dnssec_to_be_optional
+    [false, true].product([false, true], [false, true]).each do |dnssec, validation, signed|
+      sender, retries = capturing_sender(dnssec: dnssec)
+      query = edns_query
+      query.do_validation = validation
+      key = Dnsruby::RR.create(name: 'retry-key.example.', type: 'TSIG', klass: 'ANY',
+        key: 'c2VjcmV0', algorithm: 'hmac-sha256')
+      query.set_tsig(key) if signed
+      original_wire = sender.make_query_packet(query)
+      formerr = response(query)
+      formerr.header.rcode = Dnsruby::RCode::FORMERR
+      key.apply(formerr, query) if signed
+      wire = formerr.encode
+      result = sender.check_response(Dnsruby::Message.decode(wire), wire, query, Queue.new, :policy, false)
+      if dnssec && validation
+        assert_equal(true, result, 'required DNSSEC must report FORMERR without removing EDNS')
+        assert_empty(retries)
+      else
+        assert_equal(false, result)
+        assert_equal(1, retries.size)
+        retry_query, _, _, tcp, disable_edns = retries.first
+        assert_nil(retry_query.get_opt)
+        retry_wire = sender.make_query_packet(retry_query, tcp, disable_edns)
+        decoded = Dnsruby::Message.decode(retry_wire)
+        assert_nil(decoded.get_opt)
+        if signed
+          assert_equal(key.generate(decoded, nil, '', retry_wire, decoded.tsig).mac, decoded.tsig.mac)
+          refute_equal(query.tsig.mac, decoded.tsig.mac)
+        end
+      end
+      assert_equal(original_wire, query.encode, 'negotiation must preserve the caller request')
+    end
   end
 
   private

@@ -38,7 +38,7 @@ class ReviewTransportFixesTest < Minitest::Test
       SELECTOR.singleton_class.remove_method(:notify_queue_observers)
       resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1', dnssec: false, use_tcp: true)
       socket = FrameSocket.new
-      Socket.define_singleton_method(:tcp) { |*args, **options| socket }
+      Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **options| socket }
       first, duplicate = Queue.new, Queue.new
       resolver.send_async(query('first.example.'), first, :same)
       written = socket.written.dup
@@ -61,7 +61,7 @@ class ReviewTransportFixesTest < Minitest::Test
   def test_pipeline_configuration_changes_rotate_streams_while_peers_drain
     isolated(<<~'CODE')
       created = []
-      Socket.define_singleton_method(:tcp) do |*args, **options|
+      Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **options|
         socket = FrameSocket.new
         socket.define_singleton_method(:connect) { |*| raise Errno::EISCONN }
         created << [socket, args]
@@ -156,7 +156,7 @@ class ReviewTransportFixesTest < Minitest::Test
       message = sized_message(65_520)
       raise 'fixture must fit before signing' unless message.encode.bytesize == 65_520
       queue = Queue.new
-      Socket.define_singleton_method(:tcp) { |*args, **options| raise 'oversized signed packet opened a socket' }
+      Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **options| raise 'oversized signed packet opened a socket' }
       writer.send_async(message, queue, :signed)
       drain_errors
       event = queue.pop(true)

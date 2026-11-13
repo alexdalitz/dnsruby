@@ -60,7 +60,7 @@ class ReviewPacketContractsTest < Minitest::Test
           raise 'cache response was queued' unless K.class_variable_get(:@@queued_responses).empty?
           unsigned = answer(signed, 'unsigned server')
           result = writer.check_response(unsigned, unsigned.encode, signed, queue, :signed, false)
-          raise 'unsigned server answer accepted' unless result.is_a?(Dnsruby::TsigNotSignedResponseError)
+          raise 'unsigned server answer accepted' unless result == false
           response = answer(signed, 'private signed answer')
           key.apply(response, signed)
           bytes = response.encode

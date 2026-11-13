@@ -2,138 +2,138 @@
 
 ## v2.0.0
 
-This release adds SVCB and HTTPS records, fixes resolver hangs and TCP reliability
-problems, limits memory growth from unknown record types, and updates DNSSEC
-trust anchors. Ruby 3.0 or later is required.
+This release adds SVCB and HTTPS records, fixes resolver hangs and TCP handling,
+limits memory growth from unknown record types, and updates the DNSSEC trust
+anchors. Ruby 3.0 or later is required.
 
-**Before upgrading:** applications that save automatically generated record
-classes, or customise those classes, should read the compatibility notes below.
-Existing IPv6 string formatting is preserved.
+The default UDP payload size is now 1232 bytes, down from 4096, and TSIG defaults
+to HMAC-SHA256. Existing IPv6 string formatting is preserved. See the
+compatibility notes below for the changes from 1.74.0.
 
 ### Fixes and new features
 
-* **SVCB and HTTPS records.** Read and write these records in DNS messages and zone
-  files, including relative target names, numeric `keyNNNNN` values and escaped
-  text. IPv6 hints use RFC 5952 formatting.
+* **SVCB and HTTPS records.** Read and write these records in DNS messages and
+  zone files, including relative target names, numeric `keyNNNNN` values and
+  escaped text. IPv6 hints use RFC 5952 formatting.
   [PR #222](https://github.com/alexdalitz/dnsruby/pull/222).
-* **More reliable TCP queries.** Pipelined queries handle immediate replies,
-  concurrent sends, partial writes and disconnected servers. Failed queries
-  report an error promptly, and stalled writes respect the packet timeout.
-  Malformed replies no longer interrupt unrelated queries or cause endless TCP
-  retries. UDP-to-TCP fallback respects `no_tcp` and `ignore_truncation`.
-  Retrying without EDNS preserves the current transport, including explicit TCP.
-  Ordinary queries reject packets with a query header, mismatched opcode or ID;
-  explicit `send_raw` retains its existing behavior.
+* **TCP queries.** Pipelined queries handle concurrent sends, immediate replies,
+  partial writes and disconnected servers. Connects and writes respect their
+  deadlines, and cancellation releases the sender worker promptly. Matching
+  replies is faster when many queries share a connection. Malformed replies no
+  longer interrupt other queries or cause endless TCP retries.
+  UDP-to-TCP fallback still respects `no_tcp` and `ignore_truncation`, and
+  retrying without EDNS keeps the current transport.
+  Ordinary queries reject replies with the wrong ID, opcode or query/response
+  flag; `send_raw` retains its existing behavior.
   [#155](https://github.com/alexdalitz/dnsruby/issues/155).
-* **Nameserver configuration fixes.** Hostname nameservers no longer cause
-  recursive configuration hangs. IPv6 link-local nameservers accept interface
-  zones, such as `fe80::1%eth0`, including in `resolv.conf`.
+* **Nameserver configuration.** Hostname nameservers no longer cause recursive
+  configuration hangs. IPv6 link-local nameservers accept interface zones,
+  such as `fe80::1%eth0`, including in `resolv.conf`.
   [#179](https://github.com/alexdalitz/dnsruby/issues/179),
   [#184](https://github.com/alexdalitz/dnsruby/issues/184),
   [PR #221](https://github.com/alexdalitz/dnsruby/pull/221).
-* **Updated DNSSEC root trust anchors.** Add KSK-2024 (key tag 38696), remove the
-  revoked KSK-2010 key (19036), and restore the current anchors on `Dnssec.reset`.
-  `Dnssec.clear_trusted_keys` clears learned keys and DS/DLV anchors while retaining
-  configured DNSKEY anchors. Removing a local anchor discards keys learned from it.
-  Distinct DNSKEYs with the same key tag coexist, and validation tries all matching
-  keys. A malformed key or unusable signature does not hide another valid
-  candidate. Removing an expired configured anchor also invalidates learned trust.
+* **DNSSEC root trust anchors.** Add KSK-2024 (key tag 38696), remove the revoked
+  KSK-2010 key (19036), and restore the current anchors on `Dnssec.reset`.
+  `Dnssec.clear_trusted_keys` clears learned keys and DS/DLV anchors while
+  retaining configured DNSKEY anchors. Removing a configured anchor, or letting
+  it expire, also removes keys learned from it. Keys with the same tag can
+  coexist, and validation tries each matching key even if another is malformed
+  or unusable.
   [#225](https://github.com/alexdalitz/dnsruby/issues/225).
-* **Bounded memory use for unknown records.** Keep at most 256 automatically
-  generated record classes in the cache. Classes and records held by your
-  application remain usable, and explicit registrations are retained.
-  Replacing registry entries also keeps weak-index bookkeeping bounded on
-  Ruby 3.0–3.2, avoiding accumulating weak maps and slow finalizer processing.
-* **Safe query-ID reuse.** Callbacks from a completed query cannot affect a new
-  query reusing the same client ID, including when a callback overlaps `close`.
-* **DNSSEC completion and deadlines.** The total `query_timeout` remains in force
-  during local validation. Once an answer is accepted for validation, competing
-  nameserver replies cannot replace it. Late validation results are ignored after
-  timeout or close, including when the caller reuses its query ID.
-* **UDP cancellation and bounded write waits.** Closing or timing out an attempt
-  prevents subsequent datagram writes. A congested socket waits outside the
-  cancellation lock and respects the original packet deadline. Waiting UDP and
-  TCP writers check cancellation at least every 50 ms while they are scheduled,
-  releasing worker capacity without waiting for the original timeout.
-* **Cache class and authentication isolation.** Cache lookups include the question
-  class. TSIG queries require a fresh authenticated exchange, and their replies
-  do not enter the shared unsigned response cache.
-* **Efficient query cleanup.** Completion and cancellation find attempts through
-  their own queue index, avoiding a scan of every outstanding query.
-* **Zone-file parsing fixes.** Preserve quoted and escaped parentheses, comments
-  and quotes in record values.
-* **Unknown-code performance.** Ordinary record parsing uses an indexed class
-  lookup, independent of previously received numeric class names. New numeric
-  type and class mappings avoid rebuilding their reverse indexes, and generated
-  record-class lookups allocate fewer temporary method objects.
-* **Correct DNS name-length checks.** Names longer than 255 octets on the wire now
-  raise `ResolvError`, including some 256- and 257-octet names previously accepted.
+* **Memory use for unknown records.** The cache holds at most 256 automatically
+  generated record classes. Classes still held by an application remain usable,
+  and explicit registrations are retained. Replacing registered classes no
+  longer accumulates memory or slows garbage collection on Ruby 3.0–3.2.
+* **Query cancellation and timeouts.** A callback from a completed query cannot
+  affect a later query that reuses its ID. The total `query_timeout` also covers
+  local DNSSEC validation; late results are ignored after timeout or close.
+  Once validation starts, replies from other nameservers cannot replace the
+  accepted answer. Waiting UDP and TCP writers check for cancellation at least
+  every 50 ms while scheduled, without holding the cancellation lock.
+* **Authenticated replies.** TSIG queries require a fresh authenticated exchange
+  and do not use the shared response cache. Unsigned replies and invalid MACs
+  are ignored while waiting for a valid reply; if none arrives, the timeout
+  reports the authentication error. Authenticated BADTIME and BADTRUNC replies
+  report the server's error. Queries are prepared before signing, including
+  when the key is set on a Message. Already signed messages keep their headers
+  and OPT record. Cache lookups also include the question class.
+* **TSIG verification.** MACs are checked before timestamps and local truncation
+  policy, and verification uses the Original ID as described in RFC 8945.
+  Valid truncated MACs are supported; the optional `mac_length` setting controls
+  the signing length and minimum accepted length in octets. Zone transfers
+  accept up to 99 unsigned messages between signatures, authenticate the whole
+  sequence, and reject decreasing signed timestamps. Reusing a ZoneTransfer
+  gives each request a fresh signing time unless one was set explicitly.
+  Malformed TSIG records are
+  rejected, and configuring a key no longer writes its secret to the log.
+* **EDNS.** The default UDP payload size is 1232 bytes, a conservative choice
+  permitted by RFC 10001 section 3.2. Explicit sizes such as 4096 still work.
+  The smaller default reduces fragmentation risk but may lead to more TCP
+  retries. DNSSEC raises smaller limits to 1220 bytes, matching the minimum
+  supported size in RFC 4035 section 4.1. Setting DO on an existing OPT preserves
+  its size, options and other flags. A TCP FORMERR reply without a question can
+  trigger a retry without optional EDNS; UDP still requires a matching question.
+  Queries that need local DNSSEC validation keep EDNS enabled.
+* **Closed completion queues.** A closed client Queue no longer interrupts
+  completion or timeout delivery for other resolvers.
+* **DNSSEC input checks.** Numeric type/class constructors and RRSIG
+  type-covered setters reject values outside 0–65535. `verify_rrset` accepts
+  a single DS/DLV anchor as well as an RRSet.
+* **Query cleanup and parsing.** Completion and cancellation use a queue index
+  instead of scanning every query. Simple zone-file records parse faster;
+  quoted, escaped and multiline records keep the full parser. Parsing preserves
+  parentheses, semicolons and quotes inside record values where appropriate.
+  Ordinary record lookup no longer slows as numeric class names accumulate,
+  and numeric type/class lookups allocate fewer temporary objects.
+* **DNS name lengths.** Names longer than 255 octets on the wire now raise
+  `ResolvError`, including some 256- and 257-octet names previously accepted.
   [PR #223](https://github.com/alexdalitz/dnsruby/pull/223).
-* **Support `simpleidn` 0.3.x.** The supported range is now `>= 0.2.1`, `< 0.4.0`.
-  Updating from 0.2.x can change Unicode-to-DNS name conversion; check the results
-  if your application depends on exact converted names.
+* **simpleidn 0.3.x support.** The supported range is now `>= 0.2.1`, `< 0.4.0`.
+  Updating from 0.2.x can change Unicode-to-DNS name conversion. Check the
+  results if your application depends on exact converted names.
   [PR #224](https://github.com/alexdalitz/dnsruby/pull/224).
 
-### Upgrading to v2
+### Compatibility with 1.74.0
 
-#### Automatically generated record classes
-
-The memory limit changes how classes for unknown DNS type/class pairs are kept
-alive. Ordinary named classes, such as `Dnsruby::RR::IN::A`, are unaffected.
-
-* **Marshal:** automatically generated classes and their records can no longer
-  be dumped with Marshal. This also affects messages and other containers holding
-  those records; previously saved data using generated class names may not load.
-* **Customisation:** keep a reference to a class obtained with
-  `RR.get_class(type, klass)` and customise it with `class_eval`. Reopening a
-  generated class with a `class Generic::TypeN_ClassN` declaration is unsupported.
-  Customisations survive while the class or its records are held by your application.
-* **Registries and reflection:** automatic `ClassHash` entries can be evicted,
-  and generated names are no longer permanent Ruby constants. Ordinary lookup
-  still works, but native constant enumeration and reflection can differ.
-
-For a finite set of application-owned record types, call `Generic.create(type,
-klass)` before creating records to retain permanent class names and normal
-Marshal behaviour. Do not register arbitrary types received from the network:
-doing so would restore unbounded memory use. Explicit `ClassHash` registrations
-also remain persistent.
-
-#### Existing caches
-
-YAML persistence of automatically generated record classes and migration of
-stored generic SVCB/HTTPS records are not supported. Ordinary named records are
-unaffected.
-
-The AXFR demo keeps its Marshal cache format. Transfers containing unsupported
-generated records are displayed with a warning and leave any existing cache
-unchanged. Unreadable legacy caches are refetched; use `-f` to force a fresh
-transfer when needed.
-
-#### SVCB and HTTPS record data
-
-Types 64 and 65 now return parsed SVCB and HTTPS records. Existing `data` and
-`rdata` readers still return the raw binary RDATA, and `rdlength` reports its
-byte length. The bytes reflect changes to `priority`, `target`, or `params`.
-Assign raw bytes with `rdata=` (or `data=`), or supply `rdata:` in `RR.create`'s
-Hash, to update the parsed fields. Returned byte strings are snapshots; use
-these writers to replace the record data. Presentation output uses the
-registered `SVCB` and `HTTPS` mnemonics instead of `TYPE64` and `TYPE65`.
-
-Malformed presentation escapes are rejected. In ALPN and DoC path value lists,
-the second escape layer permits only an escaped comma or backslash. The
-`mandatory`, `port`, `ipv4hint` and `ipv6hint` mnemonics do not permit presentation
-escapes; their numeric `keyNNNNN` forms still accept escaped wire octets.
-
-Decoded records also retain the original binary `@rdata` snapshot for existing
-reflective consumers such as JSONDNS. As with other records' construction-time
-metadata, that private snapshot does not track later field mutations; use the
-public `rdata` reader for current bytes.
-
-#### IPv6 formatting
-
-`IPv6#to_s`, `#inspect` and existing record presentations keep their v1.74 output.
-For canonical RFC 5952 text, explicitly call `IPv6#to_s_canonical`. This changes
-only the presentation, not the DNS wire data.
+* **TSIG algorithms.** Omitting the algorithm now selects HMAC-SHA256 instead
+  of HMAC-MD5. If your server uses MD5, either update the key on both sides or
+  select MD5 explicitly with `resolver.tsig = key_name, secret, 'hmac-md5'`.
+  Existing explicit MD5 settings still work. The
+  [README](README.md#updating-tsig-keys) shows both options, including SHA-256
+  settings that also work in 1.74.0.
+  Selecting MD5 logs a warning once per process. Enable WARN logging before
+  configuring TSIG to see it; the default log level is FATAL. MD5 is retained for
+  compatibility, although RFC 8945 section 6 prohibits its use. SHA-1 remains
+  supported as required by the RFC; SHA-256 is recommended. Dnsruby does not
+  fall back to another algorithm automatically.
+* **Generated record classes.** Unknown type/class pairs use a bounded cache.
+  Records and classes held by an application remain usable, but automatic
+  `ClassHash` entries can be evicted and generated classes are no longer
+  permanent Ruby constants. Marshal/YAML persistence of these generated records
+  is unsupported. Ordinary named classes, such as `Dnsruby::RR::IN::A`, are
+  unaffected. To customise a generated class, keep the result of
+  `RR.get_class(type, klass)` and use `class_eval`.
+  For a fixed set of application-defined types, call `Generic.create(type,
+  klass)` before creating records to retain permanent names and normal Marshal
+  behavior. These explicit registrations stay in memory, so avoid registering
+  arbitrary types received from the network. The 256-class cache limit does
+  not include objects held by the application or the response cache.
+* **Numeric names.** Numeric spellings keep their presentation on each object,
+  but no longer register global aliases or change a code's preferred name.
+  Explicit `Types.add_pair` and `Classes.add_pair` aliases still work.
+* **SVCB and HTTPS.** Types 64 and 65 now return parsed records and use their
+  registered names in text output. The `data` and `rdata` readers still return
+  binary RDATA, reflecting changes to `priority`, `target` and `params`;
+  `rdlength` reports its length. Use `rdata=`, `data=` or `RR.create` with
+  `rdata:` to replace the data, since the readers return snapshots.
+  Decoded records also retain their original `@rdata` for callers such as
+  JSONDNS that read it directly; this private field does not track later edits.
+  Malformed escapes are rejected. ALPN and DoC path lists allow only escaped
+  commas and backslashes at their second escape layer. The `mandatory`, `port`,
+  `ipv4hint`, `ech` and `ipv6hint` mnemonics do not allow presentation escapes;
+  numeric `keyNNNNN` forms still accept escaped wire octets.
+* **IPv6 text.** `IPv6#to_s`, `#inspect` and existing record presentations keep
+  their 1.74.0 output. Use `IPv6#to_s_canonical` for RFC 5952 formatting.
 
 
 ## v1.74.0

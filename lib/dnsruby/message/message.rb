@@ -20,7 +20,7 @@ require 'dnsruby/resource/resource'
 module Dnsruby
   #  ===Defines a DNS packet.
   # 
-  #  RFC 1035 Section 4.1, RFC 2136 Section 2, RFC 2845
+  #  RFC 1035 Section 4.1, RFC 2136 Section 2, RFC 8945
   # 
   #  ===Sections
   #  Message objects have five sections:
@@ -365,6 +365,8 @@ module Dnsruby
     #  Sets the TSIG to sign this message with. Can either be a Dnsruby::RR::TSIG
     #  object, or it can be a (name, key) tuple, or it can be a hash which takes
     #  Dnsruby::RR::TSIG attributes (e.g. name, key, fudge, etc.)
+    #  Defaults to hmac-sha256; the algorithm must match the server's key.
+    #  You can select hmac-md5 for legacy servers, which logs a warning.
     def set_tsig(*args)
       if args.length == 1
         if args[0].instance_of?(RR::TSIG)
@@ -575,10 +577,16 @@ module Dnsruby
           }
           o.header.ancount.times {
             rr = msg.get_rr
+            if rr.type == Types::TSIG
+              raise DecodeError.new('TSIG must be the last record in the additional section')
+            end
             o.answer << rr
           }
           o.header.nscount.times {
             rr = msg.get_rr
+            if rr.type == Types::TSIG
+              raise DecodeError.new('TSIG must be the last record in the additional section')
+            end
             o.authority << rr
           }
           o.header.arcount.times { |count|
@@ -586,7 +594,6 @@ module Dnsruby
             rr = msg.get_rr
             if rr.type == Types::TSIG
               if count != o.header.arcount-1
-                Dnsruby.log.Error('Incoming message has TSIG record before last record')
                 raise DecodeError.new('TSIG record present before last record')
               end
               o.tsigstart = start # needed for TSIG verification

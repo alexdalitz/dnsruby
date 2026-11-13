@@ -110,6 +110,7 @@ module Dnsruby
             begin
               send(attr.to_s+"=", arg[attr])
             rescue Exception
+              raise if attr.to_s == 'tsig'
               Dnsruby.log.error{"Argument #{attr} not valid\n"}
             end
           end

@@ -16,11 +16,11 @@
 
 require_relative 'spec_helper'
 
-require "digest/md5"
 class TestTSig < Minitest::Test
 
   include Dnsruby
 
+  # The online fixture must configure this key for HMAC-SHA256 on the server.
   KEY_NAME="rubytsig"
   KEY = "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw=="
   def is_empty(string)
@@ -52,7 +52,7 @@ class TestTSig < Minitest::Test
         :type        => "TSIG",
         :ttl         => 0,
         :klass       => "ANY",
-        :algorithm   => "hmac-md5",
+        :algorithm   => "hmac-sha256",
         :fudge       => 300,
         :key         => KEY,
         :error       => 0

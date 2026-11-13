@@ -97,7 +97,7 @@ module Dnsruby
       attr_accessor :query_bytes, :query, :ignore_truncation, :client_queue,
         :client_query_id, :socket, :dest_server, :dest_port, :endtime, :udp_packet_size,
         :single_resolver, :is_persistent_socket, :tcp_pipelining_max_queries, :send_token,
-        :retire_connection, :disable_edns
+        :retire_connection, :disable_edns, :authentication_error
       #  new(query_bytes, query, ignore_truncation, client_queue, client_query_id,
       #      socket, dest_server, dest_port, endtime, , udp_packet_size, single_resolver)
       def initialize(*args)
@@ -120,6 +120,38 @@ module Dnsruby
       end
     end
 
+    # Look up client queries by socket and DNS message ID. Helper callers may
+    # register several queries with the same DNS ID; normal TCP sends keep IDs
+    # unique per connection. Hold @@mutex when updating the index.
+    class SocketQueries < Set
+      def initialize
+        super
+        @by_header_id = {}
+        @header_ids = {}
+      end
+
+      def add_query(settings)
+        id, header_id = settings.client_query_id, settings.query.header.id
+        add(id)
+        @header_ids[id] = header_id
+        (@by_header_id[header_id] ||= Set.new).add(id)
+      end
+
+      def matching(header_id)
+        (@by_header_id[header_id] || []).to_a
+      end
+
+      def delete(id)
+        header_id = @header_ids.delete(id)
+        if (ids = @by_header_id[header_id])
+          ids.delete(id)
+          @by_header_id.delete(header_id) if ids.empty?
+        end
+        super
+      end
+    end
+    private_constant :SocketQueries
+
     # Cancellation and each nonblocking write are ordered without holding the
     # selector mutex during I/O. Waiting for a connect or a writable socket never
     # holds this lock, so closing a Resolver remains responsive.
@@ -131,6 +163,10 @@ module Dnsruby
 
       def cancel
         @mutex.synchronize { @cancelled = true }
+      end
+
+      def cancelled?
+        @mutex.synchronize { @cancelled }
       end
 
       def write
@@ -289,7 +325,13 @@ module Dnsruby
       end
       @@query_hash[id] = settings
       (@@queries_by_queue[settings.client_queue] ||= Set.new) << id
-      (@@socket_hash[settings.socket] ||= []) << id
+      membership = @@socket_hash[settings.socket]
+      unless membership.is_a?(SocketQueries)
+        indexed = SocketQueries.new
+        (membership || []).each { |member| indexed.add_query(@@query_hash[member]) if @@query_hash[member] }
+        membership = @@socket_hash[settings.socket] = indexed
+      end
+      membership.add_query(settings)
       if settings.tcp_pipelining_max_queries != :infinite
         @@socket_remaining_queries[settings.socket] ||= settings.tcp_pipelining_max_queries
       end
@@ -335,12 +377,19 @@ module Dnsruby
 
     def query_id_in_use?(socket, header_id)
       @@mutex.synchronize do
-        (@@socket_hash[socket] || []).any? do |id|
-          settings = @@query_hash[id]
-          settings && settings.query.header.id == header_id
-        end
+        !socket_ids_for_header(socket, header_id).empty?
       end
     end
+
+    # Helper callers may supply a plain array; add_to_select uses SocketQueries.
+    # Call with @@mutex held.
+    def socket_ids_for_header(socket, header_id)
+      ids = @@socket_hash[socket]
+      return [] unless ids
+      return ids.matching(header_id) if ids.is_a?(SocketQueries)
+      ids.select { |id| (settings = @@query_hash[id]) && settings.query.header.id == header_id }
+    end
+    private :socket_ids_for_header
 
     def reusable_socket?(socket)
       @@mutex.synchronize do
@@ -575,7 +624,7 @@ module Dnsruby
       # Match the header ID against queries outstanding on this connection.
       client_ids=[]
       @@mutex.synchronize{
-        client_ids = (@@socket_hash[socket] || []).dup
+        client_ids = socket_ids_for_header(socket, msg.header.id)
       }
       #  get the queries associated with them
       client_ids.each do |id|
@@ -706,9 +755,8 @@ module Dnsruby
       time_now = TransportClock.now
       timeouts.each do |settings, timeout|
         if timeout < time_now && settings && claim_query(settings)
-          settings.client_queue.push([settings.client_query_id, Resolver::EventType::ERROR,
-            nil, ResolvTimeout.new("Query timed out")])
-          notify_queue_observers(settings.client_queue, settings.client_query_id)
+          deliver_queue_event(settings.client_queue, [settings.client_query_id, Resolver::EventType::ERROR,
+            nil, settings.authentication_error || ResolvTimeout.new("Query timed out")])
         end
       end
     end
@@ -885,11 +933,7 @@ module Dnsruby
         # This supplies peer metadata only. Normal response checks below still
         # validate the question and TSIG, including sequential duplicate IDs.
         settings = @@mutex.synchronize do
-          ids = @@socket_hash[socket] || []
-          id = ids.find do |candidate|
-            current = @@query_hash[candidate]
-            current && current.socket == socket && current.query.header.id == ans.header.id
-          end
+          id = socket_ids_for_header(socket, ans.header.id).first
           @@query_hash[id]
         end
         unless settings
@@ -915,7 +959,7 @@ module Dnsruby
       #  Not a problem, as there only will ever be one connection on the socket (Kaminsky attack mitigation)
       ids_for_socket = []
       @@mutex.synchronize{
-        ids_for_socket = (@@socket_hash[socket] || []).dup
+        ids_for_socket = (@@socket_hash[socket] || []).to_a
       }
       return if ids_for_socket.empty?
       if (ids_for_socket.length == 1)
@@ -935,7 +979,8 @@ module Dnsruby
       client_id=nil
       #  Figure out client id from answerfrom
       @@mutex.synchronize{
-        ids = (@@socket_hash[socket] || []).select { |id| @@query_hash[id] }
+        ids = (header_id ? socket_ids_for_header(socket, header_id) :
+          (@@socket_hash[socket] || [])).select { |id| @@query_hash[id] }
         # TCP decoding can fail before the peer address has been assigned. The
         # socket and partial header identify its query, including pipeline use.
         if answerip.nil?
@@ -975,8 +1020,7 @@ module Dnsruby
         remove_id_from_mutex_synchronized_block(client_id)
       }
       #       push_to_client(client_id, client_queue, msg, err)
-      client_queue.push([client_id, Resolver::EventType::ERROR, msg, err])
-      notify_queue_observers(client_queue, client_id)
+      deliver_queue_event(client_queue, [client_id, Resolver::EventType::ERROR, msg, err])
     end
 
     def push_exception_to_select(client_id, client_queue, err, msg)
@@ -1023,8 +1067,7 @@ module Dnsruby
       exceptions.each do |item|
         client_id, client_queue, err, msg = item
         #         push_to_client(client_id, client_queue, msg, err)
-        client_queue.push([client_id, Resolver::EventType::ERROR, msg, err])
-        notify_queue_observers(client_queue, client_id)
+        deliver_queue_event(client_queue, [client_id, Resolver::EventType::ERROR, msg, err])
       end
     end
 
@@ -1038,8 +1081,7 @@ module Dnsruby
       responses.each do |item|
         client_id, client_queue, msg, err, query, res = item
         #         push_to_client(client_id, client_queue, msg, err)
-        client_queue.push([client_id, Resolver::EventType::RECEIVED, msg, err])
-        notify_queue_observers(client_queue, client_id)
+        next unless deliver_queue_event(client_queue, [client_id, Resolver::EventType::RECEIVED, msg, err])
         #  Do we need to validate this? The response has come from the cache -
         #  validate it only if it has not been validated already
         #  So, if we need to validate it, send it to the validation thread
@@ -1051,8 +1093,7 @@ module Dnsruby
           validator.run
         else
           PacketSender.cache(query, msg) # The validator won't cache it, so we'd better do it now
-          client_queue.push([client_id, Resolver::EventType::VALIDATED, msg, err])
-          notify_queue_observers(client_queue, client_id)
+          deliver_queue_event(client_queue, [client_id, Resolver::EventType::VALIDATED, msg, err])
         end
       end
     end
@@ -1067,16 +1108,14 @@ module Dnsruby
       responses.each do |item|
         client_id, client_queue, msg, err, _query, _res = item
         #         push_to_client(client_id, client_queue, msg, err)
-        client_queue.push([client_id, Resolver::EventType::VALIDATED, msg, err])
-        notify_queue_observers(client_queue, client_id)
+        deliver_queue_event(client_queue, [client_id, Resolver::EventType::VALIDATED, msg, err])
       end
     end
 
     def push_to_client(client_id, client_queue, msg, err, query, res)
       # Notify the resolver before validation so it stops competing attempts
       # while retaining the logical query's total deadline.
-      client_queue.push([client_id, Resolver::EventType::RECEIVED, msg, err])
-      notify_queue_observers(client_queue, client_id)
+      return unless deliver_queue_event(client_queue, [client_id, Resolver::EventType::RECEIVED, msg, err])
 
       if (!err || (err.instance_of?(NXDomain)))
         # The validator owns delivery of the validation result.
@@ -1147,7 +1186,26 @@ module Dnsruby
       if (observer)
         observer.handle_queue_event(client_queue, client_query_id)
       end
+    rescue ClosedQueueError
+      Dnsruby.log.debug { 'Observer could not deliver to a closed client queue' }
     end
+
+    def deliver_queue_event(client_queue, event)
+      client_queue.push(event)
+      notify_queue_observers(client_queue, event.first)
+      true
+    rescue ClosedQueueError
+      # A direct PacketSender caller can close its queue while queries are
+      # pending. Cancel those queries so other clients can keep running.
+      @@mutex.synchronize do
+        cancel_queries_for_queue_synchronized(client_queue)
+        observer = @@observers.delete(client_queue)
+        remove_observer_queue_count(observer) if observer
+      end
+      Dnsruby.log.debug { 'Discarding event for closed client queue' }
+      false
+    end
+    private :deliver_queue_event
 
     def send_tick_to_observers
       #  If any observers are known then send them a tick
@@ -1156,7 +1214,11 @@ module Dnsruby
         tick_observers = @@tick_observers.dup
       }
       tick_observers.each do |observer|
-        observer.tick
+        begin
+          observer.tick
+        rescue ClosedQueueError
+          Dnsruby.log.debug { 'Observer tick could not deliver to a closed client queue' }
+        end
       end
     end
   end

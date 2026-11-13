@@ -263,8 +263,8 @@ class TestSVCB < Minitest::Test
                          '0 foo.example.com. mandatory=alpn,alpn alpn=h2']) { |r| svcb(r) }
   end
 
-  # RFC 6840 sec 5.1: a TargetName is not downcased for DNSSEC. Decoded from the
-  # wire, because Name.create lowercases a presentation string.
+  # DNSSEC preserves TargetName case (RFC 3597 section 7). Decode from the
+  # wire here because Name.create lowercases text input.
   def test_targetname_case_preserved_in_canonical_encoding
     # priority 0, TargetName "Foo.Example.COM." with mixed case.
     mixed_case_rdata = '000003466f6f074578616d706c6503434f4d00'
@@ -342,6 +342,31 @@ class TestSVCB < Minitest::Test
     assert_equal('192.0.2.1,192.0.2.2', params['ipv4hint'])
     assert_equal('Zm9vYmFy', params['ech'])
     assert_roundtrip(rr)
+  end
+
+  def test_ech_mnemonic_forbids_escapes_but_generic_key5_keeps_binary_syntax
+    # The RFC 9848 section 3 example uses Base64 for ech; key5 uses raw bytes.
+    value = 'AEj+DQBEAQAgACAdd+scUi0IYFsXnUIU7ko2Nd9+F8M26pAGZVpz/KrWPgAEAAEAAWQVZWNoLXNpdGVzLmV4YW1wbGUubmV0AAA='
+    escaped = '\\065' + value[1..]
+    binary = value.unpack1('m0')
+    generic = binary.bytes.map { |byte| format('\\%03d', byte) }.join
+    %w[SVCB HTTPS].each do |type|
+      [value, %Q{"#{value}"}].each do |plain|
+        assert_equal(binary, svcb("1 . ech=#{plain}", type).params[5])
+      end
+      [escaped, %Q{"#{escaped}"}, '\\A' + value[1..]].each do |invalid|
+        assert_raises(DecodeError) { svcb("1 . ech=#{invalid}", type) }
+        assert_raises(DecodeError) do
+          RR.create(name: 'example.', type: type, priority: 1, target: '.', params: {ech: invalid})
+        end
+      end
+      [generic, %Q{"#{generic}"}].each do |raw|
+        assert_equal(binary, svcb("1 . key5=#{raw}", type).params[5])
+        record = RR.create(name: 'example.', type: type, priority: 1, target: '.', params: {key5: raw})
+        assert_equal(binary, record.params[5])
+        assert_roundtrip(record)
+      end
+    end
   end
 
   # RFC 9460 sec 2.2: SvcParams are written in increasing key order, which is
@@ -505,11 +530,11 @@ class TestSVCB < Minitest::Test
     end
   end
 
-  # ech carries a base64 ECHConfigList (RFC 9460 sec 5), and Base64.decode64
-  # discards anything outside the alphabet rather than failing.
+  # ech carries a Base64 ECHConfigList (RFC 9848 section 3). Reject invalid
+  # characters, which Base64.decode64 would silently discard.
   def test_ech_requires_valid_base64
     assert_all_rejected(
-      ['1 . ech=!!!not-base64!!!', # decoded to 6 octets, emitted as "ech=notbase6"
+      ['1 . ech=!!!not-base64!!!', # permissive decoding would emit "ech=notbase6"
        '1 . ech=Zm9vYmF@',         # single stray character
        '1 . ech=aGk',              # unpadded
        '1 . ech=']                 # an ECHConfigList is length-prefixed, never empty
@@ -588,8 +613,7 @@ class TestSVCB < Minitest::Test
   end
 
   # RFC 9460 sec 2.1 writes the number of an unknown key "without leading
-  # zeros", so a padded spelling is not that key by another name. Left accepted,
-  # key01 read as alpn and its value was parsed as an ALPN list.
+  # zeros". Padded spellings such as key01 must not become aliases for alpn.
   def test_key_leading_zeros_rejected
     assert_all_rejected(['key01=h2', 'mandatory=key01,alpn alpn=h2']) { |p| svcb("1 . #{p}") }
 
@@ -650,7 +674,7 @@ class TestSVCB < Minitest::Test
     assert_equal(rr.params, from_zone.params)
   end
 
-  # priority= is a real setter, so it range-checks like the presentation format.
+  # The priority setter enforces the same range as the presentation format.
   def test_priority_setter_validates
     rr = svcb('1 .')
     rr.priority = 65535
@@ -977,9 +1001,8 @@ class TestSVCB < Minitest::Test
     end
   end
 
-  # params is public, so a value can reach the decoder without the .b every
-  # constructor applies, which is why the length-prefixed decoders count
-  # octets. With String#[] this decoded to ["\xC3\xA9\x02", "2"].
+  # Callers can pass multibyte strings in params. Length fields count bytes,
+  # whatever the String's encoding.
   def test_length_prefixed_decode_counts_octets
     rr = svcb('1 .')
     # [2]"\xC3\xA9" [2]"h2"
@@ -989,8 +1012,7 @@ class TestSVCB < Minitest::Test
     assert_equal('1 . alpn=\195\169,h2', rr.rdata_to_string)
   end
 
-  # Same trigger as above, for the fixed-width address hints. Splitting these in
-  # characters dropped the trailing address of each pair.
+  # Address hints also count bytes, whatever the String's encoding.
   def test_address_hint_decode_counts_octets
     rr = svcb('1 .')
 

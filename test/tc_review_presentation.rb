@@ -58,4 +58,20 @@ class TestReviewPresentation < Minitest::Test
     assert_equal(['two(three);four'], records.last.strings)
     assert_equal(records.first.name, records.last.name)
   end
+
+  def test_plain_records_and_grouped_records_produce_identical_wire_data
+    [
+      'www.example. 60 IN A 192.0.2.1',
+      "www.example.\t60\tIN\tAAAA\t2001:db8::1",
+      'example. IN MX 10 mail.example.',
+      'example. 60 IN TXT plain',
+      'example. 60 IN HTTPS 1 . alpn=h2 port=443',
+      'é.example. 60 IN A 192.0.2.1'
+    ].each do |text|
+      plain = Dnsruby::RR.create(text.freeze)
+      grouped = Dnsruby::RR.create("(#{text})")
+      assert_equal(grouped, plain, text)
+      assert_equal(grouped.clone, plain.clone, text)
+    end
+  end
 end

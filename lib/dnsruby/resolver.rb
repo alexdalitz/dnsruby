@@ -86,7 +86,7 @@ module Dnsruby
     DefaultDnssec = false
     AbsoluteMinDnssecUdpSize = 1220
     MinDnssecUdpSize = 4096
-    DefaultUDPSize = MinDnssecUdpSize
+    DefaultUDPSize = 1232
 
     class EventType
       RECEIVED = 0
@@ -128,7 +128,9 @@ module Dnsruby
     #  Should the Recursion Desired bit be set?
     attr_reader :recurse
 
-    #  The maximum UDP size to be used
+    # The advertised UDP response size, defaulting to 1232 bytes. Larger sizes
+    # may be configured explicitly. Truncated responses are retried over TCP
+    # unless no_tcp or ignore_truncation is set.
     attr_reader :udp_size
 
     #  The current Config
@@ -470,6 +472,7 @@ module Dnsruby
                 send(key.to_s + '=', args[0][key])
               end
             rescue Exception => e
+              raise if key.to_s == 'tsig'
               Dnsruby.log.error{"Argument #{key} not valid : #{e}\n"}
             end
           end
@@ -753,10 +756,13 @@ module Dnsruby
     #  Pass in either a Dnsruby::RR::TSIG, or a key_name and key (or just a key)
     #  Pass in nil to stop tsig signing.
     #  * res.tsig=(tsig_rr)
-    #  * res.tsig=(key_name, key) # defaults to hmac-md5
-    #  * res.tsig=(key_name, key, alg) # e.g. alg = 'hmac-sha1'
+    #  Update MD5 server keys to SHA-256 when upgrading from 1.74.0, or select
+    #  hmac-md5 explicitly for a legacy server. MD5 use logs a warning.
+    #  * res.tsig = key_name, key # defaults to hmac-sha256
+    #  * res.tsig = key_name, key, algorithm # must match the server's key
     #  * res.tsig=nil # Stop the resolver from signing
     def tsig=(t)
+      Resolver.get_tsig([t]) unless t.nil?
       @tsig = t
       update
     end
@@ -792,9 +798,11 @@ module Dnsruby
           return nil
         end
       else
-        tsig = RR.new_from_hash(create_tsig_options(args))
+        tsig = RR.new_from_hash(create_tsig_options(*args))
       end
-      Dnsruby.log.info{"TSIG signing now using #{tsig.name}, key=#{tsig.key}"}
+      raise ArgumentError, 'Expected a TSIG record or a key name, secret and optional algorithm' unless tsig
+      tsig.warn_if_legacy_algorithm
+      Dnsruby.log.info{"TSIG signing now using #{tsig.name} (#{tsig.algorithm})"}
       tsig
     end
 
@@ -843,8 +851,8 @@ module Dnsruby
       @dnssec = d
       if d
         #  Set the UDP size (RFC 4035 section 4.1)
-        if @udp_size < MinDnssecUdpSize
-          self.udp_size = MinDnssecUdpSize
+        if @udp_size < AbsoluteMinDnssecUdpSize
+          self.udp_size = AbsoluteMinDnssecUdpSize
         end
       end
       update
@@ -935,13 +943,17 @@ module Dnsruby
 
       # According to RFC 6891, a UDP payload size >512 bytes requires an
       # EDNS OPT RR in the message.
-      if @parent.udp_size > 512 && !msg.get_opt
+      if @parent.udp_size > 512 && !msg.get_opt && !msg.send_raw && !msg.signed? && !msg.tsig
         TheLog.debug("Automatically adding EDNS OPT RR for udp_size=#{ @parent.udp_size }")
         msg.add_additional(Dnsruby::RR::OPT.new(@parent.udp_size))
       end
 
       begin
-        if msg.encode.bytesize > 65_535
+        # Encoding may sign the Message, even for this size check. Set the
+        # header and EDNS options first so the signature covers the final query.
+        sender = @parent.single_resolvers.first
+        wire = sender ? sender.make_query_packet(msg) : msg.encode
+        if wire.bytesize > 65_535
           raise EncodeError, 'DNS message exceeds the 65535-byte wire limit'
         end
       rescue EncodeError => err
@@ -1051,6 +1063,10 @@ module Dnsruby
       #       }
       #  Return the response to the client
       client_queue.push([client_query_id, msg, error])
+    rescue ClosedQueueError
+      # The query and its observers are already removed. A closed client queue
+      # must not stop the shared selector thread.
+      Dnsruby.log.debug { "Discarding completion for closed client queue" }
     end
 
     #  This method is called twice a second from the select loop, in the select thread.

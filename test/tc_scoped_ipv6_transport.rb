@@ -51,14 +51,15 @@ class TestScopedIPv6Transport < Minitest::Test
         true
       end
 
-      connector = lambda do |host, port, source, source_port, **options|
+      connector = lambda do |host, port, source, source_port, deadline, token|
         assert_equal [server, 5300, '::', 55000], [host, port, source, source_port]
-        assert_operator options[:connect_timeout], :>, 0
-        assert_operator options[:connect_timeout], :<=, sender.packet_timeout
+        assert_operator deadline - Dnsruby::TransportClock.now, :>, 0
+        refute token.cancelled?
+        assert_operator deadline - Dnsruby::TransportClock.now, :<=, sender.packet_timeout
         socket
       end
       Dnsruby::SelectThread.stub(:instance, selector) do
-        Socket.stub(:tcp, connector) do
+        sender.stub(:connect_tcp, connector) do
           sender.send_dnsruby(bytes, message, :tcp_scope, Queue.new, true)
         end
       end
@@ -78,14 +79,15 @@ class TestScopedIPv6Transport < Minitest::Test
         assert_equal [5300, server], [port, host]
         target
       end
-      connector = lambda do |host, port, local_address, local_port, **options|
+      connector = lambda do |host, port, local_address, local_port, deadline, token|
         assert_equal [server, 5300, source, 0], [host, port, local_address, local_port]
-        assert_operator options[:connect_timeout], :>, 0
-        assert_operator options[:connect_timeout], :<=, sender.packet_timeout
+        assert_operator deadline - Dnsruby::TransportClock.now, :>, 0
+        refute token.cancelled?
+        assert_operator deadline - Dnsruby::TransportClock.now, :<=, sender.packet_timeout
         socket
       end
       Socket.stub(:sockaddr_in, address_builder) do
-        Socket.stub(:tcp, connector) do
+        sender.stub(:connect_tcp, connector) do
           connected, new_socket = sender.tcp_pipeline_socket(0)
           assert_equal socket.object_id, connected.object_id
           assert new_socket
@@ -100,17 +102,18 @@ class TestScopedIPv6Transport < Minitest::Test
       [Errno::EADDRNOTAVAIL, Errno::ENETUNREACH].each do |error_class|
         sender = Dnsruby::PacketSender.new(server: server, port: 5300, src_port: 55000)
         error = error_class.new('unusable scoped source or destination')
-        connector = lambda do |host, port, source, source_port, **options|
+        connector = lambda do |host, port, source, source_port, deadline, token|
           assert_equal [server, 5300, '::', 55000], [host, port, source, source_port]
-          assert_operator options[:connect_timeout], :>, 0
-          assert_operator options[:connect_timeout], :<=, sender.packet_timeout
+          assert_operator deadline - Dnsruby::TransportClock.now, :>, 0
+          refute token.cancelled?
+          assert_operator deadline - Dnsruby::TransportClock.now, :<=, sender.packet_timeout
           raise error
         end
 
-        # Socket.tcp owns and closes a socket whose bind/connect fails. The
-        # sender must not retain a pipeline or usage count for that failure.
+        # The connector closes the socket if bind or connect fails.
+        # The sender must also clear its pipeline and usage count.
         Socket.stub(:sockaddr_in, 'scoped destination') do
-          Socket.stub(:tcp, connector) do
+          sender.stub(:connect_tcp, connector) do
             assert_same error, assert_raises(error_class) { sender.tcp_pipeline_socket(55000) }
           end
         end

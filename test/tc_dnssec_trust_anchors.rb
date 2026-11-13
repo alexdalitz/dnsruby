@@ -67,6 +67,31 @@ class DnssecTrustAnchorsTest < Minitest::Test
     end
   end
 
+  def test_verify_rrset_accepts_a_single_ds_or_dlv_without_bypassing_authentication
+    Time.stub(:now, FIXTURE_TIME) do
+      [Dnsruby::SingleVerifier::VerifierType::ROOT, Dnsruby::SingleVerifier::VerifierType::DLV].each do |mode|
+        type = mode == Dnsruby::SingleVerifier::VerifierType::DLV ? 'DLV' : 'DS'
+        ds = Dnsruby::RR.create(ROOT_DS.last.sub(' DS ', " #{type} "))
+        [ds, Dnsruby::RRSet.new([ds])].each do |keys|
+          verifier = Dnsruby::SingleVerifier.new(mode)
+          assert(verifier.verify_rrset(@root_keys, keys), "#{mode}: #{keys.class}")
+        end
+
+        wrong_digest = Dnsruby::RR.create(ROOT_DS.last.sub(' DS ', " #{type} ").sub('683D', '0000'))
+        verifier = Dnsruby::SingleVerifier.new(mode)
+        assert_raises(Dnsruby::VerifyError) { verifier.verify_rrset(@root_keys, wrong_digest) }
+        assert_empty(verifier.get_keys_to_check)
+
+        corrupted = read_fixture('root-dnskey')
+        signature = corrupted.sigs.first.signature.dup
+        signature.setbyte(0, signature.getbyte(0) ^ 1)
+        corrupted.sigs.first.signature = signature
+        verifier = Dnsruby::SingleVerifier.new(mode)
+        assert_raises(Dnsruby::VerifyError) { verifier.verify_rrset(corrupted, ds) }
+      end
+    end
+  end
+
   def test_corrupted_signature_is_rejected_with_cold_and_warm_caches
     Time.stub(:now, FIXTURE_TIME) do
       verifier = Dnsruby::Dnssec.root_verifier

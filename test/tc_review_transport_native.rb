@@ -75,6 +75,155 @@ class ReviewTransportNativeTest < Minitest::Test
     end
   end
 
+  def test_caller_opt_receives_a_reply_larger_than_the_configured_udp_default
+    [false, true].each do |dnssec|
+      port, requests = udp_server do |request|
+        reply = response(request, 'placeholder')
+        reply.answer.first.strings = Array.new(7) { 'x' * 240 }
+        reply
+      end
+      resolver = resolver_for(port, udp_size: 1232, dnssec: dnssec, do_caching: false)
+      request = Dnsruby::Message.new('large-opt.example.', 'TXT')
+      request.do_caching = request.do_validation = false
+      option = Dnsruby::RR::OPT::Option.new(65000, 'opaque'.b)
+      request.add_additional(Dnsruby::RR::OPT.new(4096, 0, [option]))
+      reply = Timeout.timeout(6) { resolver.send_message(request) }
+      refute(reply.cached, 'each variant must receive its own UDP reply')
+      assert_equal(Array.new(7) { 'x' * 240 }, reply.answer.first.strings)
+      assert_operator(reply.answersize, :>, 1232)
+      assert_operator(reply.answersize, :<=, 4096)
+      sent = requests.pop(true)
+      assert_equal(4096, sent.get_opt.payloadsize)
+      assert_equal([[65000, 'opaque']], sent.get_opt.options(nil).map { |opt| [opt.code, opt.data] })
+      assert_equal(1232, resolver.udp_size)
+      assert_empty(requests)
+    end
+  end
+
+  def test_authenticated_badtime_and_badtrunc_errors_are_delivered_after_forged_errors
+    [18, 22].each do |error_code|
+      key = tsig_key
+      port, requests = udp_server do |request|
+        reply = response(request, 'server error')
+        reply.header.rcode = Dnsruby::RCode::NOTAUTH
+        signer = key.dup
+        signer.error = error_code
+        signer.time_signed = request.tsig.time_signed
+        if error_code == 18
+          signer.other_data = [0, Time.now.to_i + 3600].pack('nN')
+          signer.other_size = 6
+        end
+        signature = signer.generate(reply, request)
+        reply.add_additional(signature)
+        valid = reply.encode
+        forged = Dnsruby::Message.decode(valid)
+        forged.tsig.mac = forged.tsig.mac.dup
+        forged.tsig.mac.setbyte(0, forged.tsig.mac.getbyte(0) ^ 1)
+        [forged.encode, valid]
+      end
+      resolver = resolver_for(port, do_caching: false)
+      resolver.tsig = key
+      error = assert_raises(Dnsruby::TsigError) { query(resolver) }
+      assert_includes(error.message, error_code == 18 ? 'BADTIME' : 'BADTRUNC')
+      assert_equal(1, requests.size, 'authenticated error should complete the original transaction')
+    end
+  end
+
+  def test_default_udp_advertisement_retries_truncated_responses_over_tcp
+    [false, true].each do |dnssec|
+      port, udp_requests = udp_server do |request|
+        reply = response(request, 'truncated')
+        reply.header.tc = true
+        reply
+      end
+      tcp = TCPServer.new('127.0.0.1', port)
+      @sockets << tcp
+      tcp_requests = Queue.new
+      worker do
+        client = tcp.accept
+        begin
+          request = read_frame(client)
+          tcp_requests << request
+          reply = response(request, 'complete')
+          reply.answer.first.strings = Array.new(7) { 'x' * 240 }
+          write_frame(client, reply)
+        ensure
+          client.close
+        end
+      end
+      resolver = resolver_for(port, dnssec: dnssec, do_caching: false)
+      request = Dnsruby::Message.new('truncated.example.', 'TXT')
+      request.do_caching = request.do_validation = false
+      reply = Timeout.timeout(6) { resolver.send_message(request) }
+      refute(reply.cached)
+      refute(reply.header.tc)
+      assert_equal(Array.new(7) { 'x' * 240 }, reply.answer.first.strings)
+      assert_operator(reply.encode.bytesize, :>, 1232)
+      assert_equal(1232, resolver.udp_size)
+      udp_request = udp_requests.pop(true)
+      tcp_request = tcp_requests.pop(true)
+      assert_equal(1232, udp_request.get_opt.payloadsize)
+      assert_equal(dnssec, udp_request.get_opt.dnssec_ok)
+      assert_equal(udp_request.header.id, tcp_request.header.id)
+      assert_equal(udp_request.question, tcp_request.question)
+      assert_empty(udp_requests)
+      assert_empty(tcp_requests)
+    end
+  end
+
+  def test_message_and_resolver_keys_authenticate_edns_and_tcp_retries
+    [false, true].product([:message, :resolver]).each do |dnssec, key_source|
+      key = tsig_key
+      received = 0
+      observed = Queue.new
+      port, = udp_server do |request, bytes|
+        signature = request.tsig
+        raise 'invalid UDP request MAC' unless signature &&
+          key.generate(request, nil, '', bytes, signature).mac == signature.mac
+        observed << [:udp, request.get_opt]
+        reply = response(request, 'retry')
+        reply.header.rcode = Dnsruby::RCode::FORMERR if received.zero?
+        reply.header.tc = true unless received.zero?
+        received += 1
+        key.apply(reply, request)
+        reply
+      end
+      tcp = TCPServer.new('127.0.0.1', port)
+      @sockets << tcp
+      worker do
+        client = tcp.accept
+        begin
+          length = client.read(2).unpack1('n')
+          bytes = client.read(length)
+          request = Dnsruby::Message.decode(bytes)
+          signature = request.tsig
+          raise 'invalid TCP request MAC' unless signature &&
+            key.generate(request, nil, '', bytes, signature).mac == signature.mac
+          observed << [:tcp, request.get_opt]
+          reply = response(request, 'authenticated')
+          key.apply(reply, request)
+          write_frame(client, reply)
+        ensure
+          client.close
+        end
+      end
+      resolver = resolver_for(port, dnssec: dnssec, do_caching: false)
+      request = Dnsruby::Message.new('signed-retry.example.', 'TXT')
+      request.header.rd = false
+      request.do_caching = request.do_validation = false
+      key_source == :message ? request.set_tsig(key) : resolver.tsig = key
+      reply = Timeout.timeout(6) { resolver.send_message(request) }
+      assert(reply.verified?)
+      assert_equal(['authenticated'], reply.answer.first.strings)
+      attempts = 3.times.map { observed.pop(true) }
+      assert_equal([:udp, :udp, :tcp], attempts.map(&:first))
+      assert_equal([true, false, false], attempts.map { |_, opt| !!opt })
+      assert_equal(1232, attempts.first.last.payloadsize)
+      assert_equal(dnssec, attempts.first.last.dnssec_ok)
+      assert_empty(observed)
+    end
+  end
+
   def test_explicit_tcp_edns_retry_stays_on_tcp
     server = TCPServer.new('127.0.0.1', 0)
     @sockets << server
@@ -170,7 +319,7 @@ class ReviewTransportNativeTest < Minitest::Test
         bytes, peer = socket.recvfrom(65_535)
         request = Dnsruby::Message.decode(bytes)
         requests << request
-        replies = handler.call(request)
+        replies = handler.call(request, bytes)
         replies = [replies] unless replies.is_a?(Array)
         replies.each do |reply|
           bytes = reply.is_a?(String) ? reply : reply.encode
@@ -183,7 +332,7 @@ class ReviewTransportNativeTest < Minitest::Test
 
   def resolver_for(port, options = {})
     resolver = Dnsruby::Resolver.new({nameserver: '127.0.0.1', port: port,
-      dnssec: false, do_validation: false, udp_size: 512,
+      dnssec: false, do_validation: false,
       packet_timeout: 1, query_timeout: 3, retry_times: 1}.merge(options))
     @resolvers << resolver
     resolver

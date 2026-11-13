@@ -168,6 +168,9 @@ class MessageDecoder #:nodoc: all
   def get_rr
     name = get_name
     type, klass, ttl = get_unpack('nnN')
+    if type == Types::TSIG && (klass != Classes::ANY || ttl != 0)
+      raise DecodeError.new('TSIG requires class ANY and TTL zero (RFC 8945 section 4.2)')
+    end
     klass = Classes.new(klass)
     typeclass = RR.get_class(type, klass)
     #  @TODO@ Trap decode errors here, and somehow mark the record as bad.

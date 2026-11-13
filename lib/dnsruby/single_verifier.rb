@@ -787,6 +787,9 @@ module Dnsruby
       raise ArgumentError.new("Expecting DNSKEY, DLV, DS, RRSet, Array or nil for keys : got #{keys.class} instead") if
       (keys && (![Array, RR::IN::DNSKEY, RR::IN::DLV, RR::IN::DS].include?keys.class) && (keys.class != RRSet))
 
+      # Wrap a single DS or DLV record so it uses the RRSet key-matching code.
+      keys = RRSet.new([keys]) if [RR::IN::DS, RR::IN::DLV].include?(keys.class)
+
       if (rrset.type == Types.DNSKEY)
         if (keys && !(Array === keys) && ((keys.type == Types.DS) || ((keys.type == Types.DLV) && (@verifier_type == VerifierType::DLV))))
           rrset.rrs.each do |key|

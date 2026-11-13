@@ -59,7 +59,7 @@ class TestReleaseTransport < Minitest::Test
       entered, release, connected = Queue.new, Queue.new, Queue.new
       first_socket, second_socket = FrameSocket.new, FrameSocket.new
       calls = 0
-      Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+      Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **kwargs|
         calls += 1
         if calls == 1
           entered << true
@@ -115,7 +115,7 @@ class TestReleaseTransport < Minitest::Test
   def test_pipeline_collision_rotates_stream_without_modifying_raw_signed_requests
     isolated(<<~'RUBY')
       sockets = []
-      Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+      Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **kwargs|
         FrameSocket.new.tap do |socket|
           socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
           sockets << socket
@@ -152,7 +152,7 @@ class TestReleaseTransport < Minitest::Test
       SELECTOR.singleton_class.remove_method(:notify_queue_observers)
       entered, release = Queue.new, Queue.new
       sockets = []
-      Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+      Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **kwargs|
         socket = FrameSocket.new
         socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
         sockets << socket
@@ -196,7 +196,7 @@ class TestReleaseTransport < Minitest::Test
     isolated(<<~'RUBY')
       SELECTOR.singleton_class.remove_method(:notify_queue_observers)
       sockets = []
-      Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+      Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **kwargs|
         FrameSocket.new.tap do |socket|
           socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
           sockets << socket
@@ -244,7 +244,7 @@ class TestReleaseTransport < Minitest::Test
 
   def test_closed_pipeline_accounting_stays_bounded
     isolated(<<~'RUBY')
-      Socket.define_singleton_method(:tcp) { |*args, **kwargs| FrameSocket.new }
+      Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **kwargs| FrameSocket.new }
       writer = Dnsruby::PacketSender.new(server: '127.0.0.1', tcp_pipelining: true)
       100.times do
         socket, fresh = writer.tcp_pipeline_socket(0)
@@ -360,7 +360,7 @@ class TestReleaseTransport < Minitest::Test
     isolated(<<~'RUBY')
       [true, false].each do |keep_peer|
         sockets = []
-        Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+        Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **kwargs|
           FrameSocket.new.tap do |socket|
             socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
             sockets << socket
@@ -419,7 +419,7 @@ class TestReleaseTransport < Minitest::Test
   def test_timeout_without_partial_bytes_rotates_before_reusing_a_header_id
     isolated(<<~'RUBY')
       sockets = []
-      Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+      Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **kwargs|
         FrameSocket.new.tap do |socket|
           socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
           sockets << socket
@@ -444,7 +444,7 @@ class TestReleaseTransport < Minitest::Test
     isolated(<<~'RUBY')
       SELECTOR.singleton_class.remove_method(:notify_queue_observers)
       sockets = []
-      Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+      Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **kwargs|
         FrameSocket.new.tap do |socket|
           socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
           sockets << socket
@@ -482,7 +482,7 @@ class TestReleaseTransport < Minitest::Test
     isolated(<<~'RUBY')
       [[2, 3], [3, 2], [:infinite, 2], [2, :infinite], [3, 1]].each do |before, after|
         sockets = []
-        Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+        Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **kwargs|
           FrameSocket.new.tap do |socket|
             socket.define_singleton_method(:connect) { |_| raise Errno::EISCONN }
             sockets << socket
@@ -543,7 +543,7 @@ class TestReleaseTransport < Minitest::Test
       [true, false].each do |pipeline|
         calls = 0
         socket = FrameSocket.new
-        Socket.define_singleton_method(:tcp) do |*args, **kwargs|
+        Dnsruby::PacketSender.define_method(:connect_tcp) do |*args, **kwargs|
           calls += 1
           raise Errno::EADDRINUSE if calls == 1
           socket
@@ -596,7 +596,7 @@ class TestReleaseTransport < Minitest::Test
       SELECTOR.singleton_class.remove_method(:notify_queue_observers)
       [true, false].each do |pipeline|
         calls = 0
-        Socket.define_singleton_method(:tcp) { |*args, **kwargs| calls += 1; raise Errno::ETIMEDOUT }
+        Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **kwargs| calls += 1; raise Errno::ETIMEDOUT }
         resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1', use_tcp: true,
           tcp_pipelining: pipeline, dnssec: false, retry_times: 2, retry_delay: 10)
         queue = Queue.new
@@ -637,7 +637,7 @@ class TestReleaseTransport < Minitest::Test
   def test_worker_failure_after_connect_releases_an_unregistered_socket
     isolated(<<~'RUBY')
       socket = FrameSocket.new
-      Socket.define_singleton_method(:tcp) { |*args, **kwargs| socket }
+      Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **kwargs| socket }
       writer = Dnsruby::PacketSender.new(server: '127.0.0.1', use_tcp: true, dnssec: false)
       failure = RuntimeError.new('unexpected registration failure')
       construct = K::QuerySettings.method(:new)

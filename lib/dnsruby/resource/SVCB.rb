@@ -48,9 +48,10 @@ module Dnsruby
       # Keys defined to carry no value at all: no-default-alpn and ohttp.
       KEYS_FORBIDDING_VALUE = [2, 8].freeze
 
-      # RFC 9460 sections 7.2, 7.3 and 8 prohibit presentation escapes for
-      # these mnemonics. Numeric keyNNNNN values still use generic octets.
-      KEYS_FORBIDDING_ESCAPES = [0, 3, 4, 6].freeze
+      # RFC 9460 sections 7.2, 7.3 and 8, and RFC 9848 section 3, prohibit
+      # escapes in these named parameters. Numeric keyNNNNN values still
+      # use the generic byte format.
+      KEYS_FORBIDDING_ESCAPES = [0, 3, 4, 5, 6].freeze
 
       # RFC 9460 sec 14.3.2 reserves 65535 as an invalid SvcParamKey.
       INVALID_KEY = 0xffff
@@ -71,10 +72,8 @@ module Dnsruby
       # SvcParamValue in wire format. See #params_to_hash for a readable view.
       attr_accessor :params
 
-      # TYPE64/TYPE65 were formerly generic records. Preserve their raw RDATA
-      # interface alongside the parsed fields, computing bytes on demand so
-      # changes to the target or publicly mutable params cannot leave a cache
-      # out of date.
+      # Keep the binary RDATA interface provided for TYPE64/TYPE65 in 1.74.0.
+      # Compute bytes on demand so they reflect changes to target or params.
       def data
         MessageEncoder.new { |encoder| encode_rdata(encoder) }.to_s
       end
@@ -208,8 +207,8 @@ module Dnsruby
         end
 
         msg.put_pack('n', @priority)
-        # RFC 9460 sec 2.2: the TargetName MUST NOT be compressed. RFC 6840 sec
-        # 5.1: nor downcased for DNSSEC, SVCB post-dating RFC 4034.
+        # TargetName is never compressed (RFC 9460 section 2.2). Its case is
+        # preserved in canonical RDATA for DNSSEC (RFC 3597 section 7).
         msg.put_name(@target, true, false)
         params.sort_by(&:first).each do |num, value|
           msg.put_pack('n', num)
@@ -250,9 +249,9 @@ module Dnsruby
         end
         validate_svcparams(priority, params)
         record = new([priority, target, params])
-        # RR keeps construction-time metadata in @rdata. Preserve the former
-        # generic record's raw String for reflective consumers such as JSONDNS;
-        # the public data/rdata readers still derive current bytes from fields.
+        # Keep the original bytes in @rdata for callers such as JSONDNS that
+        # read it directly. The public data/rdata readers rebuild the bytes
+        # from the current fields.
         record.instance_variable_set(:@rdata, msg.data.byteslice(start, msg.index - start).b)
         record
       end

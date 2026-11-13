@@ -48,7 +48,7 @@ tsig = Dnsruby::RR.create({
         :type        => "TSIG",
         :ttl         => 0,
         :klass       => "ANY",
-        :algorithm   => "hmac-md5",
+        :algorithm   => "hmac-sha256", # must match the server's key configuration
         :fudge       => 300,
         :key         => "8n6gugn4aJ7MazyNlMccGKH1WxD2B3UvN/O/RA6iBupO2/03u9CTa3Ewz3gBWTSBCH3crY4Kk+tigNdeJBAvrw==",
         :error       => 0

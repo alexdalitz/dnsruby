@@ -44,8 +44,7 @@ class TestPipelineSend < Minitest::Test
         @on_write.call(bytes, count) if @on_write
         count
       end
-      # Old implementations use send twice; retaining it makes the fast-reply
-      # regression fail for the actual original ordering, not a missing method.
+      # Datagram sends share the byte buffer used by stream writes.
       def send(bytes, _flags); write_nonblock(bytes); end
       def recv_nonblock(length)
         raise IOError, 'closed stream' if closed?
@@ -256,7 +255,7 @@ class TestPipelineSend < Minitest::Test
       socket.close
       writer = sender(socket)
       writer.tcp_pipelining = false
-      Socket.define_singleton_method(:tcp) { |*args, **kwargs| socket }
+      Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **kwargs| socket }
       q, queue = query, Queue.new
       writer.send_dnsruby(q.encode, q, :closed, queue, true)
       drain_errors
@@ -356,7 +355,7 @@ class TestPipelineSend < Minitest::Test
         [false, true].each do |pipeline|
           socket = FrameSocket.new
           socket.define_singleton_method(:write_nonblock) { |_| raise IO::EAGAINWaitWritable }
-          Socket.define_singleton_method(:tcp) { |*args, **options| socket }
+          Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **options| socket }
           IO.define_singleton_method(:select) { |*| nil }
           writer = Dnsruby::PacketSender.new(server: '127.0.0.1', use_tcp: true,
             tcp_pipelining: pipeline, dnssec: false, packet_timeout: 0.05)
@@ -525,7 +524,7 @@ class TestPipelineSend < Minitest::Test
             end
             socket
           end
-          Socket.define_singleton_method(:tcp) { |*args, **kwargs| connect.call }
+          Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **kwargs| connect.call }
           writer.define_singleton_method(:tcp_pipeline_socket) { |_| [connect.call, true] }
           if phase == :write
             first = true
@@ -573,7 +572,7 @@ class TestPipelineSend < Minitest::Test
         SELECTOR.add_to_select(old)
         entered, release = Queue.new, Queue.new
         connect = -> { entered << true; release.pop; socket }
-        Socket.define_singleton_method(:tcp) { |*args, **kwargs| connect.call }
+        Dnsruby::PacketSender.define_method(:connect_tcp) { |*args, **kwargs| connect.call }
         writer.define_singleton_method(:tcp_pipeline_socket) { |_| [connect.call, true] }
         K.class_variable_set(:@@select_thread, Thread.current)
         Thread.current[:dnsruby_response_query] = old

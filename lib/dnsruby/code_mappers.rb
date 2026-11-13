@@ -2,6 +2,31 @@ module Dnsruby
 
   require 'dnsruby/code_mapper'
 
+  # DNS types and classes are unsigned 16-bit values. Other CodeMapper
+  # subclasses may use different value types or ranges.
+  module RRCodeRange #:nodoc: all
+    def self.check(code)
+      unless code.is_a?(Integer) && code.between?(0, 0xffff)
+        raise ArgumentError, "DNS type/class code must be an integer in 0..65535, got #{code.inspect}"
+      end
+      code
+    end
+
+    def initialize(arg)
+      super
+      # Registered names and copies of mutable mapper objects need checking too.
+      RRCodeRange.check(@code)
+      if arg.is_a?(self.class) && arg.string.is_a?(String) &&
+          self.class.to_code(arg.string).nil? &&
+          (is_a?(Classes) ? /\ACLASS\d+\z/i : /\ATYPE\d+\z/i).match?(arg.string)
+        # Keep unregistered numeric spellings on the copy. Registered names
+        # use the current preferred alias from CodeMapper.
+        @string = arg.string
+      end
+    end
+  end
+  private_constant :RRCodeRange
+
   class OpCode < CodeMapper
     Query = 0        # RFC 1035
     IQuery = 1        # RFC 1035
@@ -42,6 +67,8 @@ module Dnsruby
   end
 
   class Classes < CodeMapper
+    include RRCodeRange
+
     IN        = 1       # RFC 1035
     CH        = 3       # RFC 1035
     #     CHAOS        = 3       # RFC 1035
@@ -52,16 +79,20 @@ module Dnsruby
     update()
 
     def unknown_string(arg)
-      if (arg=~/^CLASS/i)
-        Classes.add_pair(arg, arg.gsub('CLASS', '').to_i)
-        set_string(arg)
+      if (match = /\ACLASS(\d+)\z/i.match(arg))
+        # Store one name per code so case and leading-zero variants cannot
+        # fill the global mapping table.
+        unknown_code(match[1].to_i)
+        # Keep the supplied spelling on this object without registering it.
+        @string = arg.dup.freeze
       else
         raise ArgumentError.new("String #{arg} not a member of #{self.class}")
       end
     end
 
     def unknown_code(arg)
-      Classes.add_pair('CLASS' + arg.to_s, arg)
+      RRCodeRange.check(arg)
+      Classes.add_pair('CLASS' + arg.to_s, arg) unless Classes.to_string(arg)
       set_code(arg)
     end
 
@@ -73,37 +104,29 @@ module Dnsruby
       name = name.upcase
 
       if to_code(name)
-        return to_code(name)
+        return RRCodeRange.check(to_code(name))
       end
 
-      if ((name =~/^\s*CLASS(\d+)\s*$/o) == nil)
+      if ((name =~/\A\s*CLASS(\d+)\s*\z/o) == nil)
         raise ArgumentError, "classesbyval() argument is not CLASS### (#{name})"
       end
 
-      val = $1.to_i
-      if val > 0xffff
-        raise ArgumentError, 'classesbyval() argument larger than ' + 0xffff
-      end
-
-      return val;
+      RRCodeRange.check($1.to_i)
     end
 
 
 
     def Classes.classesbyval(val) #:nodoc: all
       if (val.class == String)
-        if ((val =~ /^\s*0*([0-9]+)\s*$/) == nil)
+        if ((val =~ /\A\s*([0-9]+)\s*\z/) == nil)
           raise ArgumentError,  "classesbybal() argument is not numeric (#{val})" # unless  val.gsub!("^\s*0*([0-9]+)\s*$", "$1")
           #           val =~ s/^\s*0*([0-9]+)\s*$/$1/o;#
         end
         val = $1.to_i
       end
 
-      return to_string(val) if to_string(val)
-
-      raise ArgumentError,  'classesbyval() argument larger than ' + 0xffff if val > 0xffff;
-
-      return "CLASS#{val}";
+      RRCodeRange.check(val)
+      to_string(val) || "CLASS#{val}"
     end
   end
 
@@ -111,6 +134,8 @@ module Dnsruby
   # 
   #  New RR types should be added to this set
   class Types < CodeMapper
+    include RRCodeRange
+
     SIGZERO   = 0       # RFC2931 consider this a pseudo type
     A         = 1       # RFC 1035, Section 3.4.1
     NS        = 2       # RFC 1035, Section 3.3.11
@@ -150,7 +175,7 @@ module Dnsruby
     KX        = 36      # RFC 2230
     CERT      = 37      # RFC 2538
     DNAME     = 39      # RFC 2672
-    OPT       = 41      # RFC 2671
+    OPT       = 41      # RFC 6891
     APL       = 42      # RFC 3123
     DS        = 43      # RFC 4034
     SSHFP     = 44      # RFC 4255
@@ -173,7 +198,7 @@ module Dnsruby
     GID       = 102     # non-standard
     UNSPEC    = 103     # non-standard
     TKEY      = 249     # RFC 2930
-    TSIG      = 250     # RFC 2931
+    TSIG      = 250     # RFC 8945, Section 4.1
     IXFR      = 251     # RFC 1995
     AXFR      = 252     # RFC 1035
     MAILB     = 253     # RFC 1035 (MB, MG, MR)
@@ -185,16 +210,18 @@ module Dnsruby
     update()
 
     def unknown_string(arg) #:nodoc: all
-      if (arg=~/^TYPE/i)
-        Types.add_pair(arg, arg.gsub('TYPE', '').to_i)
-        set_string(arg)
+      if (match = /\ATYPE(\d+)\z/i.match(arg))
+        # Store one name per code; keep alternate spellings on this object.
+        unknown_code(match[1].to_i)
+        @string = arg.dup.freeze
       else
         raise ArgumentError.new("String #{arg} not a member of #{self.class}")
       end
     end
 
     def unknown_code(arg) #:nodoc: all
-      Types.add_pair('TYPE' + arg.to_s, arg)
+      RRCodeRange.check(arg)
+      Types.add_pair('TYPE' + arg.to_s, arg) unless Types.to_string(arg)
       set_code(arg)
     end
 
@@ -208,20 +235,15 @@ module Dnsruby
       name = name.upcase
 
       if to_code(name)
-        return to_code(name)
+        return RRCodeRange.check(to_code(name))
       end
 
 
-      if ((name =~/^\s*TYPE(\d+)\s*$/o)==nil)
+      if ((name =~/\A\s*TYPE(\d+)\s*\z/o)==nil)
         raise ArgumentError, "Net::DNS::typesbyname() argument (#{name}) is not TYPE###"
       end
 
-      val = $1.to_i
-      if val > 0xffff
-        raise ArgumentError, 'Net::DNS::typesbyname() argument larger than ' + 0xffff
-      end
-
-      return val;
+      RRCodeRange.check($1.to_i)
     end
 
 
@@ -229,29 +251,17 @@ module Dnsruby
     #  code. If the TYPE mapping is not specified the generic mnemonic
     #  TYPE### is returned.
     def Types.typesbyval(val) #:nodoc: all
-      if (!defined?val)
-        raise ArgumentError,  "Net::DNS::typesbyval() argument is not defined"
-      end
-
       if val.class == String
-        #       if val.gsub!("^\s*0*(\d+)\s*$", "$1")
-        if ((val =~ /^\s*0*(\d+)\s*$", "$1/o) == nil)
+        if ((val =~ /\A\s*(\d+)\s*\z/) == nil)
           raise ArgumentError,  "Net::DNS::typesbyval() argument (#{val}) is not numeric"
-          #           val =~s/^\s*0*(\d+)\s*$/$1/o;
         end
 
         val = $1.to_i
       end
 
 
-      if to_string(val)
-        return to_string(val)
-      end
-
-      raise ArgumentError,  'Net::DNS::typesbyval() argument larger than ' + 0xffff if
-          val > 0xffff;
-
-      return "TYPE#{val}";
+      RRCodeRange.check(val)
+      to_string(val) || "TYPE#{val}"
     end
   end
 
@@ -266,8 +276,8 @@ module Dnsruby
 
   class MetaTypes < CodeMapper
     TKEY        = 249    # Transaction Key   [RFC2930]
-    TSIG        = 250    # Transaction Signature  [RFC2845]
-    OPT         = 41     # RFC 2671
+    TSIG        = 250    # Transaction Signature  [RFC8945]
+    OPT         = 41     # RFC 6891
   end
 
   #  http://www.iana.org/assignments/dns-sec-alg-numbers/
