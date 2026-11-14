@@ -226,7 +226,9 @@ class TestMalformedTcp < Minitest::Test
       sender.define_singleton_method(:no_tcp) { no_tcp }
       sender.define_singleton_method(:send_async) { |*| raise 'Unexpected UDP fallback' }
       settings.single_resolver = sender
-      packet = [settings.query.header.id, 0x8200, 1, 0, 0, 0].pack('n6')
+      packet = settings.query.encode
+      packet[2, 2] = [0x8200].pack('n')
+      packet[6, 2] = [1].pack('n') # A complete matching question, then a missing answer.
       socket.udp_response = [packet, ['AF_INET', 53, '127.0.0.1', '127.0.0.1']]
       @selector.stub(:tcp?, false) { assert_nil(@selector.get_incoming_data(socket, 512)) }
       assert_kind_of(Dnsruby::DecodeError, settings.client_queue.pop(true).last)

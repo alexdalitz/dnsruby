@@ -66,7 +66,7 @@ class DnssecTrustRacesTest < Minitest::Test
       # Stop after a real digest match, while check_ds_stores still owns its old
       # snapshot; removal must not block on cryptographic or network work.
       pause_after(discovered ? @ds_set.rrs.first : @ds, :check_key, -> { revoke(operation, anchor) }) do
-        verifier.check_ds_stores(@child_keys)
+        allow_revoked_trust_rejection { verifier.check_ds_stores(@child_keys) }
       end
       assert_empty(verifier.trusted_keys)
       assert_raises(Dnsruby::VerifyError) { verifier.verify(@child_keys) }
@@ -88,7 +88,7 @@ class DnssecTrustRacesTest < Minitest::Test
         keys
       end
       pause_after(verifier, :find_closest_anchor_for, -> { revoke(operation) }) do
-        verifier.validate(message, message)
+        allow_revoked_trust_rejection { verifier.validate(message, message) }
       end
       assert_empty(verifier.trusted_keys)
       assert_raises(Dnsruby::VerifyError) { Dnsruby::Dnssec.verify(@keys) }
@@ -96,6 +96,13 @@ class DnssecTrustRacesTest < Minitest::Test
   end
 
   private
+
+  # The pause guarantees revocation occurs after the operation has captured
+  # trust. It may then finish or reject; neither outcome may publish trust.
+  def allow_revoked_trust_rejection
+    yield
+  rescue Dnsruby::VerifyError
+  end
 
   def revoke(operation, key = @key)
     operation == :remove ? Dnsruby::Dnssec.remove_trust_anchor(key) : Dnsruby::Dnssec.clear_trust_anchors

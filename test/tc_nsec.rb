@@ -126,50 +126,9 @@ class NsecTest < Minitest::Test
     end
   end
 
-  def test_examples_from_rfc_4035_wildcard_expansion
-    #  Grab the example responses from RFC4035 and make sure that they pass.
-    #  Then, try changing some of the NSEC values (ignoring the RRSIGs for now)
-    #  and make sure that they fail verification for that reason
-    m = Message.new
-    m.header.rcode =
-      m.add_question(Question.new("a.z.w.example.", Types.MX))
-    m.add_answer(RR.create("a.z.w.example. 3600 IN MX  1 ai.example."))
-    m.add_answer(RR.create("a.z.w.example. 3600 RRSIG  MX 5 4 3600 20040509183619 (
-                              20040409183619 38519 example.
-                              OMK8rAZlepfzLWW75Dxd63jy2wswESzxDKG2
-                              f9AMN1CytCd10cYISAxfAdvXSZ7xujKAtPbc
-                              tvOQ2ofO7AZJ+d01EeeQTVBPq4/6KCWhqe2X
-                              TjnkVLNvvhnc0u28aoSsG0+4InvkkOHknKxw
-                              4kX18MMR34i8lC36SR5xBni8vHI= )"))
-    m.add_authority(RR.create("x.y.w.example. 3600 NSEC   xx.example. MX RRSIG NSEC"))
-    begin
-      Dnssec.anchor_verifier.verify_nsecs(m)
-      fail("Should have failed with bad number of labels in RRSIG")
-    rescue VerifyError
-    end
-    m.answer.delete(RR.create("a.z.w.example. 3600 RRSIG  MX 5 4 3600 20040509183619 (
-                              20040409183619 38519 example.
-                              OMK8rAZlepfzLWW75Dxd63jy2wswESzxDKG2
-                              f9AMN1CytCd10cYISAxfAdvXSZ7xujKAtPbc
-                              tvOQ2ofO7AZJ+d01EeeQTVBPq4/6KCWhqe2X
-                              TjnkVLNvvhnc0u28aoSsG0+4InvkkOHknKxw
-                              4kX18MMR34i8lC36SR5xBni8vHI= )"))
-    m.add_answer(RR.create("a.z.w.example. 3600 RRSIG  MX 5 2 3600 20040509183619 (
-                              20040409183619 38519 example.
-                              OMK8rAZlepfzLWW75Dxd63jy2wswESzxDKG2
-                              f9AMN1CytCd10cYISAxfAdvXSZ7xujKAtPbc
-                              tvOQ2ofO7AZJ+d01EeeQTVBPq4/6KCWhqe2X
-                              TjnkVLNvvhnc0u28aoSsG0+4InvkkOHknKxw
-                              4kX18MMR34i8lC36SR5xBni8vHI= )"))
-    Dnssec.anchor_verifier.verify_nsecs(m)
-    m.authority.delete(RR.create("x.y.w.example. 3600 NSEC   xx.example. MX RRSIG NSEC"))
-    m.add_authority(RR.create("x.y.w.example. 3600 NSEC   z.w.example. MX RRSIG NSEC"))
-    begin
-      Dnssec.anchor_verifier.verify_nsecs(m)
-      fail("Should have failed with bad NSEC")
-    rescue VerifyError
-    end
-  end
+  # Positive wildcard expansion from RFC 4035 is covered by
+  # DnssecWildcardProofsTest#test_examples_from_rfc_4035_wildcard_expansion,
+  # where both the answer and its denial proof undergo signature verification.
 
   def test_examples_from_rfc_4035_wildcard_no_data
     #  Grab the example responses from RFC4035 and make sure that they pass.

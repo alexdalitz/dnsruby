@@ -107,6 +107,21 @@ module Dnsruby
         end
       end
 
+      # RFC 3597 section 6 compares names inside newer RDATA formats as
+      # octets. RR's normal equality already compares priority and params,
+      # but Name equality deliberately ignores case. Keep the usual RR
+      # behavior (including ignoring TTL), with this additional distinction.
+      # Comparing labels also works for unfinished records used by UPDATE.
+      def ==(other)
+        super && (@target.nil? ||
+          @target.labels.map(&:string) == other.target.labels.map(&:string))
+      end
+      alias eql? ==
+
+      def hash
+        super ^ (@target ? @target.labels.map(&:string).hash : 0)
+      end
+
       def from_hash(hash) #:nodoc: all
         if hash.key?(:data) && hash.key?(:rdata) && hash[:data] != hash[:rdata]
           raise DecodeError, 'SVCB data and rdata must agree when both are supplied'

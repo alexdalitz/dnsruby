@@ -322,6 +322,7 @@ class RR
       ivars = object.instance_variables.map { |var| var.to_s }
       ivars.delete '@ttl' # RFC 2136 section 1.1
       ivars.delete '@rdata'
+      ivars.delete '@dnsruby_learned_trust' # Validation provenance is not wire data.
       if self.type == Types.DS
         ivars.delete '@digest'
       end
@@ -346,7 +347,7 @@ class RR
   end
 
   def hash # :nodoc:
-    vars = (self.instance_variables - [:@ttl, :@rdata]).sort
+    vars = (self.instance_variables - [:@ttl, :@rdata, :@dnsruby_learned_trust]).sort
     vars.inject(0) do |hash_value, var_name|
       hash_value ^ self.instance_variable_get(var_name).hash
     end

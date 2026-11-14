@@ -23,6 +23,37 @@ class SvcbSignedTargetTest < Minitest::Test
     end
   end
 
+  def test_case_distinct_targets_remain_separate_in_signed_rrsets
+    [64, 65].each do |type|
+      records = ['Foo.Example.COM.', 'foo.example.com.'].map do |target|
+        Dnsruby::RR.create(name: 'example.', type: type, ttl: 300,
+          priority: 1, target: target)
+      end
+      refute_equal(records.first, records.last)
+      refute(records.first.eql?(records.last))
+      assert_equal(2, records.to_h { |record| [record, true] }.length)
+
+      same_record = records.first.clone
+      same_record.ttl = 60
+      assert_equal(records.first, same_record, 'TTL must remain irrelevant to RR equality')
+      assert(records.first.eql?(same_record))
+      assert_equal(records.first.hash, same_record.hash)
+
+      # Sign both original records before any RRSet or Message can deduplicate
+      # them. The signature must cover both case-distinct RDATA byte strings.
+      signature = signature_for(records)
+      rrset = Dnsruby::RRSet.new(records + [signature])
+      assert_equal(2, rrset.rrs.length)
+      assert(@verifier.verify(rrset))
+
+      message = Dnsruby::Message.new('example.', type)
+      (records + [signature]).each { |record| message.add_answer(record) }
+      decoded = Dnsruby::Message.decode(message.encode)
+      assert_equal(3, decoded.answer.length)
+      assert(@verifier.verify(Dnsruby::RRSet.new(decoded.answer.to_a)))
+    end
+  end
+
   def test_signed_hash_constructor_preserves_string_and_name_targets
     [64, 65].each do |type|
       original, signature = signed_record(type)
@@ -87,15 +118,23 @@ class SvcbSignedTargetTest < Minitest::Test
   def signed_record(type)
     record = Dnsruby::RR.new_from_data('example.', type, Dnsruby::Classes::IN, 300,
       MIXED_CASE_RDATA.bytesize, MIXED_CASE_RDATA, 0)
-    now = Time.now.to_i
-    signature = Dnsruby::RR.create(name: record.name, type: 'RRSIG', ttl: 300,
-      type_covered: type, algorithm: 8, labels: 1, original_ttl: 300,
-      expiration: now + 3600, inception: now - 60, key_tag: @key.key_tag,
-      signers_name: 'example.')
-    canonical = Dnsruby::MessageEncoder.new { |encoder| encoder.put_rr(record, true) }.to_s
-    signature.signature = @rsa.sign(OpenSSL::Digest::SHA256.new, signature.sig_data + canonical)
+    signature = signature_for([record])
     assert(@verifier.verify(Dnsruby::RRSet.new([record, signature])), 'original wire record must verify')
     [record, signature]
+  end
+
+  def signature_for(records)
+    record = records.first
+    now = Time.now.to_i
+    signature = Dnsruby::RR.create(name: record.name, type: 'RRSIG', ttl: 300,
+      type_covered: record.type, algorithm: 8, labels: 1, original_ttl: 300,
+      expiration: now + 3600, inception: now - 60, key_tag: @key.key_tag,
+      signers_name: 'example.')
+    canonical = records.sort_by(&:rdata).map do |rr|
+      Dnsruby::MessageEncoder.new { |encoder| encoder.put_rr(rr, true) }.to_s
+    end.join
+    signature.signature = @rsa.sign(OpenSSL::Digest::SHA256.new, signature.sig_data + canonical)
+    signature
   end
 
   def assert_signed_copy(original, copy, signature)

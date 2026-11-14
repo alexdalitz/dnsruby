@@ -33,11 +33,11 @@ module Dnsruby
     def add_key_with_expiration(k, expiration)
       priv_add_key(k, expiration)
     end
-    def add(k)
+    def add(k, expiration = nil)
       if (k == nil)
         return false
       elsif (k.instance_of?RRSet)
-        add_rrset(k)
+        add_rrset(k, expiration)
       elsif (k.kind_of?KeyCache)
         k.keys_and_expirations.each { |expiration, key|
           priv_add_key(key, expiration)
@@ -48,23 +48,19 @@ module Dnsruby
       return true
     end
 
-    def add_rrset(k)
-      #  Get expiration from the RRSIG
-      #  There can be several RRSIGs here, one for each key which has signed the RRSet
-      #  We want to choose the one with the most secure signing algorithm, key length,
-      #  and the longest expiration time - not easy!
-      #  for now, we simply accept all signed keys
-      k.sigs.each { |sig|
-        if (sig.type_covered == Types.DNSKEY)
-          if (sig.inception <= Time.now.to_i)
-            #  Check sig.expiration, sig.algorithm
-            if (sig.expiration > Time.now.to_i)
-              #  add the keys to the store
-              k.rrs.each {|rr| priv_add_key(rr, sig.expiration)}
-            end
-          end
-        end
-      }
+    def add_rrset(k, expiration = nil)
+      return unless k.type == Types.DNSKEY
+      now = Time.now.to_i
+      # Verification supplies an absolute deadline derived from the signature
+      # that actually verified. Never extend it using other supplied RRSIGs.
+      # Explicit callers without that deadline get a conservative TTL bound.
+      unless expiration
+        signatures = k.sigs.select { |sig| sig.inception <= now && sig.expiration >= now }
+        return if signatures.empty?
+        expiration = ([now + k.ttl] + signatures.map(&:expiration)).min
+      end
+      return if expiration <= now
+      k.rrs.each { |rr| priv_add_key(rr, expiration) }
     end
 
     def priv_add_key(k, exp)
@@ -81,7 +77,10 @@ module Dnsruby
       @keys.values.each {|v| yield v[1]}
     end
     def delete(key)
-      cached = @keys.delete(self.class.key_identity(key))
+      delete_identity(self.class.key_identity(key))
+    end
+    def delete_identity(identity)
+      cached = @keys.delete(identity)
       cached && cached[1]
     end
     def keys
@@ -98,7 +97,7 @@ module Dnsruby
     end
     def remove_expired_keys
       @keys.delete_if {|k,v|
-        v[0] < Time.now.to_i
+        v[0] <= Time.now.to_i
       }
     end
     def find_key_for(name)

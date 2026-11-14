@@ -302,9 +302,9 @@ class DnssecBudgetTest < Minitest::Test
     end
     dlv = ->(*) { flunk('Exhaustion must not try the DLV fallback') }
     Dnsruby::Dnssec.stub(:validation_limits, limits) do
-      Dnsruby::Dnssec.anchor_verifier.stub(:verify, anchor) do
-        Dnsruby::Dnssec.root_verifier.stub(:verify, root) do
-          Dnsruby::Dnssec.dlv_verifier.stub(:verify, dlv) do
+      Dnsruby::Dnssec.anchor_verifier.stub(:verify_result, anchor) do
+        Dnsruby::Dnssec.root_verifier.stub(:verify_result, root) do
+          Dnsruby::Dnssec.dlv_verifier.stub(:verify_result, dlv) do
             assert_raises(Dnsruby::ValidationLimitError) do
               Dnsruby::Dnssec.verify(Dnsruby::Message.new('example.', 'A'))
             end

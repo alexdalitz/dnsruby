@@ -300,6 +300,40 @@ class ReviewTransportNativeTest < Minitest::Test
     assert_equal(1, requests.size)
   end
 
+  def test_udp_ignores_incomplete_and_unrelated_malformed_questions_before_a_valid_reply
+    port, requests = udp_server do |request|
+      unrelated = Dnsruby::Message.new('unrelated.example.', 'AAAA', 'CH')
+      unrelated.header.id = request.header.id
+      unrelated.header.qr = true
+      malformed = [false, true].map do |truncated|
+        unrelated.header.tc = truncated
+        unrelated.encode.tap { |wire| wire[6, 2] = [1].pack('n') }
+      end
+      incomplete = [2, 11, 12, 15].map { |length| malformed.first.byteslice(0, length) }
+      incomplete + malformed + [response(request, 'valid')]
+    end
+    reply = query(resolver_for(port, do_caching: false))
+    assert_equal(['valid'], reply.answer.first.strings)
+    assert_equal(1, requests.size)
+  end
+
+  def test_short_deadline_query_on_busy_resolver_is_sent_before_its_deadline
+    port, requests = udp_server do |request|
+      request.question.first.qname.to_s == 'pending.example' ? [] : response(request, 'fast')
+    end
+    resolver = resolver_for(port, do_caching: false)
+    pending = Dnsruby::Message.new('pending.example.', 'TXT')
+    pending.do_caching = pending.do_validation = false
+    pending_results = Queue.new
+    resolver.send_async(pending, pending_results, :pending)
+    Timeout.timeout(2) { requests.pop }
+    sleep 0.03 # Start just after the selector's initial tick, while the first query remains pending.
+    resolver.query_timeout = 0.2
+    assert_equal(['fast'], query(resolver).answer.first.strings)
+    assert_equal(1, requests.size, 'the new query must reach the server while the first remains pending')
+    assert(pending_results.empty?)
+  end
+
   private
 
   def worker(&block)

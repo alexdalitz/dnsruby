@@ -15,10 +15,30 @@
 # ++
 
 require_relative 'spec_helper'
+require 'minitest/mock'
 
 class TestResOpt < Minitest::Test
 
   include Dnsruby
+
+  def test_source_port_selection_uses_secure_randomness_with_existing_ranges
+    sender = PacketSender.new(server: '127.0.0.1')
+    [0, 15_535].each do |offset|
+      SecureRandom.stub(:random_number, lambda { |count| assert_equal(15_536, count); offset }) do
+        assert_equal(50_000 + offset, sender.get_next_src_port)
+      end
+    end
+    sender.src_port = [56_353, 60_001, 65_535]
+    3.times do |index|
+      SecureRandom.stub(:random_number, lambda { |count| assert_equal(3, count); index }) do
+        assert_equal(sender.src_port[index], sender.get_next_src_port)
+      end
+    end
+    sender.src_port = 56_353
+    assert_equal(56_353, sender.get_next_src_port)
+  ensure
+    sender&.close
+  end
 
   def test_dns_file
 

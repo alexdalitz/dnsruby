@@ -222,10 +222,15 @@ module Dnsruby
       }
       if (found_sigs)
         begin
-          if (verify(msg))
-            msg.security_level = Message::SecurityLevel.SECURE
+          result = verify_result(msg)
+          if result == :secure || result == :insecure
+            msg.security_level = result == :secure ? Message::SecurityLevel.SECURE : Message::SecurityLevel.INSECURE
+            msg.security_error = ''
+            msg.header.ad = false if result == :insecure
             return true
           end
+        rescue ValidationLimitError
+          raise
         rescue VerifyError => e
           msg.security_error = e
           msg.security_level = Message::SecurityLevel.BOGUS
@@ -276,6 +281,7 @@ module Dnsruby
         if (last_error && last_error.index("ification error"))
           msg.security_level = Message::SecurityLevel.BOGUS
         end
+        msg.header.ad = false if msg.security_level == Message::SecurityLevel.INSECURE
         raise VerifyError.new(last_error) if (last_level < 0)
         return (msg.security_level.code > Message::SecurityLevel::UNCHECKED)
       end
@@ -315,19 +321,32 @@ module Dnsruby
     end
 
     def self.verify(msg, keys=nil)
+      verify_result(msg, keys) == :secure
+    end
+
+    # Keep the result separate from mutable Message state: a previous validation
+    # must not turn a newly verified Opt-Out response into a secure response.
+    private_class_method def self.verify_result(msg, keys=nil)
       ValidationBudget.with { verify_internal(msg, keys) }
     end
 
     private_class_method def self.verify_internal(msg, keys)
-      begin
-        return true if @@anchor_verifier.verify(msg, keys)
-      rescue VerifyError
+      insecure = false
+      last_error = nil
+      [@@anchor_verifier, @@root_verifier, @@dlv_verifier].each do |verifier|
         begin
-          return true if @@root_verifier.verify(msg, keys)
-        rescue VerifyError
-          return true if @@dlv_verifier.verify(msg, keys) # Will carry error to client
+          result = verifier.verify_result(msg, keys)
+          return :secure if result == :secure
+          insecure ||= result == :insecure
+        rescue ValidationLimitError
+          raise
+        rescue VerifyError => error
+          last_error = error
         end
       end
+      return :insecure if insecure
+      raise last_error if last_error
+      false
     end
 
     def self.anchor_verifier

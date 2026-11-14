@@ -15,10 +15,36 @@
 # ++
 
 require_relative 'spec_helper'
+require 'minitest/mock'
 
 class TestHeader < Minitest::Test
 
   include Dnsruby
+
+  def test_generated_ids_use_secure_randomness_and_include_both_endpoints
+    [0, 65_535].each do |id|
+      generator = lambda do |range|
+        assert_equal(65_536, range)
+        id
+      end
+      SecureRandom.stub(:random_number, generator) do
+        header = Header.new
+        assert_equal(id, header.id)
+        assert_equal(id, header.data.unpack1('n'))
+      end
+    end
+  end
+
+  def test_header_decoding_does_not_generate_an_unused_id
+    bytes = [65_535, 0x8180, 1, 2, 3, 4].pack('n6')
+    SecureRandom.stub(:random_number, ->(*) { flunk('Decoding must retain the wire ID') }) do
+      header = Header.new_from_data(bytes)
+      assert_equal(65_535, header.id)
+      assert_equal(bytes, header.data)
+      updated = Header.decrement_arcount_encoded(bytes.dup + 'payload')
+      assert_equal([65_535, 0x8180, 1, 2, 3, 3].pack('n6') + 'payload', updated)
+    end
+  end
 
   def test_header
     header = Header.new();

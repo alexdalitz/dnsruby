@@ -59,8 +59,13 @@ class TestScopedIPv6Select < Minitest::Test
       end
       sender.define_singleton_method(:no_tcp) { false }
       settings.single_resolver = sender
-      # The header advertises a question but no question bytes follow it.
-      packet = [query.header.id, 0x8200, 1, 0, 0, 0].pack('n6')
+      # Keep the matching question complete, then advertise a missing answer.
+      # Only an attributable truncated response may trigger TCP fallback.
+      response = Dnsruby::Message.decode(query.encode)
+      response.header.qr = true
+      response.header.tc = true
+      packet = response.encode
+      packet[6, 2] = [1].pack('n')
       socket.define_singleton_method(:recvfrom) { |_| [packet, ['AF_INET6', 53, 'fe80::1%7', 'fe80::1%7']] }
       removed = []
       selector.stub(:tcp?, false) do

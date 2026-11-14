@@ -232,7 +232,10 @@ class ReviewPacketContractsTest < Minitest::Test
             # Raw queries intentionally retain permissive header handling.
             flags = raw ? 0x2800 : 0x8000
             flags |= 0x0200 if truncated
-            inject_packet(socket, [100, flags, 1, 0, 0, 0].pack('n6'), tcp)
+            malformed = q.encode
+            malformed[2, 2] = [flags].pack('n')
+            malformed[6, 2] = [1].pack('n') # Complete question, missing answer.
+            inject_packet(socket, malformed, tcp)
             raise 'malformed packet decoded' if SELECTOR.get_incoming_data(socket, 512)
             if truncated && !tcp
               raise 'valid/raw truncated UDP lost TCP fallback' unless retries.length == 1 && retries.first[3] == true
@@ -251,7 +254,7 @@ class ReviewPacketContractsTest < Minitest::Test
     RUBY
   end
 
-  def test_short_malformed_headers_keep_existing_decode_error_delivery
+  def test_short_malformed_headers_only_end_tcp_transactions
     isolated(<<~'RUBY')
       [false, true].each do |tcp|
         [2, 4, 11].each do |length|
@@ -265,11 +268,59 @@ class ReviewPacketContractsTest < Minitest::Test
           SELECTOR.add_to_select(current)
           inject_packet(socket, [100, 0x2800, 1, 0, 0, 0].pack('n6').byteslice(0, length), tcp)
           raise 'incomplete header decoded' if SELECTOR.get_incoming_data(socket, 512)
-          raise 'incomplete header error was suppressed' unless current.client_queue.length == 1 &&
-            current.client_queue.pop(true).last.is_a?(Dnsruby::DecodeError)
-          raise 'incomplete header retained owner' if SELECTOR.query_settings_for_id(:current)
+          if tcp
+            raise 'incomplete TCP header error was suppressed' unless current.client_queue.length == 1 &&
+              current.client_queue.pop(true).last.is_a?(Dnsruby::DecodeError)
+            raise 'incomplete TCP header retained owner' if SELECTOR.query_settings_for_id(:current)
+          else
+            raise 'incomplete UDP header ended transaction' unless current.client_queue.empty? &&
+              SELECTOR.query_settings_for_id(:current).equal?(current)
+            SELECTOR.remove_id(:current)
+          end
           assert_clean(socket)
         end
+      end
+    RUBY
+  end
+
+  def test_malformed_udp_questions_cannot_fail_or_retry_an_unrelated_query
+    isolated(<<~'RUBY')
+      [:name, :type, :klass, :missing, :partial, :second].product([false, true]).each do |mismatch, truncated|
+        socket = FrameSocket.new
+        writer = sender(socket)
+        writer.define_singleton_method(:send_async) { |*| raise 'unrelated question triggered fallback' }
+        q = query('target.example.')
+        q.add_question('second.example.', 'AAAA') if mismatch == :second
+        current = settings(socket, :current, q, writer)
+        current.is_persistent_socket = false
+        SELECTOR.add_to_select(current)
+        original_deadline = current.endtime
+        reply = q.clone
+        reply.header.qr = true
+        reply.header.tc = truncated
+        case mismatch
+        when :name then reply.question.first.qname = Dnsruby::Name.create('unrelated.example.')
+        when :type then reply.question.first.qtype = Dnsruby::Types::AAAA
+        when :klass then reply.question.first.qclass = Dnsruby::Classes::CH
+        when :second then reply.question.last.qname = Dnsruby::Name.create('unrelated.example.')
+        end
+        wire = reply.encode
+        wire[6, 2] = [1].pack('n') # Missing answer follows the question.
+        wire = wire.byteslice(0, mismatch == :missing ? 12 : 15) if [:missing, :partial].include?(mismatch)
+        inject_packet(socket, wire, false)
+        raise 'malformed packet decoded' if SELECTOR.get_incoming_data(socket, 512)
+        raise 'unrelated question consumed transaction' unless current.client_queue.empty? &&
+          SELECTOR.query_settings_for_id(:current).equal?(current)
+        raise 'unrelated question extended deadline' unless current.endtime == original_deadline
+        valid = q.clone
+        valid.header.qr = true
+        inject_packet(socket, valid.encode, false)
+        incoming = SELECTOR.get_incoming_data(socket, 512)
+        SELECTOR.process_message(*incoming, socket)
+        SELECTOR.send_queued_validation_responses
+        raise 'following valid answer lost' unless current.client_queue.size == 2 &&
+          2.times.map { current.client_queue.pop }.all? { |event| event.last.nil? }
+        assert_clean(socket)
       end
     RUBY
   end

@@ -15,6 +15,7 @@
 # ++
 require 'dnsruby/select_thread'
 require 'ipaddr'
+require 'securerandom'
 # require 'dnsruby/iana_ports'
 module Dnsruby
 
@@ -928,24 +929,12 @@ module Dnsruby
 
 
     def get_next_src_port
-      # Different OSes have different interpretations of "random port" here.
-      # Apparently, Linux will just give you the same port as last time, unless it is still
-      # open, in which case you get n+1.
-      # We need to determine an actual (random) number here, then ask the OS for it, and
-      # continue until we get one.
+      # Preserve the existing high-port range and configured pools, using
+      # unpredictable choices for the source-port contribution to DNS IDs.
       if (@src_port[0] == 0)
-        candidate = -1
-        #         # better to construct an array of all the ports we *can* use, and then just pick one at random!
-        #         candidate = Iana::UNRESERVED_PORTS[rand(Iana::UNRESERVED_PORTS.length())]
-        #         #        while (!(Resolver.port_in_range(candidate)))
-        #         #          candidate = (rand(65535-1024) + 1024)
-        #         #        end
-        #  @TODO@ Should probably construct a bitmap of the IANA ports...
-        candidate = 50000 + (rand(15535)) # pick one over 50000
-        return candidate
+        return 50_000 + SecureRandom.random_number(15_536)
       end
-      pos = rand(@src_port.length)
-      return @src_port[pos]
+      @src_port[SecureRandom.random_number(@src_port.length)]
     end
 
     def check_response(response, response_bytes, query, client_queue, client_query_id, tcp)

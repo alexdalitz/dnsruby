@@ -1,3 +1,5 @@
+require 'securerandom'
+
 module Dnsruby
 
 # The header portion of a DNS packet
@@ -60,7 +62,7 @@ class Header
 
   def initialize(*args)
     if (args.length == 0)
-      @id = rand(MAX_ID)
+      @id = SecureRandom.random_number(MAX_ID + 1)
       @qr = false
       @opcode = OpCode.Query
       @aa = false
@@ -88,9 +90,7 @@ class Header
   end
 
   def Header.new_from_data(data)
-    header = Header.new
-    MessageDecoder.new(data) { |msg| header.decode(msg) }
-    header
+    Header.new(MessageDecoder.new(data))
   end
 
   def data
@@ -116,14 +116,10 @@ class Header
   end
 
   def Header.decrement_arcount_encoded(bytes)
-    header = Header.new
-    header_end = 0
-    MessageDecoder.new(bytes) do |msg|
-      header.decode(msg)
-      header_end = msg.index
-    end
+    decoder = MessageDecoder.new(bytes)
+    header = Header.new(decoder)
     header.arcount -= 1
-    bytes[0, header_end] = MessageEncoder.new { |msg| header.encode(msg) }.to_s
+    bytes[0, decoder.index] = MessageEncoder.new { |msg| header.encode(msg) }.to_s
     bytes
   end
 

@@ -110,6 +110,8 @@ if have_open_ssl?
   require_relative 'tc_dnssec_trust_races.rb'
   require_relative 'tc_key_cache_identity.rb'
   require_relative 'tc_dnssec_budget.rb'
+  require_relative 'tc_dnssec_cache_lifetime.rb'
+  require_relative 'tc_dnssec_wildcard_proofs.rb'
 else
   puts "-----------------------------------------------------------------------"
   puts "OpenSSL SHA256 unavailable - skipping DS and DNSSEC trust-anchor tests"

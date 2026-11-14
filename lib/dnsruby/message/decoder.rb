@@ -122,29 +122,40 @@ class MessageDecoder #:nodoc: all
   def get_labels(limit = nil)
     limit = @index if limit.nil? || (@index < limit)
     labels = []
-    while true
+    return_index = nil
+    expanded_length = 1 # The terminating root label.
+    # Empty name RDATA is used by the existing ANY/NONE UPDATE codecs.
+    return labels unless has_remaining?
+
+    loop do
+      raise DecodeError, 'Truncated DNS name' unless has_remaining?
       temp = get_byte_at(@index)
       case temp
         when 0
           @index += 1
+          @index = return_index if return_index
           return labels
         when 192..255
           idx = get_unpack('n')[0] & 0x3fff
           if limit <= idx
             raise DecodeError.new('non-backward name pointer')
           end
-          save_index = @index
+          return_index ||= @index
           @index = idx
-          labels += self.get_labels(limit)
-          @index = save_index
-          return labels
-        when nil
-          return labels
-        else
+          # Each target is below the preceding target (or original name).
+          # The 14-bit pointer address therefore bounds traversal without
+          # recursion, an arbitrary hop limit, or a growing visited set.
+          limit = idx
+        when 1..63
+          expanded_length += 1 + temp
+          if expanded_length > Name::MaxNameLength
+            raise DecodeError, "DNS name exceeds #{Name::MaxNameLength} octets"
+          end
           labels << self.get_label
+        else
+          raise DecodeError, 'Reserved or invalid DNS label type'
       end
     end
-    labels
   end
 
   # Gets a single label.

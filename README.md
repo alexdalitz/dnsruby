@@ -74,6 +74,17 @@ To continue using an existing MD5 key, select it explicitly:
 resolver.tsig = key_name, secret, 'hmac-md5'
 ```
 
+For existing array-based settings, append the server's algorithm as the third
+element. For an MD5 key, replace `resolver.tsig = [key_name, secret]` with:
+
+```ruby
+resolver.tsig = [key_name, secret, 'hmac-md5']
+```
+
+The two-element form now selects SHA-256; a key name and secret alone cannot
+identify the server's algorithm. Use `'hmac-sha256'` and the matching secret
+once the server's key has been migrated.
+
 For a message, use `algorithm: 'hmac-md5'` in the `set_tsig` hash. Dnsruby keeps
 this option for compatibility, although
 [RFC 8945 section 6](https://www.rfc-editor.org/rfc/rfc8945.html#section-6)

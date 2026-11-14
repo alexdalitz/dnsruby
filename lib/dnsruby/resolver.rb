@@ -968,12 +968,10 @@ module Dnsruby
         return
       end
 
-      tick_needed = false
       st = SelectThread.instance
       #  add to our data structures
       #       @mutex.synchronize{
       @parent.single_res_mutex.synchronize {
-        tick_needed = true if @query_list.empty?
         if @query_list.has_key?(client_query_id)
           Dnsruby.log.error("Duplicate query id requested (#{client_query_id}")
           #  @TODO@ Handle different queue tuples - push this to generic send_error method
@@ -1000,9 +998,10 @@ module Dnsruby
         st.add_observer(q, self)
       }
 
-      #  Now do querying stuff using SingleResolver
-      #  All this will be handled by the tick method (if we have 0 as the first timeout)
-      tick if tick_needed
+      # Dispatch this query immediately, even while earlier queries are pending.
+      # The same locked retry bookkeeping lets a concurrent selector tick win
+      # safely, while socket I/O still happens after releasing the query lock.
+      tick(client_query_id)
       client_query_id
     end
 
@@ -1105,14 +1104,16 @@ module Dnsruby
     #  It should arguably be called from another worker thread... (which also handles the queue)
     #  Each tick, we check if any timeouts have occurred. If so, we take the appropriate action :
     #  Return a timeout to the client, or send a new query
-    def tick # :nodoc: all
+    def tick(client_query_id = nil) # :nodoc: all
       #  Handle the tick
       #  Do we have any retries due to be sent yet?
       #       @mutex.synchronize{
       sends = []
       @parent.single_res_mutex.synchronize {
         time_now = TransportClock.now
-        @timeouts.keys.each do |client_query_id|
+        query_ids = client_query_id.nil? ? @timeouts.keys : [client_query_id]
+        query_ids.each do |client_query_id|
+          next unless @timeouts.key?(client_query_id)
           msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
           query_timeout, timeouts, no_nameservers = @timeouts[client_query_id]
           if query_timeout < time_now

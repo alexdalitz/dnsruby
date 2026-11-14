@@ -373,8 +373,12 @@ module Dnsruby
         ((@@sockets_by_sender ||= {}.compare_by_identity)[sender] || []).to_a.each do |socket|
           mark_socket_for_retirement(socket)
         end
-        @@validations.each do |_queue, owner, control|
-          control.cancel if owner.equal?(sender)
+        @@validations.each do |queue, owner, control|
+          # A Resolver owns its validation through the queue observer. Removing
+          # that observer cancels its work; retiring a shared or reconfigured
+          # sender must let other accepted responses finish. Direct PacketSender
+          # callers have no observer, so their sender's close still cancels them.
+          control.cancel if owner.equal?(sender) && !@@observers[queue]
         end
       end
       wake_up_select_thread
@@ -643,6 +647,15 @@ module Dnsruby
       send_response_to_client(msg, bytes, socket)
     end
 
+    def matching_questions?(response, query)
+      response.question.length == query.question.length &&
+        response.question.zip(query.question).all? do |answer, request|
+          answer.qname.labels == request.qname.labels &&
+            answer.qtype == request.qtype && answer.qclass == request.qclass
+        end
+    end
+    private :matching_questions?
+
     def send_response_to_client(msg, bytes, socket)
       # Match the header ID against queries outstanding on this connection.
       client_ids=[]
@@ -660,11 +673,7 @@ module Dnsruby
           # Preserve raw/update responses and questionless FORMERR handling.
           query = settings.query
           unless query.send_raw || query.kind_of?(Update) || msg.question.empty?
-            next unless msg.question.length == query.question.length &&
-              msg.question.zip(query.question).all? do |answer, request|
-                answer.qname.labels == request.qname.labels &&
-                  answer.qtype == request.qtype && answer.qclass == request.qclass
-              end
+            next unless matching_questions?(msg, query)
           end
           #  process the response
           client_queue = settings.client_queue
@@ -910,6 +919,21 @@ module Dnsruby
         if (client_id == nil)
           Dnsruby.log.error{"Decode error from #{answerip} but can't determine packet id"}
           return
+        end
+        unless is_tcp
+          matches_question = @@mutex.synchronize do
+            current = @@query_hash[client_id]
+            partial = e.partial_message if e.is_a?(DecodeError)
+            current && current.socket == socket && (current.query.send_raw ||
+              (buf.bytesize >= 12 && partial &&
+                (current.query.kind_of?(Update) ||
+                  (!partial.question.empty? && partial.header.qdcount == partial.question.length &&
+                    matching_questions?(partial, current.query)))))
+          end
+          # A truncated answer can justify TCP fallback only after its question
+          # identifies this query (RFC 5452 section 9.1). Incomplete headers or
+          # questions and unrelated questions cannot end the UDP transaction.
+          return unless matches_question
         end
         # Decoding may fail after a complete header. Such a packet must match
         # the response direction and opcode before it can retry or fail its

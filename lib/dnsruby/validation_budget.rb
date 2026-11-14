@@ -28,7 +28,7 @@ module Dnsruby
       timeout: 5.0
     }.freeze
 
-    attr_reader :control
+    attr_reader :control, :transaction
 
     def self.current
       Thread.current[:dnsruby_validation_budget]
@@ -52,6 +52,9 @@ module Dnsruby
     end
 
     def initialize(deadline: nil, limits: Dnssec.validation_limits)
+      # A plain token can be retained with learned records without retaining
+      # the budget, resolver control, or the rest of a validation operation.
+      @transaction = Object.new.freeze
       @limits = limits
       deadline = [deadline, TransportClock.now + limits[:timeout]].compact.min
       @control = QueryControl.new(deadline: deadline, parent: QueryControl.current)

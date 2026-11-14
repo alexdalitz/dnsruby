@@ -1,6 +1,53 @@
 require_relative 'tc_pipeline_send'
 
 class TestResolverConcurrency < Minitest::Test
+  def test_busy_resolver_dispatches_a_new_query_without_waiting_for_a_tick
+    isolated(<<~'RUBY')
+      SELECTOR.singleton_class.remove_method(:notify_queue_observers)
+      resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1', dnssec: false)
+      writer = resolver.single_resolvers.first
+      sent = []
+      writer.define_singleton_method(:send_async) { |_message, _queue, id| sent << id }
+      slow_results, fast_results = Queue.new, Queue.new
+      resolver.send_async(query('pending.example.'), slow_results, :pending)
+      raise 'first query not dispatched' unless sent.size == 1
+      resolver.query_timeout = 0.1
+      resolver.send_async(query('fast.example.'), fast_results, :fast)
+      raise 'busy resolver left new query waiting for a tick' unless sent.size == 2
+      fast = SELECTOR.query_settings_for_id(sent.last)
+      answer = fast.query.clone
+      answer.header.qr = true
+      SELECTOR.push_response_for_query(fast, answer, fast.query, writer)
+      SELECTOR.send_queued_responses
+      raise 'fast query did not finish independently' unless fast_results.size == 1 &&
+        fast_results.pop.last.nil? && slow_results.empty?
+      SELECTOR.send_tick_to_observers
+      raise 'selector tick resent initial attempt' unless sent.size == 2
+      resolver.close
+    RUBY
+  end
+
+  def test_concurrent_admission_and_selector_ticks_dispatch_each_attempt_once
+    isolated(<<~'RUBY')
+      resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1', dnssec: false)
+      counts, lock = Hash.new(0), Mutex.new
+      resolver.single_resolvers.first.define_singleton_method(:send_async) do |_message, _queue, id|
+        lock.synchronize { counts[id[2]] += 1 }
+        Thread.pass
+      end
+      gate = Queue.new
+      callers = 20.times.map do |index|
+        Thread.new { gate.pop; resolver.send_async(query("parallel#{index}.example."), Queue.new, index) }
+      end
+      ticking = Thread.new { 100.times { SELECTOR.send_tick_to_observers; Thread.pass } }
+      callers.length.times { gate << true }
+      callers.each(&:value)
+      ticking.value
+      raise 'lost or duplicate initial attempts' unless counts.size == callers.size && counts.values.all? { |count| count == 1 }
+      resolver.close
+    RUBY
+  end
+
   def test_concurrent_first_use_publishes_one_complete_configuration_and_engine
     isolated(<<~'RUBY')
       SELECTOR.singleton_class.remove_method(:notify_queue_observers)
@@ -244,7 +291,9 @@ class TestResolverConcurrency < Minitest::Test
         SELECTOR.notify_queue_observers(old_queue, old_id)
         raise 'stale event completed the replacement query' unless queue.empty?
         pending = engine.instance_variable_get(:@timeouts)[:reused]
-        raise 'stale event stopped the replacement sends' unless pending && !pending[1].empty?
+        replacement = engine.instance_variable_get(:@query_list)[:reused]
+        raise 'stale event stopped the replacement send' unless pending && replacement &&
+          replacement[3].size == 1 && SELECTOR.query_settings_for_id(replacement[3].first)
 
         # The same selector dispatch must still serve the replacement and a
         # different Resolver. No sockets or timing-dependent timeout is needed.
@@ -262,8 +311,8 @@ class TestResolverConcurrency < Minitest::Test
       raise 'close did not complete the old query once' unless
         queue.size == 1 && queue.pop.last.is_a?(Dnsruby::OtherResolvError)
 
-      # Keeping another query active defers the replacement to the next tick,
-      # leaving an ordinary pending retry plan with no outstanding attempt.
+      # Both new queries dispatch immediately, even while the old observer's
+      # callback is paused. That stale callback must preserve their attempts.
       resolver.send_async(query('keeper.example.'), keeper_queue, :keeper)
       resolver.send_async(query('new.example.'), queue, :reused)
       unrelated.send_async(query('unrelated.example.'), unrelated_queue, :unrelated)

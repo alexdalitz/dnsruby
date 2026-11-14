@@ -261,6 +261,56 @@ class ReleaseReviewTransportTest < Minitest::Test
     RUBY
   end
 
+  def test_sender_retirement_preserves_resolver_validation_but_owner_close_cancels_it
+    isolated(<<~'RUBY')
+      SELECTOR.singleton_class.remove_method(:notify_queue_observers)
+      [:reconfigure, :other_close, :owner_close].each do |action|
+        socket = FrameSocket.new
+        writer = sender(socket)
+        writer.use_tcp = writer.dnssec = true
+        first, second = 2.times.map do
+          Dnsruby::Resolver.new(nameserver: '127.0.0.1', dnssec: true, use_tcp: true, do_validation: true)
+        end
+        [first, second].each { |resolver| resolver.single_resolvers = [writer] }
+        entered, release = Queue.new, Queue.new
+        Dnsruby::Dnssec.define_singleton_method(:validate_with_query) do |_query, answer|
+          entered << true
+          release.pop
+          answer.security_level = Dnsruby::Message::SecurityLevel::SECURE
+        end
+        request = query('validating.example.')
+        request.do_validation = true
+        results = Queue.new
+        second.send_async(request, results, :client)
+        answer = request.clone
+        answer.header.qr = true
+        SELECTOR.process_message(answer, answer.encode, socket)
+        entered.pop
+        case action
+        when :reconfigure then second.nameserver = '127.0.0.2'
+        when :other_close then first.close
+        when :owner_close then second.close
+        end
+        release << true
+        sleep 0.001 until K.class_variable_get(:@@validations).empty?
+        SELECTOR.send_queued_validation_responses
+        raise "#{action}: missing or duplicate completion" unless results.size == 1
+        _id, response, error = results.pop
+        if action == :owner_close
+          raise 'owner close did not cancel its query' unless error.is_a?(Dnsruby::OtherResolvError)
+        else
+          raise "#{action}: accepted validation was cancelled: #{error.inspect}" unless
+            error.nil? && response.security_level == Dnsruby::Message::SecurityLevel::SECURE
+        end
+        first.close
+        second.close
+        SELECTOR.send_queued_validation_responses
+        raise 'late validation completed twice' unless results.empty?
+        raise 'validation registration leaked' unless K.class_variable_get(:@@validations).empty?
+      end
+    RUBY
+  end
+
   def test_fork_discards_parent_validation_registrations_without_losing_child_work
     skip 'fork unavailable' unless Process.respond_to?(:fork)
     isolated(<<~'RUBY')
