@@ -1,6 +1,5 @@
 require_relative 'spec_helper'
 require 'minitest/mock'
-require 'ostruct'
 
 # Decision-level tests use metadata doubles and mock cryptographic verification;
 # ordinary published root fixtures exercise DS identity without generating keys.
@@ -9,7 +8,7 @@ class ReleaseDnssecFixesTest < Minitest::Test
     @verifier = Dnsruby::SingleVerifier.new(Dnsruby::SingleVerifier::VerifierType::ANCHOR)
     @zone = Dnsruby::Name.create('example.')
     @child = Dnsruby::Name.create('child.example.')
-    @anchor = OpenStruct.new(name: @zone, klass: Dnsruby::Classes.IN, type: Dnsruby::Types.DNSKEY)
+    @anchor = metadata_double(name: @zone, klass: Dnsruby::Classes.IN, type: Dnsruby::Types.DNSKEY)
     @saved_recursor = Dnsruby::Dnssec.do_validation_with_recursor?
     Dnsruby::Dnssec.do_validation_with_recursor(false)
   end
@@ -22,8 +21,8 @@ class ReleaseDnssecFixesTest < Minitest::Test
     [[@child, 'A', @zone, true], [@zone, 'DNSKEY', @zone, true],
       [@child, 'DNSKEY', @zone, false], [@child, 'DS', @zone, true],
       [@child, 'DS', @child, false], [@zone, 'A', @child, false]].each do |owner, type, signer, valid|
-      rrset = OpenStruct.new(name: owner, klass: Dnsruby::Classes.IN, type: Dnsruby::Types.new(type))
-      signature = OpenStruct.new(name: owner, klass: rrset.klass, type_covered: rrset.type,
+      rrset = metadata_double(name: owner, klass: Dnsruby::Classes.IN, type: Dnsruby::Types.new(type))
+      signature = metadata_double(name: owner, klass: rrset.klass, type_covered: rrset.type,
         signers_name: signer, labels: owner.labels.length, inception: Time.now.to_i - 60,
         expiration: Time.now.to_i + 60)
       if valid
@@ -45,7 +44,7 @@ class ReleaseDnssecFixesTest < Minitest::Test
     key = Object.new
     def key.zone_key?; true; end
     [3, 6].each do |algorithm|
-      signature = OpenStruct.new(algorithm: Dnsruby::Algorithms.new(algorithm))
+      signature = metadata_double(algorithm: Dnsruby::Algorithms.new(algorithm))
       error = assert_raises(Dnsruby::VerifyError) do
         @verifier.send(:verify_rrset_with_key, nil, key, signature)
       end
@@ -236,11 +235,11 @@ class ReleaseDnssecFixesTest < Minitest::Test
           hashed = nsec3.hash_name(@child)
           Dnsruby::RR.create("#{hashed}.example. 60 IN NSEC3 1 0 0 - #{hashed} #{types}")
         end
-        signature = OpenStruct.new(signers_name: @zone, labels: record.name.labels.length)
-        proof = OpenStruct.new(name: record.name, klass: record.klass, type: record.type, rrs: [record], sigs: [signature])
+        signature = metadata_double(signers_name: @zone, labels: record.name.labels.length)
+        proof = metadata_double(name: record.name, klass: record.klass, type: record.type, rrs: [record], sigs: [signature])
         authority = Object.new
         authority.define_singleton_method(:rrsets) { |requested| requested == record.type ? [proof] : [] }
-        message = OpenStruct.new(question: [Dnsruby::Question.new(@child, 'DS')],
+        message = metadata_double(question: [Dnsruby::Question.new(@child, 'DS')],
           authority: authority, rcode: Dnsruby::RCode.NOERROR)
         # Stub construction at the crypto boundary; the denial bitmap and hash
         # matching decisions remain real, and no signed DNS response is created.
@@ -261,11 +260,11 @@ class ReleaseDnssecFixesTest < Minitest::Test
 
   def test_actual_wildcard_nsec_signature_is_eligible_as_denial_evidence
     record = Dnsruby::RR.create('*.example. 60 IN NSEC z.example. A RRSIG NSEC')
-    signature = OpenStruct.new(signers_name: @zone, labels: 1)
-    proof = OpenStruct.new(name: record.name, klass: record.klass, type: record.type, rrs: [record], sigs: [signature])
+    signature = metadata_double(signers_name: @zone, labels: 1)
+    proof = metadata_double(name: record.name, klass: record.klass, type: record.type, rrs: [record], sigs: [signature])
     authority = Object.new
     authority.define_singleton_method(:rrsets) { |type| type == Dnsruby::Types.NSEC ? [proof] : [] }
-    message = OpenStruct.new(question: [Dnsruby::Question.new(@child, 'DS')],
+    message = metadata_double(question: [Dnsruby::Question.new(@child, 'DS')],
       authority: authority, rcode: Dnsruby::RCode.NOERROR)
     verified = false
     Dnsruby::RRSet.stub(:new, proof) do
@@ -291,6 +290,16 @@ class ReleaseDnssecFixesTest < Minitest::Test
       assert_same(@anchor, key)
       assert_same(resolver, returned_resolver)
       assert_equal([[@child, Dnsruby::Types.DS]], calls)
+    end
+  end
+
+  private
+
+  def metadata_double(**attributes)
+    Object.new.tap do |object|
+      attributes.each do |name, value|
+        object.define_singleton_method(name) { value }
+      end
     end
   end
 end
