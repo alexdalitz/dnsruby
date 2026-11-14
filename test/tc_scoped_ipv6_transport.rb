@@ -172,6 +172,7 @@ class TestScopedIPv6Transport < Minitest::Test
   def capture_selector(&registered)
     current = nil
     Object.new.tap do |selector|
+      selector.define_singleton_method(:track_socket) { |socket| socket }
       selector.define_singleton_method(:reserve_send) { |settings, _previous| current = settings; true }
       selector.define_singleton_method(:query_settings_for_id) { |_| current }
       selector.define_singleton_method(:selector_thread?) { false }

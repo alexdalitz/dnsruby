@@ -72,7 +72,21 @@ module Dnsruby
     CONFIGURATION_MUTEX_CREATION = Mutex.new
     private_constant :CONFIGURATION_MUTEX_CREATION
 
+    def ensure_current_process
+      return if @process_pid == Process.pid
+      CONFIGURATION_MUTEX_CREATION.synchronize do
+        if @process_pid != Process.pid
+          @single_res_mutex = Mutex.new
+          @configuration_mutex = nil
+          @resolver_ruby.reset_attributes if @resolver_ruby
+          @process_pid = Process.pid
+        end
+      end
+    end
+    private :ensure_current_process
+
     def configuration_mutex
+      ensure_current_process
       CONFIGURATION_MUTEX_CREATION.synchronize { @configuration_mutex ||= Mutex.new }
     end
     private :configuration_mutex
@@ -421,6 +435,7 @@ module Dnsruby
 
     #  Close the Resolver. Unfinished queries are terminated with OtherResolvError.
     def close
+      ensure_current_process
       if @resolver_ruby
         @resolver_ruby.close
       else
@@ -457,6 +472,7 @@ module Dnsruby
       @src_address = nil
       @src_address6 = nil
       @single_res_mutex = Mutex.new
+      @process_pid = Process.pid
       @configured = false
       @do_caching = true
       @config = Config.new()
@@ -539,6 +555,9 @@ module Dnsruby
           !resolver.nil? && !resolver.server.nil?
         end
         @single_res_mutex.synchronize do
+          # Construction may resolve a hostname and run alongside setters.
+          # Publish only after applying the settings current under this lock.
+          new_resolvers.each { |resolver| update_internal_res(resolver) }
           complete = replace ? new_resolvers : @single_resolvers + new_resolvers
           raise ArgumentError, "No valid nameservers found" if complete.empty?
           @config.nameserver = nameservers if replace
@@ -599,6 +618,7 @@ module Dnsruby
     end
 
     def update # :nodoc: all
+      ensure_current_process
       #  Update any resolvers we have with the latest config
       @single_res_mutex.synchronize do
         @single_resolvers.delete(nil) # Just in case...
@@ -617,8 +637,8 @@ module Dnsruby
       configuration_mutex.synchronize do
         res = PacketSender.new(server)
         Dnsruby.log_and_raise("Can't create server #{server}", ArgumentError) unless res
-        update_internal_res(res)
         @single_res_mutex.synchronize do
+          update_internal_res(res)
           @single_resolvers.push(res)
           @configuration_error = nil
           @configured = true
@@ -870,6 +890,7 @@ module Dnsruby
     end
 
     def single_res_mutex # :nodoc: all
+      ensure_current_process
       @single_res_mutex
     end
 

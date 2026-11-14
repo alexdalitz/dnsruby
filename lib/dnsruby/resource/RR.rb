@@ -75,7 +75,11 @@ class RR
 
   def clone
     encoded = MessageEncoder.new { |encoder| encoder.put_rr(self, true) }.to_s
-    MessageDecoder.new(encoded).get_rr
+    copy = MessageDecoder.new(encoded).get_rr
+    [:@dnsruby_received_at, :@dnsruby_authenticated_expiration, :@dnsruby_learned_trust].each do |field|
+      copy.instance_variable_set(field, instance_variable_get(field)) if instance_variable_defined?(field)
+    end
+    copy
   end
 
 
@@ -323,6 +327,8 @@ class RR
       ivars.delete '@ttl' # RFC 2136 section 1.1
       ivars.delete '@rdata'
       ivars.delete '@dnsruby_learned_trust' # Validation provenance is not wire data.
+      ivars.delete '@dnsruby_authenticated_expiration'
+      ivars.delete '@dnsruby_received_at'
       if self.type == Types.DS
         ivars.delete '@digest'
       end
@@ -347,7 +353,8 @@ class RR
   end
 
   def hash # :nodoc:
-    vars = (self.instance_variables - [:@ttl, :@rdata, :@dnsruby_learned_trust]).sort
+    vars = (self.instance_variables - [:@ttl, :@rdata, :@dnsruby_learned_trust,
+      :@dnsruby_authenticated_expiration, :@dnsruby_received_at]).sort
     vars.inject(0) do |hash_value, var_name|
       hash_value ^ self.instance_variable_get(var_name).hash
     end

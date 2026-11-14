@@ -25,10 +25,14 @@ compatibility notes below for the changes from 1.74.0.
   retrying without EDNS keeps the current transport.
   Ordinary queries reject replies with the wrong ID, opcode or query/response
   flag; `send_raw` retains its existing behavior.
+  After `fork`, the child starts with fresh transport connections and query
+  state; the parent's pending queries and connections remain with the parent.
   [#155](https://github.com/alexdalitz/dnsruby/issues/155).
 * **Nameserver configuration.** Hostname nameservers no longer cause recursive
   configuration hangs. IPv6 link-local nameservers accept interface zones,
   such as `fe80::1%eth0`, including in `resolv.conf`.
+  Replacing or adding nameservers also preserves configuration changes made
+  concurrently while the new senders are being constructed.
   [#179](https://github.com/alexdalitz/dnsruby/issues/179),
   [#184](https://github.com/alexdalitz/dnsruby/issues/184),
   [PR #221](https://github.com/alexdalitz/dnsruby/pull/221).
@@ -50,6 +54,12 @@ compatibility notes below for the changes from 1.74.0.
   limit raises `ValidationLimitError` (a `VerifyError`); the answer fails
   validation rather than being accepted as insecure. See the
   [README](README.md#dnssec-validation-limits) for configuration.
+* **DNSSEC denial and cache lifetimes.** Negative answers follow CNAMEs to the
+  terminal name and check authenticated NSEC or NSEC3 denial proofs, including
+  wildcard NODATA and NSEC3 Opt-Out delegations. Validated response TTLs and
+  cached copies respect their original receipt time, signature lifetime and
+  chain of trust. Revalidating cached records does not renew their lifetime.
+  DS and DNSKEY RRsets are verified once per message.
 * **Memory use for unknown records.** The cache holds at most 256 automatically
   generated record classes. Classes still held by an application remain usable,
   and explicit registrations are retained. Replacing registered classes no
@@ -95,6 +105,8 @@ compatibility notes below for the changes from 1.74.0.
   parentheses, semicolons and quotes inside record values where appropriate.
   Ordinary record lookup no longer slows as numeric class names accumulate,
   and numeric type/class lookups allocate fewer temporary objects.
+  Cache hits decode an immutable wire snapshot outside the cache lock, and
+  incoming messages no longer generate an unused random query ID.
 * **DNS name lengths.** Names longer than 255 octets on the wire now raise
   `ResolvError`, including some 256- and 257-octet names previously accepted.
   [PR #223](https://github.com/alexdalitz/dnsruby/pull/223).

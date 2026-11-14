@@ -133,6 +133,71 @@ class DnssecCacheLifetimeTest < Minitest::Test
     end
   end
 
+  def test_full_response_ttls_and_cache_honor_every_authenticated_bound
+    [{ ttl: 7 }, { signature_ttl: 7 }, { original_ttl: 7 }, { lifetime: 7 }].each do |limit|
+      verifier = new_verifier
+      verifier.add_trust_anchor(@child)
+      record = Dnsruby::RR.create("#{@child.name} 300 IN A 192.0.2.1")
+      message = message_with(signed(record, @child, 1, **limit))
+      cache = Dnsruby::Cache.new
+      at(0) do
+        assert(verifier.verify(message), limit.inspect)
+        assert_equal([7, 7], message.answer.map(&:ttl), limit.inspect)
+      end
+      at(2) { cache.add(message) }
+      at(4) do
+        found = cache.find(@child.name, 'A')
+        assert_equal([3, 3], found.answer.map(&:ttl), limit.inspect)
+        assert(verifier.verify(found), limit.inspect)
+        assert_equal([3, 3], found.answer.map(&:ttl), limit.inspect)
+        cache.add(found)
+      end
+      at(7) { assert_nil(cache.find(@child.name, 'A'), limit.inspect) }
+    end
+  end
+
+  def test_cached_dnskey_revalidation_cannot_renew_its_authenticated_lifetime
+    verifier = new_verifier
+    verifier.add_trust_anchor(@ds)
+    message = message_with(signed(@child, @child, 1, signature_ttl: 7))
+    cache = Dnsruby::Cache.new
+    at(0) do
+      assert(verifier.verify(message))
+      cache.add(message)
+    end
+    recipient = new_verifier
+    recipient.add_trust_anchor(@ds)
+    at(4) do
+      cached = cache.find(@child.name, 'DNSKEY')
+      assert(recipient.verify(cached))
+      assert_cached_child(recipient)
+      assert_equal([3, 3], cached.answer.map(&:ttl))
+    end
+    at(7) do
+      refute_cached_child(recipient)
+      assert_nil(cache.find(@child.name, 'DNSKEY'))
+    end
+  end
+
+  def test_validation_queue_delay_does_not_restart_received_record_ttls
+    verifier = new_verifier
+    verifier.add_trust_anchor(@ds)
+    wire = message_with(signed(@child, @child, 1, signature_ttl: 7)).encode
+    message = at(0) { Dnsruby::Message.decode(wire) }
+    cache = Dnsruby::Cache.new
+    at(4) do
+      assert(verifier.verify(message))
+      assert_equal([3, 3], message.answer.map(&:ttl))
+      cache.add(message)
+      assert_equal([3, 3], cache.find(@child.name, 'DNSKEY').answer.map(&:ttl))
+      assert_cached_child(verifier)
+    end
+    at(7) do
+      refute_cached_child(verifier)
+      assert_nil(cache.find(@child.name, 'DNSKEY'))
+    end
+  end
+
   def test_public_verification_retains_learned_ds_expiration_across_all_verifiers
     [:anchor_verifier, :root_verifier, :dlv_verifier].each do |source|
       with_public_verifiers do |verifiers|
@@ -370,6 +435,44 @@ class DnssecCacheLifetimeTest < Minitest::Test
         [records.clone, Marshal.load(Marshal.dump(records))].each do |copy|
           assert_equal(records.rrs.map(&:to_s), copy.rrs.map(&:to_s))
           assert_equal(records.sigs.map(&:to_s), copy.sigs.map(&:to_s))
+        end
+      end
+    end
+  end
+
+  def test_cloned_learned_records_preserve_expiration_and_revocation
+    [:ds, :dnskey].product([:expire, :revoke]).each do |key_type, reason|
+      source = new_verifier
+      source.add_trust_anchor(@parent)
+      ds_records = signed(@ds, @parent, 0, ttl: 5)
+      key_records = signed(@child, @child, 1)
+      at(0) do
+        assert(source.verify(ds_records))
+        assert(source.verify(key_records, ds_records))
+      end
+      learned = (key_type == :ds ? ds_records : key_records).rrs.first
+      container = Dnsruby::Message.new(learned.name, learned.type)
+      container.add_answer(learned)
+      copies = at(3) do
+        [learned.clone, container.clone.answer.first, Dnsruby::RRSet.new([learned.clone])]
+      end
+      recipients = copies.map { new_verifier }
+      at(4) do
+        copies.zip(recipients).each do |copy, recipient|
+          assert(recipient.verify(signed(@child, @child, 1), copy), "#{key_type} #{reason}")
+          assert_cached_child(recipient)
+        end
+      end
+      at(reason == :expire ? 5 : 4) do
+        source.remove_trust_anchor(@parent) if reason == :revoke
+        copies.zip(recipients).each do |copy, recipient|
+          refute_cached_child(recipient)
+          assert_raises(Dnsruby::VerifyError, "#{key_type} #{reason}") do
+            recipient.verify(signed(@child, @child, 1), copy)
+          end
+          # A separately supplied original remains explicit trust input.
+          fresh = (key_type == :ds ? @ds : @child).clone
+          assert(recipient.verify(signed(@child, @child, 1), fresh))
         end
       end
     end

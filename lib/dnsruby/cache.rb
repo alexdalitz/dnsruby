@@ -71,7 +71,7 @@ module Dnsruby
       qn = Name.create(qname)
       qn.absolute = true
       key = CacheKey.new(qn, qtype, qclass).to_s
-      @mutex.synchronize {
+      data = @mutex.synchronize {
         data = @cache[key]
         if (!data)
           return nil
@@ -81,10 +81,17 @@ module Dnsruby
           TheLog.debug("CACHE lookup stale\n")
           return nil
         end
-        m = data.message
-        TheLog.debug("CACHE found\n")
-        return m
+        data
       }
+      # CacheData owns an immutable wire snapshot, so decoding does not need to
+      # serialize other cache lookups, insertions or clears behind this lock.
+      m = data.message
+      if data.expiration <= Time.now.to_i
+        @mutex.synchronize { @cache.delete(key) if @cache[key].equal?(data) }
+        return nil
+      end
+      TheLog.debug("CACHE found\n")
+      m
     end
     def Cache.delete(qname, qtype, qclass = Classes.IN)
       key = CacheKey.new(qname, qtype, qclass)
@@ -115,43 +122,60 @@ module Dnsruby
       end
     end
     class CacheData # :nodoc: all
-      attr_reader :expiration
+      Snapshot = Struct.new(:wire, :expiration, :record_expirations, :authenticated_expirations)
+      private_constant :Snapshot
+
+      def expiration
+        @snapshot.expiration
+      end
+
       def message=(m)
-        @expiration = get_expiration(m)
-        @message = Message.decode(m.encode(true))
-        @message.cached = true
+        now = Time.now.to_i
+        record_expirations = []
+        authenticated_expirations = []
+        m.each_resource do |rr|
+          authenticated = rr.instance_variable_get(:@dnsruby_authenticated_expiration)
+          authenticated_expirations << authenticated
+          record_expirations << if rr.type != Types::OPT
+            received_at = rr.instance_variable_get(:@dnsruby_received_at) || now
+            [received_at + rr.ttl, authenticated].compact.min
+          end
+        end
+        @snapshot = Snapshot.new(m.encode(true).freeze,
+          record_expirations.compact.min || 0, record_expirations.freeze,
+          authenticated_expirations.freeze).freeze
       end
       def message
-        m = Message.decode(@message.encode)
+        snapshot = @snapshot
+        m = Message.decode(snapshot.wire)
         m.cached = true
         #  @TODO@ What do we do about answerfrom, answersize, etc.?
         m.header.aa = false # Anything else to do here?
         #  Fix up TTLs!!
-        offset = (Time.now - @time_stored).to_i
+        now = Time.now.to_i
+        index = -1
         m.each_resource {|rr|
+          index += 1
           next if rr.type == Types::OPT
-          rr.ttl = rr.ttl - offset
+          rr.ttl = [[snapshot.record_expirations[index] - now, rr.ttl].min, 0].max
+          rr.instance_variable_set(:@dnsruby_received_at, now)
+          authenticated = snapshot.authenticated_expirations[index]
+          rr.instance_variable_set(:@dnsruby_authenticated_expiration, authenticated) if authenticated
         }
         return m
       end
       def get_expiration(m)
-        #  Find the minimum ttl of any of the rrsets
-        min_ttl = 9999999
-        m.each_section {|section|
-          section.rrsets.each {|rrset|
-            if (rrset.ttl < min_ttl)
-              min_ttl = rrset.ttl
-            end
-          }
-        }
-        if (min_ttl == 9999999)
-          return 0
+        now = Time.now.to_i
+        expirations = []
+        m.each_resource do |rr|
+          next if rr.type == Types::OPT
+          received_at = rr.instance_variable_get(:@dnsruby_received_at) || now
+          expirations << [received_at + rr.ttl,
+            rr.instance_variable_get(:@dnsruby_authenticated_expiration)].compact.min
         end
-        return (Time.now.to_i + min_ttl)
+        expirations.min || 0
       end
       def initialize(*args)
-        @expiration = 0
-        @time_stored = Time.now.to_i
         self.message=(args[0])
       end
       def to_s

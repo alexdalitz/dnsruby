@@ -4,10 +4,12 @@ require_relative 'tc_resolver_validation'
 
 class KeyCacheIdentityTest
   def test_expiration_alone_revokes_learned_keys_and_preserves_other_anchors
-    @verifier.add_trust_anchor_with_expiration(@a, @now.to_i + 1)
-    @verifier.add_trust_anchor_with_expiration(@b, @now.to_i + 120)
-    assert(@verifier.verify(signed(@a, @a, 0)))
-    Time.stub(:now, @now + 2) do
+    clock = @now
+    Time.stub(:now, -> { clock }) do
+      @verifier.add_trust_anchor_with_expiration(@a, @now.to_i + 1)
+      @verifier.add_trust_anchor_with_expiration(@b, @now.to_i + 120)
+      assert(@verifier.verify(signed(@a, @a, 0)))
+      clock = @now + 2
       # Do not read trust_anchors first: verification must notice expiry itself.
       assert_raises(Dnsruby::VerifyError) { @verifier.verify(signed(@record, @a, 0)) }
       assert_empty(@verifier.trusted_keys)

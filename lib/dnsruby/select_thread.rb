@@ -28,6 +28,15 @@ module Dnsruby
   class SelectThread #:nodoc: all
     class SelectWakeup < RuntimeError; end
     include Singleton
+
+    class << self
+      alias_method :instance_without_fork_check, :instance
+      private :instance_without_fork_check
+
+      def instance
+        instance_without_fork_check.tap { |selector| selector.send(:ensure_current_process) }
+      end
+    end
     #  This singleton class runs a continuous select loop which
     #  listens for responses on all of the in-use sockets.
     #  When a new query is sent, the thread is woken up, and
@@ -46,6 +55,9 @@ module Dnsruby
     # Blocking I/O and client callbacks run outside @@mutex.
 
     def initialize
+      @process_mutex ||= Mutex.new
+      @send_queue = @send_workers = @send_groups = nil
+      @created_sockets = ObjectSpace::WeakMap.new
       @@mutex = Mutex.new
       @@mutex.synchronize {
         @@in_select=false
@@ -76,8 +88,44 @@ module Dnsruby
         #  Suppress reverse lookups
         BasicSocket.do_not_reverse_lookup = true
         #  Now start the select thread
+        @process_pid = Process.pid
         @@select_thread = Thread.new { do_select }
       }
+    end
+
+    # Only the calling thread survives fork. Discard all parent transactions
+    # before restarting any workers, and close the child's descriptor copies
+    # without shutting down the connections still used by the parent.
+    def ensure_current_process
+      return unless @process_pid && @process_pid != Process.pid
+      @process_mutex.synchronize do
+        if @process_pid != Process.pid
+          sockets = @@sockets.to_a + @@socket_hash.keys + @@wakeup_sockets + @created_sockets.keys
+          sockets.uniq.each do |socket|
+            begin
+              socket.close unless socket.closed?
+            rescue IOError, SystemCallError
+            end
+          end
+          Thread.current[:dnsruby_response_query] = nil
+          initialize
+        end
+      end
+    end
+    private :ensure_current_process
+
+    # Also protect callers retaining a selector reference across fork.
+    def state_mutex
+      ensure_current_process
+      @@mutex
+    end
+    private :state_mutex
+
+    # Keep weak references from allocation through connect/write, before a
+    # socket joins the read set. A fork must close those descriptor copies too.
+    def track_socket(socket)
+      state_mutex.synchronize { (@created_sockets ||= ObjectSpace::WeakMap.new)[socket] = true }
+      socket
     end
 
     def get_socket_pair
@@ -185,7 +233,7 @@ module Dnsruby
     # Register ownership before work leaves the selector, including attempts
     # which have not acquired a socket yet. Nil is never a live attempt token.
     def reserve_send(settings, previous_settings = nil)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         return false unless @@query_hash[settings.client_query_id].equal?(previous_settings)
         if previous_settings
           settings.retire_connection = previous_settings.retire_connection
@@ -225,7 +273,7 @@ module Dnsruby
     # introducing a new admission limit; each retains its original deadline.
     def defer_send(sender = nil, &operation)
       task = SendTask.new(&operation)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         unless @send_queue && @send_workers.any?(&:alive?)
           queue = Queue.new
           workers = []
@@ -257,9 +305,9 @@ module Dnsruby
     end
 
     def run_send_group(sender)
-      task = @@mutex.synchronize { @send_groups[sender].shift }
+      task = state_mutex.synchronize { @send_groups[sender].shift }
       task.run
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         if @send_groups[sender].empty?
           @send_groups.delete(sender)
         else
@@ -284,7 +332,7 @@ module Dnsruby
 
     def add_to_select(query_settings)
       #  Add the query to sockets, and then wake the select thread up
-      @@mutex.synchronize {
+      state_mutex.synchronize {
         check_select_thread_synchronized
         add_query_from_mutex_synchronized_block(query_settings)
       }
@@ -292,17 +340,17 @@ module Dnsruby
     end
 
     def query_settings_for_id(client_query_id)
-      @@mutex.synchronize { @@query_hash[client_query_id] }
+      state_mutex.synchronize { @@query_hash[client_query_id] }
     end
 
     def selector_thread?
-      @@mutex.synchronize { @@select_thread.equal?(Thread.current) }
+      state_mutex.synchronize { @@select_thread.equal?(Thread.current) }
     end
 
     # Reserve a pipeline query before writing, or replace a protocol retry.
     # A deferred retry must not replace an attempt already completed or replaced.
     def register_query_if_current(query_settings, previous_settings)
-      registered = @@mutex.synchronize do
+      registered = state_mutex.synchronize do
         return false unless @@query_hash[query_settings.client_query_id].equal?(previous_settings)
         # Selection happens outside this mutex. A timeout or close may retire
         # that stream before admission, so leave the reservation untouched and
@@ -361,7 +409,7 @@ module Dnsruby
     # rolled-over pipelines. Other logical queries sharing a sender may finish,
     # but future sends must choose a fresh connection.
     def retire_sender(sender)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         refresh_validation_process
         # A connect can be in progress without a socket in our read set yet.
         # Carry retirement through reservation replacements so its eventual
@@ -385,7 +433,7 @@ module Dnsruby
     end
 
     def retire_socket(socket)
-      @@mutex.synchronize { mark_socket_for_retirement(socket) }
+      state_mutex.synchronize { mark_socket_for_retirement(socket) }
       wake_up_select_thread
     end
 
@@ -399,7 +447,7 @@ module Dnsruby
     private :mark_socket_for_retirement
 
     def query_id_in_use?(socket, header_id)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         !socket_ids_for_header(socket, header_id).empty?
       end
     end
@@ -415,7 +463,7 @@ module Dnsruby
     private :socket_ids_for_header
 
     def reusable_socket?(socket)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         !socket.closed? && !(@@retiring_sockets ||= Set.new).include?(socket)
       end
     end
@@ -424,7 +472,7 @@ module Dnsruby
     # its outstanding queries, then let the selector deliver their errors.
     # Sender threads must never invoke resolver callbacks themselves.
     def fail_tcp_send(settings, error)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         settings.socket.close rescue nil
         exceptions = retire_socket_from_mutex_synchronized_block(settings.socket)
         exceptions.each do |eof, socket, id|
@@ -442,7 +490,7 @@ module Dnsruby
     # A send waiting for the pipeline writer has no new socket registration yet.
     # Its original attempt may have expired or been replaced in the meantime.
     def fail_query_if_current(id, queue, previous_settings, error)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         return unless @@query_hash[id].equal?(previous_settings)
         remove_id_from_mutex_synchronized_block(id) if previous_settings
         @@queued_exceptions << [id, queue, error, nil]
@@ -459,7 +507,7 @@ module Dnsruby
     end
 
     def claim_query(settings, response_received = false)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         return false unless @@query_hash[settings.client_query_id].equal?(settings)
         remove_id_from_mutex_synchronized_block(settings.client_query_id, nil, response_received)
         true
@@ -486,7 +534,7 @@ module Dnsruby
 
     def select_thread_alive?
       ret=true
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         ret = !!(@@select_thread && @@select_thread.alive?)
       }
       return ret
@@ -504,7 +552,7 @@ module Dnsruby
         send_queued_responses
         send_queued_validation_responses
         timeout = tick_time = 0.1 # We provide a timer service to various Dnsruby classes
-        sockets, timeouts, has_observer = @@mutex.synchronize { [@@sockets.to_a, @@timeouts.values, !@@observers.empty?] }
+        sockets, timeouts, has_observer = state_mutex.synchronize { [@@sockets.to_a, @@timeouts.values, !@@observers.empty?] }
         if (timeouts.length > 0)
           timeout = timeouts.min - TransportClock.now
           if (timeout <= 0)
@@ -549,7 +597,7 @@ module Dnsruby
           unused_loop_count=0
           # process_error(errors)
         end
-        @@mutex.synchronize do
+        state_mutex.synchronize do
           if (unused_loop_count > 10 && @@query_hash.empty? && @@observers.empty? &&
               @@queued_exceptions.empty? && @@queued_responses.empty? &&
               @@queued_validation_responses.empty?)
@@ -583,7 +631,7 @@ module Dnsruby
     # Detach closed sockets before notifying clients. Callbacks can register
     # other queries, and must never run while holding the selector mutex.
     def clean_up_closed_sockets
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         @@sockets.select(&:closed?).flat_map do |socket|
           retire_socket_from_mutex_synchronized_block(socket)
         end
@@ -620,24 +668,21 @@ module Dnsruby
     end
 
     def process_ready(ready)
-      persistent_sockets, nonpersistent_sockets = @@mutex.synchronize { ready.partition { |socket| persistent?(socket) } }
+      persistent_sockets, nonpersistent_sockets = state_mutex.synchronize { ready.partition { |socket| persistent?(socket) } }
 
       nonpersistent_sockets.each do |socket|
-        query_settings = @@mutex.synchronize { @@query_hash[(@@socket_hash[socket] || []).first] }
+        query_settings = state_mutex.synchronize { @@query_hash[(@@socket_hash[socket] || []).first] }
         next if !query_settings
 
         udp_packet_size = query_settings.udp_packet_size
         msg, bytes = get_incoming_data(socket, udp_packet_size)
 
         process_message(msg, bytes, socket) if msg
-
-        ready.delete(socket)
       end
 
       persistent_sockets.each do |socket|
         msg, bytes = get_incoming_data(socket, 0)
         process_message(msg, bytes, socket) if msg
-        ready.delete(socket)
       end
     end
 
@@ -659,12 +704,12 @@ module Dnsruby
     def send_response_to_client(msg, bytes, socket)
       # Match the header ID against queries outstanding on this connection.
       client_ids=[]
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         client_ids = socket_ids_for_header(socket, msg.header.id)
       }
       #  get the queries associated with them
       client_ids.each do |id|
-        settings = @@mutex.synchronize { @@query_hash[id] }
+        settings = state_mutex.synchronize { @@query_hash[id] }
         next unless settings && settings.socket == socket
         query_header_id = settings.query.header.id
         if (query_header_id == msg.header.id)
@@ -722,7 +767,7 @@ module Dnsruby
     end
 
     def remove_id(id)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         remove_id_from_mutex_synchronized_block(id)
       end
     end
@@ -779,7 +824,7 @@ module Dnsruby
 
     def process_timeouts
       # NOTE: It's @@timeouts we need to protect; after the clone we're ok
-      timeouts = @@mutex.synchronize do
+      timeouts = state_mutex.synchronize do
         @@timeouts.map { |id, timeout| [@@query_hash[id], timeout] }
       end
       time_now = TransportClock.now
@@ -798,7 +843,7 @@ module Dnsruby
       buf = +""
       expected_length = 0
       reading_length = nil
-      @@mutex.synchronize {
+      state_mutex.synchronize {
         return false if socket.closed?
         buf, expected_length, reading_length = @@tcp_buffers[socket]
         if (!buf)
@@ -814,7 +859,7 @@ module Dnsruby
           # Depending on the Ruby version, EOF is nil or an empty string.
           if input.nil? || input.empty?
             Dnsruby.log.debug("EOF from server - no bytes read - closing socket")
-            exceptions = @@mutex.synchronize do
+            exceptions = state_mutex.synchronize do
               socket.close
               retire_socket_from_mutex_synchronized_block(socket)
             end
@@ -828,7 +873,7 @@ module Dnsruby
         rescue IOError, SystemCallError => error
           # A reset or fatal read failure cannot become readable again. Retire
           # every owner once, without invoking resolver callbacks under our lock.
-          exceptions = @@mutex.synchronize do
+          exceptions = state_mutex.synchronize do
             socket.close rescue nil
             retire_socket_from_mutex_synchronized_block(socket)
           end
@@ -841,7 +886,7 @@ module Dnsruby
       if (buf.length == expected_length)
         if reading_length
           #  We just read the data_length field. Now we need to start reading that many bytes.
-          @@mutex.synchronize {
+          state_mutex.synchronize {
             return false if socket.closed?
             answersize = buf.unpack('n')[0]
             @@tcp_buffers[socket] = [+"", answersize, false]
@@ -849,13 +894,13 @@ module Dnsruby
           return tcp_read(socket)
         else
           #  We just read the data - now return it
-          @@mutex.synchronize {
+          state_mutex.synchronize {
             @@tcp_buffers.delete(socket)
           }
           return buf
         end
       else
-        @@mutex.synchronize {
+        state_mutex.synchronize {
           return false if socket.closed?
           @@tcp_buffers[socket]=[buf, expected_length, reading_length]
         }
@@ -921,7 +966,7 @@ module Dnsruby
           return
         end
         unless is_tcp
-          matches_question = @@mutex.synchronize do
+          matches_question = state_mutex.synchronize do
             current = @@query_hash[client_id]
             partial = e.partial_message if e.is_a?(DecodeError)
             current && current.socket == socket && (current.query.send_raw ||
@@ -941,7 +986,7 @@ module Dnsruby
         # an incomplete decoded Message can still contain a default header.
         if buf.bytesize >= 12
           flags = buf.unpack('n2').last
-          matches_header = @@mutex.synchronize do
+          matches_header = state_mutex.synchronize do
             current = @@query_hash[client_id]
             current && current.socket == socket && (current.query.send_raw ||
               ((flags & 0x8000) != 0 && ((flags >> 11) & 15) == current.query.header.opcode.code))
@@ -951,7 +996,7 @@ module Dnsruby
         # No undecodable packet can authenticate its TSIG. Discard it before
         # either failing the transaction or acting on an untrusted TC bit, just
         # as check_response discards unsigned or incorrectly signed replies.
-        unauthenticated = @@mutex.synchronize do
+        unauthenticated = state_mutex.synchronize do
           current = @@query_hash[client_id]
           if current && current.socket == socket && current.query.tsig && !current.query.send_raw
             current.authentication_error ||= TsigError.new('Cannot authenticate malformed response')
@@ -963,7 +1008,7 @@ module Dnsruby
         # Repeating malformed TCP replies must not renew the packet deadline.
         settings = nil
         if !is_tcp && (DecodeError === e) && e.partial_message && e.partial_message.header.tc
-          settings = @@mutex.synchronize do
+          settings = state_mutex.synchronize do
             current = @@query_hash[client_id]
             if current && current.socket == socket && !current.ignore_truncation && !current.single_resolver.no_tcp
               current
@@ -988,7 +1033,7 @@ module Dnsruby
       if is_tcp
         # This supplies peer metadata only. Normal response checks below still
         # validate the question and TSIG, including sequential duplicate IDs.
-        settings = @@mutex.synchronize do
+        settings = state_mutex.synchronize do
           id = socket_ids_for_header(socket, ans.header.id).first
           @@query_hash[id]
         end
@@ -1014,13 +1059,13 @@ module Dnsruby
       #   No way to notify the client about this error, unless there was only one connection on the socket
       #  Not a problem, as there only will ever be one connection on the socket (Kaminsky attack mitigation)
       ids_for_socket = []
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         ids_for_socket = (@@socket_hash[socket] || []).to_a
       }
       return if ids_for_socket.empty?
       if (ids_for_socket.length == 1)
         answerfrom=nil
-        @@mutex.synchronize{
+        state_mutex.synchronize{
           query_settings = @@query_hash[ids_for_socket[0]]
           answerfrom=query_settings.dest_server if query_settings
         }
@@ -1034,7 +1079,7 @@ module Dnsruby
       #  A pipelined socket can have several outstanding queries.
       client_id=nil
       #  Figure out client id from answerfrom
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         ids = (header_id ? socket_ids_for_header(socket, header_id) :
           (@@socket_hash[socket] || [])).select { |id| @@query_hash[id] }
         # TCP decoding can fail before the peer address has been assigned. The
@@ -1069,7 +1114,7 @@ module Dnsruby
     def send_exception_to_client(err, socket, client_id, msg=nil)
       #  find the client response queue
       client_queue = nil
-      @@mutex.synchronize {
+      state_mutex.synchronize {
         settings = @@query_hash[client_id]
         return unless settings && (!socket || settings.socket == socket)
         client_queue = settings.client_queue
@@ -1080,7 +1125,7 @@ module Dnsruby
     end
 
     def push_exception_to_select(client_id, client_queue, err, msg)
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         @@queued_exceptions.push([client_id, client_queue, err, msg])
         check_select_thread_synchronized
       }
@@ -1091,7 +1136,7 @@ module Dnsruby
       #  This needs to queue the response TO THE SELECT THREAD, which then needs
       #  to send it out from its normal loop.
       Dnsruby.log.debug{"Pushing response to client queue direct from resolver or validator"}
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         err = nil
         if (msg.rcode == RCode.NXDOMAIN)
           err = NXDomain.new
@@ -1106,7 +1151,7 @@ module Dnsruby
       #  This needs to queue the response TO THE SELECT THREAD, which then needs
       #  to send it out from its normal loop.
       Dnsruby.log.debug{"Pushing response to client queue direct from resolver or validator"}
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         @@queued_validation_responses.push([client_id, client_queue, msg, err, query, res])
         check_select_thread_synchronized
       }
@@ -1115,7 +1160,7 @@ module Dnsruby
 
     def send_queued_exceptions
       exceptions = []
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         exceptions = @@queued_exceptions
         @@queued_exceptions = []
       }
@@ -1129,7 +1174,7 @@ module Dnsruby
 
     def send_queued_responses
       responses = []
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         responses = @@queued_responses
         @@queued_responses = []
       }
@@ -1156,7 +1201,7 @@ module Dnsruby
 
     def send_queued_validation_responses
       responses = []
-      @@mutex.synchronize{
+      state_mutex.synchronize{
         responses = @@queued_validation_responses
         @@queued_validation_responses = []
       }
@@ -1181,7 +1226,7 @@ module Dnsruby
     end
 
     def add_observer(client_queue, observer)
-      @@mutex.synchronize {
+      state_mutex.synchronize {
         (@@observed_queues ||= ObjectSpace::WeakMap.new)[client_queue] = true
         previous = @@observers[client_queue]
         unless previous.equal?(observer)
@@ -1198,12 +1243,12 @@ module Dnsruby
     # Take the observer snapshot before acquiring its Resolver lock: Resolver
     # completion acquires these locks in the opposite direction.
     def validation_deadline(client_queue, client_query_id)
-      observer = @@mutex.synchronize { @@observers[client_queue] }
+      observer = state_mutex.synchronize { @@observers[client_queue] }
       observer.validation_deadline(client_queue, client_query_id) if observer.respond_to?(:validation_deadline)
     end
 
     def register_validation(client_queue, sender, control)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         refresh_validation_process
         # A response may have been accepted just before close or its total
         # deadline. Remember prior observers weakly so rejected registrations
@@ -1224,7 +1269,7 @@ module Dnsruby
     end
 
     def unregister_validation(client_queue, sender, control)
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         refresh_validation_process
         @@validations.delete_if do |queue, owner, token|
           queue.equal?(client_queue) && owner.equal?(sender) && token.equal?(control)
@@ -1254,7 +1299,7 @@ module Dnsruby
     # Stop packet attempts without removing the logical query's observer. A
     # received response can still need validation and its overall deadline.
     def cancel_queries_for_queue(client_queue)
-      @@mutex.synchronize { cancel_queries_for_queue_synchronized(client_queue) }
+      state_mutex.synchronize { cancel_queries_for_queue_synchronized(client_queue) }
       wake_up_select_thread
     end
 
@@ -1276,7 +1321,7 @@ module Dnsruby
     private :remove_observer_queue_count
 
     def remove_observer(client_queue, observer)
-      @@mutex.synchronize {
+      state_mutex.synchronize {
         if (@@observers[client_queue]==observer)
           registered_observer = @@observers.delete(client_queue)
           # Resolver completion/close owns every packet attempt for this queue,
@@ -1294,7 +1339,7 @@ module Dnsruby
     def notify_queue_observers(client_queue, client_query_id)
       #  If any observers are known for this query queue then notify them
       observer=nil
-      @@mutex.synchronize {
+      state_mutex.synchronize {
         observer = @@observers[client_queue]
       }
       if (observer)
@@ -1311,7 +1356,7 @@ module Dnsruby
     rescue ClosedQueueError
       # A direct PacketSender caller can close its queue while queries are
       # pending. Cancel those queries so other clients can keep running.
-      @@mutex.synchronize do
+      state_mutex.synchronize do
         cancel_queries_for_queue_synchronized(client_queue)
         cancel_validations_for_queue_synchronized(client_queue)
         observer = @@observers.delete(client_queue)
@@ -1325,7 +1370,7 @@ module Dnsruby
     def send_tick_to_observers
       #  If any observers are known then send them a tick
       tick_observers=nil
-      @@mutex.synchronize {
+      state_mutex.synchronize {
         tick_observers = @@tick_observers.dup
       }
       tick_observers.each do |observer|

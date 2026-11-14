@@ -89,6 +89,48 @@ class TestResolverConcurrency < Minitest::Test
     RUBY
   end
 
+  def test_sender_publication_uses_settings_changed_during_construction
+    isolated(<<~'RUBY')
+      original = Dnsruby::PacketSender.method(:new)
+      resolver = Dnsruby::Resolver.new(nameserver: '127.0.0.1', dnssec: false)
+      entered, release = Queue.new, Queue.new
+      Dnsruby::PacketSender.define_singleton_method(:new) do |*args|
+        original.call(*args).tap do
+          entered << true
+          release.pop
+        end
+      end
+      reconfigure = Thread.new { resolver.nameserver = '127.0.0.2' }
+      entered.pop
+      resolver.port = 1053
+      resolver.use_tcp = true
+      resolver.no_tcp = true
+      resolver.tcp_pipelining = true
+      resolver.tcp_pipelining_max_queries = 11
+      resolver.packet_timeout = 3
+      resolver.tsig = ['example.', 'c2VjcmV0']
+      resolver.ignore_truncation = true
+      resolver.src_address = '127.0.0.3'
+      resolver.src_address6 = '::1'
+      resolver.src_port = 50123
+      resolver.recurse = false
+      resolver.udp_size = 1452
+      resolver.dnssec = true
+      release << true
+      reconfigure.value
+      sender = resolver.single_resolvers.first
+      [:port, :use_tcp, :no_tcp, :tcp_pipelining, :tcp_pipelining_max_queries,
+        :packet_timeout, :ignore_truncation, :src_address, :src_port, :recurse,
+        :udp_size, :dnssec].each do |option|
+        raise "stale #{option}" unless sender.public_send(option) == resolver.public_send(option)
+      end
+      raise 'stale IPv6 source' unless sender.instance_variable_get(:@src_address6) == '::1'
+      raise 'stale TSIG key' unless sender.tsig.name.to_s == 'example' &&
+        sender.tsig.algorithm.to_s == 'hmac-sha256'
+      resolver.close
+    RUBY
+  end
+
   def test_initialization_failure_is_shared_and_an_explicit_reconfiguration_recovers
     isolated(<<~'RUBY')
       Thread.report_on_exception = false

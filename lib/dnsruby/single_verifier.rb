@@ -403,7 +403,8 @@ module Dnsruby
     def key_provenance(key)
       identity = KeyCache.key_identity(key)
       configured = @trust_mutex.synchronize do
-        @trust_anchors.keys.any? { |anchor| KeyCache.key_identity(anchor) == identity }
+        expire_trust_anchors
+        @configured_dnskey_identities.key?(identity)
       end
       return if configured
       local = trust_operation&.fetch(:keys)&.fetch(identity, nil)
@@ -529,12 +530,14 @@ module Dnsruby
       #  new total set of keys to check the rest of the rrsets.
       #  Return true if we can verify the whole message.
 
-      context = { message: msg, proofs: {} }
-      msg.each_section do |section|
+      sections = msg.section_rrsets
+      context = { message: msg, proofs: {}, sections: sections,
+        verified: {}.compare_by_identity }
+      sections.each_value do |rrsets|
         #         print "Checking section : #{section}\n"
-        ds_rrsets = section.rrsets(Types.DS)
+        ds_rrsets = rrsets.select { |rrset| rrset.type == Types.DS }
         if ((!ds_rrsets || ds_rrsets.length == 0) && (@verifier_type == VerifierType::DLV))
-          ds_rrsets = section.rrsets(Types.DLV)
+          ds_rrsets = rrsets.select { |rrset| rrset.type == Types.DLV }
         end
         ds_rrsets.each {|ds_rrset|
           if ((ds_rrset && ds_rrset.rrs.length > 0) && !verify_ds_rrset(ds_rrset, keys, msg, context))
@@ -543,7 +546,7 @@ module Dnsruby
           end
         }
 
-        key_rrsets = section.rrsets(Types.DNSKEY)
+        key_rrsets = rrsets.select { |rrset| rrset.type == Types.DNSKEY }
         key_rrsets.each {|key_rrset|
           if ((key_rrset && key_rrset.rrs.length > 0) && !verify_key_rrset(key_rrset, keys, context))
             raise VerifyError.new("Failed to verify DNSKEY RRSet")
@@ -552,18 +555,30 @@ module Dnsruby
         }
       end
 
-      verify_nsecs(msg)
-
       #  Then, look through all the remaining RRSets, and verify them all (unless not necessary).
-      msg.section_rrsets.each do |section, rrsets|
+      sections.each do |section, rrsets|
         rrsets.each do |rrset|
+          # Key learning already authenticated these exact per-message sets.
+          next if context[:verified].key?(rrset)
           #  If delegation NS or glue AAAA/A, then don't expect RRSIG.
           #  Otherwise, expect RRSIG and fail verification if RRSIG is not present
 
           if ((section == "authority") && (rrset.type == Types.NS))
+            # Parent-side delegation NS records are unsigned, including when
+            # the query is below the cut and its DS RRset authenticated above.
+            question = msg.question.first
+            terminal, answered = terminal_answer(msg, question) if question
+            if question && !answered && rrset.klass == question.qclass &&
+                within_zone?(terminal, rrset.name) && rrset.sigs.empty? &&
+                rrsets.any? { |set| set.type == Types.DS && set.name == rrset.name &&
+                  set.klass == rrset.klass && context[:verified].key?(set) &&
+                  rrset.name.subdomain_of?(context[:verified][set][:signature].signers_name) }
+              next
+            end
             #  Check for delegation
-            dsrrset = msg.authority.rrsets('DS')[0]
-            if ((msg.answer.size == 0) && (!dsrrset) && (rrset.type == Types.NS)) # (isDelegation)
+            dsrrset = rrsets.find { |set| set.type == Types.DS && set.name == rrset.name && set.klass == rrset.klass }
+            if question && !answered && rrset.klass == question.qclass &&
+                within_zone?(terminal, rrset.name) && !dsrrset
               #  Now check NSEC(3) records for absence of DS and SOA
               nsec = msg.authority.rrsets('NSEC')[0]
               if (!nsec || (nsec.length == 0))
@@ -630,92 +645,260 @@ module Dnsruby
           end
         end
       end
+      verify_nsecs(msg, context)
+      apply_verified_lifetimes(msg, context)
       return context[:insecure] ? :insecure : true
     end
 
-    def verify_nsecs(msg) # :nodoc:
-      # Positive wildcard proofs are checked against the signature that
-      # actually verified, including CNAMEs and answers to ANY queries.
-      return if msg.rcode == RCode.NOERROR && !msg.answer.empty?
-      #  NSEC(3) handling. Get NSEC(3)s in four cases : (RFC 4035, section 3.1.3)
-      #  a) No data - <SNAME, SCLASS> matches, but no <SNAME, SCLASS, STYPE) (§3.1.3.1)
-      #      - will expect NSEC in Authority (and associated RRSIG)
-      #      - NOERROR returned
-      #  b) Name error - no RRSets that match <SNAME, SCLASS> either exactly or through wildcard expansion   (§3.1.3.2)
-      #      - NSEC wil prove i) no exact match for <SNAME, SCLASS>, and ii) no RRSets that could match through wildcard expansion
-      #      - this may be proved in one or more NSECs (and associated RRSIGs)
-      #      - NXDOMAIN returned - should ensure we verify!
-      #  c) Wildcard answer - No <SNAME, SCLASS> direct matches, but matches <SNAME, SCLASS, STYPE> through wildcard expansion (§3.1.3.3)
-      #      - Answer section must include wildcard-expanded answer (and associated RRSIGs)
-      #      - label count in answer RRSIG indicates wildcard RRSet was expanded (less labels than in owner name)
-      #      - Authority section must include NSEC (and RRSIGs) proving that zone does not contain a closer match
-      #      - NOERROR returned
-      #  d) Wildcard no data - No <SNAME, SCLASS> direct. <SNAME, SCLASS> yes but <SNAME, SCLASS, STYPE> no through wildcard expansion (§3.1.3.4)
-      #      - Authority section contains NSECs (and RRSIGs) for :
-      #          i) NSEC proving no RRSets matching STYPE at wildcard owner name that matched <SNAME, SCLASS> via wildcard expansion
-      #          ii) NSEC proving no RRSets in zone that would have been closer match for <SNAME, SCLASS>
-      #      - this may be proved by one or more NSECs (and associated RRSIGs)
-      #      - NOERROR returned
-      # 
-      #  Otherwise no NSECs should be returned.
+    # Check denial at the end of an alias chain, not at the original QNAME.
+    # A CNAME-only answer without a negative SOA can legitimately be partial.
+    # Positive wildcard proofs are checked when their signatures verify.
+    def verify_nsecs(msg, context = nil) # :nodoc:
+      question = msg.question.first
+      return unless question && [RCode.NOERROR, RCode.NXDOMAIN].include?(msg.rcode)
+      name, answered = terminal_answer(msg, question)
+      return if msg.rcode == RCode.NOERROR && answered
+      raise VerifyError, 'NXDOMAIN response contains the requested answer' if answered
 
-      #  So, check for NSEC records in response, and work out what type of answer we have.
-      #  Then, if NSECs are present, make sure that we prove what they said they would.
-      #  What if the message *should* have no NSEC records? That can only be known by the validator.
-      #  We will assume that the validator has checked the (non)-existence of NSEC records - we should not
-      #  get upset if there aren't any. However, if there are, then we should verify that they say the right thing
-      qtype = msg.question()[0].qtype
-      return if (msg.rcode == RCode.NOERROR && ((qtype == Types.ANY) || (qtype == Types.NSEC) || (qtype == Types.NSEC3)))
-      if ((msg.rrsets('NSEC').length > 0) || (msg.rrsets('NSEC3').length > 0))
-        if (msg.rcode == RCode.NXDOMAIN)
-          #           print "Checking NSECs for Name Error\n"
-          # Name error - NSEC wil prove i) no exact match for <SNAME, SCLASS>, and ii) no RRSets that could match through wildcard expansion
-          #            - this may be proved in one or more NSECs (and associated RRSIGs)
-          check_name_in_nsecs(msg)
-          return check_no_wildcard_expansion(msg)
-        elsif (msg.rcode == RCode.NOERROR)
-          if (msg.answer.length > 0)
-            #             print "Checking NSECs for wildcard expansion\n"
-            #  wildcard expansion answer - check NSECs!
-            #  We want to make sure that the NSEC tells us that there is no closer match for this name
-            #  @TODO@ We need to make replace the RRSIG name with the wildcard name before we can verify it correctly.
-            check_num_rrsig_labels(msg)
-            return check_name_in_nsecs(msg, msg.question()[0].qtype, true)
-          else
-            #  Either no data or wildcard no data - check to see which
-            #  Should be able to tell this by checking the number of labels in the NSEC records.
-            #  Sort these two last cases out!
-            isWildcardNoData = false
-            [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
-              nsec_rrsets.each {|nsec_rrset|
-                nsec_rrset.rrs.each {|nsec|
-                  #                   print "Checking nsec to see if wildcard : #{nsec}\n"
-                  if (nsec.name.wild? ||(nsec.name.labels.length < msg.question()[0].qname.labels.length))
-                    isWildcardNoData = true
-                  end
-                }
-              }
-            }
-
-            if (isWildcardNoData)
-              #               print "Checking NSECs for wildcard no data\n"
-              #  Check NSECs -
-              #          i) NSEC proving no RRSets matching STYPE at wildcard owner name that matched <SNAME, SCLASS> via wildcard expansion
-              check_name_not_in_wildcard_nsecs(msg)
-              #          ii) NSEC proving no RRSets in zone that would have been closer match for <SNAME, SCLASS>
-              return check_name_in_and_type_not_in_nsecs(msg)
-            else # (isNoData)
-              #               print "Checking NSECs for No data\n"
-              #  Check NSEC types covered to make sure this type not present.
-              return check_name_in_and_type_not_in_nsecs(msg)
-            end
-          end
-        else
-          #  Anything we should do here?
-        end
+      authority = context ? context[:sections].fetch('authority') : msg.authority.rrsets
+      klass, qtype = question.qclass, question.qtype
+      soa = authority.select do |set|
+        set.type == Types.SOA && set.klass == klass && within_zone?(name, set.name)
+      end.max_by { |set| set.name.labels.length }
+      referral = if msg.rcode == RCode.NOERROR && !soa
+        authority.select do |set|
+          set.type == Types.NS && set.klass == klass && within_zone?(name, set.name)
+        end.max_by { |set| set.name.labels.length }
+      end
+      if referral
+        # A signed delegation with DS needs no denial. An unsigned referral
+        # proves the absence of DS at the delegation, not absence of QTYPE.
+        return if authority.any? { |set| set.type == Types.DS && set.name == referral.name && set.klass == klass }
+        name, qtype = referral.name, Types.DS
+      elsif msg.rcode == RCode.NOERROR && name != question.qname && !soa
+        return
       end
 
+      proofs = authority.select { |set| [Types.NSEC, Types.NSEC3].include?(set.type) && set.klass == klass }
+      if proofs.empty?
+        raise VerifyError, "Missing denial proof for #{name}"
+      end
+      zone = soa&.name
+      if context && soa
+        signature = context[:verified][soa]&.fetch(:signature)
+        raise VerifyError, 'Negative SOA is not signed by its zone' unless signature && signature.signers_name == zone
+      end
+      groups = {}
+      proofs.each do |set|
+        ValidationBudget.current&.check!(1)
+        signature = context && context[:verified][set]&.fetch(:signature)
+        next if context && !signature
+        signing_zone = signature&.signers_name || (set.type == Types.NSEC3 ? set.name.strip_label : zone)
+        next unless signing_zone && within_zone?(name, signing_zone)
+        next if zone && signing_zone != zone
+        # DS denial at a non-root delegation must come from the parent.
+        next if qtype == Types.DS && name == signing_zone && !name.labels.empty?
+        next if signature && signature.labels != set.name.labels.length &&
+          !(set.name.wild? && signature.labels == set.name.labels.length - 1)
+        (groups[[signing_zone, set.type]] ||= []).concat(set.rrs)
+      end
+      insecure = false
+      groups.each do |(signing_zone, type), records|
+        result = if type == Types.NSEC3
+          nsec3_denial(records, name, qtype, signing_zone, msg.rcode, !!referral)
+        else
+          nsec_denial(records, name, qtype, signing_zone, msg.rcode, !!referral)
+        end
+        if result == :secure
+          return true
+        elsif result == :insecure
+          insecure = true
+        end
+      end
+      if insecure
+        context[:insecure] = true if context
+        return true
+      end
+      raise VerifyError, "No authenticated denial proof for #{name}, #{qtype}"
     end
+
+    def terminal_answer(msg, question)
+      name = question.qname
+      seen = {}
+      loop do
+        ValidationBudget.current&.check!(1)
+        raise VerifyError, 'CNAME loop in answer' if seen[name.canonical]
+        seen[name.canonical] = true
+        records = msg.answer.select { |rr| rr.name == name && rr.klass == question.qclass && rr.type != Types.RRSIG }
+        return [name, true] if records.any? { |rr| question.qtype == Types.ANY || rr.type == question.qtype }
+        aliases = records.select { |rr| rr.type == Types.CNAME }
+        return [name, false] if aliases.empty?
+        targets = aliases.map(&:domainname).uniq
+        raise VerifyError, 'Conflicting CNAME targets in answer' unless targets.length == 1
+        name = targets.first
+      end
+    end
+
+    def within_zone?(name, zone)
+      name == zone || name.subdomain_of?(zone)
+    end
+
+    def denial_bitmap?(record, qtype, referral = false)
+      types = record.types
+      # ANY has no data-type bit. NSEC3 can represent an empty nonterminal;
+      # an exact NSEC owner necessarily has at least its own NSEC RRset.
+      return record.type == Types.NSEC3 && types.empty? if qtype == Types.ANY
+      return false if types.include?(qtype) || types.include?(Types.CNAME)
+      return types.include?(Types.NS) && !types.include?(Types.SOA) if referral
+      # A parent delegation cannot deny ordinary data in the child zone.
+      qtype == Types.DS || !types.include?(Types.NS) || types.include?(Types.SOA)
+    end
+
+    def nsec3_denial(records, name, qtype, zone, rcode, referral)
+      records = records.select do |rr|
+        ValidationBudget.current&.check!(1)
+        rr.name.strip_label == zone && rr.usable_hash?
+      end
+      return unless records.any?
+      # Do not combine independently salted/iterated chains into one proof.
+      parameters = records.map { |rr| [rr.hash_alg, rr.iterations, rr.salt] }.uniq
+      return unless parameters.length == 1
+      hashes = {}
+      hash_for = lambda do |candidate|
+        hashes[candidate.canonical] ||= records.first.hash_name(candidate)
+      end
+      matching = lambda do |candidate|
+        hashed = hash_for.call(candidate)
+        find_denial_record(records) { |rr| rr.owner_hash == hashed }
+      end
+      covering = lambda do |candidate|
+        hashed = hash_for.call(candidate)
+        find_denial_record(records) { |rr| rr.covers_hash?(hashed) }
+      end
+      exact = matching.call(name)
+      if rcode == RCode.NOERROR && exact
+        return referral ? :insecure : :secure if denial_bitmap?(exact, qtype, referral)
+        return
+      end
+      return if exact
+
+      child, closest, next_cover = name, name.strip_label, nil
+      while within_zone?(closest, zone)
+        ValidationBudget.current&.check!(1)
+        if (record = matching.call(closest))
+          # RFC 5155 8.3: a DNAME or parent-side delegation is not an
+          # authoritative closest encloser for names below it.
+          return if record.types.include?(Types.DNAME) ||
+            (record.types.include?(Types.NS) && !record.types.include?(Types.SOA))
+          next_cover = covering.call(child)
+          break
+        end
+        break if closest == zone
+        child, closest = closest, closest.strip_label
+      end
+      return unless next_cover
+      if rcode == RCode.NOERROR && qtype == Types.DS
+        return :insecure if next_cover.opt_out?
+        return
+      end
+      wildcard = Name.new([Name::Label.new('*')] + closest.labels, true)
+      if rcode == RCode.NXDOMAIN
+        return unless covering.call(wildcard)
+      else
+        wildcard_record = matching.call(wildcard)
+        return unless wildcard_record && denial_bitmap?(wildcard_record, qtype)
+      end
+      next_cover.opt_out? ? :insecure : :secure
+    end
+
+    def nsec_denial(records, name, qtype, zone, rcode, referral)
+      records = records.select do |rr|
+        ValidationBudget.current&.check!(1)
+        within_zone?(rr.name, zone) && within_zone?(rr.next_domain, zone)
+      end
+      return unless records.any?
+      return unless consistent_nsec_intervals?(records)
+      exact = find_denial_record(records) { |rr| rr.name == name }
+      if rcode == RCode.NOERROR && exact
+        return referral ? :insecure : :secure if denial_bitmap?(exact, qtype, referral)
+        return
+      end
+      return if exact || referral
+      if rcode == RCode.NOERROR && find_denial_record(records) { |rr| rr.next_domain.subdomain_of?(name) && interval_covers?(rr.name, rr.next_domain, name) }
+        # An NSEC ending at a descendant proves an empty nonterminal exists.
+        return :secure
+      end
+      return unless find_denial_record(records) { |rr| nsec_covers_next_closer?(rr, name, zone) }
+      closest = name.strip_label
+      while within_zone?(closest, zone)
+        break if find_denial_record(records) { |rr| within_zone?(rr.name, closest) || within_zone?(rr.next_domain, closest) }
+        return if closest == zone
+        closest = closest.strip_label
+      end
+      next_closer = Name.new(name.labels.last(closest.labels.length + 1), true)
+      return unless find_denial_record(records) { |rr| nsec_covers_next_closer?(rr, next_closer, zone) }
+      wildcard = Name.new([Name::Label.new('*')] + closest.labels, true)
+      if rcode == RCode.NXDOMAIN
+        return :secure if find_denial_record(records) { |rr| nsec_covers_next_closer?(rr, wildcard, zone) }
+      else
+        record = find_denial_record(records) { |rr| rr.name == wildcard }
+        return :secure if record && denial_bitmap?(record, qtype)
+      end
+      nil
+    end
+
+    def find_denial_record(records)
+      records.find do |record|
+        ValidationBudget.current&.check!(1)
+        yield record
+      end
+    end
+
+    def consistent_nsec_intervals?(records)
+      # If an interval contains any observed owner, it contains the next
+      # distinct owner in canonical order. Sorting avoids an all-pairs scan.
+      owners = records.group_by do |rr|
+        ValidationBudget.current&.check!(1)
+        rr.name.canonical
+      end.values.sort do |first, second|
+        ValidationBudget.current&.check!(1)
+        first.first.name.canonically_before(second.first.name) ? -1 : 1
+      end
+      owners.each_with_index do |group, index|
+        following = owners[(index + 1) % owners.length].first.name
+        group.each do |rr|
+          ValidationBudget.current&.check!(1)
+          return false if interval_covers?(rr.name, rr.next_domain, following)
+        end
+      end
+      true
+    end
+
+    # Section#rrsets intentionally returns copies. Publish their authenticated
+    # bounds only after the entire message has passed validation, including its
+    # denial proof, so the response cache receives the same lifetimes.
+    def apply_verified_lifetimes(msg, context)
+      limits = {}
+      now = Time.now.to_i
+      context[:verified].each do |rrset, result|
+        identity = [rrset.name.canonical, rrset.klass.code, rrset.type.code]
+        previous = limits[identity]
+        limits[identity] = [([rrset.ttl] + Array(previous&.first)).min,
+          ([result[:expiration]] + Array(previous&.last)).min]
+      end
+      msg.each_resource do |rr|
+        type = rr.type == Types.RRSIG ? rr.type_covered : rr.type
+        limit = limits[[rr.name.canonical, rr.klass.code, type.code]]
+        next unless limit
+        previous = rr.instance_variable_get(:@dnsruby_authenticated_expiration)
+        deadline = [previous, limit.last].compact.min
+        rr.ttl = [rr.ttl, limit.first, [deadline - now, 0].max].min
+        rr.instance_variable_set(:@dnsruby_authenticated_expiration, deadline)
+        rr.instance_variable_set(:@dnsruby_received_at, now)
+      end
+    end
+    private :terminal_answer, :within_zone?, :denial_bitmap?, :nsec3_denial,
+      :nsec_denial, :apply_verified_lifetimes, :find_denial_record, :consistent_nsec_intervals?
 
     def check_num_rrsig_labels(msg) # :nodoc:
       #  Check that the number of labels in the RRSIG is less than the number
@@ -924,9 +1107,15 @@ module Dnsruby
       end)
       if explicit_ds
         # Caller-supplied DS records are explicit trust input. If this is a
-        # learned DS RRset, retain its original absolute deadline.
+        # learned DS RRset or a new set wrapping learned records, retain their
+        # original absolute deadlines and trust sources.
         provenance = admit_learned_rrset(explicit_ds)
-        stores = [[provenance, explicit_ds.rrs]]
+        stores = explicit_ds.rrs.filter_map do |record|
+          trust = provenance || learned_provenance(record)
+          next if trust && !usable_provenance?(trust)
+          [admit_provenance(trust), [record]]
+        end
+        raise VerifyError, 'Learned DS trust is no longer valid' if stores.empty?
       end
       candidates = {}
       key_rrset.rrs.each do |key|
@@ -998,7 +1187,7 @@ module Dnsruby
     end
 
     private def verify_rrset_internal(rrset, keys, context)
-      received_at = Time.now.to_i
+      received_at = rrset.rrs.map { |rr| rr.instance_variable_get(:@dnsruby_received_at) }.compact.min || Time.now.to_i
       #       print "Verify_rrset #{rrset.name}, #{rrset.type}\n"
 #      print "ABOUT TO VERIFY WITH #{keys == nil ? '0' : keys.length} keys\n"
 #      if (keys != nil)
@@ -1052,16 +1241,27 @@ module Dnsruby
           next if parent_provenance && !usable_provenance?(parent_provenance)
           parent_provenance = admit_provenance(parent_provenance)
           ValidationBudget.current&.signature!
+          ttl_expiration = received_at + [rrset.ttl, sigrec.ttl, sigrec.original_ttl].min
+          previous_expirations = (rrset.rrs + [sigrec]).map do |rr|
+            rr.instance_variable_get(:@dnsruby_authenticated_expiration)
+          end.compact
           verify_rrset_with_key(rrset, keyrec, sigrec, canonical_data)
           check_wildcard_proof(rrset, sigrec, keys, context) if context[:message]
           if parent_provenance && !usable_provenance?(parent_provenance)
             raise VerifyError, 'Learned trust expired during verification'
           end
-          expiration = [received_at + rrset.ttl, sigrec.expiration].min
+          expiration = ([ttl_expiration, sigrec.expiration] + previous_expirations).min
           provenance = authenticated_provenance(rrset, sigrec, expiration, parent_provenance)
+          verified_at = Time.now.to_i
+          rrset.ttl = [rrset.ttl, [provenance.expiration - verified_at, 0].max].min
+          rrset.each do |rr|
+            rr.instance_variable_set(:@dnsruby_authenticated_expiration, provenance.expiration)
+            rr.instance_variable_set(:@dnsruby_received_at, verified_at)
+          end
           context[:expiration] = provenance.expiration
           context[:provenance] = provenance
           context[:signature] = sigrec
+          context[:verified][rrset] = { signature: sigrec, expiration: provenance.expiration } if context[:verified]
           return true
         rescue VerifyError => e
           error = e
@@ -1139,11 +1339,8 @@ module Dnsruby
         raise VerifyError.new("Signature failed to cryptographically verify")
       end
       ValidationBudget.current&.check!
-      #  Sort out the TTLs - set it to the minimum valid ttl
-      expiration_diff = sigrec.expiration.to_i - Time.now.to_i
-      raise VerifyError, 'Signature expired during verification' if expiration_diff < 0
-      rrset.ttl = ([rrset.ttl, sigrec.ttl, sigrec.original_ttl,
-          expiration_diff].sort)[0]
+      # Commit lifetime bounds only after the wildcard proof also succeeds.
+      raise VerifyError, 'Signature expired during verification' if sigrec.expiration.to_i < Time.now.to_i
       #             print "VERIFIED OK\n"
       return true
     end

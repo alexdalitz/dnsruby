@@ -102,7 +102,23 @@ module Dnsruby
     # *  Dnsruby::Message.new('example.com', Dnsruby::Types.PTR, 'HS')
     # 
     def initialize(*args)
-      @header = Header.new()
+      initialize_fields(Header.new)
+      type = Types::A
+      klass = Classes::IN
+      if (args.length > 0)
+        name = args[0]
+        if (args.length > 1)
+          type = Types.new(args[1])
+          if (args.length > 2)
+            klass = Classes.new(args[2])
+          end
+        end
+        add_question(name, type, klass)
+      end
+    end
+
+    private def initialize_fields(header)
+      @header = header
       #       @question = Section.new(self)
       @question = []
       @answer = Section.new(self)
@@ -119,18 +135,6 @@ module Dnsruby
       @security_level = SecurityLevel.UNCHECKED
       @security_error = nil
       @cached = false
-      type = Types::A
-      klass = Classes::IN
-      if (args.length > 0)
-        name = args[0]
-        if (args.length > 1)
-          type = Types.new(args[1])
-          if (args.length > 2)
-            klass = Classes.new(args[2])
-          end
-        end
-        add_question(name, type, klass)
-      end
     end
 
     # The question section, an array of Dnsruby::Question objects.
@@ -567,7 +571,11 @@ module Dnsruby
 
     #  Decode the encoded message
     def Message.decode(m)
-      o = Message.new()
+      # Incoming packets already contain an ID; do not allocate and randomize
+      # a query header only to replace it with the decoded response header.
+      o = Message.allocate
+      o.send(:initialize_fields, nil)
+      received_at = Time.now.to_i
       begin
         MessageDecoder.new(m) {|msg|
           o.header = Header.new(msg)
@@ -577,6 +585,7 @@ module Dnsruby
           }
           o.header.ancount.times {
             rr = msg.get_rr
+            rr.instance_variable_set(:@dnsruby_received_at, received_at)
             if rr.type == Types::TSIG
               raise DecodeError.new('TSIG must be the last record in the additional section')
             end
@@ -584,6 +593,7 @@ module Dnsruby
           }
           o.header.nscount.times {
             rr = msg.get_rr
+            rr.instance_variable_set(:@dnsruby_received_at, received_at)
             if rr.type == Types::TSIG
               raise DecodeError.new('TSIG must be the last record in the additional section')
             end
@@ -592,6 +602,7 @@ module Dnsruby
           o.header.arcount.times { |count|
             start = msg.index
             rr = msg.get_rr
+            rr.instance_variable_set(:@dnsruby_received_at, received_at)
             if rr.type == Types::TSIG
               if count != o.header.arcount-1
                 raise DecodeError.new('TSIG record present before last record')
@@ -605,6 +616,7 @@ module Dnsruby
         #  So we got a decode error
         #  However, we might have been able to fill in many parts of the message
         #  So let's raise the DecodeError, but add the partially completed message
+        o.header ||= Header.new
         e.partial_message = o
         raise e
       end
@@ -612,7 +624,15 @@ module Dnsruby
     end
 
     def clone
-      Message.decode(self.encode)
+      copy = Message.decode(self.encode)
+      [answer, authority, additional].zip([copy.answer, copy.authority, copy.additional]) do |original, cloned|
+        original.zip(cloned) do |record, clone|
+          [:@dnsruby_received_at, :@dnsruby_authenticated_expiration, :@dnsruby_learned_trust].each do |field|
+            clone.instance_variable_set(field, record.instance_variable_get(field)) if record.instance_variable_defined?(field)
+          end
+        end
+      end
+      copy
     end
 
     #  In dynamic update packets, the question section is known as zone and

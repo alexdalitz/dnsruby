@@ -210,6 +210,7 @@ module Dnsruby
       @tcp_pipelining = false
       @tcp_pipelining_max_queries = :infinite
       @use_counts = {}
+      @process_pid = Process.pid
 
       ignore_config_resolv_errors = false;
       if arg.nil?
@@ -268,7 +269,32 @@ module Dnsruby
       end
     end
 
+    # A child must never write to a stream shared with its parent, including
+    # connections that have not yet been registered with SelectThread.
+    def ensure_current_process
+      return if @process_pid == Process.pid
+      selector = @selector
+      selector.send(:ensure_current_process) if selector
+      PIPELINE_MUTEX_CREATION.synchronize do
+        if @process_pid != Process.pid
+          ((@use_counts || {}).keys + [@pipeline_socket]).compact.uniq.each do |socket|
+            begin
+              socket.close unless socket.closed?
+            rescue IOError, SystemCallError
+            end
+          end
+          @use_counts = {}
+          @pipeline_socket = @pipeline_socket_configuration = @pipeline_socket_max_queries = nil
+          @pipeline_mutex = @pipeline_connect_context = @tcp_pipeline_local_port = nil
+          @selector = nil
+          @process_pid = Process.pid
+        end
+      end
+    end
+    private :ensure_current_process
+
     def close
+      ensure_current_process
       # Idle streams close immediately; streams still serving another Resolver
       # drain before closing. Do not wait for a writer blocked in connect.
       @selector.retire_sender(self) if @selector
@@ -278,6 +304,7 @@ module Dnsruby
     # the synchronous public send after releasing that lock. close/timeout can
     # cancel this reservation even before send_async has started.
     def prepare_send_async(message, queue, id, retire_connection = false) #:nodoc:
+      ensure_current_process
       selector = @selector = SelectThread.instance
       pending = SelectThread::QuerySettings.new(nil, message, @ignore_truncation,
         queue, id, nil, @server, @port, TransportClock.now + @packet_timeout, udp_packet_size, self)
@@ -338,6 +365,7 @@ module Dnsruby
     # validation for this particular packet (assuming SingleResolver#dnssec == true)
     # Note that these options should not normally be used!
     def send_async(*args) # msg, client_queue, client_query_id, use_tcp=@use_tcp)
+      ensure_current_process
       #  @TODO@ Need to select a good Header ID here - see forgery-resilience RFC draft for details
       msg = args[0]
       client_query_id = nil
@@ -440,6 +468,7 @@ module Dnsruby
     #  In general, every subsequent call the function will either return the current tcp
     #  pipeline socket or a new connected socket if the current one was closed by the server
     def tcp_pipeline_socket(src_port)
+      ensure_current_process
       Dnsruby.log.debug("Using tcp_pipeline_socket")
       # A live connection retains its endpoint and source binding. Compare the
       # configured source-port pool, not each randomly selected candidate port.
@@ -507,6 +536,7 @@ module Dnsruby
 
     #  This method sends the packet using the built-in pure Ruby event loop, with no dependencies.
     def send_dnsruby(query_bytes, query, client_query_id, client_queue, use_tcp, disable_edns = false) #:nodoc: all
+      ensure_current_process
       st = @selector = SelectThread.instance
       response_settings = response_query_settings(client_query_id)
       begin
@@ -599,7 +629,8 @@ module Dnsruby
       begin
         raise SendCancelled if token.cancelled?
         raise ResolvTimeout, 'Query timed out before TCP connect' if TransportClock.now >= deadline
-        socket = Socket.new(@ipv6 ? Socket::AF_INET6 : Socket::AF_INET, Socket::SOCK_STREAM, 0)
+        socket = SelectThread.instance.track_socket(
+          Socket.new(@ipv6 ? Socket::AF_INET6 : Socket::AF_INET, Socket::SOCK_STREAM, 0))
         socket.bind(Socket.sockaddr_in(source_port, source))
         result = socket.connect_nonblock(Socket.sockaddr_in(port, server), exception: false)
         while result == :wait_writable || result == :wait_readable
@@ -739,6 +770,7 @@ module Dnsruby
               #               ipv6 = @src_address =~ /:/
               socket = UDPSocket.new(@ipv6 ? Socket::AF_INET6 : Socket::AF_INET)
             end
+            st.track_socket(socket)
             new_socket = true
             socket.bind(src_address, src_port)
             socket.connect(@server, @port)

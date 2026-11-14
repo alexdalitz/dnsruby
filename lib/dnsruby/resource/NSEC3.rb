@@ -90,14 +90,42 @@ module Dnsruby
       # NSEC RR's owner name
       attr_reader :types
 
-      def check_name_in_range(_name)
-        #  @TODO@ Check if the name is covered by this record
-        false
+      # A hash interval proves absence, while equality proves existence. Keep
+      # these operations separate: an interval's bitmap describes its owner,
+      # never a name merely covered by the interval (RFC 5155 sections 8.3-8.7).
+      def usable_hash? # :nodoc:
+        @hash_alg == Nsec3HashAlgorithms.SHA_1 && [0, 1].include?(@flags) &&
+          @iterations.is_a?(Integer) && @iterations.between?(0, 65_535) &&
+          @next_hashed.is_a?(String) && @next_hashed.bytesize == 20 &&
+          /\A[0-9a-v]{32}\z/.match?(owner_hash)
       end
 
-      def check_name_in_wildcard_range(_name)
-        #  @TODO@ Check if the name is covered by this record
-        false
+      def owner_hash # :nodoc:
+        @name.labels.first.to_s.downcase
+      end
+
+      def hash_name(name) # :nodoc:
+        NSEC3.calculate_hash(name, @iterations, @salt, @hash_alg)
+      end
+
+      def covers_hash?(hashed) # :nodoc:
+        return false unless usable_hash?
+        first, following = owner_hash, NSEC3.encode_next_hashed(@next_hashed)
+        return false if hashed == first || hashed == following
+        first < following ? first < hashed && hashed < following : first < hashed || hashed < following
+      end
+
+      def check_name_in_range(name)
+        candidate = Name.create(name)
+        zone = @name.strip_label
+        usable_hash? && (candidate == zone || candidate.subdomain_of?(zone)) && covers_hash?(hash_name(candidate))
+      end
+
+      # The closest encloser must be established by the complete proof before
+      # checking its literal wildcard name; one NSEC3 cannot discover it alone.
+      def check_name_in_wildcard_range(name)
+        candidate = Name.create(name)
+        candidate.wild? && check_name_in_range(candidate)
       end
 
       def calculate_hash
@@ -322,7 +350,7 @@ module Dnsruby
       def self.decode_rdata(msg) #:nodoc: all
         hash_alg, flags, iterations, salt_length = msg.get_unpack('ccnc')
         #  Salt may be omitted
-        salt = []
+        salt = ''.b
         if salt_length > 0
           salt = msg.get_bytes(salt_length)
         end
