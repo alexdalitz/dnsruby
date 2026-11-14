@@ -93,6 +93,7 @@ module Dnsruby
 
     DefaultQueryTimeout = 0
     DefaultPacketTimeout = 5
+    DefaultTcpIdleTimeout = 10
     DefaultRetryTimes = 1
     DefaultRetryDelay = 5
     DefaultPipeLiningMaxQueries = 5
@@ -121,6 +122,9 @@ module Dnsruby
     # How many times (number of messages) to reuse the pipelining connection
     # before closing, :infinite for infinite number of requests per connection
     attr_reader :tcp_pipelining_max_queries
+
+    # Close a reusable TCP connection after this many seconds without queries.
+    attr_reader :tcp_idle_timeout
 
     #  If no_tcp==true, then ONLY UDP will be used as a transport.
     #  This should not generally be used, but is provided as a debugging aid.
@@ -270,8 +274,8 @@ module Dnsruby
     #    end
     def send_message(message)
       Dnsruby.log.debug{'Resolver : sending message'}
-      q = Queue.new
       control = QueryControl.current
+      q = control ? QueryControl::Queue.new : Queue.new
       control&.check!
       query_id = send_async(message, q)
 
@@ -466,6 +470,7 @@ module Dnsruby
     #  * :do_caching
     #  * :tcp_pipelining
     #  * :tcp_pipelining_max_queries - can be a number or :infinite symbol
+    #  * :tcp_idle_timeout - positive seconds, defaults to 10
     def initialize(*args)
       #  @TODO@ Should we allow :nameserver to be an RRSet of NS records? Would then need to randomly order them?
       @resolver_ruby = nil
@@ -511,6 +516,10 @@ module Dnsruby
     end
 
     def add_config_nameservers # :nodoc: all
+      ensure_current_process
+      # Queries can keep using the published configuration while a replacement
+      # resolves nameserver hostnames. First-use callers still share one setup.
+      return if @single_res_mutex.synchronize { @configured && !@configuration_error }
       configuration_mutex.synchronize do
         if @configured
           raise @configuration_error if @configuration_error
@@ -525,7 +534,6 @@ module Dnsruby
     # can resolve a hostname through this same selector, whose callbacks need
     # @single_res_mutex. Only publishing the finished list takes that mutex.
     def configure_nameservers(replace = false, nameservers = @config.nameserver)
-      @configuration_error = nil
       begin
         threads = []
         nameservers.each do |ns|
@@ -538,6 +546,7 @@ module Dnsruby
                 no_tcp:             @no_tcp,
                 tcp_pipelining:     @tcp_pipelining,
                 tcp_pipelining_max_queries: @tcp_pipelining_max_queries,
+                tcp_idle_timeout:    @tcp_idle_timeout,
                 packet_timeout:     @packet_timeout,
                 tsig:               @tsig,
                 ignore_truncation:  @ignore_truncation,
@@ -563,12 +572,15 @@ module Dnsruby
           @config.nameserver = nameservers if replace
           (@single_resolvers - complete).compact.each(&:close)
           @single_resolvers = complete
+          @configuration_error = nil
+          @configured = true
         end
       rescue Exception => error
-        @configuration_error = error if @single_resolvers.empty?
+        @single_res_mutex.synchronize do
+          @configuration_error = error if @single_resolvers.empty?
+          @configured = true
+        end
         raise
-      ensure
-        @configured = true
       end
     end
     private :configure_nameservers
@@ -603,6 +615,7 @@ module Dnsruby
       @no_tcp = false
       @tcp_pipelining = false
       @tcp_pipelining_max_queries = DefaultPipeLiningMaxQueries
+      @tcp_idle_timeout = DefaultTcpIdleTimeout
       @tsig = nil
       @ignore_truncation = false
       @config = Config.new()
@@ -647,7 +660,7 @@ module Dnsruby
     end
 
     def update_internal_res(res)
-      [:port, :use_tcp, :no_tcp, :tcp_pipelining, :tcp_pipelining_max_queries, :tsig, :ignore_truncation, :packet_timeout,
+      [:port, :use_tcp, :no_tcp, :tcp_pipelining, :tcp_pipelining_max_queries, :tcp_idle_timeout, :tsig, :ignore_truncation, :packet_timeout,
         :src_address, :src_address6, :src_port, :recurse,
         :udp_size, :dnssec].each do |param|
 
@@ -765,6 +778,14 @@ module Dnsruby
 
     def tcp_pipelining_max_queries=(max)
       @tcp_pipelining_max_queries = max
+      update
+    end
+
+    def tcp_idle_timeout=(seconds)
+      unless seconds.is_a?(Numeric) && seconds.finite? && seconds > 0
+        raise ArgumentError, 'TCP idle timeout must be a positive finite number'
+      end
+      @tcp_idle_timeout = seconds
       update
     end
 
@@ -1121,7 +1142,20 @@ module Dnsruby
       Dnsruby.log.debug { "Discarding completion for closed client queue" }
     end
 
-    #  This method is called twice a second from the select loop, in the select thread.
+    # Earliest retry or total query deadline, using the same lock as admission.
+    # The selector must call this outside its own lock.
+    def next_tick_at # :nodoc: all
+      @parent.single_res_mutex.synchronize do
+        earliest = nil
+        @timeouts.each_value do |deadline, retries, _|
+          earliest = deadline if !earliest || deadline < earliest
+          retries.each_key { |retry_at| earliest = retry_at if retry_at < earliest }
+        end
+        earliest
+      end
+    end
+
+    #  This method is called when a retry or query deadline is due.
     #  It should arguably be called from another worker thread... (which also handles the queue)
     #  Each tick, we check if any timeouts have occurred. If so, we take the appropriate action :
     #  Return a timeout to the client, or send a new query
@@ -1137,7 +1171,7 @@ module Dnsruby
           next unless @timeouts.key?(client_query_id)
           msg, client_queue, select_queue, outstanding = @query_list[client_query_id]
           query_timeout, timeouts, no_nameservers = @timeouts[client_query_id]
-          if query_timeout < time_now
+          if query_timeout <= time_now
             #  Time the query out through the same exactly-once completion path.
             reason = no_nameservers ? 'Query timed out - no valid nameservers configured' : 'Query timed out'
             send_result_and_stop_querying(client_queue, client_query_id, select_queue, nil,
@@ -1146,7 +1180,7 @@ module Dnsruby
           end
           timeouts_done = []
           timeouts.keys.sort.each do |timeout|
-            if timeout < time_now
+            if timeout <= time_now
               #  Send the next query
               res, retry_count = timeouts[timeout]
               id = [res, msg, client_query_id, retry_count]

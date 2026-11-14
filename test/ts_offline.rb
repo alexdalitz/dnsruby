@@ -38,6 +38,8 @@ TESTS = %w(
     resolver_concurrency
     resolver_validation
     release_transport
+    release_transport_fixes
+    release_auxiliary_fixes
     release_review_transport
     release_review_transport_native
     review_transport_fixes
@@ -109,6 +111,7 @@ if have_open_ssl?
   require_relative 'tc_ds.rb'
   require_relative 'tc_svcb_signed_target.rb'
   require_relative 'tc_dnssec_trust_anchors.rb'
+  require_relative 'tc_release_dnssec_fixes.rb'
   require_relative 'tc_dnssec_trust_races.rb'
   require_relative 'tc_key_cache_identity.rb'
   require_relative 'tc_dnssec_budget.rb'

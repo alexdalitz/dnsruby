@@ -65,11 +65,13 @@ class MessageEncoder #:nodoc: all
   def put_labels(d, do_canonical)
     d.each_index do |i|
       domain = d[i..-1].join('.')
-      if !do_canonical && (idx = @names[domain])
+      if !do_canonical && (idx = @names[domain]) && idx < 0x4000
         self.put_pack('n', 0xc000 | idx)
         return
       else
-        @names[domain] = @data.length
+        # Compression pointers have only 14 bits for the target offset.
+        # Later names can still use an earlier eligible suffix.
+        @names[domain] ||= @data.bytesize if @data.bytesize < 0x4000
         self.put_label(d[i])
       end
     end

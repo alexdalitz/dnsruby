@@ -306,6 +306,12 @@ module Dnsruby
       end
       private :verification_failed, :verify_common_fields, :verify_mac, :verify_time, :verify_truncation_policy
 
+      def initialize_copy(original)
+        super
+        @buf = @buf.dup if @buf
+      end
+      private :initialize_copy
+
       # Verify a stream, such as a zone transfer. Each signature covers the
       # messages since the previous one. RFC 8945 section 5.3.1 requires senders
       # to sign every message. For compatibility, receivers must accept up to
@@ -324,7 +330,7 @@ module Dnsruby
             Dnsruby.log.debug("Receiving intermediate envelope in TSIG TCP session")
             response.tsigstate = :Intermediate
             response.tsigerror = RCode.NOERROR
-            @buf = @buf + response_bytes
+            @buf << response_bytes
             return true
           else
             response.tsigerror = RCode.FORMERR

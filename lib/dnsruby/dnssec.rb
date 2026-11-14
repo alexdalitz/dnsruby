@@ -276,13 +276,15 @@ module Dnsruby
             Proc.new{|m, q| validate_with_dlv(m, q)}, msg, query)
         end
         #  Set the message security level!
+        if last_level == Message::SecurityLevel.SECURE
+          last_error = ''
+        elsif last_error && !last_error.empty?
+          last_level = Message::SecurityLevel.BOGUS
+        end
         msg.security_level = last_level
         msg.security_error = last_error
-        if (last_error && last_error.index("ification error"))
-          msg.security_level = Message::SecurityLevel.BOGUS
-        end
         msg.header.ad = false if msg.security_level == Message::SecurityLevel.INSECURE
-        raise VerifyError.new(last_error) if (last_level < 0)
+        raise VerifyError.new(last_error) if (msg.security_level < 0)
         return (msg.security_level.code > Message::SecurityLevel::UNCHECKED)
       end
       msg.security_level = Message::SecurityLevel.UNCHECKED
@@ -297,10 +299,16 @@ module Dnsruby
 
     private_class_method def self.try_validation_internal(last_level, last_error, last_error_level, proc, msg, query)
       begin
-        proc.call(msg, query)
+        result = proc.call(msg, query)
+        if !result || msg.security_level == Message::SecurityLevel.BOGUS
+          detail = msg.security_error.to_s
+          raise VerifyError, detail.empty? ? 'DNSSEC validation failed' : detail
+        end
         last_level = Message::SecurityLevel.new([msg.security_level.code, last_level.code].max)
       rescue VerifyError => e
-        if (last_error_level < last_level)
+        # A failed trusted path cannot be erased by a later unanchored or
+        # insecure result. A separately authenticated SECURE path may win.
+        if last_error.to_s.empty? || last_error_level < last_level
           last_error = e.to_s
           last_error_level = last_level
         end

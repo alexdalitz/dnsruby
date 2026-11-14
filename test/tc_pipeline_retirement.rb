@@ -318,7 +318,7 @@ class TestPipelineRetirement < Minitest::Test
       original = fixture.settings(fixture.socket, endtime: expired)
       replacement = fixture.settings(fixture.socket, register: false)
       replaced = false
-      expired.define_singleton_method(:<) do |other|
+      expired.define_singleton_method(:<=) do |other|
         # process_timeouts has copied its work and released the selector mutex.
         # Another sender replaces this ID before the expired entry is claimed.
         selector.add_to_select(replacement)

@@ -22,6 +22,12 @@ module Dnsruby
      class DLV < RR::DS
        ClassValue = nil #:nodoc: all
        TypeValue = Types::DLV #:nodoc: all
+
+       # DLV owners are names within the lookaside registry, rather than the
+       # DNSKEY owner used in the digest. Keep that legacy distinction explicit.
+       def check_key(key)
+         key.type == Types.DNSKEY && key.klass == klass && matching_key_digest?(key)
+       end
      end
    end
 end

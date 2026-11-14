@@ -250,8 +250,8 @@ module Dnsruby
             #  need to make explicit queries for these :(
             #  Probably best to limit the number of outstanding queries - extremely bursty behaviour otherwise
             #  What happens if we select only name
-            q = Queue.new
             control = QueryControl.current
+            q = control ? QueryControl::Queue.new : Queue.new
             query_ids = []
             begin
               hints.keys.each {|server|
@@ -433,7 +433,14 @@ module Dnsruby
 
       #  Now see if we already know the zone in question
       #  Otherwise, see if we know any of its parents (will know at least ".")
-      known_zone, known_authorities = get_closest_known_zone_authorities_for(name) # ".", @hints if nothing else
+      authority_name = name
+      if Types.new(type) == Types::DS
+        # DS records belong to the parent side of a delegation (RFC 4035
+        # section 3.1.4). A cached child authority cannot answer for them.
+        authority_name = Name.create(name)
+        authority_name = authority_name.strip_label unless authority_name.labels.empty?
+      end
+      known_zone, known_authorities = get_closest_known_zone_authorities_for(authority_name) # ".", @hints if nothing else
 
       #  Seed name servers with the closest known authority
       #       ret =  _dorecursion( name, type, klass, ".", @hints, 0)
@@ -517,109 +524,109 @@ module Dnsruby
       known_zone = known_zone.sub(/\.*$/, ".")
 
       ns = [] # Array of AddressCaches (was array of array of addresses)
+      missing_authorities = []
       @@mutex.synchronize{
         #  Get IPs from authorities
         known_authorities.keys.each do |ns_rec|
-          if (known_authorities[ns_rec] != nil  && known_authorities[ns_rec] != [] )
+          addresses = known_authorities[ns_rec]
+          cached = @@authority_cache[ns_rec]
+          if addresses && !(addresses.respond_to?(:values) ? addresses.values : addresses).empty?
             @@authority_cache[ns_rec] = known_authorities[ns_rec]
             ns.push(@@authority_cache[ns_rec])
-          elsif (@@authority_cache[ns_rec]!=nil && @@authority_cache[ns_rec]!=[])
+          elsif cached && !(cached.respond_to?(:values) ? cached.values : cached).empty?
             known_authorities[ns_rec] = @@authority_cache[ns_rec]
             ns.push(@@authority_cache[ns_rec])
+          else
+            missing_authorities << ns_rec
           end
-        end
-
-        if (ns.length == 0)
-          found_auth = 0
-          TheLog.debug(";; _dorecursion() Failed to extract nameserver IPs:")
-          TheLog.debug(known_authorities.inspect + @@authority_cache.inspect)
-          known_authorities.keys.each do |ns_rec|
-            if (known_authorities[ns_rec]==nil || known_authorities[ns_rec]==[])
-              TheLog.debug(";; _dorecursion() Manual lookup for authority [#{ns_rec}]")
-
-              auth_packet=nil
-              ans=[]
-
-              #  Don't query for V6 if its not there.
-              #  Do this in parallel
-              ip_mutex = Mutex.new
-              ip6_thread = Thread.start {
-                if ( @ipv6_ok)
-                  auth_packet = _dorecursion(ns_rec,"AAAA", klass,  # packet
-                    ".",               # known_zone
-                    @@hints,  # known_authorities
-                    depth+1);         # depth
-                  ip_mutex.synchronize {
-                    ans.push(auth_packet.answer) if auth_packet
-                  }
-                end
-              }
-
-              ip4_thread = Thread.start {
-                auth_packet = _dorecursion(ns_rec,"A",klass,  # packet
-                  ".",               # known_zone
-                  @@hints,  # known_authorities
-                  depth+1);         # depth
-
-                ip_mutex.synchronize {
-                  ans.push(auth_packet.answer ) if auth_packet
-                }
-              }
-              ip6_thread.join
-              ip4_thread.join
-
-              if ( ans.length > 0 )
-                TheLog.debug(";; _dorecursion() Answers found for [#{ns_rec}]")
-                #           foreach my $rr (@ans) {
-                ans.each do |rr_arr|
-                  rr_arr.each do |rr|
-                    TheLog.debug(";; RR:" + rr.inspect + "")
-                    if (rr.type == Types::CNAME)
-                      #  Follow CNAME
-                      server = rr.name.to_s.downcase
-                      if (server)
-                        server.sub!(/\.*$/, ".")
-                        if (server == ns_rec)
-                          cname = rr.cname.downcase
-                          cname.sub!(/\.*$/, ".")
-                          TheLog.debug(";; _dorecursion() Following CNAME ns [#{ns_rec}] -> [#{cname}]")
-                          if (!(known_authorities[cname]))
-                            known_authorities[cname] = AddressCache.new
-                          end
-                          known_authorities.delete(ns_rec)
-                          next
-                        end
-                      end
-                    elsif (rr.type == Types::A || rr.type == Types::AAAA )
-                      server = rr.name.to_s.downcase
-                      if (server)
-                        server.sub!(/\.*$/, ".")
-                        if (known_authorities[server]!=nil)
-                          ip = rr.address.to_s
-                          TheLog.debug(";; _dorecursion() Found ns: #{server} IN A #{ip}")
-                          @@authority_cache[server] = known_authorities[server]
-                          @@authority_cache[ns_rec].push([ip, rr.ttl])
-                          found_auth+=1
-                          next
-                        end
-                      end
-                    end
-                    TheLog.debug(";; _dorecursion() Ignoring useless answer: " + rr.inspect + "")
-                  end
-                end
-              else
-                TheLog.debug(";; _dorecursion() Could not find A records for [#{ns_rec}]")
-              end
-            end
-          end
-          if (found_auth > 0)
-            TheLog.debug(";; _dorecursion() Found #{found_auth} new NS authorities...")
-            return _dorecursion( name, type, klass, known_zone, known_authorities, depth+1)
-          end
-          TheLog.debug(";; _dorecursion() No authority information could be obtained.")
-          return nil
         end
       }
+
+      if (ns.length == 0)
+        found_auth = 0
+        TheLog.debug(";; _dorecursion() Failed to extract nameserver IPs:")
+        TheLog.debug(known_authorities.inspect + @@authority_cache.inspect)
+        missing_authorities.each do |ns_rec|
+          TheLog.debug(";; _dorecursion() Manual lookup for authority [#{ns_rec}]")
+
+          # Recursive lookups must run outside the shared cache mutex.
+          # Propagate cancellation and validation policy into both workers.
+          control = QueryControl.new(parent: QueryControl.current)
+          hints = @@mutex.synchronize { @@hints.dup }
+          workers = []
+          begin
+            (@ipv6_ok ? ['AAAA', 'A'] : ['A']).each do |address_type|
+              workers << Thread.new do
+                Thread.current.report_on_exception = false
+                QueryControl.with(control) do
+                  _dorecursion(ns_rec, address_type, klass, '.', hints.dup,
+                    depth + 1, no_validation)
+                end
+              end
+            end
+            ans = workers.map(&:value).compact.map(&:answer)
+          ensure
+            control.cancel
+            # A failed lookup must not leave its sibling running.
+            workers.each { |worker| worker.join rescue nil }
+          end
+
+          if ( ans.length > 0 )
+            TheLog.debug(";; _dorecursion() Answers found for [#{ns_rec}]")
+            #           foreach my $rr (@ans) {
+            @@mutex.synchronize do
+              ans.each do |rr_arr|
+                rr_arr.each do |rr|
+                  TheLog.debug(";; RR:" + rr.inspect + "")
+                  if (rr.type == Types::CNAME)
+                    #  Follow CNAME
+                    server = rr.name.to_s.downcase
+                    if (server)
+                      server.sub!(/\.*$/, ".")
+                      if (server == ns_rec)
+                        cname = rr.cname.to_s.downcase
+                        cname.sub!(/\.*$/, ".")
+                        TheLog.debug(";; _dorecursion() Following CNAME ns [#{ns_rec}] -> [#{cname}]")
+                        if (!(known_authorities[cname]))
+                          known_authorities[cname] = AddressCache.new
+                        end
+                        known_authorities.delete(ns_rec)
+                        next
+                      end
+                    end
+                  elsif (rr.type == Types::A || rr.type == Types::AAAA )
+                    server = rr.name.to_s.downcase
+                    if (server)
+                      server.sub!(/\.*$/, ".")
+                      if known_authorities.key?(server)
+                        ip = rr.address.to_s
+                        TheLog.debug(";; _dorecursion() Found ns: #{server} IN A #{ip}")
+                        addresses = known_authorities[server]
+                        unless addresses.is_a?(AddressCache)
+                          addresses = known_authorities[server] = AddressCache.new
+                        end
+                        @@authority_cache[server] = addresses
+                        addresses.push([ip, rr.ttl])
+                        found_auth+=1
+                        next
+                      end
+                    end
+                  end
+                  TheLog.debug(";; _dorecursion() Ignoring useless answer: " + rr.inspect + "")
+                end
+              end
+            end
+          else
+            TheLog.debug(";; _dorecursion() Could not find A records for [#{ns_rec}]")
+          end
+        end
+        if (found_auth > 0)
+          TheLog.debug(";; _dorecursion() Found #{found_auth} new NS authorities...")
+          return _dorecursion(name, type, klass, known_zone, known_authorities, depth + 1, no_validation)
+        end
+        TheLog.debug(";; _dorecursion() No authority information could be obtained.")
+        return nil
+      end
 
       #  Cut the deck of IPs in a random place.
       TheLog.debug(";; _dorecursion() cutting deck of (" + ns.length.to_s + ") authorities...")
@@ -635,7 +642,9 @@ module Dnsruby
         }
       end
       resolver = Resolver.new({:nameserver=>nameservers})
-      resolver.dnssec = @dnssec
+      # Validation needs signatures even when requesting DNSSEC records was not
+      # explicitly enabled. Non-validating lookups retain the caller's setting.
+      resolver.dnssec = @dnssec || !no_validation
       resolver.recurse = false
       servers = []
       resolver.single_resolvers.each {|s|

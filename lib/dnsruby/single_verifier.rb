@@ -28,7 +28,10 @@ module Dnsruby
     # validation budget. The weak registry lets another verifier check whether
     # the original trust source has since been removed.
     LearnedTrust = Struct.new(:expiration, :signature_expiration, :transaction, :sources)
-    private_constant :LearnedTrust
+    VALIDATION_ALGORITHMS = [Algorithms.RSASHA1, Algorithms.RSASHA1_NSEC3_SHA1,
+      Algorithms.RSASHA256, Algorithms.RSASHA512,
+      Algorithms.ECDSAP256SHA256, Algorithms.ECDSAP384SHA384].freeze
+    private_constant :LearnedTrust, :VALIDATION_ALGORITHMS
     @provenance_mutex = Mutex.new
     @trust_sources = {}
     @next_source_id = 0
@@ -65,9 +68,6 @@ module Dnsruby
       @trust_source_id = SingleVerifier.send(:register_trust_source, self)
       @verifier_type = vtype
       @added_dlv_key = false
-      #  The DNSKEY RRs for the signed root (when it exists)
-      @root_anchors = KeyCache.new
-
       #  The set of trust anchors.
       #  If the root is unsigned, then these must be initialised with at least
       #  one trusted key by the client application, if verification is to be performed.
@@ -75,8 +75,6 @@ module Dnsruby
       # Track configured expiration independently of KeyCache pruning so an
       # expired anchor invalidates learned trust and in-flight publication.
       @configured_dnskey_identities = {}
-
-      @dlv_registries = []
 
       #  The set of keys which are trusted.
       @trusted_keys = KeyCache.new
@@ -240,6 +238,22 @@ module Dnsruby
       # RRSIG RR's Type Covered field;
       if (rrset.type != sigrec.type_covered)
         raise VerifyError.new("RRSET should have same type as RRSIG for verification")
+      end
+
+      # RFC 4035 5.3.1: a signature is authoritative only within its zone.
+      # DNSKEY is apex data; DS is parent-side data at a strict descendant.
+      zone = sigrec.signers_name
+      unless within_zone?(rrset.name, zone)
+        raise VerifyError, 'RRSet owner is outside the signing zone'
+      end
+      if rrset.type == Types.DNSKEY && rrset.name != zone
+        raise VerifyError, 'DNSKEY RRSet must be signed by its own zone'
+      end
+      if rrset.type == Types.DS && !rrset.name.subdomain_of?(zone)
+        raise VerifyError, 'DS RRSet must be signed by a parent zone'
+      end
+      if sigrec.labels < zone.labels.length
+        raise VerifyError, 'Wildcard source is outside the signing zone'
       end
 
       #       #Each RR in the RRset MUST have the TTL listed in the
@@ -900,132 +914,6 @@ module Dnsruby
     private :terminal_answer, :within_zone?, :denial_bitmap?, :nsec3_denial,
       :nsec_denial, :apply_verified_lifetimes, :find_denial_record, :consistent_nsec_intervals?
 
-    def check_num_rrsig_labels(msg) # :nodoc:
-      #  Check that the number of labels in the RRSIG is less than the number
-      #  of labels in the answer name
-      answer_rrset = msg.answer.rrset(msg.question()[0].qname, msg.question()[0].qtype)
-      if (answer_rrset.length == 0)
-        raise VerifyError.new("Expected wildcard expanded answer for #{msg.question()[0].qname}")
-      end
-      rrsig = answer_rrset.sigs()[0]
-      if (rrsig.labels >= msg.question()[0].qname.labels.length)
-        raise VerifyError.new("RRSIG does not prove wildcard expansion for #{msg.question()[0].qname}")
-      end
-    end
-
-    def check_no_wildcard_expansion(msg) # :nodoc:
-      #  @TODO@ Do this for NSEC3 records!!!
-      proven_no_wildcards = false
-      [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
-        nsec_rrsets.each {|nsecs|
-          nsecs.rrs.each {|nsec|
-            #             print "Checking NSEC : #{nsec}\n"
-            next if (nsec.name.wild?)
-            if (check_record_proves_no_wildcard(msg, nsec))
-              proven_no_wildcards = true
-            end
-          }
-        }
-      }
-      if (!proven_no_wildcards)
-        #         print "No proof that no RRSets could match through wildcard expansion\n"
-        raise VerifyError.new("No proof that no RRSets could match through wildcard expansion")
-      end
-
-    end
-
-    def check_record_proves_no_wildcard(msg, nsec) # :nodoc:
-      #  Check that the NSEC goes from the SOA to a zone canonically after a wildcard
-      #       print "Checking wildcard proof for #{nsec.name}\n"
-      soa_rrset = msg.authority.rrset(nsec.name, 'SOA')
-      if (soa_rrset.length > 0)
-        #         print "Found SOA for #{nsec.name}\n"
-        wildcard_name = Name.create("*." + nsec.name.to_s)
-        #         print "Checking #{wildcard_name}\n"
-        if (wildcard_name.canonically_before(nsec.next_domain))
-          return true
-        end
-      end
-      return false
-    end
-
-    def check_name_in_nsecs(msg, qtype=nil, expected_qtype = false) # :nodoc:
-      #  Check these NSECs to make sure that this name cannot be in the zone
-      #  and that no RRSets could match through wildcard expansion
-      #  @TODO@ Get this right for NSEC3 too!
-      name = msg.question()[0].qname
-      proven_name_in_nsecs = false
-      type_covered_checked = false
-      [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
-        nsec_rrsets.each {|nsecs|
-          nsecs.rrs.each {|nsec|
-            #             print "Checking NSEC : #{nsec}\n"
-            next if (nsec.name.wild?)
-            if nsec.check_name_in_range(name)
-              proven_name_in_nsecs = true
-              qtype_present = false
-              if (qtype)
-                if (nsec.types.include?qtype)
-                  qtype_present = true
-                end
-                if (qtype_present != expected_qtype)
-                  #                   print "#{nsec.type} record #{nsec} does #{expected_qtype ? 'not ' : ''} include #{qtype} type\n"
-                  raise VerifyError.new("#{nsec.type} record #{nsec} does #{expected_qtype ? 'not ' : ''}include #{qtype} type")
-                  #               return false
-                end
-                type_covered_checked = true
-              end
-            end
-          }
-        }
-      }
-      if (!proven_name_in_nsecs)
-        #         print "No proof for non-existence for #{name}\n"
-        raise VerifyError.new("No proof for non-existence for #{name}")
-      end
-      if (qtype && !type_covered_checked)
-        #         print "Tyes covered wrong for #{name}\n"
-        raise VerifyError.new("Types covered wrong for #{name}")
-      end
-    end
-
-    def check_name_in_and_type_not_in_nsecs(msg) # :nodoc:
-      check_name_in_nsecs(msg, msg.question()[0].qtype, false)
-    end
-
-    def check_name_not_in_wildcard_nsecs(msg) # :nodoc:
-      #  @TODO@ Do this for NSEC3 records too!
-      name = msg.question()[0].qname
-      qtype = msg.question()[0].qtype
-      done= false
-      [msg.authority.rrsets('NSEC'), msg.authority.rrsets('NSEC3')].each {|nsec_rrsets|
-        nsec_rrsets.each {|nsecs|
-          nsecs.rrs.each {|nsec|
-            #             print "Checking NSEC : #{nsec}\n"
-            next if !nsec.name.wild?
-            #  Check the wildcard expansion
-            #  We want to see that the name is in the wildcard range, and that the type
-            #  is not in the types for the NSEC
-            if nsec.check_name_in_wildcard_range(name)
-              #               print "Wildcard expansion in #{nsec} includes #{name}\n"
-              raise VerifyError.new("Wildcard expansion in #{nsec} includes #{name}")
-              #             return false
-            end
-            if (nsec.types.include?qtype)
-              #               print "#{qtype} present in wildcard #{nsec}\n"
-              raise VerifyError.new("#{qtype} present in wildcard #{nsec}")
-              #             return false
-            end
-            done = true
-          }
-        }
-      }
-      return if done
-      #       print("Expected wildcard expansion in #{msg}\n")
-      raise VerifyError.new("Expected wildcard expansion in #{msg}")
-      #       return false
-    end
-
     def verify_ds_rrset(ds_rrset, keys = nil, msg = nil, context = {}) # :nodoc:
       with_validation { verify_ds_rrset_internal(ds_rrset, keys, msg, context) }
     end
@@ -1278,14 +1166,15 @@ module Dnsruby
       #  RFC 4034
       # 3.1.8.1.  Signature Calculation
 
-      if (keyrec.sep_key? && !keyrec.zone_key?)
-        Dnsruby.log.error("DNSKEY with SEP flag set and Zone Key flag not set was used to verify RRSIG over RRSET - this is not allowed by RFC4034 section 2.1.1")
-        #         return false
-        raise VerifyError.new("DNSKEY with SEP flag set and Zone Key flag not set")
+      unless keyrec.zone_key?
+        raise VerifyError, 'DNSKEY Zone Key flag is not set'
       end
-
-
-#      print "VERIFY KEY FOUND - doing verification\n"
+      unless VALIDATION_ALGORITHMS.include?(sigrec.algorithm)
+        if [Algorithms.DSA, Algorithms.DSA_NSEC3_SHA1].include?(sigrec.algorithm)
+          raise VerifyError, "Algorithm #{sigrec.algorithm.code} is prohibited for DNSSEC validation"
+        end
+        raise VerifyError, "Algorithm #{sigrec.algorithm.code} unsupported by Dnsruby"
+      end
 
       # Canonical RDATA is independent of the signature. The RR wire body only
       # varies with Original TTL and wildcard label count (RFC 4034 section 3.1.8).
@@ -1303,18 +1192,6 @@ module Dnsruby
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA256.new, sigrec.signature, sig_data)
       elsif (sigrec.algorithm == Algorithms.RSASHA512)
         verified = keyrec.public_key.verify(OpenSSL::Digest::SHA512.new, sigrec.signature, sig_data)
-      elsif [Algorithms.DSA,
-          Algorithms.DSA_NSEC3_SHA1].include?(sigrec.algorithm)
-        if sigrec.signature.bytesize != 41 || sigrec.signature.getbyte(0) != keyrec.key.getbyte(0)
-          raise VerifyError, "Invalid DSA signature length or T value"
-        end
-        r = RR::get_num(sigrec.signature[1, 20])
-        s = RR::get_num(sigrec.signature[21, 20])
-        r_asn1 = OpenSSL::ASN1::Integer.new(r)
-        s_asn1 = OpenSSL::ASN1::Integer.new(s)
-
-        asn1 = OpenSSL::ASN1::Sequence.new([r_asn1, s_asn1]).to_der
-        verified = keyrec.public_key.verify(OpenSSL::Digest::SHA1.new, asn1, sig_data)
       elsif [Algorithms.ECDSAP256SHA256, Algorithms.ECDSAP384SHA384].include?(sigrec.algorithm)
         byte_size = (keyrec.public_key.group.degree + 7) / 8
         if sigrec.signature.bytesize != 2 * byte_size
@@ -1656,7 +1533,7 @@ module Dnsruby
         return false if (!next_key)
         #  Add the next label on
         if (!dont_move_on)
-          parent = next_step
+          parent = next_key.name
           next_step = Name.new(name.labels[name.labels.length-1-next_step.labels.length,1] +
               next_step.labels , name.absolute?)
           #           print "Next parent = #{parent}, next_step = #{next_step}, next_key.type = #{next_key.type.string}\n"
@@ -1674,6 +1551,13 @@ module Dnsruby
 
     private def get_anchor_for_internal(child, parent, current_anchor, parent_res)
       admit_learned_rrset(current_anchor)
+      if current_anchor.type == Types.DS
+        records = current_anchor.is_a?(RRSet) ? current_anchor.rrs : [current_anchor]
+        # A cached or configured DS is already trusted input, but its learned
+        # provenance must still be live before its algorithm policy is used.
+        return false, parent_res unless records.any? { |record| supported_ds?(record) }
+      end
+      ds_rrset = current_anchor
       #       print "Trying to discover anchor for #{child} from #{parent}\n"
       TheLog.debug("Trying to discover anchor for #{child} from #{parent} using #{current_anchor}, #{parent_res}")
       #  We wish to return a DNSKEY which the caller can use to verify name
@@ -1707,7 +1591,6 @@ module Dnsruby
             parent_res.dnssec = true
           end
           #  Use that Resolver to query for DS record and NS for children
-          ds_rrset = current_anchor
           if (current_anchor.type == Types.DNSKEY)
             #             print "Trying to find DS records for #{child} from servers for #{parent}\n"
             TheLog.debug("Trying to find DS records for #{child} from servers for #{parent}")
@@ -1717,23 +1600,33 @@ module Dnsruby
               if (!ds_ret)
                 raise ResolvError.new("Couldn't get DS records from Recursor")
               end
+            rescue NXDomain => e
+              # NXDOMAIN is usable only with its authenticated denial response.
+              ds_ret = e.response
+              raise VerifyError, "Missing DS denial response for #{child}" unless ds_ret
             rescue ResolvError => e
-              #               print "Error getting DS record for #{child} : #{e}\n"
-              TheLog.error("Error getting DS record for #{child} : #{e}")
-              return false, nil
+              raise VerifyError, "Error getting DS record for #{child}: #{e}"
             end
             ds_rrset = ds_ret.answer.rrset(child, Types.DS)
             if (ds_rrset.rrs.length == 0)
-              #  @TODO@ Check NSEC(3) records - still need to verify there are REALLY no ds records!
-              #               print "NO DS RECORDS RETURNED FOR #{parent}\n"
-              #               child_res = parent_res
+              denial = authenticated_ds_absence(ds_ret, child, current_anchor)
+              # A label need not be a zone cut. Continue using the current
+              # zone's key unless the proof establishes an unsigned delegation.
+              return denial == :insecure ? [false, parent_res] : [current_anchor, parent_res]
             else
               begin
-                if (verify(ds_rrset, current_anchor) || verify(ds_rrset))
-                  #  Try to make the resolver from the authority/additional NS RRSets in DS response
-                  if (!Dnssec.do_validation_with_recursor?)
-                    child_res = get_nameservers_from_message(child, ds_ret)
-                  end
+                unless verify(ds_rrset, current_anchor) || verify(ds_rrset)
+                  raise VerifyError, "Unsigned DS RRSet for #{child}"
+                end
+                # RFC 4035 5.2: a securely authenticated delegation whose DS
+                # records all use unavailable algorithms/digests is insecure.
+                # Mixed sets must still establish trust using a supported DS.
+                unless ds_rrset.rrs.any? { |ds| supported_ds?(ds) }
+                  return false, parent_res
+                end
+                # Try the child nameservers only after authenticating its DS.
+                unless Dnssec.do_validation_with_recursor?
+                  child_res = get_nameservers_from_message(child, ds_ret)
                 end
               rescue VerifyError => e
                 #                 print "FAILED TO VERIFY DS RRSET FOR #{child}\n"
@@ -1784,44 +1677,22 @@ module Dnsruby
           # return false, nil
           raise VerifyError.new("Error getting DNSKEY for #{child} : #{e}")
         end
-        verified = true
         key_rrset = key_ret.answer.rrset(child, Types.DNSKEY)
-        if (key_rrset.rrs.length == 0)
-          #  @TODO@ Still need to check NSEC records to make *sure* no key rrs returned!
-          #           print "NO DNSKEY RECORDS RETURNED FOR #{child}\n"
-          TheLog.debug("NO DNSKEY RECORDS RETURNED FOR #{child}")
-          #         end
-          verified = false
-        else
-          #  Should check that the matching key's zone flag is set (RFC 4035 section 5.2)
-          key_rrset.rrs.each {|k|
-            if (!k.zone_key?)
-              #               print "Discovered DNSKEY is not a zone key - ignoring\n"
-              TheLog.debug("Discovered DNSKEY is not a zone key - ignoring")
-              return false, child_res
-            end
-          }
-          begin
-            verify(key_rrset, ds_rrset)
-          rescue VerifyError => e
-            begin
-              verify(key_rrset)
-            rescue VerifyError =>e
-              verified = false
-              raise VerifyError.new("Couldn't verify DNSKEY and DS records")
-            end
-          end
+        if key_rrset.rrs.empty?
+          raise VerifyError, "Missing DNSKEY RRSet for #{child}"
+        end
+        begin
+          raise VerifyError, "Unsigned DNSKEY RRSet for #{child}" unless verify(key_rrset, ds_rrset)
+        rescue VerifyError
+          # Another explicitly configured or already learned anchor can still
+          # authenticate this same zone. Non-zone keys are ignored as signers.
+          raise VerifyError, "Couldn't verify DNSKEY and DS records for #{child}" unless verify(key_rrset)
         end
 
         #  Try to make the resolver from the authority/additional NS RRSets in DNSKEY response
         new_res = get_nameservers_from_message(child,  key_ret) # @TODO@ ?
         if (!new_res)
           new_res = child_res
-        end
-        if (!verified)
-          TheLog.info("Failed to verify DNSKEY for #{child}")
-          return false, nil # new_res
-          # raise VerifyError.new("Failed to verify DNSKEY for #{child}")
         end
         #         Cache.add(key_ret)
         return key_rrset, new_res
@@ -1832,6 +1703,50 @@ module Dnsruby
         raise VerifyError.new("Verification error : #{e}\n")
       end
     end
+
+    def supported_ds?(record)
+      VALIDATION_ALGORITHMS.include?(record.algorithm) && [1, 2, 4].include?(record.digest_type.code)
+    end
+    private :supported_ds?
+
+    # Authenticate denial against the current parent key before classifying
+    # an unsigned delegation. A successful denial at an ordinary name simply
+    # means there is no zone cut at this label (RFC 4035 5.2 / RFC 5155 8.9).
+    def authenticated_ds_absence(message, child, anchor)
+      question = message.question.first
+      unless question && question.qname == child && question.qtype == Types.DS &&
+          question.qclass == anchor.klass && [RCode.NOERROR, RCode.NXDOMAIN].include?(message.rcode)
+        raise VerifyError, "Unexpected DS denial response for #{child}"
+      end
+      zone = anchor.name
+      groups = {}
+      (message.authority.rrsets(Types.NSEC) + message.authority.rrsets(Types.NSEC3)).each do |proof|
+        ValidationBudget.current&.check!(1)
+        next unless proof.klass == anchor.klass
+        signatures = proof.sigs.select do |signature|
+          signature.signers_name == zone && (signature.labels == proof.name.labels.length ||
+            (proof.name.wild? && signature.labels == proof.name.labels.length - 1))
+        end
+        next if signatures.empty?
+        begin
+          verify_rrset(RRSet.new(proof.rrs + signatures), anchor)
+          (groups[proof.type] ||= []).concat(proof.rrs)
+        rescue VerifyError
+          # A second proof/signature may still provide valid denial.
+        end
+      end
+      groups.each do |type, records|
+        check = type == Types.NSEC3 ? :nsec3_denial : :nsec_denial
+        if message.rcode == RCode.NOERROR &&
+            send(check, records, child, Types.DS, zone, message.rcode, true) == :insecure
+          return :insecure
+        end
+        result = send(check, records, child, Types.DS, zone, message.rcode, false)
+        return result if result
+      end
+      raise VerifyError, "No authenticated DS denial proof for #{child}"
+    end
+    private :authenticated_ds_absence
 
     def get_nameservers_for(name, res = nil) # :nodoc:
       #  @TODO@ !!!
@@ -2044,7 +1959,7 @@ module Dnsruby
           msg.security_level = Message::SecurityLevel.BOGUS
           return e
         end
-        # @TODO@ We need to de ermine whether there was simply no DS record, or whether there was a failure
+        # follow_chain returns false only for an authenticated unsigned delegation.
         if (!actual_anchor)
           TheLog.debug("Unable to follow chain from anchor : #{closest_anchor.name}")
           msg.security_level = Message::SecurityLevel.INSECURE

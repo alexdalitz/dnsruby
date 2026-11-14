@@ -65,6 +65,7 @@ module Dnsruby
       @use_tcp = false
       @tcp_pipelining = false
       @tcp_pipelining_max_queries = :infinite
+      @tcp_idle_timeout = Resolver::DefaultTcpIdleTimeout
       @no_tcp = false
       @tsig = nil
       @ignore_truncation = false
@@ -120,6 +121,7 @@ module Dnsruby
       isr = PacketSender.new({:server=>@server, :port=>@port, :dnssec=>@dnssec,
           :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
           :tcp_pipelining=>@tcp_pipelining, :tcp_pipelining_max_queries=>@tcp_pipelining_max_queries,
+          :tcp_idle_timeout=>@tcp_idle_timeout,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
           :src_address=>@src_address, :src_address6=>@src_address6, :src_port=>@src_port,
           :recurse=>@recurse, :udp_size=>@udp_size})
@@ -137,6 +139,7 @@ module Dnsruby
       isr = PacketSender.new({:server=>@server, :port=>@port, :dnssec=>@dnssec,
           :use_tcp=>@use_tcp, :no_tcp=>@no_tcp, :packet_timeout=>@packet_timeout,
           :tcp_pipelining=>@tcp_pipelining, :tcp_pipelining_max_queries=>@tcp_pipelining_max_queries,
+          :tcp_idle_timeout=>@tcp_idle_timeout,
           :tsig => @tsig, :ignore_truncation=>@ignore_truncation,
           :src_address=>@src_address, :src_address6=>@src_address6, :src_port=>@src_port,
           :recurse=>@recurse, :udp_size=>@udp_size})
@@ -167,6 +170,7 @@ module Dnsruby
     def packet_timeout=(t)
       @packet_timeout = t
       @query_timeout = t
+      update
     end
 
     #  Add the appropriate EDNS OPT RR for the specified packet. This is done

@@ -113,6 +113,10 @@ module Dnsruby
         validate(@query, @response, @res)
       end
       validated_ok = false if @error && !@error.is_a?(NXDomain)
+      if @response.security_level == Message::SecurityLevel.BOGUS
+        detail = @response.security_error.to_s
+        raise VerifyError, detail.empty? ? 'DNSSEC validation failed' : detail
+      end
       @budget.check! if needs_validation
       cache_if_valid(@query, @response) if validated_ok
       @st.push_validation_response_to_select(@client_id, @client_queue, @response,
@@ -167,7 +171,14 @@ module Dnsruby
       return true unless should_validate
       ValidationBudget.with do
         begin
-          Dnssec.validate_with_query(query,response)
+          validated = Dnssec.validate_with_query(query, response)
+          if !validated || response.security_level == Message::SecurityLevel.BOGUS
+            error = response.security_error
+            error = VerifyError.new(error.to_s.empty? ? 'DNSSEC validation failed' : error.to_s) unless error.is_a?(VerifyError)
+            response.security_error = error
+            response.security_level = Message::SecurityLevel.BOGUS
+            return false
+          end
           true
         rescue VerifyError => e
           response.security_error = e

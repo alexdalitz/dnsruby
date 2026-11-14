@@ -78,6 +78,7 @@ module Dnsruby
         @@validations = []
         @@tcp_buffers=Hash.new
         @@socket_remaining_queries = Hash.new
+        @@socket_idle_deadlines = Hash.new
         @@tick_observers = []
         @@queued_exceptions=[]
         @@queued_responses=[]
@@ -387,6 +388,7 @@ module Dnsruby
         membership = @@socket_hash[settings.socket] = indexed
       end
       membership.add_query(settings)
+      (@@socket_idle_deadlines ||= {}).delete(settings.socket)
       if settings.tcp_pipelining_max_queries != :infinite
         @@socket_remaining_queries[settings.socket] ||= settings.tcp_pipelining_max_queries
       end
@@ -542,30 +544,24 @@ module Dnsruby
 
     def do_select
       unused_loop_count = 0
-      last_tick_time = TransportClock.now - 10
       while true do
-        if (last_tick_time < (TransportClock.now - 0.5))
-          send_tick_to_observers # ONLY NEED TO SEND THIS TWICE A SECOND - NOT EVERY SELECT!!!
-          last_tick_time = TransportClock.now
-        end
+        send_tick_to_observers
+        expire_idle_sockets
         send_queued_exceptions
         send_queued_responses
         send_queued_validation_responses
-        timeout = tick_time = 0.1 # We provide a timer service to various Dnsruby classes
-        sockets, timeouts, has_observer = state_mutex.synchronize { [@@sockets.to_a, @@timeouts.values, !@@observers.empty?] }
-        if (timeouts.length > 0)
-          timeout = timeouts.min - TransportClock.now
-          if (timeout <= 0)
-            process_timeouts
-            timeout = 0
-            next
-          end
+        observer_deadline = next_observer_deadline
+        sockets, packet_deadline, idle_deadline = state_mutex.synchronize do
+          [@@sockets.to_a, @@timeouts.values.min, (@@socket_idle_deadlines ||= {}).values.min]
         end
+        now = TransportClock.now
+        if packet_deadline && packet_deadline <= now
+          process_timeouts
+          next
+        end
+        deadline = [packet_deadline, observer_deadline, idle_deadline].compact.min
+        timeout = deadline ? [deadline - now, 0].max : 0.1
         ready=nil
-        if (has_observer && (timeout > tick_time))
-          timeout = tick_time
-        end
-        #         next if (timeout < 0)
         begin
           ready, _write, _errors = IO.select(sockets, nil, nil, timeout)
         rescue SelectWakeup
@@ -644,6 +640,7 @@ module Dnsruby
       @@sockets.delete(socket)
       @@tcp_buffers.delete(socket)
       @@socket_remaining_queries.delete(socket)
+      (@@socket_idle_deadlines ||= {}).delete(socket)
       @@socket_is_persistent.delete(socket)
       owner = (@@socket_owners ||= {}).delete(socket)
       if (sockets = (@@sockets_by_sender ||= {}.compare_by_identity)[owner])
@@ -806,8 +803,25 @@ module Dnsruby
         Dnsruby.log.debug("Closing socket #{socket}")
         socket.close rescue nil
         retire_socket_from_mutex_synchronized_block(socket)
+      elsif (@@socket_hash[socket] || []).empty?
+        # Idle time starts after the last outstanding response, never while a
+        # query or pipeline writer still owns the socket.
+        (@@socket_idle_deadlines ||= {})[socket] =
+          TransportClock.now + settings.single_resolver.tcp_idle_timeout
       end
     end
+
+    def expire_idle_sockets
+      state_mutex.synchronize do
+        now = TransportClock.now
+        (@@socket_idle_deadlines ||= {}).dup.each do |socket, deadline|
+          next if deadline > now || !(@@socket_hash[socket] || []).empty?
+          socket.close rescue nil
+          retire_socket_from_mutex_synchronized_block(socket)
+        end
+      end
+    end
+    private :expire_idle_sockets
 
     def decrement_remaining_queries(socket)
       if @@socket_remaining_queries[socket]
@@ -829,7 +843,7 @@ module Dnsruby
       end
       time_now = TransportClock.now
       timeouts.each do |settings, timeout|
-        if timeout < time_now && settings && claim_query(settings)
+        if timeout <= time_now && settings && claim_query(settings)
           deliver_queue_event(settings.client_queue, [settings.client_query_id, Resolver::EventType::ERROR,
             nil, settings.authentication_error || ResolvTimeout.new("Query timed out")])
         end
@@ -1236,8 +1250,10 @@ module Dnsruby
           @@observer_queue_counts[observer] = count
           @@tick_observers.push(observer) if count == 1
         end
-        check_select_thread_synchronized # Is this really necessary? The client should start the thread by sending a query, really...
+        check_select_thread_synchronized
       }
+      # An empty resolver still has a logical deadline but no socket to wake us.
+      wake_up_select_thread
     end
 
     # Take the observer snapshot before acquiring its Resolver lock: Resolver
@@ -1367,19 +1383,30 @@ module Dnsruby
     end
     private :deliver_queue_event
 
-    def send_tick_to_observers
-      #  If any observers are known then send them a tick
-      tick_observers=nil
-      state_mutex.synchronize {
-        tick_observers = @@tick_observers.dup
-      }
+    def send_tick_to_observers(due_only = true)
+      # Observer callbacks acquire Resolver locks, so never call them under the
+      # selector lock. Tick only observers with a retry or query deadline due.
+      tick_observers = state_mutex.synchronize { @@tick_observers.dup }
       tick_observers.each do |observer|
         begin
-          observer.tick
+          if observer.respond_to?(:next_tick_at)
+            deadline = observer.next_tick_at
+            observer.tick if !due_only || (deadline && deadline <= TransportClock.now)
+          else
+            observer.tick
+          end
         rescue ClosedQueueError
           Dnsruby.log.debug { 'Observer tick could not deliver to a closed client queue' }
         end
       end
     end
+
+    def next_observer_deadline
+      observers = state_mutex.synchronize { @@tick_observers.dup }
+      observers.map do |observer|
+        observer.respond_to?(:next_tick_at) ? observer.next_tick_at : TransportClock.now + 0.1
+      end.compact.min
+    end
+    private :next_observer_deadline
   end
 end

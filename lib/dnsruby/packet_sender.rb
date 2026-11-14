@@ -92,6 +92,18 @@ module Dnsruby
     # Limit the number of queries per pipeline
     attr_accessor :tcp_pipelining_max_queries
 
+    # Maximum idle time for a reusable TCP connection, in seconds.
+    def tcp_idle_timeout
+      @tcp_idle_timeout || Resolver::DefaultTcpIdleTimeout
+    end
+
+    def tcp_idle_timeout=(seconds)
+      unless seconds.is_a?(Numeric) && seconds.finite? && seconds > 0
+        raise ArgumentError, 'TCP idle timeout must be a positive finite number'
+      end
+      @tcp_idle_timeout = seconds
+    end
+
     #  Use UDP only - don't use TCP
     #  For test/debug purposes only
     #  Defaults to false
@@ -183,6 +195,7 @@ module Dnsruby
     #  * :use_tcp
     #  * :tcp_pipelining
     #  * :tcp_pipelining_max_queries
+    #  * :tcp_idle_timeout
     #  * :no_tcp
     #  * :ignore_truncation
     #  * :src_address
@@ -209,6 +222,7 @@ module Dnsruby
       @recurse = true
       @tcp_pipelining = false
       @tcp_pipelining_max_queries = :infinite
+      @tcp_idle_timeout = Resolver::DefaultTcpIdleTimeout
       @use_counts = {}
       @process_pid = Process.pid
 

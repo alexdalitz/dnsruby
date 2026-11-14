@@ -130,21 +130,17 @@ module Dnsruby
 
       end
 
-      #  Check if the key's digest is the same as that stored in the DS record
+      # A DS binds both the DNSKEY's identity and its public-key digest.
       def check_key(key)
-        if ((key.key_tag == @key_tag) && (key.algorithm == @algorithm))
-
-          digestbin = digest_key(key)
-          if (@digestbin == digestbin)
-            if (!key.zone_key?)
-            else
-              return true
-            end
-          else
-          end
-        end
-        return false
+        key.type == Types.DNSKEY && key.klass == klass && key.name == name &&
+          matching_key_digest?(key)
       end
+
+      def matching_key_digest?(key)
+        key.zone_key? && key.key_tag == @key_tag && key.algorithm == @algorithm &&
+          !@digestbin.nil? && @digestbin == digest_key(key)
+      end
+      protected :matching_key_digest?
 
 
       def DS.from_key(key, digest_type)
@@ -177,7 +173,7 @@ module Dnsruby
 # 
         digest_type = get_digest_type(digest_type)
         #  Create a new DS record from the specified key
-        ds = RR.create(:name => key.name, :type => "DS", :ttl => key.ttl,
+        ds = RR.create(:name => key.name, :type => "DS", :klass => key.klass, :ttl => key.ttl,
                       :key_tag => key.key_tag,
                      :digest_type => digest_type, :algorithm => key.algorithm)
 

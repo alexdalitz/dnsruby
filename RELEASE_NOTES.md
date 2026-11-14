@@ -17,7 +17,10 @@ compatibility notes below for the changes from 1.74.0.
   escaped text. IPv6 hints use RFC 5952 formatting.
   [PR #222](https://github.com/alexdalitz/dnsruby/pull/222).
 * **TCP queries.** Pipelined queries handle concurrent sends, immediate replies,
-  partial writes and disconnected servers. Connects and writes respect their
+  partial writes and disconnected servers. Idle reusable connections close after
+  ten seconds by default; set `tcp_idle_timeout` to a positive number of seconds
+  to change this. Connections with outstanding queries are retained.
+  Connects and writes respect their
   deadlines, and cancellation releases the sender worker promptly. Matching
   replies is faster when many queries share a connection. Malformed replies no
   longer interrupt other queries or cause endless TCP retries.
@@ -32,7 +35,8 @@ compatibility notes below for the changes from 1.74.0.
   configuration hangs. IPv6 link-local nameservers accept interface zones,
   such as `fe80::1%eth0`, including in `resolv.conf`.
   Replacing or adding nameservers also preserves configuration changes made
-  concurrently while the new senders are being constructed.
+  concurrently while the new senders are being constructed. Queries continue
+  using the published configuration during hostname resolution for replacements.
   [#179](https://github.com/alexdalitz/dnsruby/issues/179),
   [#184](https://github.com/alexdalitz/dnsruby/issues/184),
   [PR #221](https://github.com/alexdalitz/dnsruby/pull/221).
@@ -59,7 +63,14 @@ compatibility notes below for the changes from 1.74.0.
   wildcard NODATA and NSEC3 Opt-Out delegations. Validated response TTLs and
   cached copies respect their original receipt time, signature lifetime and
   chain of trust. Revalidating cached records does not renew their lifetime.
-  DS and DNSKEY RRsets are verified once per message.
+  DS and DNSKEY RRsets are verified once per message. Chain discovery requires
+  authenticated proof of an unsigned delegation, and lookup failures cannot
+  become insecure results. Signer zones, DNSKEY Zone Key flags and DS owner/class
+  bindings are checked. Failed or BOGUS validation is never cached as successful.
+  DSA algorithms 3 and 6 remain readable but are no longer accepted for DNSSEC
+  validation, as required by RFC 8624. An authenticated delegation containing
+  only unsupported DS algorithms or digests is treated as insecure; mixed sets
+  still require validation through a supported DS.
 * **Memory use for unknown records.** The cache holds at most 256 automatically
   generated record classes. Classes still held by an application remain usable,
   and explicit registrations are retained. Replacing registered classes no
@@ -67,6 +78,9 @@ compatibility notes below for the changes from 1.74.0.
 * **Query cancellation and timeouts.** A callback from a completed query cannot
   affect a later query that reuses its ID. The total `query_timeout` also covers
   local DNSSEC validation; late results are ignored after timeout or close.
+  Logical deadlines and retries wake the selector when due, without a half-second
+  polling delay. Controlled internal queries wake immediately on replies or
+  cancellation, including on Ruby versions without timed Queue waits.
   Once validation starts, replies from other nameservers cannot replace the
   accepted answer. Waiting UDP and TCP writers check for cancellation at least
   every 50 ms while scheduled, without holding the cancellation lock.

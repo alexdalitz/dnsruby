@@ -114,6 +114,9 @@ module Dnsruby
     def do_transfer(zone, server) #:nodoc: all
       @transfer_type = Types.new(@transfer_type)
       @state = :InitialSoa
+      @axfr = @ixfr = nil
+      @initialsoa = @end_serial = @current_serial = @rtype = nil
+      @last_tsigstate = nil
       socket = Socket.tcp(server, @port, @src_address, connect_timeout: @connect_timeout)
       # socket = TCPSocket.new(server, @port, @src_address)
       begin

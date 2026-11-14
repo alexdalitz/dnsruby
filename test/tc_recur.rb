@@ -22,6 +22,7 @@ class TestRecur < Minitest::Test
     r = Dnsruby::Recursor.new
     ret = with_retries(max_attempts: 10, exceptions: [Dnsruby::ResolvError]) { r.query("uk", Dnsruby::Types.DNSKEY) }
     assert ret.answer.length > 0, "Answer length should > 0, but was #{ret.answer.length}."
+    assert_equal(Dnsruby::Message::SecurityLevel.SECURE, ret.security_level)
 #    ret = r.query_dorecursion("aaa.bigzone.uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
 #    ret = r.query_dorecursion("uk-dnssec.nic.uk", Dnsruby::Types.DNSKEY)
   end

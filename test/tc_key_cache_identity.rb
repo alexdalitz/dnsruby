@@ -188,7 +188,7 @@ class KeyCacheIdentityTest < Minitest::Test
     assert_equal(OpenSSL::BN.new(modulus, 2), extended.public_key.n)
   end
 
-  def test_dsa_verifies_and_invalid_signature_candidates_do_not_hide_valid_key
+  def test_dsa_is_rejected_and_does_not_hide_a_supported_signature
     private_key = OpenSSL::PKey::DSA.new(DSA_PRIVATE_KEY)
     bytes = [8].pack('C') + private_key.q.to_s(2).rjust(20, "\0") +
       [:p, :g, :pub_key].map { |part| private_key.public_send(part).to_s(2).rjust(128, "\0") }.join
@@ -201,7 +201,10 @@ class KeyCacheIdentityTest < Minitest::Test
     der = private_key.sign(OpenSSL::Digest::SHA1.new, valid_dsa.sig_data + data)
     valid_dsa.signature = [8].pack('C') +
       OpenSSL::ASN1.decode(der).value.map { |n| n.value.to_s(2).rjust(20, "\0") }.join
-    assert(@verifier.verify_rrset(Dnsruby::RRSet.new([@record, valid_dsa]), key))
+    error = assert_raises(Dnsruby::VerifyError) do
+      @verifier.verify_rrset(Dnsruby::RRSet.new([@record, valid_dsa]), key)
+    end
+    assert_match(/prohibited/, error.message)
 
     ['', "\0", [7].pack('C') + valid_dsa.signature.byteslice(1..-1), [8].pack('C') + "\0" * 40].each do |signature|
       invalid = valid_dsa.clone
